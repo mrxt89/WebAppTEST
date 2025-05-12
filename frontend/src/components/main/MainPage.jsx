@@ -112,7 +112,6 @@ useEffect(() => {
         window.notificationService.requestNotificationPermission()
           .then(permissionGranted => {
             if (permissionGranted) {
-              console.log('Permesso notifiche concesso');
               notificationServiceInitialized.current = true;
             } else {
               console.warn('Permesso notifiche negato');
@@ -847,7 +846,7 @@ useEffect(() => {
           <div className="fixed top-20 right-20 z-[1050]">
             <button
               id="window-manager-menu-button"
-              className="bg-yellow-300 text-gray-700 p-2 rounded-full shadow-xl hover:bg-gray-100 transition-colors"
+              className="bg-yellow-300 text-gray-700 p-2 rounded-full shadow-xl hover:bg-gray-100 transition-colors z-50"
               onClick={toggleWindowManagerMenu}
               title="Gestione finestre"
             >

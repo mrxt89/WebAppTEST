@@ -82,6 +82,9 @@ const ChatWindow = ({
   const positionUpdatedByUserRef = useRef(false);
   const sizeUpdatedByUserRef = useRef(false);
   const [initialScrollDone, setInitialScrollDone] = useState(false);
+  const lastMessageIdRef = useRef(null);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  
   // IMPORTANT: Define handler functions with useCallback at the component's top level
   // This ensures they maintain consistent identity between renders
   const handleMaximize = useCallback(() => {
@@ -125,6 +128,24 @@ const ChatWindow = ({
         : (typeof notification.messages === 'string' 
           ? JSON.parse(notification.messages || '[]') 
           : []);
+      
+      // Verifica se ci sono effettivamente nuovi messaggi confrontando l'ID dell'ultimo messaggio
+      const lastMessage = messages[messages.length - 1];
+      const hasNewMessagesReceived = lastMessage && 
+        (!lastMessageIdRef.current || lastMessage.messageId !== lastMessageIdRef.current);
+      
+      // Aggiorna l'ID dell'ultimo messaggio
+      if (lastMessage) {
+        lastMessageIdRef.current = lastMessage.messageId;
+      }
+      
+      // Aggiorna lo stato dei nuovi messaggi solo se l'utente ha scrollato verso l'alto
+      if (hasNewMessagesReceived && userHasScrolledRef.current) {
+        setHasNewMessages(true);
+      } else if (!userHasScrolledRef.current) {
+        setHasNewMessages(false);
+      }
+      
       setParsedMessages(messages);
       
       // Parse members info
@@ -138,6 +159,24 @@ const ChatWindow = ({
       // Set other states
       setHasLeftChat(notification.chatLeft === 1 || notification.chatLeft === true);
       setIsArchived(notification.archived === 1 || notification.archived === true);
+
+      // Se ci sono nuovi messaggi e l'utente non ha scrollato manualmente verso l'alto
+      if (hasNewMessagesReceived && !userHasScrolledRef.current) {
+        // Segnala che stiamo scrollando programmaticamente
+        scrollingToBottomRef.current = true;
+        
+        // Usa setTimeout per assicurarsi che il DOM sia aggiornato
+        setTimeout(() => {
+          if (chatListRef.current) {
+            chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+            
+            // Riattiva la rilevazione dello scroll dopo un breve ritardo
+            setTimeout(() => {
+              scrollingToBottomRef.current = false;
+            }, 500);
+          }
+        }, 100);
+      }
     } catch (err) {
       console.error("Errore nell'aggiornamento dei messaggi da prop:", err);
     }
@@ -1292,6 +1331,61 @@ useEffect(() => {
   };
 }, [notification, fetchNotificationById]);
 
+  // Aggiungi un effetto per gestire lo scroll verso il basso quando l'utente clicca sull'icona
+  const handleScrollToBottom = useCallback(() => {
+    if (chatListRef.current) {
+      scrollingToBottomRef.current = true;
+      chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+      setHasNewMessages(false);
+      userHasScrolledRef.current = false;
+      
+      setTimeout(() => {
+        scrollingToBottomRef.current = false;
+      }, 500);
+    }
+  }, []);
+
+  // Modifica l'effetto dello scroll per gestire lo stato dei nuovi messaggi
+  useEffect(() => {
+    if (chatListRef.current) {
+      const handleScroll = () => {
+        if (scrollingToBottomRef.current) {
+          return;
+        }
+  
+        const { scrollTop, scrollHeight, clientHeight } = chatListRef.current;
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+        
+        // Se l'utente ha scrollato verso l'alto (almeno 100px dal fondo)
+        if (distanceFromBottom > 100) {
+          userHasScrolledRef.current = true;
+        } 
+        // Se l'utente è tornato al fondo
+        else if (distanceFromBottom < 20) {
+          userHasScrolledRef.current = false;
+          setHasNewMessages(false);
+        }
+      };
+  
+      chatListRef.current.addEventListener('scroll', handleScroll, { passive: true });
+      
+      const handleWheel = (e) => {
+        if (e.deltaY < 0) {
+          userHasScrolledRef.current = true;
+        }
+      };
+      
+      chatListRef.current.addEventListener('wheel', handleWheel, { passive: true });
+      
+      return () => {
+        if (chatListRef.current) {
+          chatListRef.current.removeEventListener('scroll', handleScroll);
+          chatListRef.current.removeEventListener('wheel', handleWheel);
+        }
+      };
+    }
+  }, [chatListRef?.current]);
+
   // Don't render anything if component is unmounted or window is minimized
   if (!notification || isMinimized) {
     return null;
@@ -1357,6 +1451,8 @@ useEffect(() => {
           notificationCategoryName={notification.notificationCategoryName}
           hexColor={notification.hexColor}
           hasLeftChat={hasLeftChat}
+          hasNewMessages={hasNewMessages}
+          onScrollToBottom={handleScrollToBottom}
         />
       </div>
       

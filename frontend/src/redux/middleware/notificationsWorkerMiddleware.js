@@ -14,7 +14,6 @@ const notificationsWorkerMiddleware = store => {
   return next => action => {
     // Initialize the worker when the app loads
     if (action.type === 'notifications/initialize') {
-      console.log('Initializing notifications worker');
       if (worker) {
         // Stop existing worker
         worker.postMessage({ type: 'stop' });
@@ -185,11 +184,9 @@ const notificationsWorkerMiddleware = store => {
               break;
               
             case 'ready':
-              console.log('Notification worker ready:', event.data.timestamp);
               break;
               
             case 'pong':
-              console.log('Worker is alive, last update:', event.data.lastUpdateTime);
               break;
           }
         };
@@ -223,14 +220,12 @@ const notificationsWorkerMiddleware = store => {
     
     // Handle stopping the worker
     else if (action.type === 'notifications/stopWorker') {
-      console.log('Stopping notifications worker');
       if (worker) {
         worker.postMessage({ type: 'stop' });
         worker.terminate();
         worker = null;
       }
     }
-    console.log('Dispatching action:', action.type);
     // Process the action normally
     return next(action);
   };
