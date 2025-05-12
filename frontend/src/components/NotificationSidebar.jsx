@@ -198,18 +198,14 @@ const NotificationSidebar = ({
   // Ascolta gli aggiornamenti delle notifiche per forzare il ricaricamento
   useEffect(() => {
     const handleNotificationsUpdated = () => {
-      console.log('NotificationSidebar: evento notifications-updated ricevuto');
       if (visible) {
-        console.log('NotificationSidebar: forzando ricaricamento notifiche');
         forceLoadNotifications();
       }
     };
     
     // Ascolta anche i nuovi messaggi
     const handleNewMessage = (event) => {
-      console.log('NotificationSidebar: evento new-message-received ricevuto', event.detail);
       if (visible && event.detail && event.detail.notificationId) {
-        console.log('NotificationSidebar: aggiornamento notifica singola', event.detail.notificationId);
         fetchNotificationById(event.detail.notificationId)
           .then(() => {
             // Forza il ri-filtraggio delle notifiche
