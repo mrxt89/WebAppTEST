@@ -1,0 +1,305 @@
+{
+  "title": "Guida alla Chat",
+  "description": "Scopri tutte le funzionalità disponibili quando utilizzi la chat per comunicare con colleghi e collaboratori.",
+  "sections": [
+    {
+      "title": "Panoramica della Chat",
+      "content": "<div class='space-y-4'><p>L'interfaccia della chat è progettata per offrire un'esperienza di comunicazione completa e ricca di funzionalità:</p><div class='grid grid-cols-1 md:grid-cols-3 gap-4 my-4'><div class='bg-blue-50 p-4 rounded-lg'><h4 class='font-medium text-blue-700 mb-2'>Barra Superiore</h4><p class='text-sm'>Contiene titolo, categoria, e pulsanti per informazioni e gestione.</p></div><div class='bg-blue-50 p-4 rounded-lg'><h4 class='font-medium text-blue-700 mb-2'>Area Messaggi</h4><p class='text-sm'>Visualizza la cronologia completa della conversazione con opzioni di interazione.</p></div><div class='bg-blue-50 p-4 rounded-lg'><h4 class='font-medium text-blue-700 mb-2'>Barra Inferiore</h4><p class='text-sm'>Permette di comporre e inviare messaggi, con strumenti per allegati, emoji e risposte.</p></div></div><p>La chat offre numerose funzionalità che ti permettono di comunicare in modo efficace, organizzare informazioni e condividere file facilmente.</p></div>",
+      "tourId": "panoramica_chat"
+    },
+    {
+      "title": "Barra Superiore",
+      "content": "<div class='space-y-4'><p>La barra superiore fornisce accesso a tutte le informazioni e gli strumenti di gestione della conversazione:</p><div class='bg-white rounded-lg border overflow-hidden my-4'><div class='grid grid-cols-3 border-b'><div class='p-3 border-r'><h4 class='font-medium mb-1 text-sm'>Categoria</h4><p class='text-xs text-gray-600'>Mostra la categoria della conversazione con il relativo colore distintivo.</p></div><div class='p-3 border-r'><h4 class='font-medium mb-1 text-sm'>Titolo</h4><p class='text-xs text-gray-600'>Visualizza il titolo della conversazione corrente.</p></div><div class='p-3'><h4 class='font-medium mb-1 text-sm'>Azioni</h4><p class='text-xs text-gray-600'>Pulsanti per gestire la chat: info, minimizzare e chiudere.</p></div></div><div class='p-4'><h4 class='font-medium mb-2 text-sm'>Menu Informazioni</h4><p class='text-xs text-gray-600'>Cliccando sul pulsante info, puoi accedere a:</p><ul class='list-disc pl-4 text-xs text-gray-600 space-y-1 mt-1'><li>Dettagli della conversazione</li><li>Gestione partecipanti</li><li>Aggiunta di nuovi destinatari</li><li>Ricerca nei messaggi</li><li>Opzione per abbandonare la chat</li></ul></div></div><p>Utilizza la barra superiore per gestire efficacemente la conversazione e accedere a tutte le informazioni contestuali.</p></div>",
+      "tourId": "topbar_chat"
+    },
+    {
+      "title": "Area Messaggi",
+      "content": "<div class='space-y-4'><p>L'area messaggi è il cuore della chat, dove puoi visualizzare e interagire con tutti i messaggi scambiati:</p><div class='rounded-lg border my-4 overflow-hidden'><div class='bg-gray-50 p-3 border-b'><h4 class='font-medium'>Funzionalità dei messaggi</h4></div><div class='divide-y'><div class='p-3'><h4 class='text-sm font-medium mb-1'>Risposte ai messaggi</h4><p class='text-xs text-gray-600'>Clicca sull'icona di risposta su qualsiasi messaggio per avviare una risposta diretta. I messaggi risposta mostrano il testo originale per mantenere il contesto.</p></div><div class='p-3'><h4 class='text-sm font-medium mb-1'>Personalizzazione colori</h4><p class='text-xs text-gray-600'>Clicca sull'icona della tavolozza per cambiare il colore di un messaggio, utile per categorizzare visivamente le informazioni importanti.</p></div><div class='p-3'><h4 class='text-sm font-medium mb-1'>Visualizza chi ha letto</h4><p class='text-xs text-gray-600'>I tuoi messaggi mostrano indicatori di lettura. Clicca sull'icona di spunta per vedere chi e quando ha letto il messaggio.</p></div><div class='p-3'><h4 class='text-sm font-medium mb-1'>Menzioni</h4><p class='text-xs text-gray-600'>Le menzioni @nomeutente vengono evidenziate nei messaggi. La tua menzione appare in colore diverso per attirare l'attenzione.</p></div><div class='p-3'><h4 class='text-sm font-medium mb-1'>Visualizzazione allegati</h4><p class='text-xs text-gray-600'>Gli allegati appaiono sotto i messaggi con anteprime. Clicca per visualizzare o scaricare.</p></div></div></div><p>Durante lo scorrimento, appare un pulsante per tornare rapidamente in fondo quando ci sono nuovi messaggi, segnalato da un indicatore rosso.</p></div>",
+      "tourId": "messaggi_chat"
+    },
+    {
+      "title": "Barra Inferiore",
+      "content": "<div class='space-y-4'><p>La barra inferiore è dove componi e invii i tuoi messaggi, con molte funzionalità per arricchire la comunicazione:</p><div class='bg-white rounded-lg border p-4 my-4'><div class='space-y-4'><div class='flex items-start gap-3'><div class='bg-gray-100 p-2 rounded-full flex-shrink-0'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='text-gray-600'><path d='M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48'></path></svg></div><div><h4 class='font-medium mb-0.5'>Allegati</h4><p class='text-sm text-gray-600'>Aggiungi file, documenti o immagini alla conversazione.</p></div></div><div class='flex items-start gap-3'><div class='bg-gray-100 p-2 rounded-full flex-shrink-0'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='text-gray-600'><circle cx='12' cy='12' r='10'></circle><path d='M8 14s1.5 2 4 2 4-2 4-2'></path><line x1='9' y1='9' x2='9.01' y2='9'></line><line x1='15' y1='9' x2='15.01' y2='9'></line></svg></div><div><h4 class='font-medium mb-0.5'>Emoji</h4><p class='text-sm text-gray-600'>Inserisci emoji per esprimere emozioni e rendere più vivace la comunicazione.</p></div></div><div class='flex items-start gap-3'><div class='bg-gray-100 p-2 rounded-full flex-shrink-0'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='text-gray-600'><polyline points='15 10 20 15 15 20'></polyline><path d='M4 4v7a4 4 0 0 0 4 4h12'></path></svg></div><div><h4 class='font-medium mb-0.5'>Risposte</h4><p class='text-sm text-gray-600'>Quando rispondi a un messaggio specifico, un'anteprima appare sopra il campo di testo.</p></div></div><div class='flex items-start gap-3'><div class='bg-gray-100 p-2 rounded-full flex-shrink-0'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='text-gray-600'><path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'></path></svg></div><div><h4 class='font-medium mb-0.5'>Menzioni</h4><p class='text-sm text-gray-600'>Digita @ per vedere suggerimenti di utenti da menzionare nel tuo messaggio.</p></div></div><div class='flex items-start gap-3'><div class='bg-gray-100 p-2 rounded-full flex-shrink-0'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='text-gray-600'><polyline points='9 11 12 14 22 4'></polyline><path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'></path></svg></div><div><h4 class='font-medium mb-0.5'>Chiusura chat</h4><p class='text-sm text-gray-600'>Il pulsante di spunta permette di chiudere una conversazione quando è stata completata.</p></div></div></div></div><p>Puoi anche inviare un ''Mi piace'' 👍 rapidamente cliccando sul pulsante di invio quando il campo di testo è vuoto, ideale per conferme rapide.</p></div>",
+      "tourId": "bottombar_chat"
+    },
+    {
+      "title": "Barra Laterale",
+      "content": "<div class='space-y-4'><p>La barra laterale offre strumenti aggiuntivi per gestire allegati e informazioni importanti:</p><div class='grid grid-cols-1 md:grid-cols-2 gap-4 my-4'><div class='bg-white border rounded-lg p-4'><h4 class='font-medium text-blue-700 mb-2'>Tab Allegati</h4><p class='text-sm'>Visualizza, gestisce e scarica tutti i file condivisi nella conversazione. Puoi:</p><ul class='list-disc pl-4 text-sm mt-2 space-y-1'><li>Vedere tutti gli allegati in un'unica vista</li><li>Scaricare file specifici</li><li>Eliminare allegati se necessario</li></ul></div><div class='bg-white border rounded-lg p-4'><h4 class='font-medium text-blue-700 mb-2'>Tab Punti Salienti</h4><p class='text-sm'>Crea e gestisci punti importanti della conversazione. Puoi:</p><ul class='list-disc pl-4 text-sm mt-2 space-y-1'><li>Aggiungere manualmente punti salienti</li><li>Generare automaticamente un riepilogo AI</li><li>Organizzare informazioni chiave</li></ul></div></div><p>La barra laterale può essere nascosta o mostrata cliccando sul pulsante freccia sul bordo, ottimizzando lo spazio di visualizzazione in base alle tue esigenze.</p><div class='bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500 my-4'><div class='flex'><div class='flex-shrink-0 text-blue-500'><svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'></circle><line x1='12' y1='16' x2='12' y2='12'></line><line x1='12' y1='8' x2='12.01' y2='8'></line></svg></div><div class='ml-3'><p class='text-sm text-blue-700'>I punti salienti sono particolarmente utili in conversazioni lunghe o complesse, permettendoti di creare una sintesi delle informazioni critiche per riferimento futuro.</p></div></div></div></div>",
+      "tourId": "sidebar_chat"
+    },
+    {
+      "title": "Gestione Partecipanti",
+      "content": "<div class='space-y-4'><p>La gestione dei partecipanti ti permette di controllare chi è coinvolto nella conversazione:</p><div class='bg-white border rounded-lg my-4 overflow-hidden'><div class='p-4 border-b'><h4 class='font-medium'>Opzioni di gestione partecipanti</h4></div><div class='divide-y'><div class='p-4'><h4 class='font-medium mb-1'>Visualizzare partecipanti</h4><p class='text-sm text-gray-600'>Nella tab \"Membri\" del menu info puoi vedere tutti i partecipanti della conversazione, il loro stato online e le informazioni di contatto.</p></div><div class='p-4'><h4 class='font-medium mb-1'>Aggiungere partecipanti</h4><p class='text-sm text-gray-600'>Nella tab \"Aggiungi\" puoi selezionare nuovi utenti da includere nella conversazione, cercandoli per nome o ruolo.</p></div><div class='p-4'><h4 class='font-medium mb-1'>Aggiungere canali</h4><p class='text-sm text-gray-600'>Puoi anche aggiungere interi canali predefiniti, che includeranno automaticamente tutti i membri del canale selezionato.</p></div><div class='p-4'><h4 class='font-medium mb-1'>Abbandonare la chat</h4><p class='text-sm text-gray-600'>In fondo al menu info, puoi scegliere di abbandonare la conversazione se non è più rilevante per te.</p></div></div></div><div class='bg-yellow-50 border-l-4 border-yellow-500 p-4 my-4'><div class='flex'><div class='flex-shrink-0 text-yellow-500'><svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'></path><line x1='12' y1='9' x2='12' y2='13'></line><line x1='12' y1='17' x2='12.01' y2='17'></line></svg></div><div class='ml-3'><p class='text-sm text-yellow-700'>Quando abbandoni una chat, potrai ancora vedere la cronologia dei messaggi precedenti, ma non potrai più inviare nuovi messaggi. Questa azione non può essere annullata.</p></div></div></div></div>",
+      "tourId": "partecipanti_chat"
+    },
+    {
+      "title": "Ricerca e Filtri",
+      "content": "<div class='space-y-4'><p>La funzionalità di ricerca ti aiuta a trovare rapidamente informazioni specifiche all'interno della conversazione:</p><div class='rounded-lg border overflow-hidden my-4'><div class='bg-gray-50 p-3 border-b'><span class='font-medium'>Opzioni di ricerca</span></div><div class='p-4 space-y-4'><div><h4 class='font-medium mb-1'>Ricerca per parola chiave</h4><p class='text-sm text-gray-600'>Nella tab \"Cerca\" del menu info, puoi cercare parole specifiche nei messaggi della conversazione, ottenendo risultati istantanei.</p></div><div><h4 class='font-medium mb-1'>Filtro per colore</h4><p class='text-sm text-gray-600'>Puoi filtrare i messaggi in base al colore personalizzato che hai assegnato, aiutandoti a trovare contenuti categorizzati visivamente.</p></div><div><h4 class='font-medium mb-1'>Navigazione nei risultati</h4><p class='text-sm text-gray-600'>Quando applichi un filtro, il sistema evidenzia automaticamente i messaggi corrispondenti e ti permette di navigare tra di essi.</p></div></div></div><p>La ricerca è particolarmente utile nelle conversazioni lunghe o quando hai bisogno di ritrovare informazioni discusse in precedenza come numeri, date o dettagli specifici.</p><div class='bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500 my-4'><div class='flex'><div class='flex-shrink-0 text-blue-500'><svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'></circle><line x1='21' y1='21' x2='16.65' y2='16.65'></line></svg></div><div class='ml-3'><p class='text-sm text-blue-700'>Suggerimento: Puoi cercare anche menzionando azioni come ''riunione'', ''revisione'', ''scadenza'' o ''compito'' per trovare rapidamente attività o impegni discussi nella conversazione.</p></div></div></div></div>",
+      "tourId": "ricerca_chat"
+    },
+    {
+      "title": "Chat Chiuse e Abbandonate",
+      "content": "<div class='space-y-4'><p>Il sistema distingue tra diversi stati delle conversazioni, fornendo opzioni per gestirle in modo appropriato:</p><div class='grid grid-cols-1 md:grid-cols-2 gap-4 my-4'><div class='bg-white border rounded-lg p-4'><h4 class='font-medium text-orange-600 mb-2'>Chat abbandonate</h4><p class='text-sm'>Quando abbandoni una chat:</p><ul class='list-disc pl-4 text-sm mt-2 space-y-1'><li>La conversazione viene contrassegnata come \"abbandonata\"</li><li>Puoi visualizzare la cronologia completa precedente</li><li>Non puoi più inviare nuovi messaggi</li><li>La chat rimane accessibile agli altri partecipanti</li></ul></div><div class='bg-white border rounded-lg p-4'><h4 class='font-medium text-gray-700 mb-2'>Chat chiuse</h4><p class='text-sm'>Quando una chat viene chiusa:</p><ul class='list-disc pl-4 text-sm mt-2 space-y-1'><li>La conversazione viene contrassegnata come \"completata\"</li><li>Appare un messaggio indicando chi ha chiuso la chat</li><li>La chat può essere riaperta se necessario</li><li>Utile per indicare che un problema è stato risolto</li></ul></div></div><div class='bg-gray-50 p-4 rounded-lg my-4'><h4 class='font-medium mb-2'>Come riconoscere lo stato:</h4><div class='grid grid-cols-2 gap-3'><div><span class='font-medium text-sm'>Chat abbandonata:</span><p class='text-xs text-gray-600'>Mostra un banner giallo in alto e la barra di input è disabilitata con un messaggio informativo.</p></div><div><span class='font-medium text-sm'>Chat chiusa:</span><p class='text-xs text-gray-600'>Mostra un messaggio nella barra inferiore con chi l'ha chiusa e quando, con un pulsante per riaprirla.</p></div></div></div><p>Utilizza queste funzionalità per mantenere ordinate le tue comunicazioni, indicando chiaramente quando un argomento è concluso o quando non desideri più ricevere aggiornamenti.</p></div>"
+    }
+  ],
+  "tours": {
+    "panoramica_chat": [
+      {
+        "title": "Interfaccia della Chat",
+        "description": "Benvenuto nell'interfaccia della chat! Questo tour ti mostrerà le principali aree e funzionalità disponibili."
+      },
+      {
+        "title": "Barra superiore",
+        "description": "Qui trovi il titolo della conversazione, la categoria e i pulsanti per gestire la chat.",
+        "selector": ".header, .ChatTopBar",
+        "position": "bottom"
+      },
+      {
+        "title": "Area messaggi",
+        "description": "Qui vengono visualizzati tutti i messaggi della conversazione in ordine cronologico.",
+        "selector": "#chat-list-container, .ChatList, .chat-list",
+        "position": "center"
+      },
+      {
+        "title": "Barra laterale",
+        "description": "La barra laterale ti permette di gestire allegati e punti salienti della conversazione.",
+        "selector": ".ChatSidebar",
+        "position": "left"
+      },
+      {
+        "title": "Barra di input",
+        "description": "Qui puoi scrivere e inviare messaggi, allegare file, utilizzare emoji e molto altro.",
+        "selector": ".ChatBottomBar",
+        "position": "top"
+      }
+    ],
+    "topbar_chat": [
+      {
+        "title": "Barra Superiore",
+        "description": "Esploriamo le funzionalità disponibili nella barra superiore della chat."
+      },
+      {
+        "title": "Categoria",
+        "description": "Il colore e il nome indicano la categoria della conversazione, facilitando l'identificazione del tipo di comunicazione.",
+        "selector": ".notificationCategoryName, .category-badge",
+        "position": "bottom"
+      },
+      {
+        "title": "Titolo",
+        "description": "Il titolo della conversazione, visibile al centro della barra superiore.",
+        "selector": "h2, .notification-title",
+        "position": "bottom"
+      },
+      {
+        "title": "Pulsante Info",
+        "description": "Clicca qui per accedere a informazioni dettagliate, gestire partecipanti, aggiungere utenti o cercare nei messaggi.",
+        "selector": "[data-info-button], button[title='Informazioni chat']",
+        "position": "left"
+      },
+      {
+        "title": "Minimizza",
+        "description": "Puoi minimizzare la chat per continuare a lavorare mentre mantieni aperta la conversazione.",
+        "selector": "button[title='Minimizza']",
+        "position": "left"
+      },
+      {
+        "title": "Chiudi",
+        "description": "Chiude questa finestra di chat. Non preoccuparti, potrai sempre riaprirla dalla lista delle notifiche.",
+        "selector": "button[title='Chiudi chat']",
+        "position": "left"
+      }
+    ],
+    "messaggi_chat": [
+      {
+        "title": "Area Messaggi",
+        "description": "Scopriamo le funzionalità dell'area messaggi e come interagire con i contenuti della conversazione."
+      },
+      {
+        "title": "Messaggio",
+        "description": "I messaggi mostrano il testo, il mittente e l'orario di invio. I tuoi messaggi appaiono a destra, quelli degli altri a sinistra.",
+        "selector": ".notification-item",
+        "position": "left"
+      },
+      {
+        "title": "Rispondere",
+        "description": "Clicca sull'icona di risposta per rispondere direttamente a un messaggio specifico. La risposta includerà un riferimento al messaggio originale.",
+        "selector": ".Reply",
+        "position": "right"
+      },
+      {
+        "title": "Personalizzare colore",
+        "description": "Clicca sull'icona della tavolozza per cambiare il colore di un messaggio, utile per evidenziare informazioni importanti.",
+        "selector": ".Palette",
+        "position": "right"
+      },
+      {
+        "title": "Visualizzare lo stato di lettura",
+        "description": "I messaggi che hai inviato mostrano le spunte di lettura. Clicca sull'icona per vedere chi ha letto il messaggio e quando.",
+        "selector": ".bi-check-all",
+        "position": "left"
+      },
+      {
+        "title": "Allegati",
+        "description": "Gli allegati condivisi appaiono sotto i messaggi. Clicca per visualizzarli o scaricarli.",
+        "selector": ".message-attachments",
+        "position": "bottom"
+      }
+    ],
+    "bottombar_chat": [
+      {
+        "title": "Barra Inferiore",
+        "description": "Esploriamo la barra inferiore che ti permette di comporre e inviare messaggi."
+      },
+      {
+        "title": "Allegati",
+        "description": "Clicca qui per allegare file, documenti o immagini alla conversazione.",
+        "selector": "button[title='Allegati']",
+        "position": "right"
+      },
+      {
+        "title": "Area di input",
+        "description": "Qui puoi scrivere il tuo messaggio. Usa Shift+Invio per andare a capo, Invio per inviare.",
+        "selector": "[contenteditable], .message-input",
+        "position": "top"
+      },
+      {
+        "title": "Emoji",
+        "description": "Aggiungi emoji al tuo messaggio per esprimere emozioni o rendere più vivace la comunicazione.",
+        "selector": ".emoji-picker-button",
+        "position": "left"
+      },
+      {
+        "title": "Invia",
+        "description": "Clicca per inviare il messaggio. Se il campo è vuoto, invierà un 'Mi piace' 👍.",
+        "selector": "button[title='Invia messaggio'], button[title='Mi piace']",
+        "position": "left"
+      },
+      {
+        "title": "Chiudi conversazione",
+        "description": "Clicca per contrassegnare la conversazione come completata. Potrai riaprirla in seguito se necessario.",
+        "selector": "button[title='Chiudi conversazione']",
+        "position": "left"
+      }
+    ],
+    "sidebar_chat": [
+      {
+        "title": "Barra Laterale",
+        "description": "Scopriamo le funzionalità della barra laterale per gestire file e informazioni."
+      },
+      {
+        "title": "Toggle Barra Laterale",
+        "description": "Questo pulsante permette di mostrare o nascondere la barra laterale per ottimizzare lo spazio.",
+        "selector": "button[title='Toggle Sidebar']",
+        "position": "right"
+      },
+      {
+        "title": "Tab Allegati",
+        "description": "Qui puoi vedere e gestire tutti i file condivisi nella conversazione.",
+        "selector": ".Paperclip",
+        "position": "right"
+      },
+      {
+        "title": "Tab Punti Salienti",
+        "description": "Qui puoi creare e gestire punti importanti della conversazione, manualmente o con l'aiuto dell'AI.",
+        "selector": ".Zap",
+        "position": "right"
+      },
+      {
+        "title": "Lista Allegati",
+        "description": "Visualizza tutti gli allegati in ordine cronologico, con opzioni per scaricare o eliminarli.",
+        "selector": ".attachments-list",
+        "position": "left"
+      },
+      {
+        "title": "Punti Salienti",
+        "description": "Crea riepiloghi o punti importanti della conversazione che rimangono facilmente accessibili.",
+        "selector": ".highlights-list",
+        "position": "left"
+      },
+      {
+        "title": "Generazione Automatica",
+        "description": "Utilizza l'intelligenza artificiale per generare automaticamente un riepilogo dei punti chiave della conversazione.",
+        "selector": "button[title='Genera riepilogo']",
+        "position": "top"
+      }
+    ],
+    "partecipanti_chat": [
+      {
+        "title": "Gestione Partecipanti",
+        "description": "Esploriamo come gestire i partecipanti alla conversazione."
+      },
+      {
+        "title": "Menu Info",
+        "description": "Clicca sul pulsante Info nella barra superiore per accedere alle opzioni di gestione partecipanti.",
+        "selector": "button[title='Informazioni chat']",
+        "position": "bottom"
+      },
+      {
+        "title": "Tab Membri",
+        "description": "Qui puoi vedere tutti i partecipanti attuali della conversazione con il loro stato online.",
+        "selector": "button[value='members']",
+        "position": "right"
+      },
+      {
+        "title": "Lista Partecipanti",
+        "description": "Visualizza tutti i membri della conversazione con informazioni dettagliate su ciascuno.",
+        "selector": ".members-list",
+        "position": "left"
+      },
+      {
+        "title": "Tab Aggiungi",
+        "description": "Qui puoi aggiungere nuovi partecipanti alla conversazione.",
+        "selector": "button[value='add']",
+        "position": "right"
+      },
+      {
+        "title": "Ricerca Utenti",
+        "description": "Cerca utenti per nome, ruolo o azienda per aggiungerli alla conversazione.",
+        "selector": "input[placeholder='Cerca utenti...']",
+        "position": "top"
+      },
+      {
+        "title": "Abbandona Chat",
+        "description": "Puoi abbandonare la conversazione cliccando sul pulsante in fondo al menu info.",
+        "selector": "button:contains('Abbandona chat')",
+        "position": "top"
+      }
+    ],
+    "ricerca_chat": [
+      {
+        "title": "Ricerca e Filtri",
+        "description": "Esploriamo come cercare informazioni specifiche nella conversazione."
+      },
+      {
+        "title": "Menu Ricerca",
+        "description": "Accedi alle funzionalità di ricerca cliccando prima sul pulsante Info e poi sulla tab Cerca.",
+        "selector": "button[value='search']",
+        "position": "right"
+      },
+      {
+        "title": "Ricerca Testuale",
+        "description": "Inserisci parole chiave per cercare all'interno dei messaggi della conversazione.",
+        "selector": "input[placeholder='Cerca nei messaggi...']",
+        "position": "top"
+      },
+      {
+        "title": "Filtro Colori",
+        "description": "Filtra i messaggi in base al colore personalizzato che gli è stato assegnato.",
+        "selector": ".color-filter",
+        "position": "right"
+      },
+      {
+        "title": "Risultati Ricerca",
+        "description": "I messaggi che corrispondono ai criteri di ricerca vengono evidenziati e puoi navigare tra di essi.",
+        "selector": ".search-results",
+        "position": "bottom"
+      },
+      {
+        "title": "Reset Filtri",
+        "description": "Clicca qui per cancellare tutti i filtri e tornare alla visualizzazione normale.",
+        "selector": "button:contains('Mostra tutti i messaggi')",
+        "position": "bottom"
+      }
+    ]
+  }
+}

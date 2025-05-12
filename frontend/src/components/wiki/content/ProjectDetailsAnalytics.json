@@ -1,0 +1,105 @@
+{
+    "title": "Guida Statistiche Progetto",
+    "description": "Questa sezione mostra le analisi e statistiche relative al progetto.",
+    "sections": [
+      {
+        "title": "Panoramica delle Statistiche",
+        "content": "<p>La scheda <strong>Statistiche</strong> fornisce una panoramica dettagliata sullo stato e sull'avanzamento del progetto attraverso vari grafici e indicatori. Questa visione d'insieme ti permette di monitorare:</p><ul><li>L'avanzamento complessivo del progetto</li><li>La distribuzione delle attività per stato</li><li>La distribuzione delle attività per priorità</li><li>L'andamento temporale del completamento delle attività</li><li>La distribuzione del carico di lavoro tra i membri del team</li></ul><p>Questi dati sono fondamentali per valutare la salute del progetto e prendere decisioni informate sulla sua gestione.</p>",
+        "tourId": "statistiche_panoramica"
+      },
+      {
+        "title": "Avanzamento del Progetto",
+        "content": "<p>Il grafico di <strong>Avanzamento del Progetto</strong> mostra la percentuale di completamento complessivo, calcolata in base al numero di attività completate rispetto al totale delle attività previste. Questo grafico ti permette di valutare rapidamente se il progetto sta procedendo secondo i tempi previsti.</p><p>Puoi anche visualizzare l'avanzamento rispetto alla linea temporale del progetto, confrontando l'avanzamento effettivo con quello pianificato per identificare eventuali ritardi o anticipi.</p>",
+        "tourId": "statistiche_avanzamento"
+      },
+      {
+        "title": "Distribuzione delle Attività",
+        "content": "<p>I grafici di <strong>Distribuzione delle Attività</strong> mostrano come le attività del progetto sono distribuite secondo vari criteri:</p><ul><li><strong>Per Stato</strong>: quante attività sono Da Fare, In Corso, Completate, ecc.</li><li><strong>Per Priorità</strong>: distribuzione tra priorità Alta, Media e Bassa</li><li><strong>Per Membro del Team</strong>: numero di attività assegnate a ciascun membro</li></ul><p>Questi grafici aiutano a identificare squilibri nella distribuzione del lavoro o accumuli di attività in particolari stati.</p>",
+        "tourId": "statistiche_distribuzione"
+      },
+      {
+        "title": "Andamento Temporale",
+        "content": "<p>Il grafico di <strong>Andamento Temporale</strong> mostra come il progetto è progredito nel tempo, tracciando:</p><ul><li>Numero di attività completate per settimana/mese</li><li>Velocità media di completamento delle attività</li><li>Proiezione del completamento in base alla velocità attuale</li></ul><p>Questo grafico è particolarmente utile per valutare il ritmo di avanzamento e prevedere quando il progetto sarà completato in base alle prestazioni attuali.</p>",
+        "tourId": "statistiche_andamento"
+      },
+      {
+        "title": "Carico di Lavoro del Team",
+        "content": "<p>Il grafico di <strong>Carico di Lavoro</strong> mostra come le ore di lavoro sono distribuite tra i membri del team, evidenziando:</p><ul><li>Ore totali registrate per ciascun membro</li><li>Distribuzione delle ore per attività o categoria</li><li>Bilanciamento del carico tra i membri del team</li></ul><p>Questo grafico aiuta a identificare sovraccarichi o squilibri nella distribuzione del lavoro, permettendo di riassegnare le attività per ottimizzare l'utilizzo delle risorse.</p>",
+        "tourId": "statistiche_carico"
+      }
+    ],
+    "tours": {
+      "statistiche_panoramica": [
+        {
+          "title": "Statistiche del Progetto",
+          "description": "Questa scheda fornisce visualizzazioni dettagliate sull'andamento del progetto.",
+          "selector": "#project-analytics-tab",
+          "position": "bottom"
+        },
+        {
+          "title": "Pannello di Controllo",
+          "description": "Qui puoi vedere tutti i grafici e indicatori relativi al progetto.",
+          "selector": ".analytics-dashboard",
+          "position": "top"
+        },
+        {
+          "title": "Filtri Temporali",
+          "description": "Puoi filtrare i dati per periodo (settimana, mese, trimestre, anno).",
+          "selector": ".time-filter",
+          "position": "bottom"
+        },
+        {
+          "title": "Esportazione Dati",
+          "description": "Puoi esportare i dati in formato CSV o Excel per analisi più approfondite.",
+          "selector": ".export-button",
+          "position": "left"
+        }
+      ],
+      "statistiche_avanzamento": [
+        {
+          "title": "Avanzamento del Progetto",
+          "description": "Questo grafico mostra la percentuale di completamento del progetto.",
+          "selector": ".progress-chart",
+          "position": "top"
+        },
+        {
+          "title": "Percentuale Completamento",
+          "description": "La percentuale indica quante attività sono state completate rispetto al totale.",
+          "selector": ".progress-percentage",
+          "position": "right"
+        },
+        {
+          "title": "Confronto con la Pianificazione",
+          "description": "La linea tratteggiata mostra l'avanzamento pianificato, permettendo di valutare eventuali ritardi.",
+          "selector": ".planned-progress",
+          "position": "bottom"
+        }
+      ],
+      "statistiche_distribuzione": [
+        {
+          "title": "Distribuzione Attività",
+          "description": "Questi grafici mostrano come sono distribuite le attività secondo vari criteri.",
+          "selector": ".distribution-charts",
+          "position": "top"
+        },
+        {
+          "title": "Distribuzione per Stato",
+          "description": "Mostra quante attività sono in ciascuno stato (Da Fare, In Corso, Completate, ecc.).",
+          "selector": ".status-chart",
+          "position": "right"
+        },
+        {
+          "title": "Distribuzione per Priorità",
+          "description": "Mostra la suddivisione delle attività per livello di priorità.",
+          "selector": ".priority-chart",
+          "position": "left"
+        },
+        {
+          "title": "Distribuzione per Membro",
+          "description": "Mostra quante attività sono assegnate a ciascun membro del team.",
+          "selector": ".member-chart",
+          "position": "bottom"
+        }
+      ]
+    }
+  }

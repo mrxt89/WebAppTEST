@@ -1,0 +1,145 @@
+{
+    "title": "Guida Gantt Attività",
+    "description": "Questa sezione mostra le attività del progetto in un diagramma Gantt.",
+    "sections": [
+      {
+        "title": "Visualizzazione Gantt",
+        "content": "<p>Il <strong>diagramma Gantt</strong> mostra le attività del progetto in una linea temporale, evidenziando:</p><ul><li>La <strong>durata</strong> di ciascuna attività (da data inizio a data fine)</li><li>Le <strong>relazioni</strong> e dipendenze tra attività</li><li>La <strong>sequenza</strong> temporale del progetto</li><li>Lo <strong>stato</strong> delle attività tramite codici colore</li></ul><p>Questa visualizzazione è particolarmente utile per gestire le tempistiche del progetto e identificare potenziali sovrapposizioni o colli di bottiglia.</p>",
+        "tourId": "gantt_visualizzazione"
+      },
+      {
+        "title": "Navigazione Temporale",
+        "content": "<p>Puoi navigare nel diagramma Gantt in diversi modi:</p><ul><li><strong>Scalabilità</strong>: visualizza il progetto per giorno, settimana o mese</li><li><strong>Scorrimento</strong>: utilizza la barra di scorrimento per muoverti nel tempo</li><li><strong>Zoom</strong>: regola il livello di dettaglio visibile</li></ul><p>Queste opzioni ti permettono di concentrarti su un periodo specifico o di visualizzare l'intero arco del progetto.</p>",
+        "tourId": "gantt_navigazione",
+        "selector": ".gantt-container"
+      },
+      {
+        "title": "Gestione Attività Gantt",
+        "content": "<p>Nel diagramma Gantt puoi:</p><ul><li><strong>Modificare le date</strong>: trascina gli estremi di un'attività per cambiare date di inizio o fine</li><li><strong>Riposizionare</strong>: sposta un'attività su o giù per cambiarne l'ordine</li><li><strong>Visualizzare dettagli</strong>: passa il mouse su un'attività per vedere informazioni aggiuntive</li><li><strong>Aprire l'editor</strong>: fai doppio clic su un'attività per visualizzare e modificare tutti i suoi dettagli</li></ul><p>Queste funzionalità permettono di gestire visualmente la pianificazione del progetto.</p>",
+        "tourId": "gantt_gestione"
+      },
+      {
+        "title": "Filtri e Organizzazione",
+        "content": "<p>La vista Gantt offre potenti strumenti di filtro per gestire progetti complessi:</p><ul><li><strong>Filtro per stato</strong>: visualizza solo attività con uno stato specifico</li><li><strong>Filtro per priorità</strong>: concentrati sulle attività più importanti</li><li><strong>Filtro per assegnazione</strong>: visualizza solo le attività assegnate a una persona specifica</li><li><strong>Filtro per testo</strong>: cerca attività contenenti parole specifiche</li><li><strong>Filtro ritardo</strong>: evidenzia le attività in ritardo rispetto alla pianificazione</li></ul><p>Utilizzando questi filtri, puoi focalizzarti esattamente sulle attività di tuo interesse anche in progetti di grandi dimensioni.</p>",
+        "tourId": "gantt_filtri"
+      }
+    ],
+    "tours": {
+      "gantt_visualizzazione": [
+        {
+          "title": "Diagramma Gantt",
+          "description": "Il Gantt mostra le attività su una linea temporale.",
+          "selector": ".gantt-container",
+          "position": "top"
+        },
+        {
+          "title": "Barre Attività",
+          "description": "Ogni barra rappresenta un'attività con la sua durata.",
+          "selector": ".gantt-container svg",
+          "position": "top"
+        },
+        {
+          "title": "Codici Colore",
+          "description": "I colori indicano lo stato di ogni attività.",
+          "selector": ".gantt-container p-2.border-b",
+          "position": "bottom"
+        },
+        {
+          "title": "Dettagli Attività",
+          "description": "Sulla sinistra vedi i dettagli di ogni attività.",
+          "selector": ".gantt-container div.p-2.border-r",
+          "position": "right"
+        }
+      ],
+      "gantt_navigazione": [
+        {
+            "title": "Navigazione Temporale",
+            "description": "Ti mostrerò come navigare nel diagramma Gantt.",
+            "selector": ".gantt-container",
+            "position": "top"
+        },
+        {
+            "title": "Scalabilità Temporale",
+            "description": "Scegli tra visualizzazione giornaliera, settimanale o mensile.",
+            "selector": "button:contains('Giorno'), button:contains('Settimana'), button:contains('Mese')",
+            "position": "bottom"
+        },
+        {
+            "title": "Scorrimento Orizzontale",
+            "description": "Scorri orizzontalmente per navigare nel tempo.",
+            "selector": ".gantt-horizontal-scroll",
+            "position": "top"
+        },
+        {
+            "title": "Scorrimento Verticale",
+            "description": "Scorri verticalmente per vedere più attività.",
+            "selector": ".gantt-container",
+            "position": "right"
+        }
+        ],
+        "gantt_gestione": [
+            {
+                "title": "Gestione Attività",
+                "description": "Ti mostrerò come gestire le attività nel diagramma Gantt.",
+                "selector": ".gantt-container",
+                "position": "top"
+            },
+            {
+                "title": "Modifica Date",
+                "description": "Trascina gli estremi di un'attività per cambiare le date.",
+                "selector": ".gantt-container svg",
+                "position": "top"
+            },
+            {
+                "title": "Riposizionamento",
+                "description": "Sposta un'attività su o giù per cambiarne l'ordine.",
+                "selector": ".gantt-container svg",
+                "position": "top"
+            },
+            {
+                "title": "Visualizzazione Dettagli",
+                "description": "Passa il mouse su un'attività per vedere informazioni aggiuntive.",
+                "selector": ".gantt-container svg",
+                "position": "top"
+            }
+            ],
+            "gantt_filtri": [
+                {
+                    "title": "Filtri Attività",
+                    "description": "Ti mostrerò come utilizzare i filtri nel diagramma Gantt.",
+                    "selector": ".gantt-container",
+                    "position": "top"
+                },
+                {
+                    "title": "Filtro Stato",
+                    "description": "Visualizza solo attività con uno stato specifico.",
+                    "selector": "button:contains('Stato')",
+                    "position": "bottom"
+                },
+                {
+                    "title": "Filtro Priorità",
+                    "description": "Concentrati sulle attività più importanti.",
+                    "selector": "button:contains('Priorità')",
+                    "position": "bottom"
+                },
+                {
+                    "title": "Filtro Assegnazione",
+                    "description": "Visualizza solo le attività assegnate a una persona specifica.",
+                    "selector": "button:contains('Assegnazione')",
+                    "position": "bottom"
+                },
+                {
+                    "title": "Filtro Testo",
+                    "description": "Cerca attività contenenti parole specifiche.",
+                    "selector": "input[placeholder*='Cerca']",
+                    "position": "right"
+                },
+                {
+                    "title": "Filtro Ritardo",
+                    "description": "Evidenzia le attività in ritardo rispetto alla pianificazione.",
+                    "selector": "input[id='show-delayed']",
+                    "position": "right"
+                }
+            ]
+    }
+}

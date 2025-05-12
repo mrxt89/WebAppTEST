@@ -1,0 +1,194 @@
+{
+  "title": "Gestione Canali di Notifica",
+  "description": "Scopri come gestire i canali di notifica per organizzare e controllare le comunicazioni all'interno della piattaforma.",
+  "sections": [
+    {
+      "title": "Panoramica dei Canali di Notifica",
+      "content": "<div class='space-y-4'><p>I <strong>Canali di Notifica</strong> sono un sistema fondamentale per organizzare e categorizzare le comunicazioni all'interno della piattaforma. Ogni canale:</p><ul class='list-disc pl-5 space-y-2'><li>È rappresentato da un colore distintivo per facilitare l'identificazione</li><li>Può contenere diversi tipi di messaggi e notifiche</li><li>Ha un gruppo definito di destinatari che possono ricevere e inviare messaggi</li><li>Può essere standard (interno all'azienda) o interaziendale</li></ul><p>La gestione efficace dei canali di notifica è essenziale per mantenere le comunicazioni organizzate e assicurarsi che le informazioni raggiungano i destinatari corretti.</p></div>",
+      "tourId": "panoramica_canali"
+    },
+    {
+      "title": "Visualizzazione dei Canali",
+      "content": "<div class='space-y-4'><p>La schermata di gestione dei canali di notifica è divisa in due sezioni principali:</p><div class='grid grid-cols-1 md:grid-cols-2 gap-4 my-3'><div class='bg-gray-50 p-3 rounded-lg'><h4 class='font-semibold text-blue-700 mb-2'>Elenco Canali</h4><p>Visualizza tutti i canali disponibili con le relative informazioni come nome, descrizione, colore e stato interaziendale.</p></div><div class='bg-gray-50 p-3 rounded-lg'><h4 class='font-semibold text-blue-700 mb-2'>Dettagli Canale</h4><p>Mostra informazioni dettagliate sul canale selezionato, inclusi i membri attuali e le opzioni di gestione.</p></div></div><p>Seleziona un canale dall'elenco per visualizzarne i dettagli e gestire i destinatari. I canali interaziendali sono contrassegnati come tali e permettono la comunicazione tra diverse organizzazioni.</p></div>",
+      "tourId": "visualizzazione_canali"
+    },
+    {
+      "title": "Creazione e Modifica dei Canali",
+      "content": "<div class='space-y-4'><p>Per <strong>creare un nuovo canale</strong> di notifica:</p><ol class='list-decimal pl-5 space-y-2'><li>Fai clic sul pulsante <strong>Aggiungi</strong> nella barra superiore</li><li>Inserisci il nome del canale</li><li>Aggiungi una descrizione che spiega lo scopo del canale</li><li>Seleziona un colore distintivo per il canale</li><li>Scegli il tipo di risposta predefinito (Nessuna, SI/NO, Testo libero)</li><li>Imposta un titolo predefinito se necessario</li><li>Seleziona se il canale deve essere interaziendale</li><li>Conferma la creazione</li></ol><p>Per <strong>modificare un canale esistente</strong>:</p><ol class='list-decimal pl-5 space-y-2'><li>Seleziona il canale dall'elenco</li><li>Fai clic sul pulsante <strong>Modifica</strong> nei dettagli del canale</li><li>Aggiorna le informazioni necessarie</li><li>Conferma le modifiche</li></ol><p>Un canale ben configurato facilita l'identificazione visiva e l'organizzazione delle comunicazioni correlate.</p></div>",
+      "tourId": "gestione_canali"
+    },
+    {
+      "title": "Gestione dei Destinatari",
+      "content": "<div class='space-y-4'><p>Una parte fondamentale della gestione dei canali è controllare chi può ricevere e inviare messaggi:</p><div class='rounded-lg border overflow-hidden my-3'><div class='p-4 space-y-4'><div><h4 class='font-medium mb-1'>Aggiungere Destinatari Individuali</h4><p class='text-sm text-gray-600'>Dalla sezione <strong>Utenti disponibili</strong>, seleziona gli utenti che desideri aggiungere al canale e fai clic su <strong>Aggiungi selezionati</strong>.</p></div><div><h4 class='font-medium mb-1'>Aggiungere Gruppi Completi</h4><p class='text-sm text-gray-600'>Per aggiungere tutti i membri di un gruppo, usa il pulsante <strong>Aggiungi Gruppo</strong>, seleziona il gruppo desiderato e conferma.</p></div><div><h4 class='font-medium mb-1'>Rimuovere Destinatari</h4><p class='text-sm text-gray-600'>Seleziona uno o più utenti dalla sezione <strong>Destinatari</strong> e fai clic su <strong>Rimuovi selezionati</strong>.</p></div></div></div><p>Gestire correttamente i destinatari è essenziale per garantire che le comunicazioni raggiungano le persone giuste, evitando di sovraccaricare gli utenti con notifiche non pertinenti.</p></div>",
+      "tourId": "destinatari_canali"
+    },
+    {
+      "title": "Canali Interaziendali",
+      "content": "<div class='space-y-4'><p>I <strong>Canali Interaziendali</strong> sono una funzionalità speciale che permette la comunicazione tra diverse organizzazioni:</p><div class='bg-white rounded-lg border p-4 my-4'><div class='space-y-3'><div><h4 class='font-medium text-blue-700'>Caratteristiche</h4><ul class='list-disc pl-5 text-sm space-y-1'><li>Visibili e accessibili da utenti di organizzazioni diverse</li><li>Ideali per progetti collaborativi e comunicazioni con clienti o fornitori</li><li>Mantengono lo stesso colore e tipo di risposta in tutte le organizzazioni</li></ul></div><div><h4 class='font-medium text-blue-700'>Creazione</h4><p class='text-sm'>Per creare un canale interaziendale, segui il processo standard di creazione e assicurati di selezionare la casella <strong>Canale Intercompany</strong>.</p></div><div><h4 class='font-medium text-blue-700'>Gestione</h4><p class='text-sm'>Anche per i canali interaziendali, puoi gestire i destinatari all'interno della tua organizzazione. Gli amministratori delle altre organizzazioni gestiranno i loro rispettivi utenti.</p></div></div></div><p>I canali interaziendali rappresentano uno strumento potente per facilitare la comunicazione esterna strutturata, mantenendo al contempo l'organizzazione e la categorizzazione delle notifiche.</p></div>"
+    },
+    {
+      "title": "Tipi di Risposta",
+      "content": "<div class='space-y-4'><p>Ogni canale può essere configurato con un <strong>Tipo di Risposta</strong> predefinito che determina come gli utenti possono interagire con i messaggi:</p><div class='grid grid-cols-1 md:grid-cols-3 gap-4 my-4'><div class='bg-white border rounded-lg p-4'><h4 class='font-medium text-blue-700 mb-2'>Nessuna Risposta</h4><p class='text-sm'>Adatto per annunci e comunicazioni unidirezionali. I destinatari possono visualizzare il messaggio ma non possono rispondere.</p></div><div class='bg-white border rounded-lg p-4'><h4 class='font-medium text-blue-700 mb-2'>SI/NO</h4><p class='text-sm'>Ideale per richieste che necessitano di una conferma semplice. I destinatari possono rispondere solo con SI o NO.</p></div><div class='bg-white border rounded-lg p-4'><h4 class='font-medium text-blue-700 mb-2'>Testo Libero</h4><p class='text-sm'>Permette conversazioni complete. I destinatari possono rispondere con messaggi di testo completi, allegati e menzioni.</p></div></div><p>Il tipo di risposta può essere modificato durante la creazione o modifica del canale. Scegli il tipo più appropriato in base allo scopo del canale e al tipo di comunicazione prevista.</p></div>"
+    },
+    {
+      "title": "Test di Notifica",
+      "content": "<div class='space-y-4'><p>La funzionalità <strong>Test Notifica</strong> ti permette di verificare come appariranno i messaggi inviati attraverso un canale specifico:</p><div class='bg-blue-50 border-l-4 border-blue-500 p-4 my-4'><div class='flex'><div class='flex-shrink-0 text-blue-500'><svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'></circle><line x1='12' y1='16' x2='12' y2='12'></line><line x1='12' y1='8' x2='12.01' y2='8'></line></svg></div><div class='ml-3'><p class='text-sm text-blue-700'>Quando fai clic sul pulsante <strong>Test notifica</strong>, viene aperta una finestra di chat con il canale selezionato. Puoi scrivere un messaggio di prova per vedere come apparirà ai destinatari, inclusi il colore del canale e il tipo di risposta configurato.</p></div></div></div><p>Utilizzare questa funzionalità prima di inviare comunicazioni importanti ti permette di assicurarti che il messaggio appaia come previsto e che le impostazioni del canale siano configurate correttamente.</p><p>I messaggi di test vengono inviati solo a te e non sono visibili agli altri destinatari del canale, rendendoli ideali per verificare le configurazioni senza disturbare gli altri utenti.</p></div>"
+    }
+  ],
+  "tours": {
+    "panoramica_canali": [
+      {
+        "title": "Canali di Notifica",
+        "description": "Benvenuto nella gestione dei canali di notifica! Ti mostrerò come gestire e organizzare le comunicazioni nella piattaforma.",
+        "position": "center"
+      },
+      {
+        "title": "Intestazione",
+        "description": "Questa è la sezione principale per la gestione dei canali di notifica.",
+        "selector": "#notification-channels-title",
+        "position": "bottom"
+      },
+      {
+        "title": "Guida Contestuale",
+        "description": "Questo pulsante ti permette di accedere alla guida contestuale in qualsiasi momento.",
+        "selector": "#notification-sidebar-wiki-button",
+        "position": "left"
+      },
+      {
+        "title": "Elenco Canali",
+        "description": "Qui puoi vedere tutti i canali di notifica disponibili.",
+        "selector": "#notification-channels-list",
+        "position": "right"
+      },
+      {
+        "title": "Dettagli Canale",
+        "description": "In questa sezione vengono mostrati i dettagli del canale selezionato.",
+        "selector": "#notification-channel-details",
+        "position": "left"
+      }
+    ],
+    "visualizzazione_canali": [
+      {
+        "title": "Visualizzazione dei Canali",
+        "description": "Ti mostrerò come visualizzare e navigare tra i diversi canali di notifica.",
+        "position": "center"
+      },
+      {
+        "title": "Elenco Canali",
+        "description": "Questa tabella mostra tutti i canali disponibili con le loro informazioni principali.",
+        "selector": "#notification-channels-list",
+        "position": "top"
+      },
+      {
+        "title": "Canale di Notifica",
+        "description": "Ogni riga rappresenta un canale. Fai clic su un canale per visualizzarne i dettagli.",
+        "selector": "#notification-channels-list tbody tr:first-child",
+        "position": "bottom"
+      },
+      {
+        "title": "Colore del Canale",
+        "description": "Questo colore identifica visivamente il canale in tutta la piattaforma.",
+        "selector": "#notification-channels-list tbody tr:first-child td:nth-child(3)",
+        "position": "left"
+      },
+      {
+        "title": "Dettagli del Canale",
+        "description": "Quando selezioni un canale, qui vengono mostrati tutti i suoi dettagli e opzioni di gestione.",
+        "selector": "#notification-channel-details",
+        "position": "top"
+      }
+    ],
+    "gestione_canali": [
+      {
+        "title": "Gestione dei Canali",
+        "description": "Ti mostrerò come modificare e gestire i canali di notifica.",
+        "position": "center"
+      },
+      {
+        "title": "Dettagli Canale",
+        "description": "Qui puoi vedere tutte le informazioni sul canale selezionato.",
+        "selector": "#notification-category-title",
+        "position": "right"
+      },
+      {
+        "title": "Colore Canale",
+        "description": "Il colore distintivo utilizzato per identificare questo canale.",
+        "selector": "#notification-category-color",
+        "position": "left"
+      },
+      {
+        "title": "Tipo di Risposta",
+        "description": "Indica come gli utenti possono rispondere ai messaggi in questo canale.",
+        "selector": "#notification-response-type",
+        "position": "bottom"
+      },
+      {
+        "title": "Stato Intercompany",
+        "description": "Indica se il canale è accessibile da più aziende o solo dalla tua.",
+        "selector": "#notification-intercompany",
+        "position": "bottom"
+      },
+      {
+        "title": "Modifica Canale",
+        "description": "Clicca qui per modificare le informazioni del canale.",
+        "selector": "#notification-edit-button",
+        "position": "bottom"
+      },
+      {
+        "title": "Test Notifica",
+        "description": "Clicca qui per testare come appariranno i messaggi inviati tramite questo canale.",
+        "selector": "#notification-test-button",
+        "position": "bottom"
+      }
+    ],
+    "destinatari_canali": [
+      {
+        "title": "Gestione Destinatari",
+        "description": "Ti mostrerò come gestire chi può ricevere e inviare messaggi in un canale.",
+        "position": "center"
+      },
+      {
+        "title": "Destinatari Attuali",
+        "description": "Qui puoi vedere tutti gli utenti attualmente inclusi nel canale.",
+        "selector": "#notification-members-list",
+        "position": "top"
+      },
+      {
+        "title": "Destinatario",
+        "description": "Ogni utente incluso nel canale è elencato qui con le sue informazioni.",
+        "selector": "#notification-members-list .space-y-2 > div:first-child",
+        "position": "right"
+      },
+      {
+        "title": "Selezione Multipla",
+        "description": "Seleziona più utenti per aggiungere o rimuovere gruppi di destinatari in una volta.",
+        "selector": "#notification-members-list .checkbox",
+        "position": "left"
+      },
+      {
+        "title": "Rimuovi Destinatari",
+        "description": "Dopo aver selezionato uno o più utenti, clicca qui per rimuoverli dal canale.",
+        "selector": "#notification-remove-users-button",
+        "position": "left"
+      },
+      {
+        "title": "Utenti Disponibili",
+        "description": "Qui puoi vedere gli utenti che non sono ancora inclusi nel canale.",
+        "selector": "#notification-available-users-list",
+        "position": "top"
+      },
+      {
+        "title": "Aggiungi Destinatari",
+        "description": "Dopo aver selezionato uno o più utenti disponibili, clicca qui per aggiungerli al canale.",
+        "selector": "#notification-add-users-button",
+        "position": "left"
+      },
+      {
+        "title": "Aggiungi Gruppo",
+        "description": "Clicca qui per aggiungere tutti i membri di un gruppo al canale in una volta sola.",
+        "selector": "#notification-add-group-button",
+        "position": "left"
+      }
+    ]
+  }
+}

@@ -1,0 +1,82 @@
+{
+    "title": "Guida Dettagli Progetto",
+    "description": "Questa sezione permette di visualizzare e gestire i dettagli di un progetto specifico.",
+    "sections": [
+      {
+        "title": "Navigazione del Progetto",
+        "content": "<p>La pagina dei <strong>Dettagli Progetto</strong> permette di visualizzare e gestire tutti gli aspetti di un progetto specifico. La navigazione avviene tramite le schede in alto:</p><ul><li><strong>Panoramica</strong>: informazioni generali sul progetto</li><li><strong>Attività</strong>: elenco e gestione delle attività associate al progetto</li><li><strong>Utenti</strong>: gestione del team di progetto</li><li><strong>Allegati</strong>: documenti e file associati al progetto</li><li><strong>Statistiche</strong>: analisi e reportistica sul progetto</li></ul><p>Fai clic su una scheda per accedere alla sezione corrispondente.</p>",
+        "tourId": "progetto_navigazione"
+      },
+      {
+        "title": "Intestazione Progetto",
+        "content": "<p>L'<strong>Intestazione del Progetto</strong> in alto nella pagina mostra:</p><ul><li>Il titolo del progetto</li><li>Un pulsante per tornare alla dashboard progetti</li><li>Un pulsante per modificare le informazioni del progetto</li></ul><p>Queste informazioni sono sempre visibili, indipendentemente dalla scheda attiva, per assicurarsi che l'utente sappia sempre su quale progetto sta lavorando.</p>",
+        "tourId": "progetto_intestazione"
+      }
+    ],
+    "tours": {
+      "progetto_navigazione": [
+        {
+          "title": "Navigazione del Progetto",
+          "description": "Questo tour ti mostrerà come navigare tra le diverse sezioni del progetto.",
+          "selector": "div[role='tablist']",
+          "position": "bottom"
+        },
+        {
+          "title": "Scheda Panoramica",
+          "description": "Visualizza le informazioni generali del progetto.",
+          "selector": "#project-overview-tab",
+          "position": "bottom"
+        },
+        {
+          "title": "Scheda Attività",
+          "description": "Gestisci tutte le attività associate al progetto.",
+          "selector": "#project-tasks-tab",
+          "position": "bottom"
+        },
+        {
+          "title": "Scheda Utenti",
+          "description": "Gestisci il team di progetto.",
+          "selector": "#project-team-tab",
+          "position": "bottom"
+        },
+        {
+          "title": "Scheda Allegati",
+          "description": "Accedi ai documenti e file del progetto.",
+          "selector": "#project-attachments-tab",
+          "position": "bottom"
+        },
+        {
+          "title": "Scheda Statistiche",
+          "description": "Visualizza analisi e report sul progetto.",
+          "selector": "#project-analytics-tab",
+          "position": "bottom"
+        }
+      ],
+      "progetto_intestazione": [
+        {
+          "title": "Intestazione Progetto",
+          "description": "L'intestazione fornisce informazioni sul progetto e azioni principali.",
+          "selector": ".py-2.px-4.bg-[var(--primary)]",
+          "position": "bottom"
+        },
+        {
+          "title": "Torna alla Dashboard",
+          "description": "Fai clic qui per tornare alla dashboard dei progetti.",
+          "selector": "#backToDashboard",
+          "position": "right"
+        },
+        {
+          "title": "Titolo Progetto",
+          "description": "Il nome del progetto su cui stai lavorando.",
+          "selector": "h1.text-lg",
+          "position": "bottom"
+        },
+        {
+          "title": "Modifica Progetto",
+          "description": "Fai clic qui per modificare le informazioni del progetto.",
+          "selector": "#editProjectButton",
+          "position": "left"
+        }
+      ]
+    }
+  }

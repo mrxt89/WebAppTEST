@@ -1,0 +1,268 @@
+{
+  "title": "Centro Notifiche",
+  "description": "Guida completa al sistema di messaggistica integrato per comunicare con altri utenti, ricevere aggiornamenti e gestire le notifiche in modo efficiente.",
+  "sections": [
+    {
+      "title": "Panoramica",
+      "content": "<div class='space-y-4'><p>Il <strong>Centro Notifiche</strong> è il cuore del sistema di comunicazione della piattaforma. Ti permette di:</p><ul class='list-disc pl-5 space-y-2'><li>Scambiare messaggi con colleghi e collaboratori</li><li>Ricevere notifiche su attività di progetto</li><li>Gestire menzioni e citazioni</li><li>Organizzare le conversazioni importanti</li><li>Condividere file e allegati</li></ul><p>Le notifiche vengono organizzate per categoria, con codici colore dedicati che rendono immediata l'identificazione del tipo di comunicazione.</p></div>",
+      "tourId": "panoramica_notifiche"
+    },
+    {
+      "title": "Interfaccia e Navigazione",
+      "content": "<div class='space-y-4'><p>L'interfaccia del Centro Notifiche è progettata per essere intuitiva e facile da usare:</p><div class='grid grid-cols-1 md:grid-cols-2 gap-4 my-3'><div class='bg-gray-50 p-3 rounded-lg'><h4 class='font-semibold text-blue-700 mb-2'>Barra Superiore</h4><p>Contiene il titolo e il pulsante di guida contestuale per accedere a questo wiki.</p></div><div class='bg-gray-50 p-3 rounded-lg'><h4 class='font-semibold text-blue-700 mb-2'>Area di Ricerca</h4><p>Permette di cercare rapidamente nelle notifiche usando parole chiave.</p></div><div class='bg-gray-50 p-3 rounded-lg'><h4 class='font-semibold text-blue-700 mb-2'>Filtri Rapidi</h4><p>Selettore di categorie e pulsante di espansione per accedere a filtri avanzati.</p></div><div class='bg-gray-50 p-3 rounded-lg'><h4 class='font-semibold text-blue-700 mb-2'>Elenco Notifiche</h4><p>Visualizza tutte le notifiche ordinate, con quelle con pin sempre in cima.</p></div></div><p>Ogni notifica mostra un'anteprima del messaggio più recente, il mittente, e indicatori visivi come il colore della categoria, lo stato di lettura e l'eventuale presenza di menzioni.</p></div>",
+      "tourId": "interfaccia_notifiche"
+    },
+    {
+      "title": "Filtri e Ricerca Avanzata",
+      "content": "<div class='space-y-4'><p>Il sistema offre potenti strumenti di filtro per aiutarti a trovare rapidamente le informazioni di cui hai bisogno:</p><div class='border rounded-lg overflow-hidden my-3'><table class='w-full'><thead class='bg-blue-50'><tr><th class='px-4 py-2 text-left text-blue-700'>Filtro</th><th class='px-4 py-2 text-left text-blue-700'>Funzione</th></tr></thead><tbody><tr class='border-t'><td class='px-4 py-2 font-medium'>Ricerca testuale</td><td class='px-4 py-2'>Cerca termini specifici nei titoli e contenuti</td></tr><tr class='border-t bg-gray-50'><td class='px-4 py-2 font-medium'>Categorie</td><td class='px-4 py-2'>Filtra per tipo di notifica (colore)</td></tr><tr class='border-t'><td class='px-4 py-2 font-medium'>Non lette</td><td class='px-4 py-2'>Mostra solo le notifiche non ancora lette</td></tr><tr class='border-t bg-gray-50'><td class='px-4 py-2 font-medium'>Preferiti</td><td class='px-4 py-2'>Visualizza notifiche contrassegnate come preferite</td></tr><tr class='border-t'><td class='px-4 py-2 font-medium'>Menzioni</td><td class='px-4 py-2'>Filtra notifiche in cui sei stato menzionato</td></tr><tr class='border-t bg-gray-50'><td class='px-4 py-2 font-medium'>Messaggi inviati</td><td class='px-4 py-2'>Mostra solo i messaggi inviati da te</td></tr><tr class='border-t'><td class='px-4 py-2 font-medium'>Chat abbandonate</td><td class='px-4 py-2'>Visualizza conversazioni che hai lasciato</td></tr><tr class='border-t bg-gray-50'><td class='px-4 py-2 font-medium'>Stato completamento</td><td class='px-4 py-2'>Filtra tra notifiche attive, completate o tutte</td></tr></tbody></table></div><p>Puoi combinare più filtri contemporaneamente per affinare ulteriormente la ricerca. Utilizzando i filtri appropriati, potrai mantenere ordinate anche grandi quantità di notifiche.</p></div>",
+      "tourId": "filtri_notifiche"
+    },
+    {
+      "title": "Gestione delle Notifiche",
+      "content": "<div class='space-y-4'><p>Ogni notifica offre diverse opzioni di gestione per aiutarti a organizzare la tua comunicazione:</p><div class='my-4'><div class='flex items-center gap-3 mb-3'><div class='bg-blue-100 text-blue-800 p-2 rounded-full'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'></circle><line x1='12' y1='8' x2='12' y2='12'></line><line x1='12' y1='16' x2='12.01' y2='16'></line></svg></div><div><h4 class='font-medium'>Pin</h4><p class='text-sm text-gray-600'>Fissa le notifiche importanti in cima all'elenco per un accesso rapido.</p></div></div><div class='flex items-center gap-3 mb-3'><div class='bg-yellow-100 text-yellow-800 p-2 rounded-full'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'></polygon></svg></div><div><h4 class='font-medium'>Preferiti</h4><p class='text-sm text-gray-600'>Contrassegna le notifiche come preferite per trovarle rapidamente in seguito.</p></div></div><div class='flex items-center gap-3 mb-3'><div class='bg-red-100 text-red-800 p-2 rounded-full'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'></circle><line x1='12' y1='8' x2='12' y2='16'></line><line x1='12' y1='16' x2='12.01' y2='16'></line></svg></div><div><h4 class='font-medium'>Indicatore di lettura</h4><p class='text-sm text-gray-600'>Gestisci lo stato di lettura per tenere traccia delle notifiche che hai già visto.</p></div></div><div class='flex items-center gap-3'><div class='bg-purple-100 text-purple-800 p-2 rounded-full'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4'></path><polyline points='10 17 15 12 10 7'></polyline><line x1='15' y1='12' x2='3' y2='12'></line></svg></div><div><h4 class='font-medium'>Abbandono chat</h4><p class='text-sm text-gray-600'>Puoi abbandonare le conversazioni che non sono più rilevanti, mantenendo comunque l'accesso alla cronologia.</p></div></div></div><p>Le notifiche sono ordinate cronologicamente, con quelle con pin sempre in cima per darti accesso immediato alle conversazioni prioritarie.</p></div>",
+      "tourId": "gestione_notifiche" 
+    },
+    {
+      "title": "Chat e Messaggistica",
+      "content": "<div class='space-y-4'><p>Quando apri una notifica, si aprirà l'interfaccia completa della chat che offre numerose funzionalità avanzate:</p><div class='grid grid-cols-1 md:grid-cols-2 gap-4 my-4'><div class='border rounded-lg p-4 bg-gray-50'><h4 class='font-medium text-blue-700 mb-2'>Risposte e Conversazioni</h4><ul class='list-disc pl-5 space-y-1'><li>Visualizza la cronologia completa dei messaggi</li><li>Rispondi direttamente a messaggi specifici</li><li>Visualizza le risposte in thread</li></ul></div><div class='border rounded-lg p-4 bg-gray-50'><h4 class='font-medium text-blue-700 mb-2'>Menzioni e Notifiche</h4><ul class='list-disc pl-5 space-y-1'><li>Menziona altri utenti usando @nomeutente</li><li>Ricevi notifiche quando vieni menzionato</li><li>Visualizza chi ha letto i tuoi messaggi</li></ul></div><div class='border rounded-lg p-4 bg-gray-50'><h4 class='font-medium text-blue-700 mb-2'>File e Media</h4><ul class='list-disc pl-5 space-y-1'><li>Condividi facilmente file e documenti</li><li>Visualizza anteprime di immagini e PDF</li><li>Gestisci gli allegati nella barra laterale</li></ul></div><div class='border rounded-lg p-4 bg-gray-50'><h4 class='font-medium text-blue-700 mb-2'>Opzioni Avanzate</h4><ul class='list-disc pl-5 space-y-1'><li>Personalizza i colori dei messaggi</li><li>Crea punti salienti per riepilogo</li><li>Cerca contenuti nella conversazione</li></ul></div></div><p>La barra laterale della chat offre funzionalità aggiuntive per gestire allegati e creare punti salienti per riassumere le informazioni importanti. Puoi minimizzare più chat contemporaneamente e tornare ad esse quando necessario.</p></div>"
+    },
+    {
+      "title": "Nuovi Messaggi e Canali",
+      "content": "<div class='space-y-4'><p>Creare e inviare nuovi messaggi è semplice e intuitivo:</p><div class='relative my-4 rounded-lg border bg-white p-4 shadow-sm'><div class='space-y-4'><div class='flex items-center justify-between'><span class='font-medium'>Nuova Conversazione</span></div><div class='text-sm'><p class='mb-3'>Per avviare una nuova conversazione:</p><ol class='list-decimal pl-5 space-y-2'><li>Clicca sul pulsante <span class='bg-gray-100 px-1 py-0.5 rounded'>+</span> nella barra dei filtri</li><li>Inserisci un titolo descrittivo</li><li>Seleziona i destinatari dall'elenco o dai canali disponibili</li><li>Scrivi il tuo messaggio nel campo di testo</li><li>Aggiungi eventuali allegati se necessario</li><li>Invia il messaggio con il pulsante di invio</li></ol></div></div></div><p>Puoi inviare messaggi a singoli utenti o a interi canali predefiniti. I canali sono gruppi di utenti creati per facilitare la comunicazione di team o dipartimenti specifici.</p><div class='bg-blue-50 border-l-4 border-blue-500 p-4 my-4'><div class='flex'><div class='flex-shrink-0'><svg class='h-5 w-5 text-blue-500' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'><path fill-rule='evenodd' d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z' clip-rule='evenodd' /></svg></div><div class='ml-3'><h3 class='text-sm font-medium text-blue-800'>Suggerimento per i canali</h3><div class='mt-2 text-sm text-blue-700'><p>I canali possono essere interaziendali, consentendo comunicazioni strutturate tra diverse organizzazioni. Il sistema mostrerà automaticamente l'elenco dei canali a cui hai accesso.</p></div></div></div></div></div>"
+    },
+    {
+      "title": "Strumenti Avanzati",
+      "content": "<div class='space-y-4'><p>Il Centro Notifiche include strumenti avanzati per migliorare la tua esperienza:</p><div class='my-4 rounded-lg overflow-hidden border'><div class='bg-gray-50 px-4 py-2 border-b'><span class='font-medium'>Funzionalità Avanzate</span></div><div class='divide-y'><div class='p-4'><h4 class='font-medium mb-1'>Colorazione messaggi</h4><p class='text-sm text-gray-600'>Personalizza il colore dei messaggi per categorizzarli visivamente e facilitare la ricerca di informazioni importanti.</p></div><div class='p-4'><h4 class='font-medium mb-1'>Punti salienti</h4><p class='text-sm text-gray-600'>Crea manualmente o genera automaticamente punti salienti per riassumere le informazioni chiave di una conversazione.</p></div><div class='p-4'><h4 class='font-medium mb-1'>Filtro messaggi</h4><p class='text-sm text-gray-600'>Utilizza i filtri per cercare rapidamente messaggi specifici all'interno di una conversazione.</p></div><div class='p-4'><h4 class='font-medium mb-1'>Gestione destinatari</h4><p class='text-sm text-gray-600'>Aggiungi o rimuovi partecipanti da una conversazione in qualsiasi momento per includere le persone giuste.</p></div><div class='p-4'><h4 class='font-medium mb-1'>Informazioni di lettura</h4><p class='text-sm text-gray-600'>Visualizza chi ha letto i tuoi messaggi e quando, per una migliore tracciabilità della comunicazione.</p></div></div></div><p>Utilizzando questi strumenti avanzati, puoi ottenere il massimo dal sistema di notifiche e migliorare significativamente l'efficacia della tua comunicazione interna.</p></div>"
+    }
+  ],
+  "tours": {
+    "panoramica_notifiche": [
+      {
+        "title": "Centro Notifiche",
+        "description": "Benvenuto nel Centro Notifiche! Questo tour ti mostrerà le funzionalità principali del sistema di comunicazione integrato.",
+        "position": "center"
+      },
+      {
+        "title": "Intestazione",
+        "description": "Qui trovi il titolo della sezione e il pulsante di aiuto per accedere a questa guida contestuale in qualsiasi momento.",
+        "selector": "#notification-sidebar-title",
+        "position": "bottom"
+      },
+      {
+        "title": "Barra di ricerca",
+        "description": "Usa questa barra per cercare rapidamente notifiche in base al testo contenuto nel titolo o nei messaggi. La ricerca è istantanea mentre digiti.",
+        "selector": "#notification-search-input",
+        "position": "bottom"
+      },
+      {
+        "title": "Nuovo messaggio",
+        "description": "Clicca qui per creare e inviare un nuovo messaggio. Potrai selezionare destinatari singoli o interi canali predefiniti.",
+        "selector": "#notification-new-message-button",
+        "position": "right"
+      },
+      {
+        "title": "Filtro per categorie",
+        "description": "Seleziona una categoria specifica per filtrare le notifiche. Ogni categoria ha un colore distintivo per facile riconoscimento.",
+        "selector": "#notification-category-filter",
+        "position": "bottom"
+      },
+      {
+        "title": "Espandi filtri",
+        "description": "Clicca qui per visualizzare filtri aggiuntivi come non lette, preferiti, messaggi con menzioni e molto altro.",
+        "selector": "#notification-filter-toggle",
+        "position": "left"
+      },
+      {
+        "title": "Elenco notifiche",
+        "description": "Qui vengono visualizzate tutte le tue notifiche. Fai clic su una notifica per aprire la conversazione completa. Le notifiche con pin appariranno sempre in cima all'elenco.",
+        "selector": "#notification-list-container",
+        "position": "top"
+      },
+      {
+        "title": "Tour completato",
+        "description": "Hai completato il tour di panoramica! Esplora gli altri tour disponibili per scoprire tutte le funzionalità del Centro Notifiche.",
+        "position": "center"
+      }
+    ],
+    "interfaccia_notifiche": [
+      {
+        "title": "Interfaccia del Centro Notifiche",
+        "description": "Questo tour ti mostrerà come è strutturata l'interfaccia del Centro Notifiche e come navigare tra le diverse sezioni.",
+        "position": "center"
+      },
+      {
+        "title": "Intestazione",
+        "description": "L'intestazione mostra il titolo della sezione e contiene il pulsante di aiuto per accedere alla guida contestuale.",
+        "selector": "#notification-sidebar-title",
+        "position": "bottom"
+      },
+      {
+        "title": "Area principale",
+        "description": "Questa area mostra l'elenco delle notifiche, con le informazioni essenziali per ogni conversazione.",
+        "selector": "#notification-list-container",
+        "position": "top"
+      },
+      {
+        "title": "Indicatore di categoria",
+        "description": "Questa barra colorata indica la categoria della notifica, permettendoti di identificare rapidamente il tipo di messaggio.",
+        "selector": "#notification-category-indicator-1",
+        "position": "right"
+      },
+      {
+        "title": "Anteprima del messaggio",
+        "description": "Qui puoi vedere un'anteprima dell'ultimo messaggio nella conversazione, il mittente e quanto tempo è passato.",
+        "selector": "#notification-preview-1",
+        "position": "left"
+      },
+      {
+        "title": "Indicatore di lettura",
+        "description": "Questo indicatore mostra se hai già letto la notifica. Rosso significa non letta, grigio significa già letta.",
+        "selector": "#notification-read-indicator-1",
+        "position": "left"
+      },
+      {
+        "title": "Tour completato",
+        "description": "Ora conosci meglio l'interfaccia del Centro Notifiche! Esplora gli altri tour per scoprire le funzionalità avanzate.",
+        "position": "center"
+      }
+    ],
+    "filtri_notifiche": [
+      {
+        "title": "Filtri delle Notifiche",
+        "description": "Questo tour ti mostrerà come utilizzare i filtri per trovare rapidamente le notifiche importanti e gestire grandi volumi di comunicazioni.",
+        "position": "center"
+      },
+      {
+        "title": "Ricerca testuale",
+        "description": "Digita qui per cercare parole specifiche nei titoli o nei contenuti dei messaggi. La ricerca è in tempo reale.",
+        "selector": "#notification-search-input",
+        "position": "bottom"
+      },
+      {
+        "title": "Filtro categorie",
+        "description": "Seleziona una categoria specifica per visualizzare solo notifiche di quel tipo. Il menu mostra tutte le categorie disponibili.",
+        "selector": "#notification-category-filter",
+        "position": "bottom"
+      },
+      {
+        "title": "Espandi filtri avanzati",
+        "description": "Clicca qui per accedere a tutti i filtri avanzati disponibili. Da qui potrai filtrare per stato, preferiti e molto altro.",
+        "selector": "#notification-filter-toggle",
+        "position": "left"
+      },
+      {
+        "title": "Filtro non lette",
+        "description": "Attiva questo interruttore per visualizzare solo le notifiche che non hai ancora letto, facilitando la gestione delle comunicazioni nuove.",
+        "selector": "#notification-unread-switch",
+        "position": "right"
+      },
+      {
+        "title": "Filtro preferiti",
+        "description": "Clicca qui per visualizzare solo le notifiche che hai contrassegnato come preferite. Utilizza i preferiti per tenere traccia delle conversazioni importanti.",
+        "selector": "#notification-favorites-filter",
+        "position": "right"
+      },
+      {
+        "title": "Filtro menzioni",
+        "description": "Clicca qui per visualizzare solo le notifiche in cui sei stato menzionato con @nomeutente. Questo facilita il trovare messaggi rilevanti per te.",
+        "selector": "#notification-mentioned-filter",
+        "position": "right"
+      },
+      {
+        "title": "Filtro messaggi inviati",
+        "description": "Clicca qui per visualizzare solo i messaggi che hai inviato tu, utile per tenere traccia delle tue comunicazioni uscenti.",
+        "selector": "#notification-sent-filter",
+        "position": "right"
+      },
+      {
+        "title": "Filtro chat abbandonate",
+        "description": "Clicca qui per visualizzare le chat che hai abbandonato. Potrai vedere la cronologia ma non inviare nuovi messaggi in queste chat.",
+        "selector": "#notification-left-chats-filter",
+        "position": "right"
+      },
+      {
+        "title": "Stato completamento",
+        "description": "Usa questi pulsanti per filtrare tra notifiche attive, completate o tutte. Le conversazioni completate sono quelle contrassegnate come chiuse.",
+        "selector": "#notification-completion-filter",
+        "position": "top"
+      },
+      {
+        "title": "Reset filtri",
+        "description": "Se non trovi ciò che cerchi o vuoi ricominciare, puoi sempre resettare tutti i filtri con questo pulsante.",
+        "selector": "#notification-reset-filters",
+        "position": "top"
+      },
+      {
+        "title": "Tour completato",
+        "description": "Ora sai come utilizzare tutti i filtri disponibili! Questo ti aiuterà a gestire efficacemente le tue notifiche anche con grandi volumi di comunicazioni.",
+        "position": "center"
+      }
+    ],
+    "gestione_notifiche": [
+      {
+        "title": "Gestione delle Notifiche",
+        "description": "Questo tour ti mostrerà come interagire con le singole notifiche e come gestirle efficacemente.",
+        "position": "center"
+      },
+      {
+        "title": "Notifica",
+        "description": "Ogni elemento rappresenta una notifica o un messaggio. Fai clic su una notifica per aprire la conversazione completa e visualizzare tutti i messaggi.",
+        "selector": ".notification-item:first-child",
+        "position": "right"
+      },
+      {
+        "title": "Indicatore di categoria",
+        "description": "Il colore a sinistra indica la categoria della notifica, permettendoti di identificare rapidamente il tipo di comunicazione.",
+        "selector": ".category-vertical-bar:first-child",
+        "position": "right"
+      },
+      {
+        "title": "Pin",
+        "description": "Clicca su questa icona per fissare una notifica importante in cima all'elenco. Le notifiche con pin sono sempre visibili per un accesso rapido.",
+        "selector": ".pin-icon:first-child",
+        "position": "right"
+      },
+      {
+        "title": "Preferiti",
+        "description": "Clicca sulla stella per contrassegnare una notifica come preferita, facilitando il filtraggio successivo.",
+        "selector": ".bi-star:first-child, .bi-star-fill:first-child",
+        "position": "right"
+      },
+      {
+        "title": "Menzione",
+        "description": "Questa icona indica se sei stato menzionato nella conversazione con @nomeutente. L'icona sarà evidenziata per le menzioni non lette.",
+        "selector": ".bi-at:first-child",
+        "position": "right"
+      },
+      {
+        "title": "Titolo e tempo",
+        "description": "Qui vedi il titolo della notifica e quanto tempo è passato dall'ultimo messaggio nella conversazione.",
+        "selector": ".notification-header:first-child",
+        "position": "bottom"
+      },
+      {
+        "title": "Anteprima messaggio",
+        "description": "Qui puoi vedere un'anteprima dell'ultimo messaggio nella conversazione, che ti aiuta a decidere se aprirla.",
+        "selector": ".last-message-preview:first-child",
+        "position": "bottom"
+      },
+      {
+        "title": "Indicatore di lettura",
+        "description": "Clicca qui per cambiare lo stato di lettura della notifica. Il rosso indica che la notifica non è stata letta, il grigio indica che è già stata letta.",
+        "selector": ".read-indicator-wrapper:first-child",
+        "position": "left"
+      },
+      {
+        "title": "Chat abbandonate",
+        "description": "Le chat che hai abbandonato sono contrassegnate con un'etichetta. Potrai visualizzare la cronologia ma non inviare nuovi messaggi.",
+        "selector": "[data-has-left='true']",
+        "position": "bottom"
+      },
+      {
+        "title": "Tour completato",
+        "description": "Ora conosci tutte le opzioni per gestire le tue notifiche! Organizza efficacemente le tue comunicazioni utilizzando queste funzionalità.",
+        "position": "center"
+      }
+    ]
+  }
+}

@@ -1,0 +1,64 @@
+{
+    "title": "Guida Panoramica Progetto",
+    "description": "Questa sezione mostra una panoramica generale delle informazioni sul progetto.",
+    "sections": [
+      {
+        "title": "Informazioni Generali",
+        "content": "<p>La scheda <strong>Informazioni Generali</strong> mostra i dettagli principali del progetto:</p><ul><li><strong>Stato</strong>: attivo, completato o sospeso</li><li><strong>ID ERP</strong>: identificativo nel sistema ERP, se disponibile</li><li><strong>Cliente</strong>: cliente associato al progetto</li><li><strong>Categoria</strong>: tipologia del progetto</li><li><strong>Data inizio</strong>: data di avvio del progetto</li><li><strong>Data scadenza</strong>: data prevista di completamento</li><li><strong>Attività</strong>: numero totale, completate e in ritardo</li><li><strong>Membri team</strong>: numero di utenti assegnati al progetto</li></ul><p>Queste informazioni forniscono una visione d'insieme rapida sullo stato e le caratteristiche del progetto.</p>",
+        "tourId": "panoramica_informazioni"
+      },
+      {
+        "title": "Descrizione Progetto",
+        "content": "<p>La <strong>Descrizione del Progetto</strong> fornisce dettagli più approfonditi sugli obiettivi, lo scopo e qualsiasi altra informazione rilevante sul progetto.</p><p>Questa sezione consente di comprendere meglio il contesto del progetto, i suoi obiettivi e le eventuali note importanti inserite durante la creazione o le successive modifiche.</p>",
+        "tourId": "panoramica_descrizione"
+      }
+    ],
+    "tours": {
+      "panoramica_informazioni": [
+        {
+          "title": "Informazioni Generali",
+          "description": "Questa sezione mostra i dettagli principali del progetto.",
+          "selector": ".space-y-6 > .card:first-child",
+          "position": "top"
+        },
+        {
+          "title": "Stato Progetto",
+          "description": "Indica se il progetto è attivo, completato o sospeso.",
+          "selector": ".space-y-6 > .card:first-child .badge",
+          "position": "right"
+        },
+        {
+          "title": "Date del Progetto",
+          "description": "Le date di inizio e fine prevista del progetto.",
+          "selector": ".space-y-6 > .card:first-child .items-center .gap-1",
+          "position": "right"
+        },
+        {
+          "title": "Informazioni Cliente",
+          "description": "Il cliente associato al progetto, se presente.",
+          "selector": ".space-y-6 > .card:first-child div:contains('Cliente')",
+          "position": "right"
+        },
+        {
+          "title": "Statistiche Attività",
+          "description": "Numero di attività totali, completate e in ritardo.",
+          "selector": ".space-y-6 > .card:first-child div:contains('Attività')",
+          "position": "right"
+        }
+      ],
+      "panoramica_descrizione": [
+        {
+          "title": "Descrizione Progetto",
+          "description": "Visualizza la descrizione dettagliata del progetto.",
+          "selector": ".space-y-6 > .card:nth-child(2)",
+          "position": "top"
+        },
+        {
+          "title": "Contenuto Descrizione",
+          "description": "Il testo completo della descrizione del progetto.",
+          "selector": ".space-y-6 > .card:nth-child(2) p",
+          "position": "top"
+        }
+      ]
+    }
+  }

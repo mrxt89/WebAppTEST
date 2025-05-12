@@ -1,0 +1,107 @@
+{
+    "title": "Gestione Attività",
+    "description": "Questa sezione permette di visualizzare, gestire e tracciare le tue attività di progetto.",
+    "sections": [
+      {
+        "title": "Panoramica",
+        "content": "<p>La pagina <strong>Gestione Attività</strong> ti permette di gestire e visualizzare tutte le attività assegnate a te. Puoi filtrare le attività, cambiare la visualizzazione, tracciare il tempo e monitorare lo stato di avanzamento.</p>",
+        "tourId": "panoramica_attivita"
+      },
+      {
+        "title": "Visualizzazioni disponibili",
+        "content": "<p>Puoi visualizzare le tue attività in diversi modi:</p><ul><li><strong>Lista</strong>: visualizzazione a tabella con tutti i dettagli</li><li><strong>Kanban</strong>: visualizzazione a schede organizzate per stato</li><li><strong>Timeline</strong>: visualizzazione organizzata per scadenza</li><li><strong>Statistiche</strong>: grafici e dati riassuntivi</li></ul><p>Puoi cambiare visualizzazione usando i pulsanti in alto a destra.</p>",
+        "tourId": "visualizzazioni"
+      },
+      {
+        "title": "Filtri e ricerche",
+        "content": "<p>Puoi filtrare le attività usando la barra dei filtri in alto. I filtri disponibili includono:</p><ul><li>Ricerca testuale</li><li>Priorità</li><li>Stato</li><li>Scadenza</li><li>Progetto</li><li>Utente coinvolto</li></ul><p>I filtri possono essere combinati tra loro. Usa il pulsante 'Reset filtri' per rimuovere tutti i filtri applicati.</p>"
+      },
+      {
+        "title": "Gestione delle attività",
+        "content": "<p>Puoi gestire le attività nei seguenti modi:</p><ul><li><strong>Visualizzare dettagli</strong>: clicca su un'attività per aprire la finestra dei dettagli</li><li><strong>Cambiare stato</strong>: nella visualizzazione Kanban, trascina le schede tra le colonne</li><li><strong>Completare un'attività</strong>: usa il pulsante 'Completa' o cambia lo stato in 'Completata'</li><li><strong>Aggiungere commenti</strong>: nella finestra dei dettagli, usa la sezione commenti</li></ul>"
+      },
+      {
+        "title": "Timesheet e ore lavorate",
+        "content": "<p>La scheda <strong>Ore lavorate</strong> permette di:</p><ul><li>Registrare le ore lavorate su ciascuna attività</li><li>Visualizzare il riepilogo settimanale e mensile</li><li>Visualizzare report dettagliati per progetto e attività</li><li>Esportare i dati in formato Excel o CSV</li></ul><p>Per registrare le ore, clicca sul pulsante '+' nel giorno corrispondente.</p>",
+        "tourId": "timesheet"
+      },
+      {
+        "title": "Statistiche e reportistica",
+        "content": "<p>Nella visualizzazione <strong>Statistiche</strong> puoi visualizzare:</p><ul><li>Distribuzione delle attività per stato</li><li>Distribuzione per priorità</li><li>Distribuzione per scadenza</li><li>Completamento complessivo</li></ul><p>Questi dati possono aiutarti a monitorare il tuo carico di lavoro e l'avanzamento.</p>"
+      }
+    ],
+    "tours": {
+      "panoramica_attivita": [
+        {
+          "title": "Benvenuto in Gestione Attività",
+          "description": "Questo tour ti mostrerà come navigare e utilizzare la pagina di gestione delle attività."
+        },
+        {
+          "title": "Schede principali",
+          "description": "Puoi passare dalla visualizzazione delle attività al timesheet usando questi tab.",
+          "selector": "#tabsList",
+          "position": "bottom"
+        },
+        {
+          "title": "Filtri",
+          "description": "Usa questi filtri per trovare facilmente le attività che ti interessano.",
+          "selector": ".card:first-child",
+          "position": "bottom"
+        },
+        {
+          "title": "Visualizzazione principale",
+          "description": "Qui vengono mostrate le tue attività nel formato selezionato.",
+          "selector": "#tasksContent",
+          "position": "top"
+        },
+        {
+          "title": "Interazione con le attività",
+          "description": "Puoi cambiare lo stato e completare le attività usando questi pulsanti.",
+          "selector": "#completeTaskBtn",
+          "position": "top"
+        },
+        {
+          "title": "Interazione con le attività",
+          "description": "Puoi aprire i dettagli di un'attività cliccando su di essa."
+        }
+      ],
+      "visualizzazioni": [
+        {
+          "title": "Cambiare visualizzazione",
+          "description": "Puoi cambiare il modo in cui visualizzi le tue attività usando questi pulsanti.",
+          "selector": ".flex.items-center.bg-white.border.rounded-md",
+          "position": "left"
+        },
+        {
+          "title": "Visualizzazione lista",
+          "description": "La visualizzazione a lista mostra tutti i dettagli in formato tabella.",
+          "selector": "button[title='Visualizzazione lista']",
+          "position": "bottom"
+        },
+        {
+          "title": "Visualizzazione kanban",
+          "description": "La visualizzazione kanban organizza le attività per stato in colonne.",
+          "selector": "button[title='Visualizzazione kanban']",
+          "position": "bottom"
+        },
+        {
+          "title": "Visualizzazione timeline",
+          "description": "La visualizzazione timeline organizza le attività per scadenza.",
+          "selector": "button[title='Visualizzazione scadenze']",
+          "position": "bottom"
+        },
+        {
+          "title": "Visualizzazione statistiche",
+          "description": "Le statistiche mostrano grafici e dati riassuntivi sulle tue attività.",
+          "selector": "button[title='Visualizzazione statistiche']",
+          "position": "bottom"
+        },
+        {
+          "title": "Mostrare/nascondere filtri",
+          "description": "Puoi mostrare o nascondere la barra dei filtri usando questo pulsante.",
+          "selector": "button[title='Mostra filtri'], button[title='Nascondi filtri']",
+          "position": "bottom"
+        }
+      ]
+    }
+  }

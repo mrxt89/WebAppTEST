@@ -1,0 +1,20 @@
+{
+  "development": {
+    "API_BASE_URL": "http://10.0.0.19:3001/api",
+    "SWEET_ALERT_COLORS": {
+      "cancelButtonColor": "rgb(155, 33, 33)",
+      "confirmButtonColor": "rgb(30, 97, 155)",
+      "cancelButtonText": "Annulla",
+      "zIndex": 9999
+    }
+  },
+  "production": {
+    "API_BASE_URL": "http://10.0.0.129:3000/api",
+    "SWEET_ALERT_COLORS": {
+      "cancelButtonColor": "rgb(155, 33, 33)",
+      "confirmButtonColor": "rgb(30, 97, 155)",
+      "cancelButtonText": "Annulla",
+      "zIndex": 9999
+    }
+  }
+}

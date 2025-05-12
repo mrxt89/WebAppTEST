@@ -1,0 +1,1977 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.colorPrimary {
+  color: var(--primary);
+}
+
+.colorSecondary {
+  color: var(--secondary);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Assicura che SweetAlert sia sempre visibile */
+.swal-container {
+  z-index: 10000 !important; /* Un valore più alto di quello di ReactModal */
+}
+
+.swal-backdrop {
+  z-index: 9999 !important;
+}
+
+.swal-popup {
+  z-index: 10001 !important;
+}
+
+/* Questo aiuta con l'animazione */
+.swal2-shown {
+  overflow-y: visible !important;
+  padding-right: 0 !important;
+}
+
+/* Assicura che non ci siano problemi di overflow */
+body.swal2-shown:not(.swal2-no-backdrop) {
+  overflow-y: visible !important;
+  padding-right: 0 !important;
+}
+
+
+/* CSS per garantire che il pulsante WikiButton sia sempre accessibile */
+button[aria-label="Aiuto e Wiki"] {
+  position: relative !important;
+  z-index: 2500 !important;
+  pointer-events: auto !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Assicura che gli overlay dei modali non blocchino il pulsante */
+.ReactModal__Overlay,
+.modal-overlay,
+.dialog-overlay {
+  pointer-events: auto !important;
+}
+
+/* Crea un layer di protezione sui contenuti dei modali */
+.ReactModal__Content:before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+/* Migliora la visibilità quando un modale è aperto */
+.ReactModal__Body--open button[aria-label="Aiuto e Wiki"] {
+  transform: scale(1.1) !important;
+  transition: transform 0.2s ease !important;
+}
+
+/* Selettori aggiuntivi per garantire l'accessibilità nei vari contesti */
+.ReactModal__Overlay button[aria-label="Aiuto e Wiki"],
+.modal-overlay button[aria-label="Aiuto e Wiki"],
+.dialog-overlay button[aria-label="Aiuto e Wiki"] {
+  pointer-events: auto !important;
+}
+
+/* Migliora la visibilità durante l'interazione */
+button[aria-label="Aiuto e Wiki"]:hover,
+button[aria-label="Aiuto e Wiki"]:focus {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Assicura che il pulsante sia sempre visibile, anche con modali scuri */
+.notification-sidebar.show ~ button[aria-label="Aiuto e Wiki"],
+.ReactModal__Content ~ button[aria-label="Aiuto e Wiki"] {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3) !important;
+}
+
+.archa-input {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+
+}
+
+.main-container {
+  padding-top: 4rem; /* Spazio per l'header fisso */
+}
+
+@media (max-width: 640px) {
+  .primaryButton {
+    font-size: 0.9rem;
+  }
+}
+
+/* CUSTOM CLASS FOR SWEETALERT */
+
+
+/* LOGIN */
+/* /src/styles/global.css */
+.login-background {
+ /* background-image: url('/images/backgrounds/backgroundLogin3.png'); */
+  background-size: cover;
+  background-position: center;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--primary);
+}
+
+.login-overlay {
+  background-color: rgba(233, 233, 233, 0.7);
+  padding: 0px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.login-overlay h2,
+.login-overlay label,
+.login-overlay .primaryButton {
+  color: var(--primary);
+}
+
+.login-overlay input {
+  color: black; /* Colore del testo degli input */
+  background-color: rgba(255, 255, 255, 0.637); /* Colore di sfondo degli input */
+  opacity: 1; /* Opacità degli input */
+}
+
+
+
+/* Body e layout base */
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+.main-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.page-content {
+  position: relative;
+  top: 50px;
+  z-index: 0;
+}
+
+/* Navbar */
+#main-navbar.navbar {
+  background-color: var(--primary);
+  position: fixed;
+  top: 0;
+  color: white;
+  display: flex;
+  padding: 10px;
+  height: 60px;
+  z-index: 1000;
+}
+
+.logoNavbar {
+  display: flex;
+  color: var(--accent);
+  margin-inline: 30px;
+  text-decoration: none;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.textNavbar {
+  margin-inline: 30px;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+  display: flex!important;
+  position: fixed;
+  top: 64px;
+  margin: 0px!important;
+  height: 40px;
+  width: 100%;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--accent)!important;
+  border-radius: 0.375rem;
+  margin-inline: 1rem;
+  font-size: 0.875rem;
+  align-items: center;
+  z-index: 10;
+}
+
+.breadcrumb-item {
+  margin-right: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.breadcrumb-item button {
+  background: none;
+  border: none;
+  color: var(--muted)!important;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  transition: background-color 0.3s;
+  display: flex;
+  align-items: center;
+}
+
+.breadcrumb-item button:hover {
+  background-color: var(--muted)!important;
+}
+
+/* ReactModal */
+.ReactModal__Overlay {
+  z-index: 10;
+}
+
+/* Menu */
+.mainMenu {
+  display: flex;
+  grid-template-columns: repeat(2, 1fr); /* Due colonne per riga */
+  gap: 1rem; /* Spaziatura tra i pulsanti */
+  width: 100%; /* La griglia occupa tutta la larghezza */
+  height: 100%; /* La griglia occupa tutta l'altezza */
+  padding-top: 120px;
+  padding-inline: 40px;
+}
+
+
+.primaryButton {
+  background-color: var(--primary);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  transition: background-color 0.3s;
+  width: 100%;
+  height: 100%;
+}
+
+.button:hover {
+  background-color: var(--accent);
+}
+
+/* Altri stili globali */
+
+.archa-button {
+  background: var(--accent);
+  border: var(--bs-border-width) var(--bs-border-style) var(--bs-border-color)!important;
+  color: var(--primary);
+  cursor: pointer;
+  border-radius: 0.375rem;
+  transition: background-color 0.3s;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  justify-content: center;
+}
+
+.archa-button:hover {
+  background-color: var(--muted);
+}
+
+/* Dropdown Menu */
+.user-dropdown-menu {
+  position: absolute;
+  z-index: 2000;
+  right: auto;
+  top: 100%;
+  background-color: white;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+  opacity: 0;
+  width: 160px;
+  text-align: right;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+}
+
+.user-dropdown-menu.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #dc3545;
+}
+
+.anchor-button {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.anchor-button:hover {
+  background: var(--secondary);
+}
+
+/* Altri stili */
+
+.text-gradient {
+  background: linear-gradient(90deg,#6366f1,rgba(168,85,247,.8));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Notifiche */
+.notification-sidebar {
+  position: fixed;
+  right: -350px;
+  top: 64px;
+  width: 350px;
+  height: calc(100% - 64px);
+  background: var(--background);
+  border-left: 1px solid var(--border);
+  padding: 5px;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+  z-index: 999;
+}
+/* Se window.innerWidth < 768px, width: 100% */
+@media (max-width: 768px) {
+  .notification-sidebar {
+    width: 100%;
+    right: -768px;
+    top: 65px;
+    height: calc(100% - 65px);
+    border-left: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+.notification-sidebar.show {
+  right: 0;
+  transition: right 0.7s ease;
+}
+
+/* Se window.innerWidth < 768px, right: 0 */
+@media (max-width: 768px) {
+  .notification-sidebar.show {
+    right: 0;
+    top: 65px;
+    height: calc(100% - 65px);
+    border-left: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+.notification-sidebar.hide {
+  right: -350px;
+  transition: right 0.7s ease;
+}
+
+/* Se window.innerWidth < 768px, right: -768px */
+@media (max-width: 768px) {
+  .notification-sidebar.hide {
+    right: -768px;
+    top: 65px;
+    height: calc(100% - 65px);
+    border-left: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+.notifications-list {
+  overflow-y: auto;
+  /* la barra laterale però non viene mostrata */
+  overflow-x: hidden;
+  height: 85%
+}
+
+.pin-animation {
+  transform: scale(1.3);
+  color: #000000 !important; /* Cambiato in nero */
+}
+
+/* Aggiungi anche uno stile per migliorare l'animazione della sidebar quando cambia a causa dell'ordinamento */
+.notification-item {
+  transition: transform 0.4s ease, opacity 0.3s ease;
+  position: relative;
+}
+
+/* Classi di animazione per il riordinamento */
+.pin-exit-active {
+  animation: slideOutRight 0.4s forwards;
+}
+
+.pin-enter-active {
+  animation: slideInFromLeft 0.5s forwards;
+  animation-delay: 0.1s; /* Piccolo ritardo per dare tempo all'uscita */
+}
+
+@keyframes slideOutRight {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes slideInFromLeft {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Aggiungi anche questi stili per l'icona del pin */
+.pin-icon {
+  transition: transform 0.4s ease, color 0.4s ease;
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+
+.pin-animation {
+  transform: scale(1.3);
+  color: #000000 !important;
+}
+
+.notification-item {
+  display: flex;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  position: relative;
+  background: var(--background);
+  margin-bottom: 1rem;
+  margin-block: 0.5rem;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+  height: 80px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.notification-item:hover {
+  transform: scale(1.02);
+}
+
+.isClosed {
+  background-color: #53c99378!important;
+}
+
+.category-vertical-bar {
+  width: 4px;
+  margin-right: 10px;
+}
+
+.read-indicator-wrapper {
+  display: flex;
+  background-color: #e7e7e7;
+  border-radius: 10%;
+  cursor: pointer;
+  width: 10px;
+  height: 90%;
+  margin-block: auto;
+  margin-left: 5px;
+}
+
+.notification-item:hover .read-indicator-wrapper {
+  width: 15px;
+  transition: width 0.3s cubic-bezier(0.075, 0.82, 0.165, 1);
+}
+
+.notification-content1A {
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  width: 25px;
+}
+
+.notification-content1B {
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  width: 25px;
+  
+}
+
+.notification-content2 {
+  flex: 1;
+}
+
+.notification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e7e7e7;
+  height: 35px;
+}
+
+.filterControls {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  height: 80px;
+  padding: 0rem;
+  border-bottom: 1px solid #e7e7e7;
+}
+
+.search-bar {
+  width: 100%;
+  font-size: 0.9rem;
+  padding: 1px;
+}
+
+.search-bar button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.notification-title {
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  word-break: break-all;
+  width: 185px;
+  font-size: 0.8em;
+}
+
+.notification-header .unread {
+  color: rgb(224, 42, 42);
+}
+
+.notification-header .name {
+  font-weight: bold;
+}
+
+.notification-header .time {
+  color: grey;
+  font-size: 10px;
+  width: 50px;
+  text-align: right;
+}
+
+.notification-item .sender {
+  color: rgb(0, 0, 0);
+  font-size: 0.8em;
+}
+
+.notification-sidebar h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.notification-icon {
+  position: relative;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-inline-end: 80px;
+}
+
+.notification-count {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  background: rgb(224, 42, 42);
+  color: white;
+  border-radius: 20%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0rem 0.4rem;
+  font-size: 0.7rem;
+}
+
+.last-message-preview {
+  color: grey;
+  font-size: 0.7em;
+  max-width: 250px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Stili CSS da aggiungere al tuo foglio di stile per le chat abbandonate */
+
+/* Stile per la notifica nella sidebar */
+.notification-item.chat-left {
+  position: relative;
+  background-color: rgba(253, 230, 138, 0.1) !important; /* Sfondo giallo chiaro */
+}
+
+.notification-item.chat-left:after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  background-color: #f59e0b; /* Bordo arancione/giallo */
+}
+
+.notification-item.chat-left .notification-title {
+  color: #78350f !important; /* Testo marrone scuro */
+}
+
+/* Banner per le chat abbandonate */
+.chat-left-banner {
+  background-color: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  color: #92400e;
+}
+
+.chat-left-banner svg {
+  color: #f59e0b;
+  margin-right: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Disattiva interazioni per le chat abbandonate */
+.chat-left-disabled {
+  opacity: 0.7;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Stile per il tag nella chat abbandonata */
+.chat-left-tag {
+  display: inline-flex;
+  align-items: center;
+  background-color: #fef3c7;
+  color: #92400e;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  margin-left: 0.5rem;
+}
+
+.chat-left-tag svg {
+  height: 0.75rem;
+  width: 0.75rem;
+  margin-right: 0.25rem;
+}
+
+/* Pulsanti disabilitati nella chat abbandonata */
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Animazione per messaggi filtrati */
+.filtered-message-highlight {
+  animation: highlight-pulse 2s ease-in-out;
+}
+
+@keyframes highlight-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+  50% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+/* Imposta l'aspetto del contentEditable quando disabilitato */
+[contentEditable=true][aria-disabled=true] {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+
+/* ChatPage.css */
+.custom-popover-content {
+  z-index: 100000 !important; /* Assicurati che il valore sia sufficientemente alto */
+}
+
+/* This class ensures that all emojis have a consistent font size */
+.emoji-picker-container {
+  font-size: 20px; /* Set emoji size */
+}
+
+/* Apply this class to the container or input field where emojis will appear */
+.emoji-text-input {
+  font-size: 20px; /* Ensures that emojis within the input also appear at 20px */
+}
+
+.chat-backgroundImage {
+  background-image: url('/images/backgrounds/chatBackground2.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.background-overlay {
+  background: rgba(255, 255, 255, 0.7);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.minimized-chats {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.045);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  z-index: 999;
+  font-size: 12px;
+  padding: 0; /* Default padding is 0 */
+  backdrop-filter: blur(2px); /* Applica l'effetto blur */
+}
+
+.minimized-chats.visible {
+  padding: 7px 5px;
+  border-top: #1f293765 1px solid;
+  box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.2);
+  animation: openChat 0.5s ease-out forwards;
+}
+
+.minimized-chat {
+  background: var(--primary);
+  padding: 10px 10px;
+  margin-right: 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.minimized-chat-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1; /* Limita il testo a una riga */
+  -webkit-box-orient: vertical;
+  white-space: normal; /* Permette il word break */
+  word-break: break-all; /* Spezza le parole se necessario */
+}
+
+.minimized-chat:hover {
+  background: rgba(48, 59, 68, 0.8);
+}
+
+.minimized-chat-icon.new-message {
+  position: fixed;
+  top: 2px;
+  color: red;
+  background-color: transparent;
+
+}
+
+
+.ReactModal__Overlay {
+  background-color: rgba(0, 0, 0, 0.15)!important;
+  transition: background-color 0.3s ease-in-out;
+}
+
+.ReactModal__Content {
+  transform: translate(-50%, -50%);
+  background-color: white;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+@keyframes openChat {
+  from {
+    transform: translateY(10%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes closeChat {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(10%);
+    opacity: 0;
+  }
+}
+
+.reply-preview {
+  border-left: 2px solid #888;
+  padding-left: 10px;
+  margin-bottom: 5px;
+  font-size: 0.9em;
+  color: #555;
+}
+
+.reply-content {
+  background-color: #f0f0f0;
+  border-radius: 5px;
+  padding: 5px;
+  margin-top: 5px;
+}
+
+
+.chat-open {
+  animation: openChat 0.3s ease-out forwards;
+}
+
+.chat-close {
+  animation: closeChat 0.3s ease-out forwards;
+}
+
+.chat-page {
+  position: fixed;
+  top: 10%;
+  left: 20%;
+  width: 60%;
+  height: 80%;
+  background-color: white;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+  z-index: 1000;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* Chat */
+.chat-top-bar {
+  height: 60px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1rem;
+  background-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  backdrop-filter: saturate(1);
+  z-index: 50;
+  flex-shrink: 0;
+  border-bottom: 1px solid #eee;
+}
+
+.chat-title {
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  word-break: break-all;
+  width: 80%;
+}
+
+.chat-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chat-messages {
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.chat-list {
+  padding: 1rem;
+}
+
+.chat-message {
+  margin-bottom: 1rem;
+}
+
+.bg-green {
+  background-color: green;
+}
+
+.bg-yellow {
+  background-color: yellow;
+}
+
+.bg-red {
+  background-color: red;
+}
+
+.user-list-itemsContainer {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.user-list {
+  max-height: 390px;
+  overflow-y: hidden;
+  position: relative;
+  left: 10px;
+  padding: 0.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  background-color: #ffffff;
+}
+
+.user-list input[type="text"] {
+  padding: 8px;
+  width: calc(100% - 36px);
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  transition: border-color 0.2s;
+}
+
+.user-list input[type="text"]:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+}
+
+.user-list .user-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  margin-bottom: 5px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.user-list .user-item:hover {
+  background-color: #f1f1f1;
+}
+
+.user-list .user-item input[type="checkbox"] {
+  margin-right: 12px;
+}
+
+.user-list .user-item span {
+  font-size: 0.95rem;
+  color: #333;
+}
+
+.chat-message-sender {
+  font-weight: bold;
+}
+
+.chat-message-body {
+  margin-left: 1rem;
+}
+
+.chat-bottom-bar {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  border-top: 1px solid #ccc;
+  flex-shrink: 0;
+}
+
+.chat-bottom-bar input {
+  flex-grow: 1;
+  margin-right: 1rem;
+  padding: 0.5rem;
+}
+
+.chat-bottom-bar button {
+  padding: 0.5rem 1rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease-in-out;
+}
+
+.emoji-picker {
+  position: absolute;
+  bottom: 50px;
+  right: 10px;
+}
+
+.mention-suggestions{
+  position: absolute;
+  bottom: 80px;
+  background-color: rgba(36, 121, 102, 0.85);
+  color: white;
+  border: 1px solid #383838;
+  border-radius: 5px;
+  padding: 0.5rem;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.mention-suggestions:hover {
+  background-color:rgba(53, 187, 158, 0.95);
+}
+
+.mention-suggestion-item {
+  padding: 8px;
+  margin: 2px 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mention-suggestion-item:hover {
+  background-color: #3c9a9a; /* Colore di sfondo per il suggerimento al passaggio del mouse */
+  color: #333;
+}
+
+/* Aggiungi questo CSS al file di stile della tua applicazione */
+
+@keyframes pulse-highlight {
+  0% { background-color: rgba(59, 130, 246, 0.4); }
+  50% { background-color: rgba(59, 130, 246, 0.2); }
+  100% { background-color: rgba(59, 130, 246, 0); }
+}
+
+.highlight-message {
+  animation: pulse-highlight 2s ease-in-out;
+  border-radius: 0.375rem; /* 6px */
+  position: relative;
+}
+
+.highlight-message::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 4px;
+  background-color: rgb(59, 130, 246);
+  border-top-left-radius: 0.375rem;
+  border-bottom-left-radius: 0.375rem;
+  opacity: 0.8;
+}
+
+/* Per una migliore leggibilità in modalità dark */
+.dark .highlight-message {
+  animation: pulse-highlight-dark 2s ease-in-out;
+}
+
+@keyframes pulse-highlight-dark {
+  0% { background-color: rgba(37, 99, 235, 0.3); }
+  50% { background-color: rgba(37, 99, 235, 0.15); }
+  100% { background-color: rgba(37, 99, 235, 0); }
+}
+
+/* Stilizzazione per il selettore del numero di messaggi */
+.search-results-count {
+  font-size: 0.75rem;
+  color: #4b5563;
+  background-color: #e5e7eb;
+  border-radius: 9999px;
+  padding: 0.125rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+}
+
+.search-results-count.has-results {
+  color: #2563eb;
+  background-color: #dbeafe;
+}
+
+/* Miglioramento stile bottoni navigazione */
+.search-nav-button {
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  color: #4b5563;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.search-nav-button:hover:not(:disabled) {
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+.search-nav-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.search-nav-button.active {
+  background-color: #dbeafe;
+  color: #2563eb;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+}
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 5px;
+  width: 80%;
+  max-width: 500px;
+}
+
+.chatLayout-Sidebar {
+  background-color: #f9f9f9;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  transition: width 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+  overflow: hidden; /* Assicura che il contenuto non debordi durante la transizione */
+}
+
+/* STILI PER DIAGRAMMI GANTT */
+@import "gantt-task-react/dist/index.css";
+
+.gantt-container .gantt-horizontal-scroll {
+  overflow-x: auto !important;
+  scrollbar-width: thin;
+}
+.gantt-container .gantt-vertical-scroll {
+  overflow-y: auto !important;
+  scrollbar-width: thin;
+}
+
+
+/* Stili CSS da aggiungere alla sezione style di TasksKanban.jsx */
+
+/* Transizioni fluide */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+}
+
+/* Migliorare le transizioni della fase di drag */
+.task-card {
+  transition: transform 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease;
+}
+
+.task-card.dragging {
+  opacity: 0.6;
+  transform: scale(0.95);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Transizione durante l'aggiornamento */
+.task-card.updating {
+  animation: pulsate 2s infinite;
+}
+
+@keyframes pulsate {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+/* Stili per la colonna di destinazione */
+.kanban-column.drop-target {
+  transition: background-color 0.3s ease;
+  background-color: rgba(99, 102, 241, 0.1);
+  box-shadow: inset 0 0 0 2px rgba(99, 102, 241, 0.5);
+}
+
+/* Animazione per le modifiche di stato */
+.task-move-enter {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.task-move-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.task-move-exit {
+  opacity: 1;
+}
+
+.task-move-exit-active {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 300ms, transform 300ms;
+}
+
+/* Sistema di espansione migliorato con transizioni più fluide */
+.kanban-column {
+  flex: 1;
+  min-width: 0;
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  transition: flex 0.5s cubic-bezier(0.25, 1, 0.5, 1), 
+              box-shadow 0.5s cubic-bezier(0.25, 1, 0.5, 1),
+              transform 0.3s ease;
+  position: relative;
+}
+
+.kanban-column:hover {
+  flex: 1.6;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+/* Indicatore di caricamento durante aggiornamento */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 20;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.loading-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.loading-spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-left-color: #3b82f6;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+
+/* Animazione per evidenziare un messaggio filtrato */
+@keyframes highlightMessage {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+.filtered-message-highlight {
+  animation: highlightMessage 1.5s ease-in-out;
+}
+
+/* Stile per l'icona della tavolozza colori */
+.color-picker-area {
+  position: relative;
+  right: 8rem;
+}
+
+/* Stile per il selettore colori */
+.color-picker-menu {
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease-in-out;
+}
+
+/* Stile per i messaggi colorati */
+.message-colored {
+  transition: background-color 0.3s ease;
+}
+
+/* Stile per pannello di filtro */
+.filter-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.filter-panel.open {
+  max-height: 500px;
+}
+
+/* Stili per i badge di filtro */
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.filter-badge-color {
+  background-color: #e5e7eb;
+  color: #4b5563;
+}
+
+.filter-badge-text {
+  background-color: #dbeafe;
+  color: #3b82f6;
+}
+
+
+/* Stili per il drag & drop - Versione ottimizzata */
+
+/* Aumenta l'efficacia e la coerenza del sistema di drag and drop */
+
+/* Assicura che i contenuti espansi siano visibili sopra gli altri elementi */
+.bom-expanded-item {
+  position: relative;
+  z-index: 10;
+}
+
+/* Stile per elementi durante il trascinamento */
+.dragging-component {
+  transform: rotate(1deg) !important;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.15) !important;
+  opacity: 0.8 !important;
+  cursor: grabbing !important;
+}
+
+/* Contenitore degli elementi espansi */
+.expansion-container {
+  position: relative;
+  z-index: 20;
+  overflow: visible !important;
+}
+
+/* Droppable containers - garantisce che siano sempre visibili e ricevano eventi */
+.droppable-container {
+  position: relative;
+  overflow: visible !important;
+  pointer-events: auto !important;
+}
+
+/* Rimuove eventuali clip che possono nascondere gli elementi */
+.no-clip {
+  overflow: visible !important;
+  clip: auto !important;
+  clip-path: none !important;
+}
+
+/* Modifica per la lista virtualizzata */
+.react-window-list {
+  overflow: visible !important;
+}
+
+/* COMPONENTI NELLA SIDEBAR */
+
+/* Sidebar droppable genera struttura che ottimizza il drag */
+.sidebar-droppable {
+  pointer-events: none;
+}
+
+/* Mentre i figli diretti della sidebar possono essere draggati */
+.sidebar-droppable > * {
+  pointer-events: auto !important;
+}
+
+/* MIGLIORAMENTI DURANTE IL DRAG - CLASSE AGGIUNTA A BODY */
+/* Stili aggiornati per migliorare il drag and drop in strutture multilivello */
+
+/* STILI STRUTTURALI - definiscono la struttura base */
+.bom-expanded-item {
+  position: relative;
+  z-index: auto; /* Importante: z-index gestito con logica basata sul livello */
+}
+
+/* Stile per elementi durante il trascinamento */
+.dragging-component {
+  transform: rotate(1deg) !important;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.15) !important;
+  opacity: 0.8 !important;
+  cursor: grabbing !important;
+}
+
+/* Contenitore degli elementi espansi */
+.expansion-container {
+  position: relative;
+  overflow: visible !important;
+}
+
+/* Droppable containers - garantisce che siano sempre visibili e ricevano eventi */
+.droppable-container {
+  position: relative;
+  overflow: visible !important;
+}
+
+/* STILI PER IL DRAG & DROP - ottimizzano la rilevazione del trascianmento */
+
+/* Quando il drag è attivo, garantisci che tutte le aree target siano clickabili */
+.bom-dragging-active [data-component-id] {
+  pointer-events: auto !important;
+  /* Non impostare z-index qui, lo gestiamo dinamicamente basato sul livello */
+}
+
+.bom-dragging-active [data-badge-for],
+.bom-dragging-active [data-drop-zone],
+.bom-dragging-active [data-component-header],
+.bom-dragging-active [data-expand-button="true"],
+.bom-dragging-active [data-droppable-id] {
+  pointer-events: auto !important;
+  position: relative !important;
+}
+
+/* Stile per i badge durante il drag */
+.bom-dragging-active .badge-drop-target {
+  transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* Evidenzia i badge quando si passa sopra */
+.bom-dragging-active .badge-drop-target:hover,
+.bom-dragging-active [data-badge-for]:hover .badge-drop-target {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+}
+
+/* Modifica per la lista virtualizzata */
+.react-window-list {
+  overflow: visible !important;
+}
+
+/* SIDEBAR - comportamento specifico per la barra laterale */
+
+/* Sidebar droppable genera struttura che ottimizza il drag */
+.sidebar-droppable {
+  pointer-events: none;
+}
+
+/* Mentre i figli diretti della sidebar possono essere draggati */
+.sidebar-droppable > * {
+  pointer-events: auto !important;
+}
+
+/* LIVELLI E Z-INDEX SPECIFICI - garantiscono che i livelli superiori (più vicini alla radice) 
+   abbiano sempre priorità sui livelli più profondi */
+
+/* Livello 0 (radice) - massima priorità */
+.bom-dragging-active [data-node-level="0"] {
+  z-index: 100 !important;
+}
+
+/* Livello 1 */
+.bom-dragging-active [data-node-level="1"] {
+  z-index: 90 !important;
+}
+
+/* Livello 2 */
+.bom-dragging-active [data-node-level="2"] {
+  z-index: 80 !important;
+}
+
+/* Livello 3 e oltre */
+.bom-dragging-active [data-node-level="3"],
+.bom-dragging-active [data-node-level="4"],
+.bom-dragging-active [data-node-level="5"] {
+  z-index: 70 !important;
+}
+
+/* Variazioni di z-index per elementi specifici all'interno di ciascun nodo */
+.bom-dragging-active [data-badge-for] {
+  z-index: 50 !important;
+}
+
+.bom-dragging-active [data-drop-zone] {
+  z-index: 40 !important;
+  min-width: 40px !important;
+  min-height: 24px !important;
+}
+
+/* Aumenta l'area di hit dei componenti */
+.bom-dragging-active [data-component-id] {
+  position: relative;
+}
+
+.bom-dragging-active [data-component-id]::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  z-index: -1;
+  pointer-events: auto;
+}
+
+/* Evidenzia visivamente le aree attive quando in hover */
+.bom-dragging-active [data-component-id]:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* Ripristina lo stile quando un componente ha i suoi figli espansi */
+.bom-expanded-item .draggable-component {
+  overflow: visible !important;
+}
+
+.bom-expanded-item .expansion-container {
+  position: relative;
+  z-index: auto !important;
+}
+
+/* Stile speciale per il container di root level */
+#root-level-droppable {
+  transition: all 0.2s ease-in-out;
+  z-index: 200 !important; /* Sempre più alto di qualsiasi componente dell'albero */
+}
+
+#root-level-droppable:hover {
+  background-color: rgba(96, 165, 250, 0.3);
+  border-color: rgba(59, 130, 246, 0.8);
+}
+
+/* Aumenta lo z-index sia del modal che dell'overlay */
+.wiki-modal {
+  z-index: 9999 !important; /* Questo sovrascrive lo z-index del modal */
+}
+
+.wiki-modal-overlay {
+  z-index: 9998 !important; /* Questo sovrascrive lo z-index dell'overlay */
+}
+
+/* Assicurati che il contenuto del modal sia sopra l'overlay */
+.wiki-modal-content {
+  z-index: 10000 !important;
+}
+
+/* Opzionalmente, puoi rendere il modale più visibile con un'ombra più pronunciata */
+.wiki-modal-content {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* --- MODERN CHAT STYLES --- */
+
+/* Sfondo chat moderno */
+.chat-background {
+  min-height: 50vh;
+  width: 100%;
+  position: relative;
+}
+
+/* Separatore data */
+.chat-date-separator {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 18px 0 10px 0;
+}
+.chat-date-separator span {
+  background: #e5e7eb;
+  color: #64748b;
+  padding: 2px 16px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin: 0 auto;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.chat-date-separator:before, .chat-date-separator:after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+  margin: 0 8px;
+}
+
+/* Bolle messaggi */
+.message-bubble {
+  border-radius: 20px;
+  padding: 12px 18px;
+  max-width: 100vw;
+  min-height: 70px;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  margin-bottom: 4px;
+  transition: background 0.2s, box-shadow 0.2s;
+  font-size: 1.05rem;
+  word-break: break-word;
+}
+.message-bubble.sent {
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  color: #fff;
+  margin-left: auto;
+  border-bottom-right-radius: 6px;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.08);
+}
+.message-bubble.received {
+  background: #f1f5f9;
+  color: #222;
+  margin-right: auto;
+  border-bottom-left-radius: 6px;
+  box-shadow: 0 2px 8px rgba(100,116,139,0.07);
+}
+.message-bubble:hover {
+  box-shadow: 0 4px 16px rgba(59,130,246,0.10);
+  background: linear-gradient(135deg, #e0e7ef 0%, #f1f5f9 100%);
+}
+
+/* Avatar */
+.message-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  border: 2px solid #fff;
+  background: #e0e7ef;
+}
+
+/* TopBar moderno */
+.chat-top-bar {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+}
+.chat-top-bar .chat-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #334155;
+  letter-spacing: 0.01em;
+}
+.chat-top-bar .chat-category {
+  font-size: 0.95rem;
+  color: #64748b;
+  margin-left: 10px;
+  font-weight: 400;
+}
+
+/* BottomBar moderno */
+.chat-bottom-bar {
+  background: rgba(255,255,255,0.95);
+  border-top: 1px solid #e5e7eb;
+  padding: 16px 24px;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.chat-input {
+  border: 1.5px solid #e5e7eb;
+  border-radius: 24px;
+  padding: 12px 18px;
+  font-size: 1.08rem;
+  background: #f8fafc;
+  flex: 1;
+  transition: border 0.2s, box-shadow 0.2s;
+}
+.chat-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px #6366f133;
+  background: #fff;
+}
+
+/* Icone azione moderne */
+.chat-action-btn {
+  background: none;
+  border: none;
+  border-radius: 50%;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+.chat-action-btn:hover {
+  background: #e0e7ef;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.08);
+}
+
+/* Timestamp */
+.message-timestamp {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  margin-top: 2px;
+  margin-left: 6px;
+  margin-right: 6px;
+  text-align: right;
+}
+
+/* Risposta/quote */
+.message-quote {
+  background: #e0e7ef;
+  border-left: 3px solid #6366f1;
+  border-radius: 10px;
+  padding: 6px 12px;
+  margin-bottom: 6px;
+  font-size: 0.97rem;
+  color: #475569;
+}
+
+/* Animazioni */
+@keyframes chatMessageIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.message-bubble {
+  animation: chatMessageIn 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* --- END MODERN CHAT STYLES --- */
+
+/* Hover bolle messaggio migliorato */
+.message-bubble.sent:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #6366f1 100%);
+  box-shadow: 0 6px 18px rgba(59,130,246,0.13);
+}
+.message-bubble.received:hover {
+  background: #e0f2fe;
+  box-shadow: 0 6px 18px rgba(100,116,139,0.13);
+}
+
+/* Contenitore messaggi: altezza e overflow */
+.chat-list-container {
+  max-height: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding-bottom: 12px;
+}
+
+
+ /* Chat window styles */
+ .chat-window {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  will-change: transform;
+}
+
+.chat-window:hover {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.chat-window-handle {
+  touch-action: none;
+  cursor: move;
+}
+
+/* Animation for minimizing/maximizing */
+@keyframes slideInUp {
+  from {
+    transform: translate3d(0, 100%, 0);
+    visibility: visible;
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes slideOutDown {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    visibility: hidden;
+    transform: translate3d(0, 100%, 0);
+  }
+}
+
+.minimized-chat-dock {
+  animation: slideInUp 0.3s;
+  pointer-events: auto;
+}
+
+.minimized-chat-icon {
+  position: relative;
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease;
+}
+
+.minimized-chat-icon:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Dock styles */
+.window-dock {
+  padding: 4px;
+  background: rgba(186, 186, 186, 0.60);
+  backdrop-filter: blur(5px);
+  border-radius: 99px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  z-index: 100000!important;
+} 
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.scroll-to-bottom-btn {
+  animation: pulse 2s infinite;
+}
+
+.scroll-to-bottom-btn.new-message {
+  animation: pulse-red 2s infinite;
+}
+
+.minimized-chat-dock {
+  animation: slideInUp 0.3s;
+  pointer-events: auto;
+}
+
+.window-dock {
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(5px);
+  border-radius: 999px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: row; /* Cambio da column a row */
+  gap: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  z-index: 100000 !important;
+  transition: opacity 0.2s ease;
+  opacity: 0.7;
+}
+
+.window-dock:hover {
+  opacity: 1;
+}
+
+/* Stili per le icone di chat minimizzate */
+.minimized-chat-icon {
+  position: relative;
+  transition: transform 0.2s ease, opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.minimized-chat-icon:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Stile per le chat con messaggi non letti */
+.minimized-chat-icon.unread-pulse {
+  animation: pulse-red 2s infinite;
+  background-color: rgba(254, 226, 226, 0.8);
+}
+
+/* Animazioni */
+@keyframes slideInUp {
+  from {
+    transform: translate3d(0, 100%, 0);
+    visibility: visible;
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes slideOutDown {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    visibility: hidden;
+    transform: translate3d(0, 100%, 0);
+  }
+}
+
+@keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(239, 68, 68, 0);
+    transform: scale(1.05);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    transform: scale(1);
+  }
+}

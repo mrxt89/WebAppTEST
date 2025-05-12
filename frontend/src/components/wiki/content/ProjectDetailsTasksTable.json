@@ -1,0 +1,128 @@
+{
+    "title": "Guida Tabella Attività",
+    "description": "Questa sezione mostra le attività del progetto in formato tabellare.",
+    "sections": [
+      {
+        "title": "Visualizzazione Tabellare",
+        "content": "<p>La <strong>visualizzazione Tabellare</strong> mostra tutte le attività del progetto in un formato a tabella con colonne per tutte le informazioni principali:</p><ul><li><strong>Titolo</strong>: nome dell'attività</li><li><strong>Responsabile</strong>: persona assegnata all'attività</li><li><strong>Stato</strong>: stato corrente dell'attività</li><li><strong>Scadenza</strong>: data entro cui l'attività deve essere completata</li><li><strong>Priorità</strong>: livello di importanza dell'attività</li><li><strong>Commenti</strong>: numero di commenti associati all'attività</li><li><strong>Allegati</strong>: numero di file allegati all'attività</li></ul><p>Questa visualizzazione è ideale per avere una panoramica completa di tutte le attività con i relativi dettagli.</p>",
+        "tourId": "tabella_visualizzazione"
+      },
+      {
+        "title": "Ordinamento e Filtri",
+        "content": "<p>La <strong>visualizzazione Tabellare</strong> offre funzionalità avanzate di ordinamento e filtro:</p><ul><li><strong>Ordinamento</strong>: fai clic sull'intestazione di una colonna per ordinare le attività in base a quel criterio</li><li><strong>Filtro Ricerca</strong>: utilizza il campo di ricerca per filtrare le attività in base al testo nel titolo, descrizione o nome del responsabile</li><li><strong>Filtro Ritardo</strong>: seleziona la casella \"Mostra solo attività in ritardo\" per visualizzare solo le attività scadute</li></ul><p>Queste funzionalità permettono di trovare rapidamente le attività specifiche anche in progetti di grandi dimensioni.</p>",
+        "tourId": "tabella_filtri",
+        "selector": ".tasks-legend"
+      },
+      {
+        "title": "Modifica Inline",
+        "content": "<p>Una caratteristica potente della visualizzazione tabellare è la possibilità di <strong>modificare direttamente</strong> le informazioni delle attività senza aprire una finestra di dialogo separata:</p><ul><li>Fai clic su un campo modificabile per attivare la modalità di modifica</li><li>Apporta le modifiche necessarie</li><li>Premi Invio per salvare o Esc per annullare</li></ul><p>I campi modificabili includono stato, priorità, responsabile e data di scadenza. Questa funzionalità permette di aggiornare rapidamente lo stato del progetto.</p>",
+        "tourId": "tabella_modifica",
+        "selector": ".table-row"
+      },
+      {
+        "title": "Indicatori Visivi",
+        "content": "<p>La tabella utilizza <strong>indicatori visivi</strong> per evidenziare informazioni importanti:</p><ul><li><strong>Badge colorati</strong> per stati e priorità</li><li><strong>Icone di avviso</strong> per attività in ritardo</li><li><strong>Contatori</strong> per commenti e allegati</li><li><strong>Colori di sfondo</strong> per evidenziare le righe in ritardo</li></ul><p>Questi indicatori rendono più facile identificare a colpo d'occhio le attività critiche o problematiche.</p>",
+        "tourId": "tabella_indicatori"
+      }
+    ],
+    "tours": {
+      "tabella_visualizzazione": [
+        {
+          "title": "Visualizzazione Tabellare",
+          "description": "La tabella mostra tutte le attività del progetto in un formato compatto.",
+          "selector": ".table",
+          "position": "top"
+        },
+        {
+          "title": "Intestazioni Colonne",
+          "description": "Ogni colonna rappresenta un diverso attributo delle attività.",
+          "selector": ".table-header",
+          "position": "bottom"
+        },
+        {
+          "title": "Riga Attività",
+          "description": "Ogni riga rappresenta un'attività del progetto con tutte le sue informazioni.",
+          "selector": ".table-row",
+          "position": "bottom"
+        }
+      ],
+      "tabella_filtri": [
+        {
+          "title": "Filtri e Ordinamento",
+          "description": "Ti mostrerò come filtrare e ordinare le attività nella tabella.",
+          "selector": ".tasks-legend",
+          "position": "bottom"
+        },
+        {
+          "title": "Campo di Ricerca",
+          "description": "Usa questo campo per cercare testo nel titolo, descrizione o nome del responsabile.",
+          "selector": "input[placeholder*='Cerca']",
+          "position": "right"
+        },
+        {
+          "title": "Ordinamento Colonne",
+          "description": "Fai clic su un'intestazione di colonna per ordinare le attività in base a quel criterio.",
+          "selector": ".table-head",
+          "position": "bottom"
+        },
+        {
+          "title": "Filtro Attività in Ritardo",
+          "description": "Spunta questa casella per visualizzare solo le attività in ritardo.",
+          "selector": "input[id='show-delayed']",
+          "position": "right"
+        }
+      ],
+      "tabella_modifica": [
+        {
+          "title": "Modifica Inline",
+          "description": "Puoi modificare direttamente i valori nella tabella senza aprire una finestra di dialogo.",
+          "selector": ".table-row",
+          "position": "top"
+        },
+        {
+          "title": "Modifica Stato",
+          "description": "Fai clic sul badge di stato per modificarlo direttamente.",
+          "selector": ".badge.cursor-pointer",
+          "position": "right"
+        },
+        {
+          "title": "Modifica Responsabile",
+          "description": "Fai clic sul nome del responsabile per cambiare l'assegnazione.",
+          "selector": ".flex.items-center.gap-2.cursor-pointer",
+          "position": "right"
+        },
+        {
+          "title": "Modifica Scadenza",
+          "description": "Fai clic sulla data per modificare la scadenza dell'attività.",
+          "selector": ".flex.items-center.gap-1.cursor-pointer",
+          "position": "right"
+        }
+      ],
+      "tabella_indicatori": [
+        {
+          "title": "Indicatori Visivi",
+          "description": "La tabella utilizza colori e icone per evidenziare informazioni importanti.",
+          "selector": ".table-body",
+          "position": "top"
+        },
+        {
+          "title": "Badge di Stato",
+          "description": "I colori indicano lo stato corrente dell'attività.",
+          "selector": ".badge:has(.w-4.h-4)",
+          "position": "right"
+        },
+        {
+          "title": "Indicatore di Ritardo",
+          "description": "Questo simbolo appare quando un'attività è scaduta.",
+          "selector": ".text-red-600, .text-red-500",
+          "position": "right"
+        },
+        {
+          "title": "Contatori",
+          "description": "Mostrano quanti commenti e allegati ha l'attività.",
+          "selector": ".badge.bg-blue-50",
+          "position": "left"
+        }
+      ]
+    }
+  }

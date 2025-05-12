@@ -1,0 +1,105 @@
+{
+    "title": "Guida Timesheet",
+    "description": "Questa sezione permette di registrare e visualizzare le ore lavorate sui progetti.",
+    "sections": [
+      {
+        "title": "Panoramica del Timesheet",
+        "content": "<p>Il <strong>Timesheet</strong> ti permette di tracciare le ore lavorate sui vari progetti e attività. Con questo strumento puoi:</p><ul><li>Registrare le ore lavorate quotidianamente</li><li>Visualizzare il riepilogo settimanale</li><li>Generare report e statistiche</li><li>Esportare i dati in formato CSV o Excel</li></ul><p>Il sistema calcola automaticamente i totali e mostra avvisi quando non raggiungi le ore lavorative previste.</p>",
+        "tourId": "panoramica_timesheet"
+      },
+      {
+        "title": "Inserimento ore",
+        "content": "<p>Per inserire le ore lavorate:</p><ol><li>Individua il giorno e l'attività su cui vuoi registrare le ore</li><li>Clicca sul simbolo <strong>+</strong> corrispondente</li><li>Inserisci il numero di ore lavorate</li><li>Aggiungi eventuali note</li><li>Clicca su <strong>Salva</strong></li></ol><p>Puoi inserire ore anche facendo clic sul totale giornaliero per aggiungere ore a qualsiasi attività.</p>",
+        "tourId": "inserimento_ore",
+        "selector": ".lucide-plus",
+        "position": "bottom"
+      },
+      {
+        "title": "Navigazione nel calendario",
+        "content": "<p>Puoi navigare tra le settimane usando i controlli di navigazione in alto:</p><ul><li>Usa le frecce <strong>&lt;</strong> e <strong>&gt;</strong> per spostarti tra le settimane</li><li>Clicca sulla data centrale per aprire un selettore di date e saltare direttamente a una specifica settimana</li></ul><p>Non è possibile inserire ore per date future.</p>"
+      },
+      {
+        "title": "Modifica e cancellazione",
+        "content": "<p>Per modificare o cancellare ore già inserite:</p><ol><li>Trova la cella con le ore registrate</li><li>Clicca sull'icona della matita per modificare</li><li>Oppure clicca sull'icona del cestino per eliminare</li></ol><p>Se elimini delle ore, il sistema aggiorna automaticamente tutti i totali.</p>"
+      },
+      {
+        "title": "Visualizzazione dei totali",
+        "content": "<p>Il sistema mostra diversi livelli di totali:</p><ul><li><strong>Totali giornalieri</strong>: ore totali lavorate in un giorno</li><li><strong>Totali per attività</strong>: ore totali lavorate su ciascuna attività nella settimana</li><li><strong>Totale settimanale</strong>: ore totali lavorate nella settimana</li></ul><p>Il target standard è di 8 ore al giorno e 40 ore settimanali. Le celle sono colorate in base al raggiungimento di questi target.</p>"
+      },
+      {
+        "title": "Reportistica e statistiche",
+        "content": "<p>Per accedere ai report dettagliati:</p><ol><li>Clicca sulla scheda <strong>Report</strong> nel timesheet</li><li>Seleziona il periodo di interesse (giorno, settimana, mese, trimestre, anno)</li><li>Visualizza i grafici e le statistiche</li><li>Usa i pulsanti di esportazione per scaricare i dati in CSV o Excel</li></ol><p>I report forniscono informazioni utili sulla distribuzione del tempo tra i progetti e sull'efficienza complessiva.</p>",
+        "tourId": "reportistica"
+      }
+    ],
+    "tours": {
+      "panoramica_timesheet": [
+        {
+          "title": "Benvenuto nel Timesheet",
+          "description": "Questo tour ti mostrerà come usare il timesheet per tracciare le tue ore di lavoro.",
+          "selector": "div[value='timesheet'] .space-y-6, div[data-state='active'][role='tabpanel'] .space-y-6",
+          "position": "bottom"
+        },
+        {
+          "title": "Struttura della griglia",
+          "description": "La griglia mostra i giorni della settimana sulle colonne e le attività sulle righe.",
+          "selector": "div[value='timesheet'] table, div[data-state='active'][role='tabpanel'] table",
+          "position": "top"
+        },
+        {
+          "title": "Visualizzazione attività",
+          "description": "Qui puoi vedere le attività su cui puoi registrare ore.",
+          "selector": "div[value='timesheet'] tbody tr:first-child td:first-child, div[data-state='active'][role='tabpanel'] tbody tr:first-child td:first-child",
+          "position": "right"
+        },
+        {
+          "title": "Giorni della settimana",
+          "description": "Le colonne rappresentano i giorni della settimana. Il giorno corrente è evidenziato in blu.",
+          "selector": "div[value='timesheet'] thead tr, div[data-state='active'][role='tabpanel'] thead tr",
+          "position": "bottom"
+        },
+        {
+          "title": "Totali giornalieri",
+          "description": "Questa riga mostra il totale delle ore registrate per ciascun giorno.",
+          "selector": ".total-row ",
+          "position": "top"
+        },
+        {
+            "title": "Reportistica",
+            "description": "Qui puoi visualizzare report dettagliati sul tuo timesheet.",
+            "selector": ".lucide-bar-chart",
+            "position": "bottom"
+        }
+      ],
+      "inserimento_ore": [
+        {
+          "title": "Inserimento ore",
+          "description": "Ti mostrerò come inserire le ore lavorate.",
+          "selector": "div[value='timesheet'] button:has(.h-4.w-4.mr-1), div[data-state='active'][role='tabpanel'] button:has(.h-4.w-4.mr-1)",
+          "position": "bottom"
+        },
+        {
+          "title": "Seleziona l'attività",
+          "description": "Seleziona la riga corrispondente all'attività su cui hai lavorato.",
+          "selector": ".align-middle",
+          "position": "bottom"
+        },
+        {
+          "title": "Inserisci le ore",
+          "description": "Inserisci il numero di ore lavorate. Puoi usare incrementi di 0.25 ore (15 minuti).",
+          "selector": ".lucide-plus",
+          "position": "bottom"
+        },
+        {
+          "title": "Aggiungi note",
+          "description": "Opzionalmente, puoi aggiungere note per descrivere il lavoro svolto.",
+          "selector": "textarea",
+          "position": "top"
+        },
+        {
+          "title": "Salva le ore",
+          "description": "Clicca su Salva per confermare le ore inserite."
+        }
+      ]
+    }
+  }
