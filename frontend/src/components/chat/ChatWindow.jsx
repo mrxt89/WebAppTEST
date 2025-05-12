@@ -83,6 +83,7 @@ const ChatWindow = ({
   const sizeUpdatedByUserRef = useRef(false);
   const [initialScrollDone, setInitialScrollDone] = useState(false);
   const lastMessageIdRef = useRef(null);
+  const previousMessagesRef = useRef([]);
   const [hasNewMessages, setHasNewMessages] = useState(false);
   
   // IMPORTANT: Define handler functions with useCallback at the component's top level
@@ -119,7 +120,7 @@ const ChatWindow = ({
   
   // Funzione per aggiornare i messaggi localmente dal prop notification
   const updateMessagesFromNotification = useCallback(() => {
-    if (!notification) return;
+    if (!notification || !isMountedRef.current) return;
     
     try {
       // Parse messages
@@ -146,6 +147,8 @@ const ChatWindow = ({
         setHasNewMessages(false);
       }
       
+      // Aggiorna il riferimento ai messaggi precedenti prima di aggiornare lo stato
+      previousMessagesRef.current = messages;
       setParsedMessages(messages);
       
       // Parse members info
@@ -167,12 +170,14 @@ const ChatWindow = ({
         
         // Usa setTimeout per assicurarsi che il DOM sia aggiornato
         setTimeout(() => {
-          if (chatListRef.current) {
+          if (chatListRef.current && isMountedRef.current) {
             chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
             
             // Riattiva la rilevazione dello scroll dopo un breve ritardo
             setTimeout(() => {
-              scrollingToBottomRef.current = false;
+              if (isMountedRef.current) {
+                scrollingToBottomRef.current = false;
+              }
             }, 500);
           }
         }, 100);
