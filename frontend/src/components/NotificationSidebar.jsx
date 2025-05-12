@@ -1436,8 +1436,8 @@ useEffect(() => {
         {/* La sezione delle notifiche visibile solo quando non è attiva la ricerca per documenti */}
         {!isDocumentSearchVisible && (
           filteredNotifications && filteredNotifications.length > 0 ? (
-            filteredNotifications.map((notification, index) => {
-              // Add index to ensure uniqueness
+            filteredNotifications.map((notification) => {
+  
               const messages = parseMessages(notification.messages);
               const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
               const categoryColor = notification.hexColor;
@@ -1445,11 +1445,10 @@ useEffect(() => {
               const hasLeftChat = notification.chatLeft == '1' || notification.chatLeft === true;
               // Verifica se questa chat è stata archiviata dall'utente
               const isArchived = notification.archived == '1' || notification.archived === true;
-
+  
               return (
                 <div
-                  // Use a more unique key with index to prevent duplicates
-                  key={`notification-${notification.notificationId}-${index}-${Date.now()}`}
+                  key={`notification-${notification.notificationId}-${lastMessage ? lastMessage.messageId : ''}`}
                   className={`notification-item ${notification.isReadByUser ? 'read' : 'unread'} ${notification.isClosed ? 'isClosed' : ''} ${hasLeftChat ? 'chat-left' : ''} ${isArchived ? 'archived' : ''}
                               ${animatingItemId === notification.notificationId && animationPhase === 'exit' ? 'pin-exit-active' : ''}
                               ${animatingItemId === notification.notificationId && animationPhase === 'enter' ? 'pin-enter-active' : ''}`}

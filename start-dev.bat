@@ -25,8 +25,8 @@ docker-compose up -d
 
 echo.
 echo === AMBIENTE DI TEST AVVIATO ===
-echo Frontend: http://localhost:5174
-echo Backend:  http://localhost:3001
+echo Frontend: http://10.0.0.129:5174
+echo Backend:  http://10.0.0.129:3001
 echo Database: WebAppTEST
 echo.
 echo Per vedere i log: docker-compose logs -f

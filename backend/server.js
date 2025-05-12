@@ -12,25 +12,43 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs-extra');
 const config = require('./config');
+const https = require('https');
+const http = require('http');
 const uploadPath = path.join(__dirname, 'uploads');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
 console.log('=== ENVIRONMENT VARIABLES ===');
 console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('HOST_IP:', process.env.HOST_IP);
+console.log('HOST_DOMAIN:', process.env.HOST_DOMAIN);
 console.log('DB_NAME:', process.env.DB_NAME);
 console.log('DB_SERVER:', process.env.DB_SERVER);
-console.log('PORT:', process.env.PORT);
+console.log('HTTPS PORT:', process.env.PORT);
+console.log('HTTP PORT:', process.env.HTTP_PORT);
+console.log('API URL:', config.server.apiBaseUrl);
+console.log('FRONTEND URL:', config.server.frontendUrl);
 console.log('===========================');
+
+// Costruisci gli indirizzi dei frontend per CORS
+const hostIp = config.server.host.ip;
+const hostDomain = config.server.host.domain;
 
 // Configurazione CORS aggiornata
 const corsOptions = {
   origin: (origin, callback) => {
+    // Costruisci dinamicamente gli origins permessi
     const allowedOrigins = [
-      'http://localhost',     // Frontend in produzione
-      'http://localhost:80',  // Frontend in produzione (esplicito)
-      'http://localhost:5174', // Frontend in sviluppo
-      'http://10.0.0.129:5174', // Frontend in sviluppo
+      // HTTP
+      `http://${hostDomain}`,          // Frontend HTTP in produzione
+      `http://${hostDomain}:80`,       // Frontend HTTP in produzione (esplicito)
+      `http://${hostDomain}:5174`,     // Frontend HTTP in sviluppo
+      `http://${hostIp}:5174`,         // Frontend HTTP in sviluppo (IP)
+      // HTTPS
+      `https://${hostDomain}`,         // Frontend HTTPS in produzione
+      `https://${hostDomain}:443`,     // Frontend HTTPS in produzione (esplicito)
+      `https://${hostDomain}:5173`,    // Frontend HTTPS in sviluppo
+      `https://${hostIp}:5173`,        // Frontend HTTPS in sviluppo (IP)
     ];
     
     // Permetti richieste senza origin (es. da Postman)
@@ -41,6 +59,7 @@ const corsOptions = {
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.warn(`Origin ${origin} not allowed by CORS`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -162,14 +181,30 @@ app.use(cors(corsOptions));
 // Middleware per headers CORS
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (corsOptions.origin(origin, () => {})) {
-    res.header('Access-Control-Allow-Origin', origin);
+  if (corsOptions.origin && typeof corsOptions.origin === 'function') {
+    corsOptions.origin(origin, (err, allowed) => {
+      if (allowed) {
+        res.header('Access-Control-Allow-Origin', origin);
+      }
+    });
   }
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control', 'Pragma');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma');
   next();
 });
+
+// Middleware per reindirizzare da HTTP a HTTPS in produzione
+if (isProduction) {
+  app.use((req, res, next) => {
+    if (!req.secure) {
+      // Se non è una richiesta sicura e siamo in produzione
+      const httpsUrl = `https://${req.headers.host.split(':')[0]}:${config.server.httpsPort}${req.url}`;
+      return res.redirect(httpsUrl);
+    }
+    next();
+  });
+}
 
 // Configurazione path statici
 app.use('/uploads', cors(), express.static(path.join(__dirname, 'uploads')));
@@ -453,9 +488,34 @@ async function initializeServer() {
 
         await testDatabaseConnection();
 
-        app.listen(config.server.port, '0.0.0.0', () => {
-            console.log(`Server running on port ${config.server.port}`);
-            console.log(`Server accessible at http://localhost:${config.server.port}`);
+        // Leggi i certificati SSL
+        let httpsOptions;
+        try {
+            const privateKey = fs.readFileSync(config.server.ssl.keyPath, 'utf8');
+            const certificate = fs.readFileSync(config.server.ssl.certPath, 'utf8');
+            httpsOptions = { key: privateKey, cert: certificate };
+            console.log('SSL certificates loaded successfully');
+        } catch (error) {
+            console.error('Error loading SSL certificates:', error);
+            console.log('HTTPS server will not be started due to missing certificates');
+            process.exit(1);
+        }
+
+        // In development, avvia sia HTTP che HTTPS
+        if (!isProduction) {
+            // Configura server HTTP
+            const httpServer = http.createServer(app);
+            httpServer.listen(config.server.httpPort, '0.0.0.0', () => {
+                console.log(`HTTP Server running on port ${config.server.httpPort}`);
+                console.log(`HTTP Server accessible at http://${config.server.host.ip}:${config.server.httpPort}`);
+            });
+        }
+
+        // Configura server HTTPS (principale)
+        const httpsServer = https.createServer(httpsOptions, app);
+        httpsServer.listen(config.server.port, '0.0.0.0', () => {
+            console.log(`HTTPS Server running on port ${config.server.port}`);
+            console.log(`HTTPS Server accessible at https://${config.server.host.ip}:${config.server.port}`);
         });
     } catch (err) {
         console.error('Error initializing server:', err);

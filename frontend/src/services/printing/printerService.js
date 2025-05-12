@@ -1,7 +1,7 @@
 // printerService.js
 export const printLabel = async (orderDetails) => {
     // Assumendo che l'URL base sia definito in una variabile d'ambiente
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'; // Usa la porta del tuo backend
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://10.0.0.129:3000'; // Usa la porta del tuo backend
     try {
       const response = await fetch(`${baseUrl}/api/printer/print`, {
         method: 'POST',

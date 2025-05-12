@@ -1,11 +1,30 @@
 //backend config.js
 require('dotenv').config();
+const path = require('path');
+
+// Funzione per sostituire variabili d'ambiente nelle stringhe
+function replaceEnvVars(str) {
+  return str.replace(/\${([^}]+)}/g, (_, varName) => process.env[varName] || '');
+}
+
+// Host configuration
+const hostIp = process.env.HOST_IP || '10.0.0.129';
+const hostDomain = process.env.HOST_DOMAIN || 'localhost';
 
 const config = {
   server: {
-    port: process.env.PORT || 3000,
-    apiBaseUrl: process.env.API_BASE_URL,
-    frontendUrl: process.env.FRONTEND_URL
+    host: {
+      ip: hostIp,
+      domain: hostDomain
+    },
+    port: process.env.PORT || 3443,
+    httpPort: process.env.HTTP_PORT || 3000,
+    apiBaseUrl: replaceEnvVars(process.env.API_BASE_URL) || `https://${hostIp}:3443/api`,
+    frontendUrl: replaceEnvVars(process.env.FRONTEND_URL) || `https://${hostIp}:5173`,
+    ssl: {
+      keyPath: process.env.HTTPS_KEY_PATH || path.join(__dirname, 'ssl/key.pem'),
+      certPath: process.env.HTTPS_CERT_PATH || path.join(__dirname, 'ssl/cert.pem')
+    }
   },
   database: {
     user: process.env.DB_USER,
@@ -80,6 +99,8 @@ console.log('\n=== CONFIG.JS LOADED ===');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('Database Name:', process.env.DB_NAME);
 console.log('Server:', process.env.DB_SERVER);
+console.log('API URL:', process.env.API_BASE_URL);
+console.log('Frontend URL:', process.env.FRONTEND_URL);
 console.log('=== END CONFIG.JS ===\n');
 
 module.exports = config;

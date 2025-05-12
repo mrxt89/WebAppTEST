@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
         interval: 1000
       } : {},
       hmr: !isProduction ? {
-        host: 'localhost',
+        host: '10.0.0.129',
         port: 5174,
         protocol: 'ws',
       } : false,
@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
       ...(isProduction ? {} : {
         proxy: {
           '/api': {
-            target: 'http://localhost:3000',
+            target: 'http://10.0.0.129:3000',
             changeOrigin: true,
             secure: false,
             ws: true
