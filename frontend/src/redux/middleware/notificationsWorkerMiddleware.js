@@ -14,6 +14,12 @@ const notificationsWorkerMiddleware = store => {
   return next => action => {
     // Initialize the worker when the app loads
     if (action.type === 'notifications/initialize') {
+      // Skip worker initialization if richiesto (per finestre non-master)
+      if (action.meta?.skipWorkerInit) {
+        console.log('[NotificationWorker] Skipping worker initialization in non-master window');
+        return next(action);
+      }
+      
       if (worker) {
         // Stop existing worker
         worker.postMessage({ type: 'stop' });
@@ -30,7 +36,8 @@ const notificationsWorkerMiddleware = store => {
           type: 'init',
           data: {
             token,
-            apiBaseUrl: config.API_BASE_URL
+            apiBaseUrl: config.API_BASE_URL,
+            debug: true // Abilita logs per debugging avanzato
           }
         });
         
@@ -80,14 +87,30 @@ const notificationsWorkerMiddleware = store => {
                       const state = store.getState();
                       const notification = state?.notifications?.notifications?.find(n => n.notificationId === notificationId);
                       
+                      // Controlla se la chat è aperta in una finestra standalone
+                      const standaloneChats = state?.notifications?.standaloneChats || new Set();
+                      const isStandalone = standaloneChats.has(parseInt(notificationId));
+                      
+                      // Se è aperta in una finestra standalone, modifica il comportamento del click
+                      const onClick = () => {
+                        if (isStandalone) {
+                          // Focus sulla finestra esistente
+                          const standaloneWindow = window.open('', `chat_${notificationId}`);
+                          if (standaloneWindow) {
+                            standaloneWindow.focus();
+                          } else {
+                            // Se la finestra non è più disponibile, apri una nuova
+                            window.open(`/standalone-chat/${notificationId}`, `chat_${notificationId}`);
+                          }
+                        } else if (window.openChatModal) {
+                          window.openChatModal(notificationId);
+                        }
+                      };
+                      
                       window.notificationService.notifySystem(
                         notification?.title || 'Nuovo messaggio', 
                         `Hai ricevuto ${newMessageCount > 1 ? `${newMessageCount} nuovi messaggi` : 'un nuovo messaggio'}`,
-                        () => {
-                          if (window.openChatModal) {
-                            window.openChatModal(notificationId);
-                          }
-                        }
+                        onClick
                       );
                     } else if (window.Notification && Notification.permission === 'granted') {
                       const notification = new Notification('Nuovo messaggio', {
@@ -184,9 +207,11 @@ const notificationsWorkerMiddleware = store => {
               break;
               
             case 'ready':
+              console.log('[NotificationWorker] Worker is ready');
               break;
               
             case 'pong':
+              console.log('[NotificationWorker] Received pong from worker');
               break;
           }
         };
@@ -204,7 +229,7 @@ const notificationsWorkerMiddleware = store => {
     
     // Handle reloading notifications
     else if (action.type === 'notifications/reload') {
-      console.log('Reloading notifications');
+      console.log('[NotificationWorker] Reloading notifications', action.payload?.highPriority ? 'with high priority' : '');
       if (worker) {
         const token = localStorage.getItem('token');
         worker.postMessage({
@@ -226,6 +251,14 @@ const notificationsWorkerMiddleware = store => {
         worker = null;
       }
     }
+    
+    // Handle ping to check worker status
+    else if (action.type === 'notifications/pingWorker') {
+      if (worker) {
+        worker.postMessage({ type: 'ping' });
+      }
+    }
+    
     // Process the action normally
     return next(action);
   };

@@ -503,6 +503,7 @@ const notificationsSlice = createSlice({
     error: null,
     unreadMessages: [],
     openChatIds: new Set(),
+    standaloneChats: new Set(), // Nuova proprietà per chat in finestre separate
     dbViewCreated: false,
     highlights: {}, // For tracking important points
     loadingHighlights: false,
@@ -541,8 +542,88 @@ const notificationsSlice = createSlice({
         ...state.notificationAttachments,
         [action.payload.notificationId]: action.payload.attachments
       };
+    },
+    // Registra una chat come aperta in finestra separata
+    registerStandaloneChat: (state, action) => {
+      state.standaloneChats.add(parseInt(action.payload));
+      
+      // Salva anche in localStorage per persistenza tra refresh
+      try {
+        const current = JSON.parse(localStorage.getItem('standalone_chats') || '[]');
+        if (!current.includes(parseInt(action.payload))) {
+          localStorage.setItem('standalone_chats', JSON.stringify([...current, parseInt(action.payload)]));
+        }
+      } catch (e) {
+        console.error('Error saving standalone chat to localStorage:', e);
+      }
+      
+      // Registra anche la chat come aperta nello stato Redux
+      state.openChatIds.add(parseInt(action.payload));
+    },
+    
+    // Rimuovi una chat dalla lista delle finestre separate
+    unregisterStandaloneChat: (state, action) => {
+      state.standaloneChats.delete(parseInt(action.payload));
+      
+      // Aggiorna localStorage
+      try {
+        const current = JSON.parse(localStorage.getItem('standalone_chats') || '[]');
+        localStorage.setItem('standalone_chats', 
+          JSON.stringify(current.filter(id => id !== parseInt(action.payload))));
+      } catch (e) {
+        console.error('Error removing standalone chat from localStorage:', e);
+      }
+    },
+    // All'inizializzazione, caricare le chat aperte in finestre separate da localStorage
+    initializeStandaloneChats: (state) => {
+      try {
+        const storedChats = JSON.parse(localStorage.getItem('standalone_chats') || '[]');
+        state.standaloneChats = new Set(storedChats.map(id => parseInt(id)));
+        
+        // Verifica che le finestre siano effettivamente aperte
+        setTimeout(() => {
+          const toRemove = [];
+          
+          storedChats.forEach(id => {
+            // Prova ad accedere alla finestra
+            const win = window.open('', `chat_${id}`);
+            
+            // Se la finestra non esiste o è chiusa
+            if (!win || win.closed || win.location.href === 'about:blank') {
+              toRemove.push(parseInt(id));
+            } else {
+              // Chiudi il riferimento
+              win.focus(); // Focus per assicurarsi che la finestra sia visualizzata
+            }
+          });
+          
+          // Rimuovi chat che non sono più in finestre aperte
+          if (toRemove.length > 0) {
+            const current = JSON.parse(localStorage.getItem('standalone_chats') || '[]');
+            const filtered = current.filter(id => !toRemove.includes(parseInt(id)));
+            localStorage.setItem('standalone_chats', JSON.stringify(filtered));
+            
+            // Aggiorna anche lo stato Redux
+            store.dispatch({ 
+              type: 'notifications/cleanupStandaloneChats',
+              payload: toRemove
+            });
+          }
+        }, 1000);
+      } catch (e) {
+        console.error('Error loading standalone chats from localStorage:', e);
+      }
+    },
+    
+    // Pulizia delle chat in finestre separate che non esistono più
+    cleanupStandaloneChats: (state, action) => {
+      const toRemove = action.payload || [];
+      toRemove.forEach(id => {
+        state.standaloneChats.delete(parseInt(id));
+      });
     }
   },
+  
   extraReducers: (builder) => {
     builder
       // Fetch notifications
@@ -1028,6 +1109,7 @@ export const selectHighlights = state => state.notifications.highlights;
 export const selectLoadingHighlights = state => state.notifications.loadingHighlights;
 export const selectAttachmentsLoading = state => state.notifications.attachmentsLoading;
 export const selectNotificationAttachments = state => state.notifications.notificationAttachments;
+export const selectStandaloneChats = state => state.notifications.standaloneChats;
 
 // Check if notification is muted
 export const isNotificationMuted = (notification) => {
@@ -1050,7 +1132,11 @@ export const {
   resetNotificationError,
   addUnreadMessage,
   setAttachmentsLoading,
-  setNotificationAttachments
+  setNotificationAttachments,
+  registerStandaloneChat,
+  unregisterStandaloneChat,
+  initializeStandaloneChats,
+  cleanupStandaloneChats
 } = notificationsSlice.actions;
 
 export default notificationsSlice.reducer;

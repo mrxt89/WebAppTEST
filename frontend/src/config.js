@@ -1,5 +1,5 @@
 import configData from './config.json';
-import hostConfig from '../lib/config/host';
+import hostConfig from './lib/config/host';
 
 const env = import.meta.env.VITE_ENV || 'development';
 const envConfig = configData[env];
