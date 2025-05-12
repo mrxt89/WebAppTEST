@@ -4,8 +4,10 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "vite",
+    "dev:https": "vite --mode development",
     "build": "vite build",
     "preview": "vite preview",
+    "preview:https": "vite preview --https",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "clean": "if exist node_modules\\.vite rd /s /q node_modules\\.vite && if exist dist rd /s /q dist",
     "rebuild": "npm run clean && npm install && npm run build"

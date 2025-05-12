@@ -4,16 +4,26 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "3001:3000"
+      - "3001:3000"  # Porta HTTP (mantenuta per compatibilità)
+      - "3443:3443"  # Porta HTTPS
     environment:
       - NODE_ENV=development
-      - PORT=3000
+      - HOST_IP=10.0.0.129
+      - HOST_DOMAIN=localhost
+      - PORT=3443        # Porta principale HTTPS
+      - HTTP_PORT=3000   # Porta secondaria HTTP
+      - API_BASE_URL=https://10.0.0.129:3443/api
+      - FRONTEND_URL=https://10.0.0.129:5173
       - DB_USER=sa
       - DB_PASSWORD=Kacu938861
       - DB_SERVER=host.docker.internal\ARCHASERVER
       - DB_NAME=WebAppTEST
       - DB_PORT=1433
       - ACCESS_TOKEN_SECRET=cDb!Yu6wU!2
+
+      # Configurazione SSL
+      - SSL_KEY_PATH=/usr/src/app/ssl/key.pem
+      - SSL_CERT_PATH=/usr/src/app/ssl/cert.pem
 
       # Configurazione storage 
       - STORAGE_TYPE=local                    # Cambia a 'remote' per attivare storage remoto
@@ -33,6 +43,7 @@ services:
       # Volume per storage locale (commenta per storage remoto)
       - ./backend/uploads:/usr/src/app/uploads
       - ./backend/temp:/usr/src/app/temp
+      - ./backend/ssl:/usr/src/app/ssl  # Volume per i certificati SSL
       
       # Volume per storage remoto (decommentare e modificare per storage remoto)
       # Esempio per NFS:
@@ -52,13 +63,23 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "5174:5174"
+      - "5173:5173"  # Porta HTTPS
+      - "5174:5174"  # Porta HTTP (mantenuta per compatibilità)
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://10.0.0.129:3001/api
+      - VITE_HOST_IP=10.0.0.129
+      - VITE_HOST_DOMAIN=localhost
+      - VITE_USE_HTTPS=true
+      - VITE_HTTPS_PORT=5173
+      - VITE_HTTP_PORT=5174
+      - VITE_API_HTTPS_PORT=3443
+      - VITE_API_HTTP_PORT=3001
+      - VITE_ENV=development
+      - VITE_PRIMARY_COLOR=#2563eb
     volumes:
       - ./frontend:/usr/src/app:delegated
       - /usr/src/app/node_modules
+      - ./ssl:/usr/src/app/ssl  # Volume per i certificati SSL dalla root
     depends_on:
       - backend
     networks:
