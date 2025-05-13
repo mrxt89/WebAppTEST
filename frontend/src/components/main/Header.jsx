@@ -45,6 +45,14 @@ const Header = ({
 }) => {
   const navigate = useNavigate();
   
+  // Funzione per gestire l'apertura del dropdown e la chiusura della sidebar
+  const handleDropdownToggle = () => {
+    toggleDropdown();
+    if (!dropdownVisible) {
+      toggleSidebar(false); // Chiude la sidebar quando si apre il menu
+    }
+  };
+
   // Funzione per gestire la navigazione ai percorsi del profilo utente
   const handleProfileNavigation = (route, title) => {
     setIsPageComponent(true);
@@ -86,7 +94,7 @@ const Header = ({
             {user && (
               <div className="relative">
                 <button
-                  onClick={toggleDropdown}
+                  onClick={handleDropdownToggle}
                   className="user-dropdown-button flex items-center space-x-2 text-white hover:bg-[var(--secondary)] px-3 py-2 rounded-lg transition-colors"
                 >
                   <span className="text-sm font-medium hidden sm:block">

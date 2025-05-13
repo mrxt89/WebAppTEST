@@ -990,7 +990,6 @@ useEffect(() => {
               right: window.innerWidth < 768 ? '0px' : '340px',
               backgroundColor: '#ffffff',
               borderRadius: '0.5rem',
-              zIndex: 100,
               maxHeight: '80vh',
               overflowY: 'auto'
             }}

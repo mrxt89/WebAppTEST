@@ -1,3 +1,6 @@
+/* STILI PER DIAGRAMMI GANTT */
+@import "gantt-task-react/dist/index.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -1187,9 +1190,6 @@ button:disabled {
   transition: width 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
   overflow: hidden; /* Assicura che il contenuto non debordi durante la transizione */
 }
-
-/* STILI PER DIAGRAMMI GANTT */
-@import "gantt-task-react/dist/index.css";
 
 .gantt-container .gantt-horizontal-scroll {
   overflow-x: auto !important;
