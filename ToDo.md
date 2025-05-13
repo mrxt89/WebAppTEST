@@ -8,15 +8,13 @@
 
 OLD BUT NEW
 
-- Notifica push
+- [ ] Notifica push
 
-- Errore get
+- [x] Errore get
 
-- Problema zindex sul menu layout chat quando ho almeno una modale della chat aperta
+- [x] Problema zindex sul menu layout chat quando ho almeno una modale della chat aperta
 
-- Conteggio notifiche
-
-- 
+- [x] Conteggio notifiche
 
 
 

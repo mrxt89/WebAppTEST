@@ -43,7 +43,7 @@ const WindowManagerMenu = ({
       {isOpen && (
         <motion.div
           id="window-manager-menu"
-          className="fixed top-20 right-20 z-[10050] bg-white rounded-lg shadow-xl border border-gray-200"
+          className="fixed top-20 right-10 z-[10050] bg-white rounded-lg shadow-xl border border-gray-200"
           initial="hidden"
           animate="visible"
           exit="hidden"

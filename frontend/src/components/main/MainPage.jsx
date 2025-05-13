@@ -248,7 +248,6 @@ useEffect(() => {
     const { notificationId, newMessageCount } = event.detail || {};
     
     if (notificationId && newMessageCount) {
-      
       // Se la notifica non è già in una chat aperta, mostrala
       const isOpen = openChats.some(chat => chat.notificationId === notificationId);
       
@@ -842,10 +841,10 @@ useEffect(() => {
         
         {/* Window arrangement menu button - only shown when there are open chats */}
         {showWindowControls && (
-          <div className="fixed top-20 right-20 z-[1050]">
+          <div className="fixed top-20 right-10 z-[2500]">
             <button
               id="window-manager-menu-button"
-              className="bg-yellow-300 text-gray-700 p-2 rounded-full shadow-xl hover:bg-gray-100 transition-colors z-50"
+              className="bg-yellow-300 text-gray-700 p-2 rounded-full shadow-xl hover:bg-gray-100 transition-colors z-[2501]"
               onClick={toggleWindowManagerMenu}
               title="Gestione finestre"
             >
