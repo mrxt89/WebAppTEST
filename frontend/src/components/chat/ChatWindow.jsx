@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Resizable } from 're-resizable';
 import ChatTopBar from './ChatTopBar';
 import ChatLayout from './ChatLayout';
@@ -12,16 +12,50 @@ const debouncedForceUpdate = debounce((func) => {
   func();
 }, 1000, { leading: true, trailing: false });
 
+// Hook personalizzato per la memorizzazione degli utenti
+const useMemoizedUsers = (initialUsers = []) => {
+  const [users, setUsers] = useState(initialUsers);
+  const lastValidUsersRef = useRef(initialUsers);
+  const usersLoadedRef = useRef(false);
+  const lastUsersFetchTimeRef = useRef(0);
+  const MIN_FETCH_INTERVAL = 30000; // 30 secondi
+
+  const updateUsers = useCallback((newUsers) => {
+    if (Array.isArray(newUsers) && newUsers.length > 0) {
+      setUsers(newUsers);
+      lastValidUsersRef.current = newUsers;
+      usersLoadedRef.current = true;
+      lastUsersFetchTimeRef.current = Date.now();
+    }
+  }, []);
+
+  const getUsers = useCallback(() => {
+    return users.length > 0 ? users : lastValidUsersRef.current;
+  }, [users]);
+
+  const shouldFetchUsers = useCallback(() => {
+    return !usersLoadedRef.current || 
+           (Date.now() - lastUsersFetchTimeRef.current > MIN_FETCH_INTERVAL);
+  }, []);
+
+  return {
+    users: getUsers(),
+    updateUsers,
+    shouldFetchUsers,
+    usersLoaded: usersLoadedRef.current
+  };
+};
+
 // Main ChatWindow component
 const ChatWindow = ({ 
   notification, 
   onClose, 
   onMinimize, 
   windowManager,
-  isStandalone = false, // Nuova prop per indicare se siamo in modalità standalone
-  standaloneData = null // Nuova prop per dati in modalità standalone
+  isStandalone = false, // prop per indicare se siamo in modalità standalone
+  standaloneData = null // prop per dati in modalità standalone
 }) => {
-   const { 
+  const { 
     markMessageAsRead, 
     fetchNotificationById, 
     sendNotification,
@@ -34,9 +68,9 @@ const ChatWindow = ({
     leaveChat,       
     archiveChat,    
     unarchiveChat,
-    uploadNotificationAttachment, // Assicuriamoci di aver importato questa funzione
-    captureAndUploadPhoto,       // E anche questa
-    refreshAttachments           // Aggiungiamo anche questa
+    uploadNotificationAttachment,
+    captureAndUploadPhoto,
+    refreshAttachments
   } = useNotifications();
   
   // Usa i dati standalone se disponibili, altrimenti usa quelli dall'hook
@@ -94,6 +128,48 @@ const ChatWindow = ({
   const lastMessageIdRef = useRef(null);
   const previousMessagesRef = useRef([]);
   const [hasNewMessages, setHasNewMessages] = useState(false);
+  
+  // Stato specifico per gli utenti della chat
+  const [chatUsers, setChatUsers] = useState([]);
+  const { users: memoizedUsers, updateUsers, shouldFetchUsers } = useMemoizedUsers(standaloneData?.users || hookUsers);
+
+  // Funzione dedicata per il caricamento degli utenti
+  const loadUsers = useCallback(async () => {
+    if (!shouldFetchUsers()) return;
+
+    try {
+      const fetchedUsers = await fetchUsers();
+      if (Array.isArray(fetchedUsers) && fetchedUsers.length > 0) {
+        updateUsers(fetchedUsers);
+        setChatUsers(fetchedUsers);
+      }
+    } catch (error) {
+      console.error('Errore nel caricamento degli utenti:', error);
+    }
+  }, [fetchUsers, shouldFetchUsers, updateUsers]);
+
+  // Effetto per il caricamento iniziale degli utenti
+  useEffect(() => {
+    if (notification?.notificationId) {
+      loadUsers();
+    }
+  }, [notification?.notificationId, loadUsers]);
+
+  // Funzione di utilità per filtrare gli utenti disabilitati in modo sicuro
+  const getFilteredUsers = useCallback(() => {
+    const usersToFilter = chatUsers.length > 0 ? chatUsers : memoizedUsers;
+    return Array.isArray(usersToFilter) 
+      ? usersToFilter.filter(user => user && !user.userDisabled)
+      : [];
+  }, [chatUsers, memoizedUsers]);
+
+  // Funzione di utilità per trovare l'utente corrente in modo sicuro
+  const getCurrentUser = useCallback(() => {
+    const usersToSearch = chatUsers.length > 0 ? chatUsers : memoizedUsers;
+    return Array.isArray(usersToSearch) 
+      ? usersToSearch.find(user => user && user.isCurrentUser)
+      : null;
+  }, [chatUsers, memoizedUsers]);
   
   // IMPORTANT: Define handler functions with useCallback at the component's top level
   // This ensures they maintain consistent identity between renders
@@ -1500,8 +1576,8 @@ useEffect(() => {
           onMaximize={isStandalone ? null : handleMaximize} // Disabilita per standalone
           isMaximized={isMaximized}
           membersInfo={parsedMembersInfo}
-          users={users?.filter(user => !user?.userDisabled) || []}
-          currentUser={currentUser}
+          users={getFilteredUsers()}
+          currentUser={getCurrentUser()}
           notificationId={notification.notificationId}
           notificationCategoryId={notification.notificationCategoryId}
           notificationCategoryName={notification.notificationCategoryName}
@@ -1528,9 +1604,9 @@ useEffect(() => {
           markMessageAsRead={markMessageAsRead}
           chatListRef={chatListRef}
           membersInfo={parsedMembersInfo}
-          users={users?.filter(user => !user?.userDisabled) || []}
+          users={getFilteredUsers()}
+          currentUser={getCurrentUser()}
           updateReceiversList={handleReceiversUpdate}
-          currentUser={currentUser}
           receivers={receiversList}
           onReply={handleReply}
           title={notification.title}

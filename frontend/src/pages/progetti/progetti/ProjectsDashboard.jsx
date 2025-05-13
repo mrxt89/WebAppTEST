@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -65,10 +65,44 @@ const ProjectsList = ({ projects, loading, onViewDetails }) => {
   ));
 };
 
+// Hook personalizzato per la memorizzazione degli utenti
+const useMemoizedUsers = (initialUsers = []) => {
+  const [users, setUsers] = useState(initialUsers);
+  const lastValidUsersRef = useRef(initialUsers);
+  const usersLoadedRef = useRef(false);
+  const lastUsersFetchTimeRef = useRef(0);
+  const MIN_FETCH_INTERVAL = 30000; // 30 secondi
+
+  const updateUsers = useCallback((newUsers) => {
+    if (Array.isArray(newUsers) && newUsers.length > 0) {
+      setUsers(newUsers);
+      lastValidUsersRef.current = newUsers;
+      usersLoadedRef.current = true;
+      lastUsersFetchTimeRef.current = Date.now();
+    }
+  }, []);
+
+  const getUsers = useCallback(() => {
+    return users.length > 0 ? users : lastValidUsersRef.current;
+  }, [users]);
+
+  const shouldFetchUsers = useCallback(() => {
+    return !usersLoadedRef.current || 
+           (Date.now() - lastUsersFetchTimeRef.current > MIN_FETCH_INTERVAL);
+  }, []);
+
+  return {
+    users: getUsers(),
+    updateUsers,
+    shouldFetchUsers,
+    usersLoaded: usersLoadedRef.current
+  };
+};
+
 // Componente principale Dashboard
 const ProjectsDashboard = () => {
   const navigate = useNavigate();
-  const { fetchUsers, users } = useNotifications();
+  const { fetchUsers } = useNotifications();
   const { projects
           , loading: projectsLoading
           , fetchProjects
@@ -80,7 +114,6 @@ const ProjectsDashboard = () => {
           , projectStatuses
           , fetchProjectStatuses 
           } = useProjectActions();
-
 
   const { projectCustomers, loading: loadingCustomers, fetchProjectCustomers } = useProjectCustomersActions();
 
@@ -114,6 +147,27 @@ const ProjectsDashboard = () => {
     CustSupp: 0,
     ProjectErpID: ''
   });
+
+  // Gestione robusta degli utenti
+  const { users: memoizedUsers, updateUsers, shouldFetchUsers } = useMemoizedUsers([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Funzione dedicata per il caricamento degli utenti
+  const loadUsers = useCallback(async () => {
+    if (!shouldFetchUsers() || loadingUsers) return;
+
+    try {
+      setLoadingUsers(true);
+      const fetchedUsers = await fetchUsers();
+      if (Array.isArray(fetchedUsers) && fetchedUsers.length > 0) {
+        updateUsers(fetchedUsers);
+      }
+    } catch (error) {
+      console.error('Errore nel caricamento degli utenti:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, [fetchUsers, shouldFetchUsers, updateUsers, loadingUsers]);
 
   // Gestione filtri
   const applyFilters = async (currentFilters) => {
@@ -171,7 +225,7 @@ const ProjectsDashboard = () => {
       try {
         setLoading(true);
         await Promise.all([
-          fetchUsers(),
+          loadUsers(),
           fetchProjectCustomers(),
           fetchCategories(), 
           fetchProjectStatuses(), 
@@ -290,7 +344,6 @@ const ProjectsDashboard = () => {
   };
 
   const getFilteredProjects = (tabStatus) => {
-    // Usando i nuovi campi Sequence e HideProject dalla tabella MA_ProjectStatus
     if (!projectStatuses || projectStatuses.length === 0) return [];
     
     switch (tabStatus) {
@@ -444,8 +497,8 @@ const ProjectsDashboard = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="0">Tutti gli utenti</SelectItem>
-              {users 
-                .filter(user => user.userId !== 0)
+              {memoizedUsers 
+                .filter(user => user && user.userId !== 0)
                 .map(user => (
                   <SelectItem 
                     key={user.userId} 
