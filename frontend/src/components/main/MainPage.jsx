@@ -865,7 +865,7 @@ useEffect(() => {
             />
           </div>
         )}
-        
+
         {/* Minimized Chats Dock */}
         <MinimizedChatsDock 
           minimizedChats={minimizedChats}

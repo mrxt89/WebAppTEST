@@ -1,42 +1,9 @@
 // src/components/settings/NotificationSettings.jsx
 import React from 'react';
 import { Bell, Volume2, VolumeX, Monitor } from 'lucide-react';
-import { createSlice } from '@reduxjs/toolkit';
 import useNotificationSettings from '../../redux/features/notifications/useNotificationSettings';
 
-// Slice Redux per le impostazioni delle notifiche
-export const notificationSettingsSlice = createSlice({
-  name: 'notificationSettings',
-  initialState: {
-    notificationsEnabled: true,
-    soundEnabled: true,
-    webNotificationsEnabled: false,
-    webNotificationsPermission: 'default'
-  },
-  reducers: {
-    setNotificationsEnabled: (state, action) => {
-      state.notificationsEnabled = action.payload;
-    },
-    setSoundEnabled: (state, action) => {
-      state.soundEnabled = action.payload;
-    },
-    setWebNotificationsEnabled: (state, action) => {
-      state.webNotificationsEnabled = action.payload;
-    },
-    setWebNotificationsPermission: (state, action) => {
-      state.webNotificationsPermission = action.payload;
-    }
-  }
-});
-
-export const { 
-  setNotificationsEnabled,
-  setSoundEnabled,
-  setWebNotificationsEnabled,
-  setWebNotificationsPermission
-} = notificationSettingsSlice.actions;
-
-const NotificationSettings = () => {
+function NotificationSettings() {
   // Utilizziamo il nostro hook personalizzato per gestire le impostazioni
   const {
     notificationsEnabled,
@@ -170,6 +137,7 @@ const NotificationSettings = () => {
       </div>
     </div>
   );
-};
+}
 
+// Esportiamo il componente come default export
 export default NotificationSettings;
