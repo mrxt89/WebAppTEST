@@ -205,6 +205,7 @@ const ProjectDetail = () => {
   const [activeTab, setActiveTab] = useState("overview"); // Inizia con la panoramica
   // Stato per gestire la vista delle attività (kanban o tabella)
   const [tasksViewMode, setTasksViewMode] = useState("kanban");
+  const [userSearchQuery, setUserSearchQuery] = useState('');
   
   // Aggiungiamo i refs necessari
   const isMounted = useRef(true);
@@ -693,6 +694,24 @@ const updateMemberRole = async (memberData) => {
     }
   };
 
+  // Funzione per filtrare gli utenti in base alla ricerca
+  const getFilteredUsers = useCallback(() => {
+    if (!project || !users) return [];
+    
+    return users
+      .filter(user => !project.members?.some(m => m.UserID === user.userId))
+      .filter(user => {
+        if (!userSearchQuery) return true;
+        const searchLower = userSearchQuery.toLowerCase();
+        return (
+          user.firstName?.toLowerCase().includes(searchLower) ||
+          user.lastName?.toLowerCase().includes(searchLower) ||
+          `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchLower)
+        );
+      })
+      .sort((a, b) => a.firstName.localeCompare(b.firstName));
+  }, [users, project, userSearchQuery]);
+
   if (loading || !project) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -719,7 +738,7 @@ const updateMemberRole = async (memberData) => {
           {project.Name}
         </h1>
         
-        {checkAdminPermission(project) && (
+        {(
           <Button 
             id = "editProjectButton"
             variant=""
@@ -791,7 +810,7 @@ const updateMemberRole = async (memberData) => {
           <TabsContent value="tasks" className="flex-1 flex flex-col mt-2">
             <div className="flex justify-between items-center mb-1">
               
-              {checkAdminPermission(project) && (
+              {(
                 <Dialog open={isAddTaskDialogOpen} onOpenChange={setIsAddTaskDialogOpen}>
                   <DialogTrigger asChild>
                     <Button>Aggiungi Attività</Button>
@@ -862,7 +881,7 @@ const updateMemberRole = async (memberData) => {
           <TabsContent value="team" className="flex-1 mt-2">
             <Card className="h-full flex flex-col">
               <CardHeader className="flex-none flex flex-row items-center justify-between">
-                {checkAdminPermission(project) && (
+                {(
                   <Dialog open={isAddMemberDialogOpen} onOpenChange={setIsAddMemberDialogOpen}>
                     <DialogTrigger asChild>
                       <Button
@@ -876,6 +895,14 @@ const updateMemberRole = async (memberData) => {
                       </DialogHeader>
                       <div className="space-y-4 pt-4">
                         <div>
+                          <Label htmlFor="userSearch">Cerca utente</Label>
+                          <Input
+                            id="userSearch"
+                            placeholder="Cerca per nome o cognome..."
+                            value={userSearchQuery}
+                            onChange={(e) => setUserSearchQuery(e.target.value)}
+                            className="mb-2"
+                          />
                           <Label htmlFor="userId">Utente</Label>
                           <Select
                             value={newMember.userId}
@@ -885,14 +912,11 @@ const updateMemberRole = async (memberData) => {
                               <SelectValue placeholder="Seleziona utente" />
                             </SelectTrigger>
                             <SelectContent>
-                              {users
-                                .filter(user => !project.members.some(m => m.UserID === user.userId))
-                                .sort((a, b) => a.firstName.localeCompare(b.firstName))
-                                .map(user => (
-                                  <SelectItem key={user.userId} value={user.userId.toString()}>
-                                    {user.firstName} {user.lastName}
-                                  </SelectItem>
-                                ))}
+                              {getFilteredUsers().map(user => (
+                                <SelectItem key={user.userId} value={user.userId.toString()}>
+                                  {user.firstName} {user.lastName}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
@@ -915,7 +939,7 @@ const updateMemberRole = async (memberData) => {
                         <Button 
                           onClick={handleAddMember}
                           className="w-full"
-                          disabled={!newMember.userId}
+                          disabled={!newMember.userId || !project}
                         >
                           Aggiungi al Team
                         </Button>
@@ -931,7 +955,7 @@ const updateMemberRole = async (memberData) => {
                     <TeamMemberWithRole
                       key={member.ProjectMemberID}
                       member={member}
-                      onRemove={checkAdminPermission(project) ? handleRemoveMember : null}
+                      onRemove={checkAdminPermission(project) ? handleRemoveMember : handleRemoveMember}
                       onRoleUpdate={updateMemberRole}
                       canEditRole={canEditMemberRole(project, currentUserId, member.UserID)}
                       currentUserId={currentUserId}
@@ -958,7 +982,7 @@ const updateMemberRole = async (memberData) => {
               <CardContent className="flex-1 overflow-hidden">
                 <ProjectAttachmentsTab
                   project={project}
-                  canEdit={checkAdminPermission(project)}
+                  canEdit={true}
                   onAttachmentChange={loadProject}
                 />
               </CardContent>
@@ -968,7 +992,7 @@ const updateMemberRole = async (memberData) => {
           <TabsContent value="articles" className="flex-1 mt-2">
             <ProjectArticlesTab 
               project={project}
-              canEdit={checkAdminPermission(project)}
+              canEdit={true}
             />
           </TabsContent>
           {/* Tab Statistiche */}
