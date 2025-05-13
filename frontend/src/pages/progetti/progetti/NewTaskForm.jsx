@@ -27,10 +27,25 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   
+  // Ottieni l'utente loggato dal localStorage
+  const [currentUserId, setCurrentUserId] = useState(() => {
+    try {
+      const userString = localStorage.getItem('user');
+      if (userString) {
+        const userData = JSON.parse(userString);
+        return userData.userId.toString();
+      }
+      return null;
+    } catch (error) {
+      console.error('Error parsing user data from localStorage:', error);
+      return null;
+    }
+  });
+
   const [taskData, setTaskData] = useState({
     Title: '',
     Description: '',
-    AssignedTo: '',
+    AssignedTo: currentUserId, // Imposta l'utente corrente come default
     Participants: [],
     Priority: 'MEDIA',
     StartDate: new Date().toISOString().split('T')[0], // Set current date as default
@@ -236,7 +251,10 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
                     <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
+                <PopoverContent 
+                  className="w-full p-0"
+                  style={{ height: '40vh' }}
+                >
                   <Command>
                     <CommandInput 
                       placeholder="Cerca per nome, cognome o ruolo..." 
