@@ -606,32 +606,55 @@ const notificationsSlice = createSlice({
         // Salva il valore corrente per rilevare cambiamenti
         const previousUnreadCount = state.unreadCount;
         
-        // Sort notifications by pin and date
-        const sortedNotifications = action.payload.sort((a, b) => {
-          if (a.pinned && !b.pinned) return -1;
-          if (!a.pinned && b.pinned) return 1;
-          return new Date(b.tbCreated) - new Date(a.tbCreated);
-        });
-        
-        state.notifications = sortedNotifications;
-        state.unreadCount = sortedNotifications.filter(n => !n.isReadByUser && n.archived === '0').length;
-        state.loading = false;
-        state.error = null;
-        
-        // Controlla se il conteggio è cambiato
-        const unreadCountChanged = previousUnreadCount !== state.unreadCount;
-        
-        // Emetti evento solo se il conteggio è cambiato
-        if (unreadCountChanged) {
-          setTimeout(() => {
-            document.dispatchEvent(new CustomEvent('unread-count-changed', {
-              detail: {
-                previous: previousUnreadCount,
-                current: state.unreadCount,
-                timestamp: new Date().toISOString()
+        try {
+          // Crea una copia locale del payload per evitare problemi con i proxy
+          const notificationsCopy = [...action.payload];
+          
+          // Sort notifications by pin and date usando la copia locale
+          const sortedNotifications = notificationsCopy.sort((a, b) => {
+            if (a.pinned && !b.pinned) return -1;
+            if (!a.pinned && b.pinned) return 1;
+            return new Date(b.tbCreated) - new Date(a.tbCreated);
+          });
+          
+          // Calcola il nuovo conteggio usando la copia locale
+          const newUnreadCount = sortedNotifications.filter(n => 
+            n && typeof n === 'object' && !n.isReadByUser && n.archived !== '1'
+          ).length;
+          
+          // Aggiorna lo stato in modo sicuro
+          state.notifications = sortedNotifications;
+          state.unreadCount = newUnreadCount;
+          state.loading = false;
+          state.error = null;
+          
+          // Controlla se il conteggio è cambiato
+          const unreadCountChanged = previousUnreadCount !== newUnreadCount;
+          
+          // Emetti evento solo se il conteggio è cambiato
+          if (unreadCountChanged) {
+            // Usa i valori già calcolati invece di accedere allo state
+            const eventDetail = {
+              previous: previousUnreadCount,
+              current: newUnreadCount,
+              timestamp: new Date().toISOString()
+            };
+            
+            // Emetti l'evento in modo sicuro usando requestAnimationFrame
+            requestAnimationFrame(() => {
+              try {
+                document.dispatchEvent(new CustomEvent('unread-count-changed', {
+                  detail: eventDetail
+                }));
+              } catch (eventError) {
+                console.error('Errore nell\'emissione dell\'evento unread-count-changed:', eventError);
               }
-            }));
-          }, 0);
+            });
+          }
+        } catch (error) {
+          console.error('Errore nell\'aggiornamento delle notifiche:', error);
+          state.loading = false;
+          state.error = 'Errore nell\'aggiornamento delle notifiche';
         }
       })
       .addCase(fetchNotifications.rejected, (state, action) => {
@@ -649,25 +672,25 @@ const notificationsSlice = createSlice({
       // Fetch single notification by ID
       .addCase(fetchNotificationById.fulfilled, (state, action) => {
         const notification = action.payload;
-        const index = state.notifications.findIndex(n => n.notificationId === notification.notificationId);
-        
+        const index = state.notifications.findIndex(n => (n && n.notificationId === notification.notificationId));
         if (index !== -1) {
-          // Update existing notification
-          state.notifications[index] = notification;
+          // Aggiorna la notifica esistente (in modo "immutabile")
+          const newNotifications = [...state.notifications];
+          newNotifications[index] = notification;
+          state.notifications = newNotifications;
         } else {
-          // Add new notification
-          state.notifications.push(notification);
+          // Aggiungi la nuova notifica (in modo "immutabile")
+          state.notifications = [...state.notifications, notification];
         }
         
-        // Update unread count
+        // Calcola il conteggio "unread" (in modo "immutabile") – cioè, crea un nuovo array (state.notifications) e filtra (senza accedere a state.notifications "proxy revocato") – così non si tenta di "get" su un proxy revocato.
         try {
-            state.unreadCount = state.notifications.filter(n => 
-              n && typeof n === 'object' && !n.isReadByUser && n.archived !== '1'
-            ).length;
-          } catch (e) {
-            console.error('Errore nel calcolo unreadCount:', e);
-            // Mantieni il valore precedente
-          }
+          const newNotifications = [...state.notifications];
+          state.unreadCount = newNotifications.filter(n => (n && !n.isReadByUser && (n.archived !== '1'))).length;
+        } catch (e) {
+          console.error("Errore nel calcolo unreadCount (fetchNotificationById.fulfilled):", e);
+          // In caso di errore, mantieni il valore precedente (state.unreadCount)
+        }
       })
       .addCase(fetchNotificationById.rejected, (state, action) => {
         state.error = action.payload;
@@ -810,39 +833,55 @@ const notificationsSlice = createSlice({
       // Toggle read/unread status
       .addCase(toggleReadUnread.fulfilled, (state, action) => {
         const { notificationId, isReadByUser } = action.payload;
-        const notification = state.notifications.find(n => n.notificationId === notificationId);
         
-        if (notification) {
-          notification.isReadByUser = isReadByUser;
+        try {
+          // Crea una copia locale delle notifiche
+          const notificationsCopy = [...state.notifications];
+          const notificationIndex = notificationsCopy.findIndex(n => n && n.notificationId === notificationId);
           
-          // Update unread count
-          try {
-            state.unreadCount = state.notifications.filter(n => 
+          if (notificationIndex !== -1) {
+            // Aggiorna la notifica nella copia locale
+            notificationsCopy[notificationIndex] = {
+              ...notificationsCopy[notificationIndex],
+              isReadByUser
+            };
+            
+            // Calcola il nuovo conteggio usando la copia locale
+            const newUnreadCount = notificationsCopy.filter(n => 
               n && typeof n === 'object' && !n.isReadByUser && n.archived !== '1'
             ).length;
-          } catch (e) {
-            console.error('Errore nel calcolo unreadCount:', e);
-            // Mantieni il valore precedente
-          }
-          
-          // Also update unread messages
-          if (isReadByUser) {
-            state.unreadMessages = state.unreadMessages.filter(
-              message => message.notificationId !== notificationId
-            );
-          }
-          
-          // Emetti evento per altri componenti
-          setTimeout(() => {
-            document.dispatchEvent(new CustomEvent('read-status-changed', {
-              detail: { 
-                notificationId, 
-                isReadByUser,
-                unreadCount: state.unreadCount,
-                timestamp: new Date().toISOString()
+            
+            // Aggiorna lo stato in modo sicuro
+            state.notifications = notificationsCopy;
+            state.unreadCount = newUnreadCount;
+            
+            // Aggiorna i messaggi non letti
+            if (isReadByUser) {
+              state.unreadMessages = state.unreadMessages.filter(
+                message => message.notificationId !== notificationId
+              );
+            }
+            
+            // Emetti evento per altri componenti usando i valori già calcolati
+            const eventDetail = {
+              notificationId,
+              isReadByUser,
+              unreadCount: newUnreadCount,
+              timestamp: new Date().toISOString()
+            };
+            
+            requestAnimationFrame(() => {
+              try {
+                document.dispatchEvent(new CustomEvent('read-status-changed', {
+                  detail: eventDetail
+                }));
+              } catch (eventError) {
+                console.error('Errore nell\'emissione dell\'evento read-status-changed:', eventError);
               }
-            }));
-          }, 0);
+            });
+          }
+        } catch (error) {
+          console.error('Errore nell\'aggiornamento dello stato di lettura:', error);
         }
       })
       
@@ -876,42 +915,62 @@ const notificationsSlice = createSlice({
       // Archive/unarchive chat
       .addCase(archiveChat.fulfilled, (state, action) => {
         const { notificationId, archived } = action.payload;
-        const notification = state.notifications.find(n => n.notificationId === notificationId);
         
-        if (notification) {
-          notification.archived = archived;
+        try {
+          // Crea una copia locale delle notifiche
+          const notificationsCopy = [...state.notifications];
+          const notificationIndex = notificationsCopy.findIndex(n => n && n.notificationId === notificationId);
           
-          // Update unread count if needed
-          if (!notification.isReadByUser) {
-            try {
-              state.unreadCount = state.notifications.filter(n => 
+          if (notificationIndex !== -1) {
+            // Aggiorna la notifica nella copia locale
+            notificationsCopy[notificationIndex] = {
+              ...notificationsCopy[notificationIndex],
+              archived
+            };
+            
+            // Se la notifica non era letta, ricalcola il conteggio
+            if (!notificationsCopy[notificationIndex].isReadByUser) {
+              const newUnreadCount = notificationsCopy.filter(n => 
                 n && typeof n === 'object' && !n.isReadByUser && n.archived !== '1'
               ).length;
-            } catch (e) {
-              console.error('Errore nel calcolo unreadCount:', e);
-              // Mantieni il valore precedente
+              state.unreadCount = newUnreadCount;
             }
+            
+            // Aggiorna lo stato in modo sicuro
+            state.notifications = notificationsCopy;
           }
+        } catch (error) {
+          console.error('Errore nell\'archiviazione della chat:', error);
         }
       })
       .addCase(unarchiveChat.fulfilled, (state, action) => {
         const { notificationId, archived } = action.payload;
-        const notification = state.notifications.find(n => n.notificationId === notificationId);
         
-        if (notification) {
-          notification.archived = archived;
+        try {
+          // Crea una copia locale delle notifiche
+          const notificationsCopy = [...state.notifications];
+          const notificationIndex = notificationsCopy.findIndex(n => n && n.notificationId === notificationId);
           
-          // Update unread count if needed
-          if (!notification.isReadByUser) {
-            try {
-                state.unreadCount = state.notifications.filter(n => 
-                  n && typeof n === 'object' && !n.isReadByUser && n.archived !== '1'
-                ).length;
-              } catch (e) {
-                console.error('Errore nel calcolo unreadCount:', e);
-                // Mantieni il valore precedente
-              }
+          if (notificationIndex !== -1) {
+            // Aggiorna la notifica nella copia locale
+            notificationsCopy[notificationIndex] = {
+              ...notificationsCopy[notificationIndex],
+              archived
+            };
+            
+            // Se la notifica non era letta, ricalcola il conteggio
+            if (!notificationsCopy[notificationIndex].isReadByUser) {
+              const newUnreadCount = notificationsCopy.filter(n => 
+                n && typeof n === 'object' && !n.isReadByUser && n.archived !== '1'
+              ).length;
+              state.unreadCount = newUnreadCount;
+            }
+            
+            // Aggiorna lo stato in modo sicuro
+            state.notifications = notificationsCopy;
           }
+        } catch (error) {
+          console.error('Errore nella riattivazione della chat:', error);
         }
       })
       

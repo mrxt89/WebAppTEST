@@ -386,15 +386,10 @@ export const useNotifications = () => {
   }, [dispatch]);
 
   const forceLoadNotifications = useCallback(() => {
-    console.log('Forzando il caricamento diretto delle notifiche...');
-    
     // Usa setTimeout per evitare problemi con la chiamata durante un reducer
     setTimeout(() => {
       dispatch(fetchNotifications())
         .then(result => {
-          console.log('Caricamento forzato completato, ricevute:', 
-            result?.payload ? result.payload.length : 0, 'notifiche');
-          
           // Configura l'event listener per i nuovi messaggi in un altro setTimeout
           // per assicurarsi che nessun reducer sia in esecuzione
           setTimeout(() => {

@@ -196,8 +196,6 @@ requestNotificationPermission() {
   
   // Se il permesso è già concesso, non fare nulla di più
   if (Notification.permission === "granted") {
-    console.log("NotificationService: Notification permission already granted");
-    
     // Imposta direttamente la variabile locale invece di chiamare il metodo
     this.webNotificationsEnabled = true;
     localStorage.setItem('webNotificationsEnabled', 'true');
@@ -321,8 +319,6 @@ async initAudio() {
   if (this.audioInitialized) return Promise.resolve(true);
   
   try {
-    console.log('NotificationService: Initializing audio system');
-    
     // Create a new AudioContext
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) {
@@ -347,8 +343,6 @@ async initAudio() {
     }
     
     this.audioInitialized = true;
-    console.log('NotificationService: Audio system successfully initialized');
-    
     // Process any notifications in queue
     this.processPendingNotifications();
     
