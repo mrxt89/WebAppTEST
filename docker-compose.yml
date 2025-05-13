@@ -8,15 +8,15 @@ services:
       - "3443:3443"  # Porta HTTPS
     environment:
       - NODE_ENV=development
-      - HOST_IP=10.0.0.129
+      - HOST_IP=${SELF_IP}
       - HOST_DOMAIN=localhost
       - PORT=3443        # Porta principale HTTPS
       - HTTP_PORT=3000   # Porta secondaria HTTP
-      - API_BASE_URL=https://10.0.0.129:3443/api
-      - FRONTEND_URL=https://10.0.0.129:5173
+      - API_BASE_URL=https://${SELF_IP}:3443/api
+      - FRONTEND_URL=https://${SELF_IP}:5173
       - DB_USER=sa
       - DB_PASSWORD=Kacu938861
-      - DB_SERVER=host.docker.internal\ARCHASERVER
+      - DB_SERVER=${DB_SERVER}
       - DB_NAME=WebAppTEST
       - DB_PORT=1433
       - ACCESS_TOKEN_SECRET=cDb!Yu6wU!2
@@ -67,7 +67,7 @@ services:
       - "5174:5174"  # Porta HTTP (mantenuta per compatibilità)
     environment:
       - NODE_ENV=development
-      - VITE_HOST_IP=10.0.0.129
+      - VITE_HOST_IP=${SELF_IP}
       - VITE_HOST_DOMAIN=localhost
       - VITE_USE_HTTPS=true
       - VITE_HTTPS_PORT=5173

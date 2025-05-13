@@ -15,7 +15,7 @@ function loadHostConfig(env) {
     API_HTTPS_PORT: 3443,
     API_HTTP_PORT: 3001
   }
-  
+
   // Estrai valori dall'ambiente o usa i valori predefiniti
   return {
     hostIp: env.VITE_HOST_IP || defaults.HOST_IP,
