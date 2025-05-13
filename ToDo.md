@@ -6,6 +6,21 @@
 
 - [x] Sistemare scroll quando arriva un messaggio
 
+OLD BUT NEW
+
+- Notifica push
+
+- Errore get
+
+- Problema zindex sul menu layout chat quando ho almeno una modale della chat aperta
+
+- Conteggio notifiche
+
+- 
+
+
+
+
 - All'apertura di una chat non viene passata la lista degli utenti disponibili alla topbar (per aggiungere destinatari) e alla bottombar (per menzionare persone con la @). Sulla creazione di un nuovo messaggio (NewMessageModal.jsx) invece funziona.
 
 - Sondaggi: Se clicco il "Mostra sondaggi" quando non ce ne sono: chunk-WRD5HZVH.js?v=eb3a2bdf:19413 Uncaught TypeError: polls.filter is not a function at PollsList (PollsList.jsx:41:31)

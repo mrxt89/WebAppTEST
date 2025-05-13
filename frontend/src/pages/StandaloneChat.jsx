@@ -327,23 +327,6 @@ const StandaloneChat = () => {
     };
   }, [notificationId, fetchNotificationById, loaded]);
   
-  // Effect for periodic updates
-  useEffect(() => {
-    if (loaded && notification) {
-      // Set up polling interval to keep chat updated
-      const updateInterval = setInterval(() => {
-        fetchNotificationById(notificationId)
-          .then(updatedNotification => {
-            if (updatedNotification) {
-              setNotification(updatedNotification);
-            }
-          })
-          .catch(err => console.error("Errore aggiornamento periodico:", err));
-      }, 15000); // Poll every 15 seconds
-      
-      return () => clearInterval(updateInterval);
-    }
-  }, [loaded, notification, notificationId, fetchNotificationById]);
   
   // Function to close the window
   const handleClose = useCallback(() => {
