@@ -252,12 +252,6 @@ const NotificationSidebar = ({
   useEffect(() => {
     setFilteredNotifications(notifications);
   }, [notifications]);
-
-  useEffect(() => {
-    if (filteredNotifications.length === 0 && notifications.length > 0) {
-      console.warn('Nessuna notifica filtrata ma ci sono notifiche disponibili:', notifications);
-    }
-  }, [filteredNotifications, notifications]);
   
   // Effetto per filtrare le notifiche ogni volta che cambiano o cambia un filtro
   useEffect(() => {

@@ -40,9 +40,6 @@ const EditMessageModal = ({ isOpen, onClose, message, onMessageUpdated, users = 
   }, [isOpen]);
 
 useEffect(() => {
-  // Se non ci sono utenti o sono pochi, usa gli utenti dal contesto
-  console.log('Loaded users:', loadedUsers);
-  
   // Usa gli utenti già presenti nel contesto senza chiamare fetchUsers
   if (contextUsers && contextUsers.length > 0) {
     setLoadedUsers(contextUsers.filter(user => !user.userDisabled));

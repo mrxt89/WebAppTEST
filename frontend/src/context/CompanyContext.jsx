@@ -16,7 +16,6 @@ export const CompanyProvider = ({ children }) => {
   // Load company data when user is authenticated
   useEffect(() => {
     const fetchCompanyData = async () => {
-        console.log('Fetching company data.. user:', user);
       if (!user || !user.CompanyId) return;
       
       try {
@@ -25,7 +24,6 @@ export const CompanyProvider = ({ children }) => {
         const response = await axios.get(`${config.API_BASE_URL}/company/${user.CompanyId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        console.log('Company data:', response.data);
         const company = response.data;
         setCompanyData(company);
         
@@ -44,12 +42,9 @@ export const CompanyProvider = ({ children }) => {
 
   // Function to apply company theme colors
   const applyCompanyTheme = (company) => {
-    console.log('Applying company theme.. data:', company);
     if (!company) return;
     
     const root = document.documentElement;
-    
-    console.log('Applying company theme:', company.w_PrimaryColor, company.w_SecondaryColor);
     
     // Verifica che i colori esistano e applica solo se ci sono
     if (company.w_PrimaryColor) {
@@ -59,7 +54,6 @@ export const CompanyProvider = ({ children }) => {
         : `#${company.w_PrimaryColor}`;
       
       root.style.setProperty('--primary', primaryColor);
-      console.log('Primary color applied:', primaryColor);
     }
     
     if (company.w_SecondaryColor) {
@@ -68,13 +62,11 @@ export const CompanyProvider = ({ children }) => {
         : `#${company.w_SecondaryColor}`;
       
       root.style.setProperty('--secondary', secondaryColor);
-      console.log('Secondary color applied:', secondaryColor);
     }
   };
 
   // Function to get company logo URL
   const getCompanyLogoUrl = () => {
-    console.log('CompanyData:', companyData);
     if (!companyData || !companyData.CompanyId) return '/images/logos/Logo.png'; // Default logo
     
     // Try different extensions (case insensitive)

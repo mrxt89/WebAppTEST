@@ -326,8 +326,6 @@ const ChatTopBar = ({
 
       // Aggiorna il notificationCategoryId solo se è una nuova chat
       if (isNewMessage) {
-        console.log(`Canale selezionato: ${selectedChannel.name} (ID: ${selectedChannel.notificationCategoryId})`);
-        
         if (typeof onUpdateCategoryId === 'function') {
           onUpdateCategoryId(selectedChannel.notificationCategoryId);
         }
@@ -372,7 +370,6 @@ const ChatTopBar = ({
     
     filterMessages(notificationId, { searchText })
       .then(results => {
-        console.log('Messaggi filtrati:', results);
         // Emetti un evento personalizzato che verrà catturato dalla chat per evidenziare i messaggi
         const event = new CustomEvent('chat-filter-applied', { 
           detail: { messageIds: results.map(m => m.messageId) } 
@@ -406,9 +403,6 @@ const ChatTopBar = ({
   };
 
   const handlePollCreated = (poll, messageResult) => {
-    // Puoi gestire eventuali aggiornamenti necessari dell'UI dopo la creazione di un sondaggio
-    console.log('Sondaggio creato:', poll);
-    
     // Aggiorna la notifica per includere il nuovo messaggio del sondaggio
     if (messageResult && messageResult.notificationId) {
       fetchNotificationById(messageResult.notificationId);

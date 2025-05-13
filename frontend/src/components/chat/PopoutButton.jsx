@@ -20,13 +20,9 @@ const PopoutButton = ({ notificationId, title, onSuccess }) => {
         console.error('ID notifica mancante per PopoutButton');
         throw new Error('ID notifica mancante');
       }
-      
-      console.log(`Tentativo di apertura chat ${notificationId} in finestra separata`);
-      
+
       // Verifica se la chat è già aperta in una finestra separata
       if (isStandaloneChat && isStandaloneChat(notificationId)) {
-        console.log(`Chat ${notificationId} già aperta in finestra separata, tentativo di focus`);
-        
         // Tenta di trovare e attivare la finestra esistente
         const windowName = `chat_${notificationId}`;
         const existingWindow = window.open('', windowName);
@@ -36,7 +32,6 @@ const PopoutButton = ({ notificationId, title, onSuccess }) => {
           
           // Chiudi il modale principale se richiesto
           if (onSuccess && typeof onSuccess === 'function') {
-            console.log('Chiusura modale principale dopo focus su finestra esistente');
             onSuccess();
           }
           
@@ -44,7 +39,7 @@ const PopoutButton = ({ notificationId, title, onSuccess }) => {
           return;
         }
         
-        console.log(`Finestra esistente non trovata, creazione nuova finestra`);
+        console.warn(`Finestra esistente non trovata, creazione nuova finestra`);
       }
       
       // Registra la chat come aperta in finestra separata prima di aprirla
@@ -88,7 +83,6 @@ const PopoutButton = ({ notificationId, title, onSuccess }) => {
       
       // Se l'apertura ha avuto successo e abbiamo una callback, chiama la funzione per chiudere il modale
       if (onSuccess && typeof onSuccess === 'function') {
-        console.log('Chiusura modale principale dopo apertura nuova finestra');
         onSuccess();
       }
       
@@ -102,8 +96,6 @@ const PopoutButton = ({ notificationId, title, onSuccess }) => {
           }
         }
       }, 300);
-      
-      console.log(`Finestra standalone aperta con successo per chat ${notificationId}`);
     } catch (error) {
       console.error('Errore durante apertura finestra standalone:', error);
       

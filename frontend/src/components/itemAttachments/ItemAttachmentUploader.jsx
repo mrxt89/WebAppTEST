@@ -102,9 +102,7 @@ function ItemAttachmentUploader({
         tags: tags.length > 0 ? tags.join(', ') : null,
         categoryIds: selectedCategories.map(cat => cat.CategoryID || cat).join(',')
       };
-      
-      console.log("Uploading file with metadata:", metadata);
-      
+
       let result;
       
       // Simula la progress bar

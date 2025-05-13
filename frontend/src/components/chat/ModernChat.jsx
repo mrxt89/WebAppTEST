@@ -23,7 +23,6 @@ const ModernChat = ({
   useEffect(() => {
     if (isOpen && !hasMarkedAsRead && notification) {
       if (notification.notificationId && !notification.isReadByUser) {
-        console.log(`[ModernChat] Marking notification ${notification.notificationId} as read`);
         markMessageAsRead(notification.notificationId);
         setHasMarkedAsRead(true);
       }

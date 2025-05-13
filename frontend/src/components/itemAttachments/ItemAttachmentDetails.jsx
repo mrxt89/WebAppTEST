@@ -261,14 +261,6 @@ function ItemAttachmentDetails({
     if (!canEdit || loading) return;
     
     try {
-      console.log("Saving attachment with data:", {
-        description,
-        isPublic,
-        isVisible,
-        isErpAttachment,
-        tags: tags.length > 0 ? tags.join(', ') : null // Usiamo null invece di stringa vuota
-      });
-      
       const result = await updateAttachment(
         attachment.AttachmentID,
         {

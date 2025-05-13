@@ -46,7 +46,6 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
     
     try {
       console.log('Creating poll with data:', poll);
-
     } catch (error) {
       console.error('Error in poll creation flow:', error);
       swal.fire('Errore', 'Si è verificato un errore durante la creazione del sondaggio: ' + error.message, 'error');

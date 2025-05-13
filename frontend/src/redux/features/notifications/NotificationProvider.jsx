@@ -18,12 +18,10 @@ export const NotificationProvider = ({ children }) => {
 
   // Initialize the notification worker on component mount
   useEffect(() => {
-    console.log('NotificationProvider: Initializing notification worker');
     initializeWorker();
     
     // Force reload notifications after a short delay to ensure initial data
     const timeoutId = setTimeout(() => {
-      console.log('NotificationProvider: Forcing initial notification reload');
       reloadNotifications(true); // high priority
     }, 1000);
     
@@ -31,7 +29,6 @@ export const NotificationProvider = ({ children }) => {
     const initAudioOnInteraction = () => {
       notificationService.initAudio()
         .then(success => {
-          console.log('NotificationProvider: Audio initialization result:', success);
           if (success) {
             // Remove event listeners after successful initialization
             document.removeEventListener('click', initAudioOnInteraction);
@@ -48,7 +45,6 @@ export const NotificationProvider = ({ children }) => {
     
     // Setup periodic notification refresh
     const refreshInterval = setInterval(() => {
-      console.log('NotificationProvider: Periodic notification refresh');
       forceLoadNotifications();
     }, 30000); // Every 30 seconds
     
@@ -68,8 +64,6 @@ useEffect(() => {
     const { notificationId, newMessageCount } = event.detail || {};
     
     if (notificationId && newMessageCount > 0) {
-      console.log('NotificationProvider: New message event received', event.detail);
-      
       // Forza refresh notifications per aggiornare UI
       forceLoadNotifications();
     }
@@ -82,18 +76,6 @@ useEffect(() => {
   };
 }, [forceLoadNotifications]);
 
-  // Listen for notifications-updated events
-  useEffect(() => {
-    const handleNotificationsUpdated = () => {
-      console.log('NotificationProvider: Notifications updated event received');
-    };
-    
-    document.addEventListener('notifications-updated', handleNotificationsUpdated);
-    
-    return () => {
-      document.removeEventListener('notifications-updated', handleNotificationsUpdated);
-    };
-  }, []);
 
   return <>{children}</>;
 };

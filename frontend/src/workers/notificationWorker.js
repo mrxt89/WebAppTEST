@@ -21,14 +21,6 @@ const THROTTLE_INTERVAL = 2000; // Minimo tempo tra richieste consecutive
 // Tracking per limitare le richieste troppo frequenti
 let lastRequestTime = 0;
 
-// Helper function for logging with timestamp
-function log(...args) {
-  if (debugEnabled) {
-    const timestamp = new Date().toISOString();
-    console.log(`[NotificationWorker ${timestamp}]`, ...args);
-  }
-}
-
 // Log errors even when debug is disabled
 function logError(...args) {
   const timestamp = new Date().toISOString();
@@ -42,7 +34,6 @@ function haveNotificationsChanged(newNotifications) {
   }
   
   if (newNotifications.length !== notificationCache.length) {
-    log('Notification count changed:', notificationCache.length, '->', newNotifications.length);
     return true; // Different number of notifications
   }
   
@@ -52,7 +43,6 @@ function haveNotificationsChanged(newNotifications) {
     const cachedNotif = notificationCache.find(n => n.notificationId === newNotif.notificationId);
     
     if (!cachedNotif) {
-      log('New notification found:', newNotif.notificationId);
       return true; // New notification found
     }
     
@@ -61,13 +51,11 @@ function haveNotificationsChanged(newNotifications) {
     const cachedMsgCount = getMsgCount(cachedNotif.messages);
     
     if (newMsgCount !== cachedMsgCount) {
-      log(`Messages changed for notification ${newNotif.notificationId}: ${cachedMsgCount} -> ${newMsgCount}`);
       return true; // Message count changed
     }
     
     // Check for read status changes
     if (newNotif.isReadByUser !== cachedNotif.isReadByUser) {
-      log(`Read status changed for notification ${newNotif.notificationId}: ${cachedNotif.isReadByUser} -> ${newNotif.isReadByUser}`);
       return true; // Read status changed
     }
     
@@ -76,14 +64,12 @@ function haveNotificationsChanged(newNotifications) {
         newNotif.favorite !== cachedNotif.favorite ||
         newNotif.archived !== cachedNotif.archived ||
         newNotif.isClosed !== cachedNotif.isClosed) {
-      log(`Status changed for notification ${newNotif.notificationId}`);
       return true; // Status changed
     }
   }
   
   // If forcedRefreshRequested is true, consider it changed regardless
   if (forcedRefreshRequested) {
-    log('Forced refresh requested, returning true regardless');
     forcedRefreshRequested = false; // Reset the flag
     return true;
   }
@@ -112,12 +98,8 @@ async function fetchNotifications() {
   const timeSinceLastRequest = now - lastRequestTime;
   
   if (timeSinceLastRequest < THROTTLE_INTERVAL && !highPriorityUpdate) {
-    log(`Skipping notification fetch: too soon (${timeSinceLastRequest}ms since last request)`);
-    
     // Riprogramma per quando sarà passato l'intervallo minimo
     const waitTime = THROTTLE_INTERVAL - timeSinceLastRequest;
-    log(`Rescheduling fetch in ${waitTime}ms`);
-    
     if (pollingTimeout) {
       clearTimeout(pollingTimeout);
     }
@@ -126,7 +108,6 @@ async function fetchNotifications() {
   }
   
   if (isRequestInProgress) {
-    log('Skipping notification fetch: previous request still in progress');
     scheduleNextFetch();
     return;
   }
@@ -135,7 +116,6 @@ async function fetchNotifications() {
   lastRequestTime = now;
   isRequestInProgress = true;
   const fetchStartTime = now;
-  log('Starting notification fetch');
 
   // Request with timeout
 // Request with timeout
@@ -160,7 +140,6 @@ const fetchPromise = fetch(`${apiBaseUrl}/notifications`, {
     if (!response.ok) {
       // Handle authentication errors
       if (response.status === 401 || response.status === 403) {
-        log('Authentication error:', response.status);
         self.postMessage({ 
           type: 'auth_error',
           error: 'Session expired'
@@ -172,7 +151,6 @@ const fetchPromise = fetch(`${apiBaseUrl}/notifications`, {
 
     const notifications = await response.json();
     const fetchEndTime = Date.now();
-    log(`Fetched ${notifications.length} notifications in ${fetchEndTime - fetchStartTime}ms`);
     
     // Sort notifications by pin and date
     notifications.sort((a, b) => {
@@ -186,10 +164,7 @@ const fetchPromise = fetch(`${apiBaseUrl}/notifications`, {
     
     if (hasChanges || highPriorityUpdate) {
       if (highPriorityUpdate) {
-        log('High priority update, forcing update regardless of changes');
         highPriorityUpdate = false; // Reset flag
-      } else {
-        log('Changes detected, updating main thread');
       }
       
       // Update cache
@@ -206,8 +181,6 @@ const fetchPromise = fetch(`${apiBaseUrl}/notifications`, {
           const cachedMsgCount = getMsgCount(cachedNotification.messages);
           
           if (newMsgCount > cachedMsgCount) {
-            log(`Rilevato nuovo messaggio per notifica ${notification.notificationId}: ${cachedMsgCount} -> ${newMsgCount}`);
-            
             // Emetti messaggio esplicito per ogni chat con nuovi messaggi
             self.postMessage({ 
               type: 'new_message',
@@ -224,13 +197,10 @@ const fetchPromise = fetch(`${apiBaseUrl}/notifications`, {
         notifications: notifications,
         updateTime: lastUpdateTime
       });
-    } else {
-      log('No changes detected, skipping update');
     }
 
   } catch (error) {
     // Notify the React component of the error
-    logError('Error fetching notifications:', error);
     self.postMessage({ 
       type: 'error',
       error: error.message 
@@ -254,8 +224,7 @@ function scheduleNextFetch() {
   if (highPriorityUpdate) {
     interval = 100; // Praticamente immediato
   }
-  
-  log(`Scheduling next fetch in ${interval/1000} seconds`);
+
   pollingTimeout = setTimeout(fetchNotifications, interval);
 }
 
@@ -267,14 +236,12 @@ self.onmessage = (event) => {
     switch (type) {
       case 'init':
         // Initialize worker with token and URL
-        log('Initializing worker', data);
         token = data.token;
         apiBaseUrl = data.apiBaseUrl;
         
         // Enable debug if requested
         if (data.debug) {
           debugEnabled = true;
-          log('Debug mode enabled');
         }
         
         // Start fetching immediately
@@ -283,7 +250,6 @@ self.onmessage = (event) => {
 
       case 'stop':
         // Stop polling
-        log('Stopping worker');
         if (pollingTimeout) {
           clearTimeout(pollingTimeout);
         }
@@ -291,7 +257,6 @@ self.onmessage = (event) => {
         
       case 'reload':
         // Force immediate reload
-        log('Forced reload requested');
         token = data.token || token;
         apiBaseUrl = data.apiBaseUrl || apiBaseUrl;
         
@@ -300,10 +265,6 @@ self.onmessage = (event) => {
         
         // Imposta il flag di alta priorità se specificato
         highPriorityUpdate = data.highPriority || false;
-        
-        if (highPriorityUpdate) {
-          log('High priority update requested - executing immediately');
-        }
         
         // Cancel any pending fetch and start immediately
         if (pollingTimeout) {
@@ -322,12 +283,10 @@ self.onmessage = (event) => {
       case 'debug':
         // Toggle debug mode
         debugEnabled = data.enabled;
-        log('Debug mode ' + (debugEnabled ? 'enabled' : 'disabled'));
         break;
         
       case 'ping':
         // Ping to check worker is alive
-        log('Ping received, sending pong');
         self.postMessage({
           type: 'pong',
           timestamp: Date.now(),
@@ -336,11 +295,10 @@ self.onmessage = (event) => {
         break;
 
       default:
-        log('Unknown message type:', type);
+        logError('Unknown message type:', type);
     }
   }
 };
 
 // Send initial ready message
 self.postMessage({ type: 'ready', timestamp: Date.now() });
-log('Notification worker initialized and ready');

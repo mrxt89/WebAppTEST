@@ -42,8 +42,6 @@ export const fetchNotifications = createAsyncThunk(
       const token = localStorage.getItem('token');
       if (!token) return rejectWithValue('No token available');
       
-      console.log('Esecuzione fetchNotifications con token:', token.substring(0, 10) + '...');
-      
       const response = await axios.get(`${config.API_BASE_URL}/notifications`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -51,9 +49,7 @@ export const fetchNotifications = createAsyncThunk(
           'Cache-Control': 'no-cache' // Evita la cache
         }
       });
-      
-      console.log('Risposta fetchNotifications ricevuta:', response.status, response.data ? response.data.length : 0);
-      
+
       // Se la risposta è vuota o null, prova a utilizzare dei dati di test per debug
       if (!response.data || (Array.isArray(response.data) && response.data.length === 0)) {
         console.warn('Nessuna notifica ricevuta dal server, verifica il backend.');
@@ -81,8 +77,6 @@ export const fetchNotificationById = createAsyncThunk(
   'notifications/fetchNotificationById',
   async (notificationId, { rejectWithValue, getState }) => {
     try {
-      console.log(`fetchNotificationById chiamato per ID: ${notificationId}`);
-      
       const token = localStorage.getItem('token');
       if (!token) {
         console.error('Token mancante per fetchNotificationById');
@@ -97,7 +91,6 @@ export const fetchNotificationById = createAsyncThunk(
       // Aggiungi timestamp per evitare cache
       const timestamp = Date.now();
       
-      console.log(`Esecuzione chiamata API per notifica ${notificationId}`);
       const response = await axios.get(`${config.API_BASE_URL}/notifications/${notificationId}?t=${timestamp}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -107,8 +100,6 @@ export const fetchNotificationById = createAsyncThunk(
       });
       
       if (response.data) {
-        console.log(`Dati ricevuti per notifica ${notificationId}`, response.data);
-        
         // Emit an event to notify other parts of the app
         const event = new CustomEvent('notification-updated', {
           detail: {

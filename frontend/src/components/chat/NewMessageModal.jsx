@@ -157,7 +157,6 @@ useEffect(() => {
       if (currentResponseOption && currentResponseOption.recipientsJSON) {
         try {
           const parsedRecipients = JSON.parse(currentResponseOption.recipientsJSON).map(recipient => recipient.userId.toString());
-          console.log('Destinatari pre-caricati:', parsedRecipients);
           setReceivers(parsedRecipients);
         } catch (e) {
           console.error('Errore nel parsing dei destinatari:', e);
@@ -184,7 +183,6 @@ useEffect(() => {
   }, [isOpen]);
   
   const handleSend = async (notificationData) => {
-    console.log('Dati da inviare:', notificationData);
     if (!notificationData.title || !notificationData.message) {
       swal.fire('Errore', 'Assicurati che tutti i campi siano compilati', 'error');
       return;
@@ -199,8 +197,7 @@ useEffect(() => {
       ...notificationData,
       notificationCategoryId: currentNotificationCategoryId || 1
     };
-    console.log('Dati finali da inviare:', updatedNotificationData);
-  
+
     try {
       const newNotification = await sendNotification(updatedNotificationData);
       if (newNotification) {
@@ -225,7 +222,6 @@ useEffect(() => {
       if (currentResponseOption && currentResponseOption.recipientsJSON) {
         try {
           const parsedRecipients = JSON.parse(currentResponseOption.recipientsJSON).map(recipient => recipient.userId.toString());
-          console.log('Destinatari pre-caricati:', parsedRecipients);
           setReceivers(parsedRecipients);
         } catch (e) {
           console.error('Errore nel parsing dei destinatari:', e);
@@ -239,7 +235,6 @@ useEffect(() => {
 
   // funzione per aggiornare il notificationCategoryId
   const handleUpdateCategoryId = (newCategoryId) => {
-    console.log(`Aggiornamento notificationCategoryId da ${currentNotificationCategoryId} a ${newCategoryId}`);
     setCurrentNotificationCategoryId(newCategoryId);
     
     // Possiamo anche aggiornare altre proprietà in base alla categoria,

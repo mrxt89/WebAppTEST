@@ -165,10 +165,7 @@ const AsyncItemSelect = ({
     }, [searchTerm, handleSearch]);
 
     const handleSelect = useCallback((newValue) => {
-        console.log('handleSelect called with:', newValue);
-        
         const selectedItem = itemsMap[newValue];
-        console.log('Found selected item:', selectedItem);
 
         if (selectedItem) {
             const option = formatOption(selectedItem);
@@ -176,13 +173,11 @@ const AsyncItemSelect = ({
 
             // Prima chiamiamo onItemSelect
             if (onItemSelect) {
-                console.log('Calling onItemSelect with:', selectedItem);
                 onItemSelect(selectedItem);
             }
 
             // Poi chiamiamo onValueChange
             if (onValueChange) {
-                console.log('Calling onValueChange with:', newValue);
                 onValueChange(newValue);
             }
         }
@@ -192,7 +187,6 @@ const AsyncItemSelect = ({
         <Select 
             value={value} 
             onValueChange={(newValue) => {
-                console.log("Select base - onValueChange called with:", newValue);
                 handleSelect(newValue);
             }}
             disabled={disabled}

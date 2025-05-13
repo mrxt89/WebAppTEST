@@ -908,8 +908,6 @@ const handleViewVersionHistory = async (messageId) => {
     
     const result = await getMessageVersionHistory(messageId);
     
-    console.log("Version history result:", result);
-    
     if (result) {
       // Format the data to match what the component expects
       setSelectedMessageVersions({

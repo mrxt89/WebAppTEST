@@ -248,18 +248,14 @@ const ChatModal = ({
   useEffect(() => {
     const handleMessageUpdated = (event) => {
       const { notificationId: updatedNotificationId, messageId } = event.detail;
-      
-      console.log(`Message-updated event received for notificationId: ${updatedNotificationId}, messageId: ${messageId}`);
-      
+
       // Verify that the updated notification corresponds to the current one
       if (updatedNotificationId && notification && updatedNotificationId === notification.notificationId) {
-        console.log('Reloading notification after message modification');
         
         // Reload notification data
         fetchNotificationById(updatedNotificationId)
           .then((updatedNotification) => {
             if (updatedNotification) {
-              console.log('Notification successfully reloaded');
               
               // If needed, update other states or perform additional actions
               if (messageId) {
@@ -316,7 +312,6 @@ const ChatModal = ({
       
       // Only update if this is for the current notification
       if (updatedNotificationId && notification && updatedNotificationId === notification.notificationId) {
-        console.log(`Notification update event received for ${updatedNotificationId}`);
         
         // Reload notification data
         fetchNotificationById(updatedNotificationId)
@@ -332,7 +327,6 @@ const ChatModal = ({
       
       // Verifica che questo evento sia per la chat corrente
       if (notificationId && notification && parseInt(notificationId) === parseInt(notification.notificationId)) {
-        console.log(`Stato della chat ${notificationId} cambiato: ${action}`);
         
         // Ricarica i dati aggiornati
         const updatedNotification = await fetchNotificationById(notificationId);
@@ -409,13 +403,11 @@ const ChatModal = ({
         // Considera l'utente "scrollato" solo se è almeno 200px dal fondo
         if (scrollTop + clientHeight < scrollHeight - 200) {
           userHasScrolled = true;
-          console.log('[ChatModal] User has scrolled up');
         }
         
         // Se l'utente scorre fino in fondo, reimposta il flag
         if (scrollTop + clientHeight >= scrollHeight - 20) {
           userHasScrolled = false;
-          console.log('[ChatModal] User has scrolled to bottom');
         }
       };
       
@@ -423,7 +415,6 @@ const ChatModal = ({
         // Se l'utente scorre verso l'alto, imposta il flag
         if (e.deltaY < 0) {
           userHasScrolled = true;
-          console.log('[ChatModal] User is scrolling up with wheel');
         }
       };
       
@@ -464,13 +455,9 @@ const ChatModal = ({
       // Controlla se lo stato di lettura è cambiato
       const readStateChanged = lastReadStateRef.current !== notification.isReadByUser;
       
-      // Logging per debug
-      console.log(`[ChatModal] Notification ${notification.notificationId}, isReadByUser: ${notification.isReadByUser}, hasMarkedAsRead: ${hasMarkedAsRead}, lastReadState: ${lastReadStateRef.current}`);
-      
       // Se è una nuova notifica o lo stato di lettura è cambiato e la notifica non è letta
       // E non abbiamo già marcato questo messaggio come letto localmente
       if ((isNewNotification || readStateChanged) && !notification.isReadByUser && !hasMarkedAsRead) {
-        console.log(`[ChatModal] Marking notification ${notification.notificationId} as read (previous state: ${lastReadStateRef.current})`);
         
         // Marca come letta solo se necessario
         markMessageAsRead(notification.notificationId);
@@ -591,7 +578,6 @@ const ChatModal = ({
     // 2. L'utente ha inviato un messaggio
     // Nessun altro caso dovrebbe forzare lo scrolling
     if (prevMessages.length === 0 || isFromCurrentUser) {
-      console.log('[ChatModal] Scrolling to bottom - first load or user message');
       // First load or user's own message - always scroll to bottom
       requestAnimationFrame(() => {
         if (chatListRef.current) {
@@ -656,7 +642,6 @@ const ChatModal = ({
 
   // Function to scroll to message when found in search
   const scrollToMessage = (messageId) => {
-    console.log(`Scrolling to message ID: ${messageId}`);
     setSelectedMessageId(messageId);
 
     // Wait for refs to update
@@ -679,10 +664,6 @@ const ChatModal = ({
             messageElement.classList.remove('highlight-message');
           }, 1000);
         }, 2000);
-        
-        console.log(`Message highlighted: ${messageId}`);
-      } else {
-        console.error(`Message not found: ${messageId}`);
       }
     }, 100);
   };
@@ -740,7 +721,6 @@ const ChatModal = ({
           if (chatListRef?.current) {
             // Ripristina la visibilità e scrolling
             if (chatListRef.current) {
-              console.log('[ChatModal] Auto-scrolling after message sent');
               chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
             }
           }
@@ -789,8 +769,6 @@ const ChatModal = ({
   // Handle chat archiving
   const handleArchiveChat = async () => {
     try {
-      console.log(`Attempting to archive chat with ID: ${notificationId}`);
-      
       // Show loading indicator for immediate feedback
       swal.fire({
         title: 'Archiviazione in corso...',
@@ -806,8 +784,6 @@ const ChatModal = ({
       }
       
       const result = await archiveChat(notificationId);
-      console.log('Archive result:', result);
-      
       if (result && result.success) {
         // Importante: Ricarica i dati aggiornati della chat
         await fetchNotificationById(notificationId);
@@ -847,8 +823,6 @@ const ChatModal = ({
   // Handle unarchiving chat
   const handleUnarchiveChat = async () => {
     try {
-      console.log(`Attempting to unarchive chat with ID: ${notificationId}`);
-      
       // Show loading indicator for immediate feedback
       swal.fire({
         title: 'Rimozione dall\'archivio in corso...',
@@ -864,8 +838,7 @@ const ChatModal = ({
       }
       
       const result = await unarchiveChat(notificationId);
-      console.log('Unarchive result:', result);
-      
+
       if (result && result.success) {
         // Importante: Ricarica i dati aggiornati della chat
         await fetchNotificationById(notificationId);
@@ -919,8 +892,6 @@ const ChatModal = ({
       
       const result = await getMessageVersionHistory(messageId);
       
-      console.log("Version history result:", result);
-      
       if (result && result.success) {
         // Make sure the data is in the correct format for the component
         setSelectedMessageVersions({
@@ -950,11 +921,9 @@ const ChatModal = ({
       
       // Toggle the reaction
       await toggleMessageReaction(messageId, emoji);
-      console.log('Reaction toggled successfully:', emoji);
-      
+     
       if (notificationId) {
         await fetchNotificationById(notificationId);
-        console.log('Notification data refreshed after reaction update');
       }
       
       // Notify about the reaction update using a custom event
@@ -1244,8 +1213,6 @@ const ChatModal = ({
               if (idToUpdate) {
                 fetchNotificationById(idToUpdate)
                   .then(result => {
-                    console.log("Notification updated successfully:", result);
-                    
                     // Emit event to update other components
                     document.dispatchEvent(new CustomEvent('message-updated', { 
                       detail: { 

@@ -20,7 +20,6 @@ const checkMasterStatus = () => {
     localStorage.setItem('chat_master_window', WINDOW_ID);
     localStorage.setItem('chat_master_heartbeat', Date.now().toString());
     isMaster = true;
-    console.log('[WindowSync] Becoming master window');
     return true;
   }
   
@@ -64,10 +63,6 @@ const windowSyncMiddleware = store => {
     masterHeartbeatTimeout = setInterval(() => {
       localStorage.setItem('chat_master_heartbeat', Date.now().toString());
     }, 1000);
-    
-    console.log('[WindowSync] This window is the master window');
-  } else {
-    console.log('[WindowSync] This window is a client window');
   }
   
   // Verifica regolare dello stato master per ripristino in caso di master morto
@@ -76,8 +71,6 @@ const windowSyncMiddleware = store => {
     isMaster = checkMasterStatus();
     
     if (!wasMaster && isMaster) {
-      console.log('[WindowSync] Promoted to master window');
-      
       // Avvia il heartbeat
       masterHeartbeatTimeout = setInterval(() => {
         localStorage.setItem('chat_master_heartbeat', Date.now().toString());
@@ -100,8 +93,6 @@ const windowSyncMiddleware = store => {
         
         // Ignora eventi che provengono da questa finestra
         if (syncData.source === WINDOW_ID) return;
-        
-        console.log(`[WindowSync] Received sync action: ${syncData.action.type}`);
         
         // Applica l'azione sincronizzata
         store.dispatch({
@@ -136,8 +127,6 @@ const windowSyncMiddleware = store => {
       
       // Se lo stato master è cambiato
       if (wasMaster !== isMaster) {
-        console.log(`[WindowSync] Master status changed: ${isMaster ? 'became master' : 'no longer master'}`);
-        
         // Se è diventato master, inizializza il heartbeat
         if (isMaster) {
           masterHeartbeatTimeout = setInterval(() => {
@@ -184,7 +173,6 @@ const windowSyncMiddleware = store => {
     
     if (shouldBeMaster !== isMaster) {
       if (shouldBeMaster) {
-        console.log('[WindowSync] Connection restored, becoming master');
         isMaster = true;
         
         // Avvia heartbeat
@@ -276,7 +264,6 @@ const windowSyncMiddleware = store => {
   return next => action => {
     // Gestione speciale per azioni worker (solo il master deve eseguire il polling)
     if (action.type === 'notifications/initialize' && !isMaster && !action.meta?.forceWorkerInit) {
-      console.log('[WindowSync] Skipping worker initialization in non-master window');
       return next({
         ...action,
         meta: { ...action.meta, skipWorkerInit: true }
@@ -285,15 +272,12 @@ const windowSyncMiddleware = store => {
     
     // Se è un reload forzato da una nuova finestra master
     if (action.type === 'notifications/reload' && action.meta?.newMaster && isMaster) {
-      console.log('[WindowSync] New master window forcing reload');
       // Assicurati che sia trattato come prioritario
       action.payload = { ...action.payload, highPriority: true };
     }
     
     // Gestione speciale per la registrazione delle chat standalone
     if (action.type === 'notifications/registerStandaloneChat' && !action.meta?.isFromSync) {
-      console.log(`[WindowSync] Registering standalone chat: ${action.payload}`);
-      
       // Salva anche in localStorage per persistenza tra refresh
       try {
         const current = JSON.parse(localStorage.getItem('standalone_chats') || '[]');
@@ -308,8 +292,6 @@ const windowSyncMiddleware = store => {
     
     // Gestione speciale per la rimozione delle chat standalone
     if (action.type === 'notifications/unregisterStandaloneChat' && !action.meta?.isFromSync) {
-      console.log(`[WindowSync] Unregistering standalone chat: ${action.payload}`);
-      
       // Aggiorna localStorage
       try {
         const current = JSON.parse(localStorage.getItem('standalone_chats') || '[]');
@@ -330,8 +312,6 @@ const windowSyncMiddleware = store => {
     
     // Se necessario, sincronizza l'azione con altre finestre
     if (shouldSync) {
-      console.log(`[WindowSync] Syncing action: ${action.type}`);
-      
       const syncData = {
         source: WINDOW_ID,
         timestamp: Date.now(),

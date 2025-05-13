@@ -40,8 +40,6 @@ const DoNotDisturbToggle = () => {
   // Nuovo listener per il reset forzato delle notifiche
   useEffect(() => {
     const handleForceReset = (event) => {
-      console.log("Ricevuto evento di reset forzato delle notifiche");
-      
       // Forza un ricaricamento completo delle notifiche dal server
       if (loadNotifications) {
         setTimeout(() => {
@@ -91,8 +89,6 @@ const DoNotDisturbToggle = () => {
       setIsUpdating(true);
       
       const newState = !enabled;
-      console.log(`Cambiando stato Non Disturbare: ${enabled} -> ${newState}`);
-      
       // Aggiorna prima l'interfaccia per un feedback immediato
       setEnabled(newState);
       
@@ -110,8 +106,6 @@ const DoNotDisturbToggle = () => {
       
       // Se stiamo disattivando "Non disturbare", assicuriamoci che TUTTO venga resettato
       if (!newState) {
-        console.log("Disattivazione Non Disturbare - Esecuzione reset completo");
-        
         // Prima verifica se il metodo esiste per evitare errori
         if (typeof notificationService.resetService === 'function') {
           try {
@@ -124,7 +118,6 @@ const DoNotDisturbToggle = () => {
         // Forza un ricaricamento delle notifiche dal server
         if (loadNotifications) {
           setTimeout(() => {
-            console.log("Ricaricamento notifiche dal server...");
             try {
               loadNotifications();
             } catch (e) {
@@ -136,7 +129,6 @@ const DoNotDisturbToggle = () => {
         // Forza un ricaricamento ad alta priorità
         if (reloadNotifications) {
           setTimeout(() => {
-            console.log("Ricaricamento notifiche con alta priorità...");
             try {
               reloadNotifications(true);
             } catch (e) {
@@ -148,7 +140,6 @@ const DoNotDisturbToggle = () => {
         // Come ultima risorsa, riavviamo il worker delle notifiche se il metodo esiste
         if (restartNotificationWorker) {
           setTimeout(() => {
-            console.log("Riavvio worker delle notifiche...");
             try {
               restartNotificationWorker(true);
             } catch (e) {

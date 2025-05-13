@@ -37,7 +37,7 @@ const AttachmentUploader = ({ notificationId, onAttachmentUploaded }) => {
     }
     
     if (!file) {
-      console.log('No file selected');
+      console.warn('No file selected');
       return;
     }
 

@@ -23,30 +23,25 @@ const notificationsWorkerMiddleware = store => {
       const masterHeartbeat = parseInt(localStorage.getItem('chat_master_heartbeat') || '0');
       const isMasterActive = Date.now() - masterHeartbeat < 10000; // 10 secondi
       
-      console.log(`[NotificationWorker] Window context: isStandalone=${isStandalone}, isMaster=${isMaster}, isMasterActive=${isMasterActive}`);
-      
       // Non inizializzare se esplicitamente richiesto di saltare
       if (action.meta?.skipWorkerInit) {
-        console.log('[NotificationWorker] Skipping worker initialization as requested');
         return next(action);
       }
       
       // Se è una finestra standalone ma non è l'inizializzazione forzata, salta
       if (isStandalone && !action.meta?.forceWorkerInit && isMasterActive) {
-        console.log('[NotificationWorker] Skipping worker initialization in standalone window');
         return next(action);
       }
       
       // Se un worker esiste già, fermalo e creane uno nuovo
       if (worker) {
-        console.log('[NotificationWorker] Stopping existing worker before creating a new one');
         worker.postMessage({ type: 'stop' });
         worker.terminate();
         worker = null;
       }
       
-      console.log('[NotificationWorker] Creating new notification worker');
-      
+      // Crea un nuovo worker
+      worker = new NotificationWorker();
       // Crea un nuovo worker
       worker = new NotificationWorker();
       isWorkerInitialized = true;
@@ -88,7 +83,6 @@ const notificationsWorkerMiddleware = store => {
               // Limita aggiornamenti troppo frequenti per evitare problemi di performance
               const now = Date.now();
               if (now - lastNotificationUpdate < UPDATE_THROTTLE_MS) {
-                console.log('[NotificationWorker] Throttling updates, skipping this update');
                 return;
               }
               
@@ -135,7 +129,6 @@ const notificationsWorkerMiddleware = store => {
                     // Trova la notifica negli stati
                     const notification = state.notifications.notifications?.find(n => n.notificationId === notificationId);
                     if (!notification) {
-                      console.log(`Notifica ${notificationId} non trovata nello stato Redux, aggiornamento richiesto`);
                       // Aggiorna la notifica specifica
                       store.dispatch(fetchNotificationById(notificationId));
                       return;
@@ -230,11 +223,9 @@ const notificationsWorkerMiddleware = store => {
               break;
               
             case 'ready':
-              console.log('[NotificationWorker] Worker is ready');
               break;
               
             case 'pong':
-              console.log('[NotificationWorker] Received pong from worker');
               break;
           }
         };
@@ -257,8 +248,6 @@ const notificationsWorkerMiddleware = store => {
         return next(action);
       }
       
-      console.log('[NotificationWorker] Reloading notifications', action.payload?.highPriority ? 'with high priority' : '');
-      
       const token = localStorage.getItem('token');
       worker.postMessage({
         type: 'reload',
@@ -273,7 +262,6 @@ const notificationsWorkerMiddleware = store => {
     // Gestisci lo stop del worker
     else if (action.type === 'notifications/stopWorker') {
       if (worker) {
-        console.log('[NotificationWorker] Stopping worker');
         worker.postMessage({ type: 'stop' });
         worker.terminate();
         worker = null;

@@ -84,19 +84,14 @@ const WindowManager = ({ openChats, onCloseChat, onMinimizeChat, restoreChat }) 
   
   // Toggle window minimize state
   const toggleMinimize = useCallback((id) => {
-    console.log(`Toggle minimize called for window ID: ${id}`); // Log di debug
-    
     // Ottieni lo stato corrente prima di cambiarlo
     const currentState = windowStates[id];
     const currentlyMinimized = currentState?.isMinimized || false;
-    
-    console.log(`Current minimized state: ${currentlyMinimized}`);
     
     // Aggiorna lo stato con il toggle corretto
     setWindowStates(prev => {
       // Se lo stato per questo ID non esiste, crealo con valori di default
       if (!prev[id]) {
-        console.log(`Creating new window state for ID: ${id}`);
         return {
           ...prev,
           [id]: {
@@ -111,8 +106,6 @@ const WindowManager = ({ openChats, onCloseChat, onMinimizeChat, restoreChat }) 
         };
       }
       
-      // Altrimenti aggiorna lo stato esistente
-      console.log(`Updating window state, new minimized state: ${!currentlyMinimized}`);
       return {
         ...prev,
         [id]: {

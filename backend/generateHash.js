@@ -8,7 +8,5 @@ bcrypt.genSalt(saltRounds, (err, salt) => {
 
     bcrypt.hash(newPassword, salt, (err, hash) => {
         if (err) throw err;
-
-        console.log('Nuovo hash della password:', hash);
     });
 });

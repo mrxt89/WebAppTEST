@@ -31,10 +31,7 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
     setError('');
     
     try {
-      console.log(`Cercando messaggi con termine: "${term}" nella notifica ID: ${notificationId}`);
-      
       const filteredMessages = await filterMessages(notificationId, { searchText: term });
-      console.log('Risultati ricerca:', filteredMessages);
       
       if (!filteredMessages) {
         setResults([]);

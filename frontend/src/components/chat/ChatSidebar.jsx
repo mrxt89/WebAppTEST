@@ -261,18 +261,13 @@ const ChatSidebar = forwardRef((props, ref) => {
       
       // Chiama il servizio di AI tramite il hook per generare il riepilogo
       const response = await generateConversationSummary(notificationId, currentUserId);
-      
-      console.log('AI Summary response:', response);
-      
+  
       // Controlla se abbiamo ricevuto generatedHighlights nella risposta (nuovo formato)
       // o se abbiamo ricevuto direttamente un array di highlight (vecchio formato)
       const summaryPoints = response.generatedHighlights || response;
       
       // Se abbiamo ricevuto dei punti salienti, aggiorna lo stato
       if (summaryPoints && summaryPoints.length > 0) {
-        // Visualizza i punti generati
-        console.log('Generated summary points:', summaryPoints);
-        
         // Recupera tutti i punti salienti aggiornati dal database
         await fetchHighlights(notificationId);
         

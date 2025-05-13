@@ -248,7 +248,6 @@ useEffect(() => {
     const { notificationId, newMessageCount } = event.detail || {};
     
     if (notificationId && newMessageCount) {
-      console.log(`Nuovo messaggio ricevuto per notifica ${notificationId}`, event.detail);
       
       // Se la notifica non è già in una chat aperta, mostrala
       const isOpen = openChats.some(chat => chat.notificationId === notificationId);
