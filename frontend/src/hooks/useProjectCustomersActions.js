@@ -208,11 +208,6 @@ const importFromERP = useCallback(async (erpCustSupp) => {
       }
     }
   }, [makeRequest, fetchProjectCustomers]);
-
-  // Load countries data when the hook is initialized
-  useEffect(() => {
-    fetchCountriesData();
-  }, [fetchCountriesData]);
   
   return {
     projectCustomers,

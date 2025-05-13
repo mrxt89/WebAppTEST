@@ -451,6 +451,29 @@ const updateProjectMemberRole = async (memberId, role, userId) => {
     }
   };
 
+// Ottieni progetti di cui l'utente è membro
+const getUserMemberProjects = async (userId) => {
+  try {
+    let pool = await sql.connect(config.dbConfig);
+    const result = await pool.request()
+      .input('UserId', sql.Int, userId)
+      .query(`
+        SELECT p.ProjectID, p.Name, p.Description, p.Status, 
+              pm.Role, pm.ProjectMemberID
+        FROM MA_Projects p
+        JOIN MA_ProjectMembers pm ON p.ProjectID = pm.ProjectID
+        WHERE pm.UserID = @UserId
+          AND p.Disabled = 0
+        ORDER BY p.Name
+      `);
+    
+    return result.recordset;
+  } catch (err) {
+    console.error('Error in getUserMemberProjects:', err);
+    throw err;
+  }
+};
+
 module.exports = {
     getPaginatedProjects,
     getProjectById,
@@ -468,5 +491,6 @@ module.exports = {
     updateTaskSequence,
     getUserTasks,
     updateProjectMemberRole,
-    getProjectStatuses 
+    getProjectStatuses,
+    getUserMemberProjects
 };

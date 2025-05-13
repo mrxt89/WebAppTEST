@@ -455,17 +455,30 @@ useEffect(() => {
     navigate('/login');
   };
 
-  const toggleSidebar = () => {
-    // Se la sidebar delle notifiche è già aperta, chiudi entrambe
-    if (sidebarVisible) {
+  // Funzione aggiornata per gestire la visibilità della sidebar
+  const toggleSidebar = (showSidebar) => {
+    if (showSidebar === true) {
+      // Se stiamo esplicitamente mostrando la sidebar, nascondiamo il dropdown
+      if (dropdownVisible) {
+        setDropdownVisible(false);
+      }
+      setSidebarVisible(true);
+    } else if (showSidebar === false) {
+      // Se stiamo esplicitamente nascondendo la sidebar
       setSidebarVisible(false);
     } else {
-      // Se stiamo aprendo la sidebar delle notifiche, chiudi l'altra se è aperta
-      setSidebarVisible(true);
+      // Se non è specificato, alterna lo stato
+      setSidebarVisible(!sidebarVisible);
     }
   };
 
+  // Funzione aggiornata per gestire la visibilità del dropdown
   const toggleDropdown = () => {
+    // Se stiamo aprendo il dropdown, chiudiamo la sidebar
+    if (!dropdownVisible && sidebarVisible) {
+      setSidebarVisible(false);
+    }
+    // Alterna lo stato del dropdown
     setDropdownVisible(!dropdownVisible);
   };
 
@@ -548,25 +561,24 @@ useEffect(() => {
   
     // Gestione sidebar delle notifiche
     if (sidebarVisible && sidebarElement && !sidebarElement.contains(event.target)) {
-      const notificationButton = document.querySelector('button[onClick="toggleSidebar"]');
+      const notificationButton = document.querySelector('#notification-button');
       
       // Non chiudere la sidebar nei seguenti casi:
       // 1. Se il click è sul pulsante wiki o nel modal wiki
       // 2. Se il click è su un messaggio o elementi correlati
       // 3. Se il click è all'interno della sidebar stessa
-      if (isWikiButtonClick || isWikiModalClick || isMessageClick || sidebarElement.contains(event.target)) {
+      if (isWikiButtonClick || isWikiModalClick || isMessageClick || sidebarElement.contains(event.target) || notificationButton?.contains(event.target)) {
         return;
       }
-      if (!notificationButton?.contains(event.target)) {
-        const chatModals = document.querySelectorAll('.ReactModal__Content');
-        const hasOpenNonMinimizedChats = openChats.length > 0 && openChats.some(chat => 
-          !minimizedChats.find(min => min.notificationId === chat.notificationId)
-        );
-        const clickedInChatModal = Array.from(chatModals).some(modal => modal?.contains(event.target));
-  
-        if (!hasOpenNonMinimizedChats && !clickedInChatModal) {
-          setSidebarVisible(false);
-        }
+      
+      const chatModals = document.querySelectorAll('.ReactModal__Content');
+      const hasOpenNonMinimizedChats = openChats.length > 0 && openChats.some(chat => 
+        !minimizedChats.find(min => min.notificationId === chat.notificationId)
+      );
+      const clickedInChatModal = Array.from(chatModals).some(modal => modal?.contains(event.target));
+
+      if (!hasOpenNonMinimizedChats && !clickedInChatModal) {
+        setSidebarVisible(false);
       }
     }
     
@@ -798,7 +810,7 @@ useEffect(() => {
         />
         
         <NotificationSidebar
-          closeSidebar={toggleSidebar}
+          closeSidebar={() => toggleSidebar(false)}
           visible={sidebarVisible}
           openChatModal={handleOpenChat}
         />

@@ -528,6 +528,26 @@ const updateProjectMemberRole = async (projectId, memberId, role) => {
     }
   }, []);
 
+  const getUserMemberProjects = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${config.API_BASE_URL}/projects/user/member`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) throw new Error('Error fetching user member projects');
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching user member projects:', error);
+    throw error;
+  }
+};
+
           
     return {
         projects,
@@ -561,6 +581,7 @@ const updateProjectMemberRole = async (projectId, memberId, role) => {
         updateProjectMemberRole,
         projectStatuses,
         fetchProjectStatuses,
+        getUserMemberProjects,
     };
 };
 

@@ -15,11 +15,13 @@ import {
   AlertTriangle,
   Clock,
   BarChart3,
-  PieChart
+  PieChart,
+  Plus
 } from 'lucide-react';
 import TasksViewToggler from './TasksViewToggler'; 
 import useProjectActions from '../../../hooks/useProjectManagementActions';
 import TaskDetailsDialog from '../progetti/TaskDetailsDialog';
+import TimesheetTaskDialog from './TimesheetTaskDialog'; 
 import MyTasksFilters from './MyTasksFilters';
 import MyTasksList from './MyTasksList';
 import MyTasksKanban from './MyTasksKanban';
@@ -37,6 +39,7 @@ const MyTasksPage = () => {
   const [viewMode, setViewMode] = useState('list');
   const [selectedTask, setSelectedTask] = useState(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [isCreateTaskDialogOpen, setIsCreateTaskDialogOpen] = useState(false); // Nuovo stato per il dialog di creazione
   const [filtersVisible, setFiltersVisible] = useState(true);
   const [preventDialogOpen, setPreventDialogOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState({});
@@ -100,6 +103,8 @@ const MyTasksPage = () => {
   // Applica i filtri e l'ordinamento alle attività
   const applyFilters = useCallback((tasksList, mainFilters, colFilters = {}) => {
     let result = [...tasksList];
+    
+    // [Contenuto esistente della funzione applyFilters...]
     
     // Filtraggio con filtri principali
     if (mainFilters.searchText) {
@@ -181,8 +186,6 @@ const MyTasksPage = () => {
         }
       });
     }
-    
-    // Resto del codice per filtraggio e ordinamento...
     
     // Filtraggio con filtri di colonna
     if (colFilters.title) {
@@ -484,126 +487,134 @@ const MyTasksPage = () => {
   return (
     <div className="p-6 mx-auto space-y-6">
       {/* Header con titolo, tabs e toggles */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold">Le mie attività</h1>
+        
+        {/* Pulsante "Crea attività" sempre visibile nella parte superiore della pagina */}
+        <Button 
+          onClick={() => setIsCreateTaskDialogOpen(true)}
+          className=""
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Crea nuova attività
+        </Button>
+      </div>
 
-    <div className="flex items-center gap-2">
-          {/* Tabs per passare tra attività e timesheet */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" id = "tabs">
-            <div className="flex items-center justify-between" id="tabsList">
-              <TabsList className="mb-4">
-                <TabsTrigger value="tasks" className="flex items-center gap-2">
-                  <ListTodo className="h-4 w-4" />
-                  <span>Attività</span>
-                </TabsTrigger>
-                <TabsTrigger value="timesheet" className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  <span>Ore lavorate</span>
-                </TabsTrigger>
-              </TabsList>
+      <div className="flex items-center gap-2">
+        {/* Tabs per passare tra attività e timesheet */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" id="tabs">
+          <div className="flex items-center justify-between" id="tabsList">
+            <TabsList className="mb-4">
+              <TabsTrigger value="tasks" className="flex items-center gap-2">
+                <ListTodo className="h-4 w-4" />
+                <span>Attività</span>
+              </TabsTrigger>
+              <TabsTrigger value="timesheet" className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <span>Ore lavorate</span>
+              </TabsTrigger>
+            </TabsList>
 
-              {activeTab === 'tasks' && (
-                <TasksViewToggler 
+            {activeTab === 'tasks' && (
+              <TasksViewToggler 
                 className="flex items-center gap-2"
-                  viewMode={viewMode} 
-                  setViewMode={setViewMode} 
-                  showFilters={filtersVisible}
-                  toggleFilters={toggleFilters}
-                />
-              )}
-            </div>
-            
-            <TabsContent value="tasks" className="space-y-6">
-              {/* Contenuto della tab attività */}
-              {filtersVisible && (
-                <MyTasksFilters
-                  filters={filters}
-                  onFilterChange={handleFilterChange}
-                  onResetFilters={resetFilters}
-                  hasActiveFilters={hasActiveFilters()}
-                  uniqueProjects={getUniqueProjects()}
-                  allUsers={users} // Passaggio degli utenti per il filtro coinvolgimento
-                />
-              )}
-
-              {/* Visualizzazione attività (lista, kanban, timeline o statistiche) */}
-              <Card className="flex-1">
-                <CardContent className="p-4" id="tasksContent">
-                  {loading ? (
-                    <div className="flex items-center justify-center h-64">
-                      <Loader2 className="h-6 w-6 animate-spin text-gray-400 mr-2" />
-                      <span className="text-gray-500">Caricamento attività...</span>
-                    </div>
-                  ) : filteredTasks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                      <ListTodo className="h-12 w-12 mb-4" />
-                      <p className="text-lg font-medium">Nessuna attività trovata</p>
-                      {hasActiveFilters() && (
-                        <Button variant="link" onClick={resetFilters} className="mt-2">
-                          Rimuovi filtri
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      {viewMode === 'list' && (
-                        <MyTasksList
-                          tasks={filteredTasks} 
-                          onTaskClick={handleTaskClick} 
-                          onTaskUpdate={handleTaskUpdate}
-                          checkAdminPermission={checkAdminPermission}
-                          isOwnTask={isOwnTask}
-                          filtersVisible={filtersVisible}
-                          isAdmin={isUserAdmin}
-                          columnFilters={columnFilters}
-                          onFilterChange={handleColumnFilterChange}
-                        />
-                      )}
-                      
-                      {viewMode === 'kanban' && (
-                        <MyTasksKanban
-                          tasks={filteredTasks}
-                          onTaskClick={handleTaskClick}
-                          onTaskUpdate={handleTaskUpdate}
-                          checkAdminPermission={checkAdminPermission}
-                          isOwnTask={isOwnTask}
-                        />
-                      )}
-                      
-                      {viewMode === 'timeline' && (
-                        <MyTasksTimelineView
-                          tasks={filteredTasks}
-                          onTaskClick={handleTaskClick}
-                          onTaskUpdate={handleTaskUpdate}
-                          checkAdminPermission={checkAdminPermission}
-                          isOwnTask={isOwnTask}
-                        />
-                      )}
-                      
-                      {viewMode === 'statistics' && (
-                        <TasksStatistics 
-                          tasks={filteredTasks} 
-                          isAdmin={isUserAdmin} 
-                        />
-                      )}
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="timesheet">
-              {/* Contenuto del timesheet */}
-              <MyTasksTimeTracking 
-                currentUserId={user.userId} 
-                isAdmin={isUserAdmin}
-                users={users}
+                viewMode={viewMode} 
+                setViewMode={setViewMode} 
+                showFilters={filtersVisible}
+                toggleFilters={toggleFilters}
               />
-            </TabsContent>
-          </Tabs>
-    
-    </div>
+            )}
+          </div>
+          
+          <TabsContent value="tasks" className="space-y-6">
+            {/* Contenuto della tab attività */}
+            {filtersVisible && (
+              <MyTasksFilters
+                filters={filters}
+                onFilterChange={handleFilterChange}
+                onResetFilters={resetFilters}
+                hasActiveFilters={hasActiveFilters()}
+                uniqueProjects={getUniqueProjects()}
+                allUsers={users} // Passaggio degli utenti per il filtro coinvolgimento
+              />
+            )}
 
-
-
+            {/* Visualizzazione attività (lista, kanban, timeline o statistiche) */}
+            <Card className="flex-1">
+              <CardContent className="p-4" id="tasksContent">
+                {loading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-400 mr-2" />
+                    <span className="text-gray-500">Caricamento attività...</span>
+                  </div>
+                ) : filteredTasks.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                    <ListTodo className="h-12 w-12 mb-4" />
+                    <p className="text-lg font-medium">Nessuna attività trovata</p>
+                    {hasActiveFilters() && (
+                      <Button variant="link" onClick={resetFilters} className="mt-2">
+                        Rimuovi filtri
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {viewMode === 'list' && (
+                      <MyTasksList
+                        tasks={filteredTasks} 
+                        onTaskClick={handleTaskClick} 
+                        onTaskUpdate={handleTaskUpdate}
+                        checkAdminPermission={checkAdminPermission}
+                        isOwnTask={isOwnTask}
+                        filtersVisible={filtersVisible}
+                        isAdmin={isUserAdmin}
+                        columnFilters={columnFilters}
+                        onFilterChange={handleColumnFilterChange}
+                      />
+                    )}
+                    
+                    {viewMode === 'kanban' && (
+                      <MyTasksKanban
+                        tasks={filteredTasks}
+                        onTaskClick={handleTaskClick}
+                        onTaskUpdate={handleTaskUpdate}
+                        checkAdminPermission={checkAdminPermission}
+                        isOwnTask={isOwnTask}
+                      />
+                    )}
+                    
+                    {viewMode === 'timeline' && (
+                      <MyTasksTimelineView
+                        tasks={filteredTasks}
+                        onTaskClick={handleTaskClick}
+                        onTaskUpdate={handleTaskUpdate}
+                        checkAdminPermission={checkAdminPermission}
+                        isOwnTask={isOwnTask}
+                      />
+                    )}
+                    
+                    {viewMode === 'statistics' && (
+                      <TasksStatistics 
+                        tasks={filteredTasks} 
+                        isAdmin={isUserAdmin} 
+                      />
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="timesheet">
+            {/* Contenuto del timesheet */}
+            <MyTasksTimeTracking 
+              currentUserId={user.userId} 
+              isAdmin={isUserAdmin}
+              users={users}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
 
       {/* Dialog per i dettagli del task */}
       {selectedTask && (
@@ -623,6 +634,14 @@ const MyTasksPage = () => {
           refreshProject={loadTasks}
         />
       )}
+
+      {/* Dialog per la creazione di nuove attività */}
+      <TimesheetTaskDialog
+        isOpen={isCreateTaskDialogOpen}
+        onClose={() => setIsCreateTaskDialogOpen(false)}
+        onTaskCreated={loadTasks}
+        users={users}
+      />
     </div>
   );
 };

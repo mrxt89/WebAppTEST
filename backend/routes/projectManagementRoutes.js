@@ -18,7 +18,8 @@ const {
     updateTaskSequence,
     getUserTasks,
     updateProjectMemberRole,
-    getProjectStatuses
+    getProjectStatuses,
+    getUserMemberProjects
   } = require('../queries/projectManagement');
 
 // Ottieni tutte le unità di misura
@@ -440,6 +441,21 @@ router.get('/projectsStatuses', authenticateToken, async (req, res) => {
         console.error('Error fetching project statuses:', err);
         res.status(500).json({ success: 0, msg: err.message });
     }
+});
+
+// Ottieni progetti in cui l'utente è membro
+router.get('/projects/user/member', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.UserId;
+    const projects = await getUserMemberProjects(userId);
+    res.json(projects);
+  } catch (err) {
+    console.error('Error fetching user member projects:', err);
+    res.status(500).json({ 
+      success: 0, 
+      msg: 'Error fetching user member projects' 
+    });
+  }
 });
 
   

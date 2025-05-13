@@ -41,7 +41,9 @@ import {
 } from 'lucide-react';
 import { swal } from '../../../lib/common';
 import TimeEntryDialog from './TimeEntryDialog';
+import TimesheetTaskDialog from '../attivita/TimesheetTaskDialog';
 import useTimeTracking from '../../../hooks/useTimeTracking';
+import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
 
 const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
   const {
@@ -53,6 +55,8 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
     deleteTimeEntry,
     canViewUserData
   } = useTimeTracking();
+  
+  const { fetchUsers, users: allUsers } = useNotifications();
   
   const [loading, setLoading] = useState(true);
   const [weekStartDate, setWeekStartDate] = useState(() => {
@@ -69,12 +73,18 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
   const [selectedUserId, setSelectedUserId] = useState(currentUserId);
   const [availableTasks, setAvailableTasks] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [dialogConfig, setDialogConfig] = useState({
     preselectedTaskId: null,
     availableTasks: []
   });
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
+  
+  // Carica gli utenti all'avvio
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
   
   // Funzione per caricare i dati della settimana corrente
   const loadWeekData = async () => {
@@ -333,8 +343,6 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
     <div className="space-y-4">
       {/* Intestazione */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-
-        
         <div className="flex items-center gap-2">
           {isAdmin && (
             <div className="relative border rounded-md bg-white">
@@ -397,7 +405,16 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
               )}
             </CardTitle>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsTaskDialogOpen(true)}
+                className="text-sm flex items-center gap-2 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200"
+              >
+                <Plus className="h-4 w-4" />
+                Crea attività
+              </Button>
+              
               <div className="flex items-center text-sm">
                 <div className="w-3 h-3 bg-red-200 border border-red-50 rounded-sm mr-1"></div>
                 <span>0h</span>
@@ -688,6 +705,14 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
         isAdmin={isAdmin}
         users={users}
         dialogConfig={dialogConfig}
+      />
+      
+      {/* Dialog per creare nuova attività */}
+      <TimesheetTaskDialog
+        isOpen={isTaskDialogOpen}
+        onClose={() => setIsTaskDialogOpen(false)}
+        onTaskCreated={loadWeekData}
+        users={allUsers || []}
       />
       
       {/* Stile CSS per la tabella fixed */}
