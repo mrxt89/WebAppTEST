@@ -418,18 +418,7 @@ useEffect(() => {
   };
 }, [notification, fetchNotificationById]);
 
-// 3. Polling dedicato per chat aperte (opzionale)
-useEffect(() => {
-  // Setup polling for open chats only
-  const pollingInterval = setInterval(() => {
-    if (notification?.notificationId && !isMinimized) {
-      // Force update with high priority if needed
-      forceUpdateFromServer();
-    }
-  }, 15000); // Check every 15 seconds
-  
-  return () => clearInterval(pollingInterval);
-}, [notification?.notificationId, isMinimized, forceUpdateFromServer]);
+
 
   useEffect(() => {
   if (notification?.notificationId) {
