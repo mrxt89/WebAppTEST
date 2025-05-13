@@ -732,60 +732,147 @@ const handleDragStart = useCallback((e) => {
     };
   }, [notification?.notificationId, sendNotification, forceUpdateFromServer]);
 
-  // Aggiungi questo listener agli eventi in ChatWindow.jsx
-useEffect(() => {
-  // Gestore per aggiornamenti dalle notifiche
-  const handleNotificationUpdate = (event) => {
-    const { notificationId: updatedNotificationId } = event.detail || {};
-    
-    // Verifica che si tratti della notifica corrente
-    if (updatedNotificationId && notification && 
-        parseInt(updatedNotificationId) === parseInt(notification.notificationId)) {
-     
-      // Usa alta priorità per questi aggiornamenti
-      forceUpdateFromServer();
-    }
-  };
-  
-  // Aggiungi il listener per l'evento
-  document.addEventListener('notification-updated', handleNotificationUpdate);
-  
-  // Pulizia del listener
-  return () => {
-    document.removeEventListener('notification-updated', handleNotificationUpdate);
-  };
-}, [notification, forceUpdateFromServer]);
-  
-  // Listener per gli eventi di aggiornamento
+  // Modifico l'effetto per la gestione degli eventi di aggiornamento
   useEffect(() => {
-    const handleNotificationRefreshed = (event) => {
-      // Se l'evento contiene un ID di notifica, verifica che sia quello corrente
-      const eventNotificationId = event.detail?.notificationId;
-      if (eventNotificationId && notification && eventNotificationId !== notification.notificationId) {
+    isMountedRef.current = true;
+    
+    // Funzione per gestire tutti gli eventi di aggiornamento relativi alle chat
+    const handleChatUpdate = (event) => {
+      // Ignora gli eventi se il componente è stato smontato
+      if (!isMountedRef.current) return;
+      
+      const eventType = event.type;
+      const detail = event.detail || {};
+      
+      // Estrai l'ID notifica dall'evento
+      const eventNotificationId = detail.notificationId;
+      
+      // Se l'evento non è per questa chat, ignoralo
+      if (eventNotificationId && notification && parseInt(eventNotificationId) !== parseInt(notification.notificationId)) {
         return;
       }
       
-      // Usa un timeout per evitare aggiornamenti troppo frequenti
-      if (messageUpdateTimeoutRef.current) {
-        clearTimeout(messageUpdateTimeoutRef.current);
+      // Imposta un flag per evitare aggiornamenti troppo frequenti
+      if (updateInProgressRef.current) {
+        updateQueuedRef.current = true;
+        return;
       }
       
-      messageUpdateTimeoutRef.current = setTimeout(() => {
-        forceUpdateFromServer();
-        messageUpdateTimeoutRef.current = null;
-      }, 300);
+      updateInProgressRef.current = true;
+      
+      // Usa requestAnimationFrame per assicurarsi che il reducer sia completato
+      requestAnimationFrame(() => {
+        // Usa setTimeout per un ulteriore livello di sicurezza
+        setTimeout(() => {
+          forceUpdateFromServer()
+            .finally(() => {
+              if (!isMountedRef.current) return;
+              
+              updateInProgressRef.current = false;
+              
+              // Se ci sono aggiornamenti in coda, eseguili
+              if (updateQueuedRef.current) {
+                updateQueuedRef.current = false;
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    if (isMountedRef.current) {
+                      forceUpdateFromServer();
+                    }
+                  }, 0);
+                });
+              }
+            });
+        }, 0);
+      });
     };
     
-    // Aggiungi listener per vari eventi di aggiornamento
-    document.addEventListener('refreshNotifications', handleNotificationRefreshed);
-    document.addEventListener('notificationsRefreshed', handleNotificationRefreshed);
-    document.addEventListener('chat-message-sent', handleNotificationRefreshed);
+    // Aggiungi il listener per l'evento
+    document.addEventListener('notification-updated', handleChatUpdate);
     
+    // Pulizia del listener
     return () => {
-      // Rimuovi i listener alla pulizia
-      document.removeEventListener('refreshNotifications', handleNotificationRefreshed);
-      document.removeEventListener('notificationsRefreshed', handleNotificationRefreshed);
-      document.removeEventListener('chat-message-sent', handleNotificationRefreshed);
+      document.removeEventListener('notification-updated', handleChatUpdate);
+    };
+  }, [notification, forceUpdateFromServer]);
+  
+  // Modifico anche l'effetto per la gestione degli eventi di chat
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    // Funzione per gestire tutti gli eventi di aggiornamento relativi alle chat
+    const handleChatUpdate = (event) => {
+      // Ignora gli eventi se il componente è stato smontato
+      if (!isMountedRef.current) return;
+      
+      const eventType = event.type;
+      const detail = event.detail || {};
+      
+      // Estrai l'ID notifica dall'evento
+      const eventNotificationId = detail.notificationId;
+      
+      // Se l'evento non è per questa chat, ignoralo
+      if (eventNotificationId && notification && parseInt(eventNotificationId) !== parseInt(notification.notificationId)) {
+        return;
+      }
+      
+      // Imposta un flag per evitare aggiornamenti troppo frequenti
+      if (updateInProgressRef.current) {
+        updateQueuedRef.current = true;
+        return;
+      }
+      
+      updateInProgressRef.current = true;
+      
+      // Usa requestAnimationFrame per assicurarsi che il reducer sia completato
+      requestAnimationFrame(() => {
+        // Usa setTimeout per un ulteriore livello di sicurezza
+        setTimeout(() => {
+          forceUpdateFromServer()
+            .finally(() => {
+              if (!isMountedRef.current) return;
+              
+              updateInProgressRef.current = false;
+              
+              // Se ci sono aggiornamenti in coda, eseguili
+              if (updateQueuedRef.current) {
+                updateQueuedRef.current = false;
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    if (isMountedRef.current) {
+                      forceUpdateFromServer();
+                    }
+                  }, 0);
+                });
+              }
+            });
+        }, 0);
+      });
+    };
+    
+    // Registra tutti gli eventi che richiedono un aggiornamento
+    const eventTypes = [
+      'chat-message-sent',
+      'message-updated',
+      'message-deleted',
+      'message-reaction-updated',
+      'attachment-updated',
+      'poll-updated',
+      'message-color-changed',
+      'refreshNotifications'
+    ];
+    
+    // Registra i listener per tutti gli eventi
+    eventTypes.forEach(eventType => {
+      document.addEventListener(eventType, handleChatUpdate);
+    });
+    
+    // Cleanup
+    return () => {
+      isMountedRef.current = false;
+      
+      eventTypes.forEach(eventType => {
+        document.removeEventListener(eventType, handleChatUpdate);
+      });
       
       // Pulisci eventuali timeout
       if (messageUpdateTimeoutRef.current) {
@@ -981,12 +1068,10 @@ useEffect(() => {
         // Se l'utente ha scrollato verso l'alto (almeno 100px dal fondo)
         if (distanceFromBottom > 100) {
           userHasScrolledRef.current = true;
-         
         } 
         // Se l'utente è tornato al fondo
         else if (distanceFromBottom < 20) {
           userHasScrolledRef.current = false;
-         
         }
       };
   
@@ -999,7 +1084,6 @@ useEffect(() => {
         // Se l'utente sta scrollando verso l'alto con la rotella del mouse
         if (e.deltaY < 0) {
           userHasScrolledRef.current = true;
-         
         }
       };
       
@@ -1060,29 +1144,30 @@ useEffect(() => {
       
       updateInProgressRef.current = true;
       
-      // Esegui l'aggiornamento
-      forceUpdateFromServer()
-        .then(() => {
-          if (!isMountedRef.current) return;
-          
-          updateInProgressRef.current = false;
-          
-          // Se ci sono aggiornamenti in coda, eseguili
-          if (updateQueuedRef.current) {
-            updateQueuedRef.current = false;
-            setTimeout(() => {
-              if (isMountedRef.current) {
-                forceUpdateFromServer();
+      // Usa requestAnimationFrame per assicurarsi che il reducer sia completato
+      requestAnimationFrame(() => {
+        // Usa setTimeout per un ulteriore livello di sicurezza
+        setTimeout(() => {
+          forceUpdateFromServer()
+            .finally(() => {
+              if (!isMountedRef.current) return;
+              
+              updateInProgressRef.current = false;
+              
+              // Se ci sono aggiornamenti in coda, eseguili
+              if (updateQueuedRef.current) {
+                updateQueuedRef.current = false;
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    if (isMountedRef.current) {
+                      forceUpdateFromServer();
+                    }
+                  }, 0);
+                });
               }
-            }, 300);
-          }
-        })
-        .catch(error => {
-          if (!isMountedRef.current) return;
-          
-          console.error('Errore durante l\'aggiornamento:', error);
-          updateInProgressRef.current = false;
-        });
+            });
+        }, 0);
+      });
     };
     
     // Registra tutti gli eventi che richiedono un aggiornamento

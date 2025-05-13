@@ -603,44 +603,31 @@ const notificationsSlice = createSlice({
         state.loading = true;
       })
       .addCase(fetchNotifications.fulfilled, (state, action) => {
-        // Salva il valore corrente per rilevare cambiamenti
-        const previousUnreadCount = state.unreadCount;
-        
         try {
-          // Crea una copia locale del payload per evitare problemi con i proxy
-          const notificationsCopy = [...action.payload];
+          // Crea una copia locale delle notifiche dal payload
+          const notifications = [...action.payload];
           
-          // Sort notifications by pin and date usando la copia locale
-          const sortedNotifications = notificationsCopy.sort((a, b) => {
-            if (a.pinned && !b.pinned) return -1;
-            if (!a.pinned && b.pinned) return 1;
-            return new Date(b.tbCreated) - new Date(a.tbCreated);
+          // Ordina le notifiche
+          notifications.sort((a, b) => {
+            const dateA = new Date(a.tbCreated || a.lastUpdated || 0);
+            const dateB = new Date(b.tbCreated || b.lastUpdated || 0);
+            return dateB - dateA;
           });
           
-          // Calcola il nuovo conteggio usando la copia locale
-          const newUnreadCount = sortedNotifications.filter(n => 
-            n && typeof n === 'object' && !n.isReadByUser && n.archived !== '1'
-          ).length;
+          // Calcola il conteggio dei messaggi non letti direttamente dal payload
+          const unreadCount = notifications.reduce((count, notification) => {
+            return count + (notification.isReadByUser ? 0 : 1);
+          }, 0);
           
-          // Aggiorna lo stato in modo sicuro
-          state.notifications = sortedNotifications;
-          state.unreadCount = newUnreadCount;
+          // Aggiorna lo stato in modo immutabile
+          state.notifications = notifications;
+          state.unreadCount = unreadCount;
           state.loading = false;
           state.error = null;
           
-          // Controlla se il conteggio è cambiato
-          const unreadCountChanged = previousUnreadCount !== newUnreadCount;
-          
-          // Emetti evento solo se il conteggio è cambiato
-          if (unreadCountChanged) {
-            // Usa i valori già calcolati invece di accedere allo state
-            const eventDetail = {
-              previous: previousUnreadCount,
-              current: newUnreadCount,
-              timestamp: new Date().toISOString()
-            };
-            
-            // Emetti l'evento in modo sicuro usando requestAnimationFrame
+          // Emetti l'evento solo se il conteggio è cambiato
+          if (state.unreadCount !== unreadCount) {
+            // Usa requestAnimationFrame per emettere l'evento in modo sicuro
             requestAnimationFrame(() => {
               try {
                 document.dispatchEvent(new CustomEvent('unread-count-changed', {
@@ -653,8 +640,8 @@ const notificationsSlice = createSlice({
           }
         } catch (error) {
           console.error('Errore nell\'aggiornamento delle notifiche:', error);
+          state.error = error.message;
           state.loading = false;
-          state.error = 'Errore nell\'aggiornamento delle notifiche';
         }
       })
       .addCase(fetchNotifications.rejected, (state, action) => {
