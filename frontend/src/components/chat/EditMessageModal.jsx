@@ -4,6 +4,7 @@ import { CheckCircle, XCircle, AlertTriangle, Clock, AtSign, Smile } from 'lucid
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
 import { swal } from '../../lib/common';
 import EmojiPicker from './Emoji-picker';
+import '@/styles/chat-components.css';
 
 Modal.setAppElement('#root');
 
@@ -209,7 +210,7 @@ useEffect(() => {
       shouldCloseOnEsc={!submitting}
       style={{
         overlay: {
-          zIndex: 9999, // Z-index molto alto per essere sopra tutto
+          zIndex: 9999,
           position: 'fixed',
           top: 0,
           left: 0,
@@ -233,81 +234,10 @@ useEffect(() => {
           outline: 'none',
           padding: '20px',
           backgroundColor: 'white',
-          inset: 'auto', // Rimuove le impostazioni predefinite di React Modal
+          inset: 'auto',
         }
       }}
     >
-      {/* CSS inline per forzare il centramento */}
-      <style jsx="true">{`
-        .edit-message-modal-overlay {
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-        }
-        
-        .edit-message-modal-content {
-          position: absolute !important;
-          top: 50% !important;
-          left: 50% !important;
-          right: auto !important;
-          bottom: auto !important;
-          transform: translate(-50%, -50%) !important;
-          margin: 0 !important;
-          max-height: 80vh !important;
-          width: 100% !important;
-          max-width: 500px !important;
-        }
-        
-        .emoji-picker-container {
-          position: absolute;
-          bottom: 40px;
-          right: 10px;
-          z-index: 10;
-        }
-        
-        .emoji-button {
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: #6b7280;
-          transition: color 0.2s;
-        }
-        
-        .emoji-button:hover {
-          color: #3b82f6;
-        }
-        
-        .mention-suggestions {
-          position: absolute;
-          bottom: 100%;
-          left: 0;
-          width: 100%;
-          max-height: 150px;
-          overflow-y: auto;
-          background-color: white;
-          color: #374151;
-          border: 1px solid #e5e7eb;
-          border-radius: 6px;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-          z-index: 50;
-        }
-        
-        .mention-item {
-          padding: 8px 12px;
-          cursor: pointer;
-          border-bottom: 1px solid #f3f4f6;
-          transition: background-color 0.2s;
-        }
-        
-        .mention-item:hover {
-          background-color: #f3f4f6;
-        }
-        
-        .mention-item:last-child {
-          border-bottom: none;
-        }
-      `}</style>
-      
       <div className="flex flex-col h-full">
         <div className="flex justify-between items-center border-b pb-2 mb-4">
           <h3 className="text-lg font-medium">Modifica messaggio</h3>

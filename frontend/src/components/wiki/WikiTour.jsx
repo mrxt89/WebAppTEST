@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Button } from "@/components/ui/button";
 import { X, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { useWikiContext } from './WikiContext';
+import '@/styles/WikiTour.css';  // Importo il nuovo file CSS
 
 /**
  * Componente Tour guidato
@@ -491,33 +492,6 @@ const WikiTour = () => {
     <>
       {renderOverlay()}
       {renderTooltip()}
-      <style jsx="true">{`
-        .wiki-tour-highlight {
-          position: relative;
-          animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-          0% {
-            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
-          }
-          70% {
-            box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
-          }
-          100% {
-            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
-          }
-        }
-        
-        /* Stili specifici per i tour nelle notifiche */
-        .notification-tooltip {
-          z-index: ${Z_INDEX.tooltip + 1} !important; /* Assicuriamo che sia sempre visibile sopra la sidebar */
-        }
-        
-        #notification-sidebar .wiki-tour-highlight {
-          z-index: ${Z_INDEX.highlightedElement + 1} !important; /* Incrementiamo lo z-index per gli elementi evidenziati nella sidebar */
-        }
-      `}</style>
     </>,
     document.body
   );

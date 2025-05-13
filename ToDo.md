@@ -13,4 +13,6 @@
 
 - [ ] Quando apro una chat e poi apro il WindowManagerMenu e clicco su "min/max" mi aspetto che la chat ( o le chat) si riducano a icona, invece scompaiono. Invece usando il tasto di minimizzazione della finestra funziona.
 
+- [ ] Quando si apre la chat, la finestra non si adatta alle dimensioni della chat negli schermi piccoli.
+
 - (Da vedere assieme) Non va la gestione allegati

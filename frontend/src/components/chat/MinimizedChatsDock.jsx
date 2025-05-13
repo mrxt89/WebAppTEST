@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, MessageSquare } from 'lucide-react';
+import '@/styles/chat-components.css';
 
 /**
  * Dock di chat minimizzate disposte orizzontalmente
@@ -30,7 +31,7 @@ const MinimizedChatsDock = ({
 
   return (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 minimized-chat-dock pointer-events-auto z-[1000]">
-      <div className="window-dock flex-row">
+      <div className="window-dock">
         {minimizedChats.map((chat) => (
           <div 
             key={`minimized-chat-${chat.notificationId}`}
@@ -76,52 +77,6 @@ const MinimizedChatsDock = ({
           </div>
         ))}
       </div>
-      
-      {/* Stile locale per sovrascrivere gli stili globali */}
-      <style jsx>{`
-        .window-dock {
-          padding: 8px;
-          background: rgba(255, 255, 255, 0.6);
-          backdrop-filter: blur(5px);
-          border-radius: 999px;
-          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-          display: flex;
-          flex-direction: row; /* Orizzontale invece di column */
-          gap: 4px;
-          border: 1px solid rgba(0, 0, 0, 0.05);
-          z-index: 100000;
-          transition: opacity 0.2s ease;
-          opacity: 0.7;
-        }
-        
-        .window-dock:hover {
-          opacity: 1;
-        }
-
-        .minimized-chat-icon {
-          transition: transform 0.2s ease, opacity 0.2s ease, background-color 0.2s ease;
-        }
-        
-        .minimized-chat-icon.unread-pulse {
-          animation: pulse-red 2s infinite;
-          background-color: rgba(254, 226, 226, 0.8);
-        }
-        
-        @keyframes pulse-red {
-          0% {
-            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-            transform: scale(1);
-          }
-          50% {
-            box-shadow: 0 0 0 5px rgba(239, 68, 68, 0);
-            transform: scale(1.05);
-          }
-          100% {
-            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-            transform: scale(1);
-          }
-        }
-      `}</style>
     </div>
   );
 };

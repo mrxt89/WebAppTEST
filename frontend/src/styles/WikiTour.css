@@ -1,0 +1,26 @@
+/* WikiTour Styles */
+.wiki-tour-highlight {
+  position: relative;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+/* Stili specifici per i tour nelle notifiche */
+.notification-tooltip {
+  z-index: 10001 !important; /* Assicuriamo che sia sempre visibile sopra la sidebar */
+}
+
+#notification-sidebar .wiki-tour-highlight {
+  z-index: 10002 !important; /* Incrementiamo lo z-index per gli elementi evidenziati nella sidebar */
+} 

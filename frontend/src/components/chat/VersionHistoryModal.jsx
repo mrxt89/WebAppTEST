@@ -1,6 +1,7 @@
 import React from 'react';
 import Modal from 'react-modal';
 import { X, Clock, History, AlertCircle, User } from 'lucide-react';
+import '@/styles/chat-components.css';
 
 // Ensure Modal is correctly configured
 Modal.setAppElement('#root');
@@ -141,83 +142,6 @@ const VersionHistoryModal = ({
         }
       }}
     >
-      <style jsx="true">{`
-        .version-history-modal-overlay {
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          padding: 20px;
-        }
-        
-        .version-history-modal {
-          position: absolute !important;
-          top: 50% !important;
-          left: 50% !important;
-          transform: translate(-50%, -50%) !important;
-          max-height: 80vh !important;
-          width: 100% !important;
-          max-width: 550px !important;
-          margin: 0 !important;
-          display: flex !important;
-          flex-direction: column !important;
-        }
-        
-        .version-history-header {
-          position: sticky;
-          top: 0;
-          background-color: white;
-          z-index: 10;
-          border-bottom: 1px solid #e5e7eb;
-        }
-        
-        .version-card {
-          transition: all 0.2s ease;
-        }
-        
-        .version-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-        
-        .current-version-card {
-          background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
-          border-color: #93c5fd;
-        }
-        
-        .edit-badge {
-          display: inline-flex;
-          align-items: center;
-          background-color: #f3f4f6;
-          border-radius: 9999px;
-          padding: 2px 8px;
-          font-size: 0.75rem;
-          color: #4b5563;
-        }
-        
-        .loading-spinner {
-          animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        
-        .animated-fade-in {
-          animation: fadeIn 0.3s ease-in-out;
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .message-text {
-          white-space: pre-line;
-          word-break: break-word;
-        }
-      `}</style>
-      
       <div className="flex flex-col h-full">
         {/* Header */}
         <div className="version-history-header px-6 py-4 flex justify-between items-center">

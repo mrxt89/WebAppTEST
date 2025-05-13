@@ -20,6 +20,7 @@ import { useNotifications } from '@/redux/features/notifications/notificationsHo
 import FileDropZone from '@/components/ui/FileDropZone';
 import { debounce } from 'lodash';
 import { Margin } from "@mui/icons-material";
+import '@/styles/chat-components.css';
 
 const ChatBottomBar = ({  
   notificationId,
@@ -1195,7 +1196,7 @@ if (isClosed) {
 return (
   <div 
     ref={containerRef}
-    className="w-full bg-white border-t border-gray-200"
+    className="w-full bg-white border-t border-gray-200 chat-bottom-bar-container"
     style={{ 
       maxHeight: isNewMessage ? '150px' : '180px',
       overflowY: 'visible',
@@ -1208,13 +1209,10 @@ return (
   >
     {/* Overlay per drag & drop - visibile solo durante drag */}
     {isDraggingOver && (
-      <div 
-        className="absolute inset-0 bg-blue-50 bg-opacity-70 flex items-center justify-center z-50 border-2 border-dashed border-blue-300 rounded-lg"
-        style={{ backdropFilter: 'blur(2px)' }}
-      >
-        <div className="text-center p-4">
-          <Paperclip className="mx-auto h-8 w-8 text-blue-500 mb-2" />
-          <p className="text-blue-700 font-medium">Rilascia qui per allegare il file</p>
+      <div className="drag-overlay">
+        <div className="drag-overlay-content">
+          <Paperclip className="drag-overlay-icon" />
+          <p className="drag-overlay-text">Rilascia qui per allegare il file</p>
         </div>
       </div>
     )}
@@ -1546,19 +1544,6 @@ return (
         )}
       </div>
     </div>
-    
-    {/* Stili per l'animazione del pulsante di invio */}
-    <style jsx>{`
-      @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-        100% { transform: scale(1); }
-      }
-      
-      .pulse-animation {
-        animation: pulse 0.5s infinite;
-      }
-    `}</style>
   </div>
 );
 };

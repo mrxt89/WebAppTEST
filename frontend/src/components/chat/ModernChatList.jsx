@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { debounce, throttle, isEqual } from 'lodash';
+import '@/styles/ModernChatList.css';
 import { 
   File, 
   FileText, 
@@ -42,6 +43,7 @@ import { FaFlag, FaRegSmile } from 'react-icons/fa';
 import ReactionPicker from './ReactionPicker';
 import MessageReactions from './MessageReactions';
 import MessageActionsMenu from './MessageActionsMenu';
+import '@/styles/ModernChatList.css';  // Importo il nuovo file CSS
 
 // Assicurati che il modal sia configurato per il tuo root element
 Modal.setAppElement('#root');
@@ -1416,199 +1418,180 @@ const handleReactionSelect = async (messageId, emoji) => {
     return (
       <div className="flex-1 flex flex-col relative" style={{ height: '100%' }}>
         <div className="flex-1 overflow-y-auto chat-list-container" ref={chatListRef}>
-          <style jsx>{`
-            @keyframes pulse-highlight {
-              0% { background-color: rgba(59, 130, 246, 0.3); }
-              50% { background-color: rgba(59, 130, 246, 0.1); }
-              100% { background-color: transparent; }
-            }
-            
-            .highlight-message {
-              animation: pulse-highlight 2s;
-            }
-            
-            @keyframes chatMessageIn {
-              from { opacity: 0; transform: translateY(20px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-            
-            .message-bubble {
-              animation: chatMessageIn 0.35s cubic-bezier(0.4,0,0.2,1);
-            }
-          `}</style>
-          
-          {/* Lista messaggi raggruppati per data in modalità sola lettura */}
-          {Object.entries(groupMessagesByDate(localMessages)).map(([date, dateMessages]) => (
-            <React.Fragment key={date}>
-              {renderDate(date)}
+          <AnimatePresence>
+            {/* Lista messaggi raggruppati per data in modalità sola lettura */}
+            {Object.entries(groupMessagesByDate(localMessages)).map(([date, dateMessages]) => (
+              <React.Fragment key={date}>
+                {renderDate(date)}
               
-              {dateMessages.map((message, index) => {
-                const originalMessage = findOriginalMessage(message.replyToMessageId);
-                const isCurrentUserMessage = message.selectedUser;
-                const senderName = isCurrentUserMessage ? "Tu" : message.senderName;
-                const messageColor = message.messageColor;
-                const containsPoll = isPollMessage(message);
-                
-                return (
-                  <motion.div
-                    key={message.messageId}
-                    ref={(el) => (messageRefs.current[message.messageId] = el)}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.2 }}
-                    className={cn(
-                      'flex p-2 mb-2 relative',
-                      isCurrentUserMessage == '1' ? 'justify-end' : 'justify-start',
-                      message.messageId === selectedMessageId ? 'highlight-message' : '',
-                      message.messageId === animatedEditId ? 'just-edited' : '',
-                      containsPoll ? 'poll-message' : ''
-                    )}
-                    id={`message-${message.messageId}`}
-                  >
-                    {/* Avatar per messaggi ricevuti */}
-                    {!isCurrentUserMessage == '1' && (
-                      <MessageAvatar 
-                        senderName={message.senderName} 
-                        onClick={(e) => handleAvatarClick(message.senderId, e)}
-                      />
-                    )}
-                    
-                    <div className="flex flex-col max-w-[70%]">
-                      {/* Se è un messaggio con risposta, mostra la risposta */}
-                      {originalMessage && (
-                        <div 
-                          className="message-quote cursor-pointer mb-1"
-                          onClick={() => handlePreviewClick(originalMessage.messageId)}
-                        >
-                          <div className="text-sm font-semibold text-gray-700">
-                            {originalMessage.senderName}
-                          </div>
-                          <div className="text-xs text-gray-700 line-clamp-2">
-                            {originalMessage.message}
-                          </div>
-                        </div>
+                {dateMessages.map((message, index) => {
+                  const originalMessage = findOriginalMessage(message.replyToMessageId);
+                  const isCurrentUserMessage = message.selectedUser;
+                  const senderName = isCurrentUserMessage ? "Tu" : message.senderName;
+                  const messageColor = message.messageColor;
+                  const containsPoll = isPollMessage(message);
+                  
+                  return (
+                    <motion.div
+                      key={message.messageId}
+                      ref={(el) => (messageRefs.current[message.messageId] = el)}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.2 }}
+                      className={cn(
+                        'flex p-2 mb-2 relative',
+                        isCurrentUserMessage == '1' ? 'justify-end' : 'justify-start',
+                        message.messageId === selectedMessageId ? 'highlight-message' : '',
+                        message.messageId === animatedEditId ? 'just-edited' : '',
+                        containsPoll ? 'poll-message' : ''
+                      )}
+                      id={`message-${message.messageId}`}
+                    >
+                      {/* Avatar per messaggi ricevuti */}
+                      {!isCurrentUserMessage == '1' && (
+                        <MessageAvatar 
+                          senderName={message.senderName} 
+                          onClick={(e) => handleAvatarClick(message.senderId, e)}
+                        />
                       )}
                       
-                      {/* Bolla del messaggio */}
-                      <div className="flex items-center gap-2">
-                        {/* Bandierina a sinistra per ricevuti, a destra per inviati */}
-                        {isCurrentUserMessage == '0' && messageColor && (
-                          <span
-                            className="message-flag animate-flag"
-                            style={{ color: messageColor }}
-                            title={messageColor ? `Colore: ${messageColor}` : 'Nessun colore'}
+                      <div className="flex flex-col max-w-[70%]">
+                        {/* Se è un messaggio con risposta, mostra la risposta */}
+                        {originalMessage && (
+                          <div 
+                            className="message-quote cursor-pointer mb-1"
+                            onClick={() => handlePreviewClick(originalMessage.messageId)}
                           >
-                            <FaFlag />
-                          </span>
+                            <div className="text-sm font-semibold text-gray-700">
+                              {originalMessage.senderName}
+                            </div>
+                            <div className="text-xs text-gray-700 line-clamp-2">
+                              {originalMessage.message}
+                            </div>
+                          </div>
                         )}
-                        <div
-                          className={cn(
-                            'message-bubble relative',
-                            isCurrentUserMessage == '1' ? 'sent' : 'received'
+                        
+                        {/* Bolla del messaggio */}
+                        <div className="flex items-center gap-2">
+                          {/* Bandierina a sinistra per ricevuti, a destra per inviati */}
+                          {isCurrentUserMessage == '0' && messageColor && (
+                            <span
+                              className="message-flag animate-flag"
+                              style={{ color: messageColor }}
+                              title={messageColor ? `Colore: ${messageColor}` : 'Nessun colore'}
+                            >
+                              <FaFlag />
+                            </span>
                           )}
-                          style={messageColor ? { backgroundColor: messageColor + '15', color: getContrastTextColor(messageColor), boxShadow: `0 2px 8px ${messageColor}33` } : {}}
-                        >
-                          {/* Contenuto del messaggio */}
-                          <div style={{ paddingTop: '15px', paddingBottom: '10px', fontSize: '1rem' }}>
-                            {/* Verifica se è un messaggio di sondaggio */}
-                            {isPollMessage(message) ? (
-                              <div className="message-with-poll">
-                                {polls[message.messageId] ? (
-                                  <PollMessage
-                                    poll={polls[message.messageId]}
-                                    onUpdate={handlePollUpdate}
-                                    showResults={false}
-                                    currentUserId={currentUser?.userId}
-                                  />
-                                ) : (
-                                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center">
-                                    <BarChart className="h-5 w-5 text-blue-500 mr-2 animate-pulse" />
-                                    <span className="text-gray-500">Caricamento sondaggio...</span>
-                                  </div>
-                                )}
+                          <div
+                            className={cn(
+                              'message-bubble relative',
+                              isCurrentUserMessage == '1' ? 'sent' : 'received'
+                            )}
+                            style={messageColor ? { backgroundColor: messageColor + '15', color: getContrastTextColor(messageColor), boxShadow: `0 2px 8px ${messageColor}33` } : {}}
+                          >
+                            {/* Contenuto del messaggio */}
+                            <div style={{ paddingTop: '15px', paddingBottom: '10px', fontSize: '1rem' }}>
+                              {/* Verifica se è un messaggio di sondaggio */}
+                              {isPollMessage(message) ? (
+                                <div className="message-with-poll">
+                                  {polls[message.messageId] ? (
+                                    <PollMessage
+                                      poll={polls[message.messageId]}
+                                      onUpdate={handlePollUpdate}
+                                      showResults={false}
+                                      currentUserId={currentUser?.userId}
+                                    />
+                                  ) : (
+                                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center">
+                                      <BarChart className="h-5 w-5 text-blue-500 mr-2 animate-pulse" />
+                                      <span className="text-gray-500">Caricamento sondaggio...</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                // Usa renderMessageText per gestire i ritorni a capo
+                                renderMessageText(message.message, message.usernameMention, message.isEdited)
+                              )}
+                            </div>
+                            
+                            {/* Allegati del messaggio */}
+                            {messageAttachments[notificationId]?.[message.messageId] && (
+                              <MessageAttachments 
+                                attachments={messageAttachments[notificationId][message.messageId]} 
+                                onClick={(file) => setSelectedFile(file)}
+                                onDownload={handleAttachmentDownload}
+                              />
+                            )}
+                            
+                            {/* Componente per le reazioni con cache migliorata */}
+                            <div className={`message-reactions flex flex-wrap gap-1 mt-1 ${loading ? 'opacity-60' : ''}`}>
+                              {/* Ottieni le reazioni dalla cache invece di chiamare l'API ogni volta */}
+                              {Object.entries(groupReactionsByType(getReactionsForMessage(message.messageId))).map(([reactionType, reactors]) => {
+                                // Trova la reazione dell'utente corrente, se presente
+                                const userReaction = reactors.find(r => r.UserID === currentUser?.userId);
+                                const hasCurrentUserReacted = !!userReaction;
+                                
+                                // Crea una lista di utenti per il tooltip
+                                const userNames = reactors.map(r => r.UserName).join(', ');
+                                
+                                return (
+                                  <button
+                                    key={reactionType}
+                                    className={`reaction-badge flex items-center rounded-full px-1.5 py-0.5 text-xs ${
+                                      hasCurrentUserReacted ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 hover:bg-gray-200 text-black'
+                                    }`}
+                                    onClick={() => handleReactionSelect(
+                                      message.messageId, 
+                                      reactionType
+                                    )}
+                                    title={userNames}
+                                    disabled={loading}
+                                  >
+                                    <span className="mr-1">{reactionType}</span>
+                                    <span className="reaction-count">{reactors.length}</span>
+                                  </button>
+                                  );
+                              })}
+                            </div>
+                            
+                            {/* Indicatore di messaggi letti */}
+                            {isCurrentUserMessage == '1' && readByUsers[index]?.length > 0 && (
+                              <div 
+                                className="absolute bottom-1 right-2 text-xs text-gray-500 cursor-pointer"
+                                onClick={() => handleInfoClick(message.messageId)}
+                              >
+                                <div className="bi bi- text-white"></div>
                               </div>
-                            ) : (
-                              // Usa renderMessageText per gestire i ritorni a capo
-                              renderMessageText(message.message, message.usernameMention, message.isEdited)
                             )}
                           </div>
-                          
-                          {/* Allegati del messaggio */}
-                          {messageAttachments[notificationId]?.[message.messageId] && (
-                            <MessageAttachments 
-                              attachments={messageAttachments[notificationId][message.messageId]} 
-                              onClick={(file) => setSelectedFile(file)}
-                              onDownload={handleAttachmentDownload}
-                            />
-                          )}
-                          
-                          {/* Componente per le reazioni con cache migliorata */}
-                          <div className={`message-reactions flex flex-wrap gap-1 mt-1 ${loading ? 'opacity-60' : ''}`}>
-                            {/* Ottieni le reazioni dalla cache invece di chiamare l'API ogni volta */}
-                            {Object.entries(groupReactionsByType(getReactionsForMessage(message.messageId))).map(([reactionType, reactors]) => {
-                              // Trova la reazione dell'utente corrente, se presente
-                              const userReaction = reactors.find(r => r.UserID === currentUser?.userId);
-                              const hasCurrentUserReacted = !!userReaction;
-                              
-                              // Crea una lista di utenti per il tooltip
-                              const userNames = reactors.map(r => r.UserName).join(', ');
-                              
-                              return (
-                                <button
-                                  key={reactionType}
-                                  className={`reaction-badge flex items-center rounded-full px-1.5 py-0.5 text-xs ${
-                                    hasCurrentUserReacted ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 hover:bg-gray-200 text-black'
-                                  }`}
-                                  onClick={() => handleReactionSelect(
-                                    message.messageId, 
-                                    reactionType
-                                  )}
-                                  title={userNames}
-                                  disabled={loading}
-                                >
-                                  <span className="mr-1">{reactionType}</span>
-                                  <span className="reaction-count">{reactors.length}</span>
-                                </button>
-                                );
-                            })}
-                          </div>
-                          
-                          {/* Indicatore di messaggi letti */}
-                          {isCurrentUserMessage == '1' && readByUsers[index]?.length > 0 && (
-                            <div 
-                              className="absolute bottom-1 right-2 text-xs text-gray-500 cursor-pointer"
-                              onClick={() => handleInfoClick(message.messageId)}
+                          {isCurrentUserMessage == '1' && messageColor && (
+                            <span
+                              className="message-flag animate-flag"
+                              style={{ color: messageColor }}
+                              title={messageColor ? `Colore: ${messageColor}` : 'Nessun colore'}
                             >
-                              <div className="bi bi- text-white"></div>
-                            </div>
+                              <FaFlag />
+                            </span>
                           )}
                         </div>
-                        {isCurrentUserMessage == '1' && messageColor && (
-                          <span
-                            className="message-flag animate-flag"
-                            style={{ color: messageColor }}
-                            title={messageColor ? `Colore: ${messageColor}` : 'Nessun colore'}
-                          >
-                            <FaFlag />
-                          </span>
-                        )}
+                        
+                        {/* Timestamp e stato modifica */}
+                        <div className={cn(
+                          'message-timestamp',
+                          isCurrentUserMessage == '1' ? 'text-right' : 'text-left'
+                        )}>
+                          {formatTime(message.tbCreated)}
+                          {message.isEdited == '1' && <span className="ml-1 text-gray-400 text-[10px]">✎</span>}
+                        </div>
                       </div>
-                      
-                      {/* Timestamp e stato modifica */}
-                      <div className={cn(
-                        'message-timestamp',
-                        isCurrentUserMessage == '1' ? 'text-right' : 'text-left'
-                      )}>
-                        {formatTime(message.tbCreated)}
-                        {message.isEdited == '1' && <span className="ml-1 text-gray-400 text-[10px]">✎</span>}
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </React.Fragment>
-          ))}
+                    </motion.div>
+                  );
+                })}
+              </React.Fragment>
+            ))}
+          </AnimatePresence>
         </div>
       </div>
     );
@@ -1696,7 +1679,7 @@ const handleReactionSelect = async (messageId, emoji) => {
                                   <FaFlag />
                                 </span>
                               )}
-                             
+                              
                               {/* Timestamp per messaggi dell'utente corrente */}
                               {isCurrentUserMessage == '1' && (
                                 <div className={cn(
@@ -1912,30 +1895,7 @@ const handleReactionSelect = async (messageId, emoji) => {
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
             >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className="w-6 h-6 mx-auto"
-              >
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-              
-              {/* Badge indicator for new messages */}
-              {newMessage && (
-                <motion.span 
-                  className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                >
-                  <span>!</span>
-                </motion.span>
-              )}
+              <ArrowBigUp className="h-6 w-6" />
             </motion.button>
           )}
           
@@ -1980,209 +1940,6 @@ const handleReactionSelect = async (messageId, emoji) => {
           versionData={selectedMessageVersions}
           loadingVersions={loadingVersions}
         />
-
-        {/* Stili CSS per l'animazione di highlight e stili moderni della chat */}
-        <style jsx>{`
-          @keyframes pulse-highlight {
-            0% { background-color: rgba(59, 130, 246, 0.3); }
-            50% { background-color: rgba(59, 130, 246, 0.1); }
-            100% { background-color: transparent; }
-          }
-          
-          .highlight-message {
-            animation: pulse-highlight 2s;
-          }
-          
-          @keyframes pulse-edit {
-            0% { background-color: rgba(236, 72, 153, 0.2); }
-            50% { background-color: rgba(236, 72, 153, 0.1); }
-            100% { background-color: transparent; }
-          }
-          
-          .just-edited {
-            animation: pulse-edit 2s ease-in-out;
-          }
-          
-          .edited-message-content {
-            position: relative;
-            margin-left: 4px;
-            padding-inline-end: 15px;
-          }
-          
-          .edited-message-content:after {
-            content: '✎';
-            position: absolute;
-            right: -12px;
-            bottom: 0;
-            font-size: 10px;
-            opacity: 0.7;
-          }
-          
-          @keyframes chatMessageIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          
-          .message-bubble {
-            animation: chatMessageIn 0.35s cubic-bezier(0.4,0,0.2,1);
-          }
-          
-          /* Stili moderni per i messaggi chat */
-          .message-bubble {
-            border-radius: 20px;
-            padding: 12px 18px;
-            max-width: 100%;
-            position: relative;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-            margin-bottom: 4px;
-            transition: background 0.2s, box-shadow 0.2s;
-            font-size: 1.05rem;
-            word-break: break-word;
-          }
-          
-          .message-bubble.sent {
-            background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
-            color: #fff;
-            margin-left: auto;
-            border-bottom-right-radius: 6px;
-            box-shadow: 0 2px 8px rgba(59,130,246,0.08);
-          }
-          
-          .message-bubble.received {
-            background: #f1f5f9;
-            color: #222;
-            margin-right: auto;
-            border-bottom-left-radius: 6px;
-            box-shadow: 0 2px 8px rgba(100,116,139,0.07);
-          }
-          
-          .message-bubble.sent:hover {
-            background: linear-gradient(135deg, #2563eb 0%, #6366f1 100%);
-            box-shadow: 0 6px 18px rgba(59,130,246,0.13);
-          }
-          
-          .message-bubble.received:hover {
-            background: #e0f2fe;
-            box-shadow: 0 6px 18px rgba(100,116,139,0.13);
-          }
-          
-          /* Message timestamp */
-          .message-timestamp {
-            font-size: 0.78rem;
-            color: #94a3b8;
-            margin-top: 2px;
-            margin-left: 6px;
-            margin-right: 6px;
-            white-space: nowrap;
-          }
-          
-          /* Separatore data */
-          .chat-date-separator {
-            display: flex;
-            align-items: center;
-            text-align: center;
-            margin: 18px 0 10px 0;
-          }
-          
-          .chat-date-separator span {
-            background: #e5e7eb;
-            color: #64748b;
-            padding: 2px 16px;
-            border-radius: 999px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            margin: 0 auto;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-          }
-          
-          .chat-date-separator:before, .chat-date-separator:after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: #e5e7eb;
-            margin: 0 8px;
-          }
-          
-          /* Stile per il messaggio citato */
-          .message-quote {
-            background: #e0e7ef;
-            border-left: 3px solid #6366f1;
-            border-radius: 10px;
-            padding: 6px 12px;
-            margin-bottom: 6px;
-            font-size: 0.97rem;
-            color: #475569;
-          }
-
-          .message-flag {
-            font-size: 1.1rem;
-            margin: 0 4px;
-            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.08));
-            cursor: pointer;
-            transition: transform 0.18s cubic-bezier(0.4,0,0.2,1);
-          }
-          .message-flag:hover {
-            transform: scale(1.18) rotate(-8deg);
-            filter: drop-shadow(0 2px 6px rgba(0,0,0,0.13));
-          }
-          @keyframes flag-pop {
-            0% { transform: scale(0.7) rotate(-20deg); opacity: 0; }
-            60% { transform: scale(1.15) rotate(8deg); opacity: 1; }
-            100% { transform: scale(1) rotate(0deg); opacity: 1; }
-          }
-          .animate-flag {
-            animation: flag-pop 0.38s cubic-bezier(0.4,0,0.2,1);
-          }
-          
-          /* Stili per le reazioni */
-          .message-reactions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            margin-top: 2px;
-            padding: 4px 0;
-          }
-          
-          .reaction-badge {
-            display: flex;
-            align-items: center;
-            background-color: #f1f5f9;
-            border-radius: 9999px;
-            padding: 2px 6px;
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: background-color 0.2s;
-          }
-          
-          .reaction-badge:hover {
-            background-color: #e2e8f0;
-          }
-          
-          .reaction-badge.active {
-            background-color: #dbeafe;
-            color: #2563eb;
-          }
-          
-          .reaction-count {
-            margin-left: 2px;
-            font-size: 0.7rem;
-          }
-
-          .refreshing {
-            opacity: 0.7;
-            transition: opacity 0.3s;
-          }
-
-          @keyframes refresh-pulse {
-            0% { opacity: 0.7; }
-            50% { opacity: 1; }
-            100% { opacity: 0.7; }
-          }
-
-          .message-reactions.refreshing {
-            animation: refresh-pulse 0.5s;
-          }
-        `}</style>
       </div>
     
   );
