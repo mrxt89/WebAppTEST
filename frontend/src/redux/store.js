@@ -8,7 +8,7 @@ import highlightsReducer from './features/notifications/highlightsSlice';
 import documentLinksReducer from './features/notifications/documentLinksSlice';
 import notificationsWorkerMiddleware from './middleware/notificationsWorkerMiddleware';
 import windowSyncMiddleware from './middleware/windowSyncMiddleware';
-import { notificationSettingsSlice } from '../components/settings/NotificationSettings';
+import notificationSettingsReducer from './features/notifications/notificationSettingsSlice';
 import { enableMapSet } from 'immer';
 
 // Abilita il supporto per Map e Set in Immer
@@ -17,7 +17,7 @@ enableMapSet();
 export const store = configureStore({
   reducer: {
     notifications: notificationsReducer,
-    notificationSettings: notificationSettingsSlice.reducer,
+    notificationSettings: notificationSettingsReducer,
     // Nuovi reducer per le funzionalità aggiuntive
     messageReactions: messageReactionsReducer,
     messageManagement: messageManagementReducer,

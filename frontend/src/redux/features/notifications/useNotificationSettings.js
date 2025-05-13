@@ -5,8 +5,8 @@ import {
   setSoundEnabled, 
   setWebNotificationsEnabled, 
   setWebNotificationsPermission 
-} from '../../../components/settings/NotificationSettings';
-import notificationService from '../../../services/notifications/NotificationService';
+} from './notificationSettingsSlice';
+import notificationService from '../../services/notifications/NotificationService';
 
 /**
  * Hook per accedere e manipolare le impostazioni delle notifiche nello store Redux

@@ -3,10 +3,10 @@ import React, { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNotifications } from './notificationsHooks';
 import notificationService from '../../../services/notifications/NotificationService';
+import { store } from '../../../redux/store';
 
 /**
  * Proper NotificationProvider that initializes and connects the notification system
- * This replaces the placeholder from notificationsHooks.js
  */
 export const NotificationProvider = ({ children }) => {
   const dispatch = useDispatch();
@@ -15,6 +15,25 @@ export const NotificationProvider = ({ children }) => {
     reloadNotifications,
     forceLoadNotifications
   } = useNotifications();
+
+  // Inizializza il contesto delle notifiche prima di tutto
+  useEffect(() => {
+    if (!window.notificationsContext) {
+      window.notificationsContext = {
+        notifications: [],
+        isNotificationMuted: (notification) => notification?.isMuted || false,
+        markMessageAsReceived: (notificationId, messageId) => {
+          if (store?.dispatch) {
+            store.dispatch({
+              type: 'notifications/markMessageAsReceived',
+              payload: { notificationId, messageId }
+            });
+            console.log('[DEBUG] NotificationProvider: Marked message as received', { notificationId, messageId });
+          }
+        }
+      };
+    }
+  }, []); // Esegui solo al mount
 
   // Initialize the notification worker on component mount
   useEffect(() => {
@@ -59,23 +78,21 @@ export const NotificationProvider = ({ children }) => {
   }, [initializeWorker, reloadNotifications, forceLoadNotifications]);
 
   // Listen for new-message-received events
-useEffect(() => {
-  const handleNewMessage = (event) => {
-    const { notificationId, newMessageCount } = event.detail || {};
+  useEffect(() => {
+    const handleNewMessage = (event) => {
+      const { notificationId, newMessageCount } = event.detail || {};
+      
+      if (notificationId && newMessageCount > 0) {
+        forceLoadNotifications();
+      }
+    };
     
-    if (notificationId && newMessageCount > 0) {
-      // Forza refresh notifications per aggiornare UI
-      forceLoadNotifications();
-    }
-  };
-  
-  document.addEventListener('new-message-received', handleNewMessage);
-  
-  return () => {
-    document.removeEventListener('new-message-received', handleNewMessage);
-  };
-}, [forceLoadNotifications]);
-
+    document.addEventListener('new-message-received', handleNewMessage);
+    
+    return () => {
+      document.removeEventListener('new-message-received', handleNewMessage);
+    };
+  }, [forceLoadNotifications]);
 
   return <>{children}</>;
 };
