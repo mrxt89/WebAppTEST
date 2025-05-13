@@ -217,7 +217,6 @@ export const useNotifications = () => {
       const response = await axios.get(`${config.API_BASE_URL}/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      console.log('Fetched users:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching users:', error);

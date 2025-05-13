@@ -94,11 +94,14 @@ const ChatWindow = ({
   const scrollingToBottomRef = useRef(false);
   
   // IMPORTANT: Calculate initial position under the header - not at bottom of page
-  const initialX = Math.max(0, (window.innerWidth - 900) / 2);
-  const initialY = 20; // Posizione più in alto, appena sotto l'header
+  const initialX = Math.max(0, Math.floor((window.innerWidth - 900) / 2));
+  const initialY = Math.max(0, Math.floor(20)); // Posizione più in alto, appena sotto l'header
   
   // Local state for window position and size tracking during drag/resize
-  const [position, setPosition] = useState({ x: initialX, y: initialY });
+  const [position, setPosition] = useState(() => ({
+    x: Number(initialX) || 0,
+    y: Number(initialY) || 0
+  }));
   const [size, setSize] = useState({ width: 900, height: 700 });
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);

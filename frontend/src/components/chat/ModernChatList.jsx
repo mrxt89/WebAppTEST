@@ -26,7 +26,7 @@ import {
   Heart,
   ThumbsUp,
   Smile,
-  ArrowBigUp
+  ArrowBigDown
 } from 'lucide-react';
 import FileViewer from '../ui/fileViewer';
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
@@ -1877,14 +1877,17 @@ const handleReactionSelect = async (messageId, emoji) => {
           {/* Pulsante "Torna all'ultimo messaggio" */}
           {(showScrollButton || newMessage) && (
             <motion.button
-              className={`absolute bottom-6 right-4 rounded-full p-2 shadow-lg transition-colors duration-200 ${
+              className={`absolute bottom-6 right-4 rounded-full p-2 shadow-lg transition-colors duration-200 flex items-center justify-center ${
                 newMessage ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-blue-500 text-white hover:bg-blue-600'
               }`}
               style={{ 
                 zIndex: 1000, 
                 width: '50px', 
                 height: '50px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
               onClick={handleScrollToBottom}
               aria-label={newMessage ? 'Nuovo messaggio' : 'Scorri fino in fondo'}
@@ -1895,7 +1898,7 @@ const handleReactionSelect = async (messageId, emoji) => {
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
             >
-              <ArrowBigUp className="h-6 w-6" />
+              <ArrowBigDown className="h-6 w-6 flex-shrink-0" />
             </motion.button>
           )}
           
