@@ -19,6 +19,7 @@ import PollFilter from './PollFilter';
 import DocumentLinker from './DocumentLinker';
 import ImprovedSearchBar from './ImprovedSearchBar';
 import { swal } from '../../lib/common';
+import PopoutButton from './PopoutButton'; 
 
 const ChatTopBar = ({ 
   title, 
@@ -44,7 +45,9 @@ const ChatTopBar = ({
   isArchived = false, // Prop per identificare se la chat è archiviata
   archiveChat = null, // Funzione per archiviare la chat
   unarchiveChat = null, // Funzione per rimuovere dall'archivio la chat
-  renderExtraButtons = null // Prop per renderizzare pulsanti extra
+  renderExtraButtons = null, // Prop per renderizzare pulsanti extra
+  isStandalone = false, // Nuova prop per indicare se siamo in modalità standalone
+  onRequestClose = null
 }) => {
   const [isInfoVisible, setIsInfoVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
@@ -621,6 +624,14 @@ useEffect(() => {
                   notificationId={notificationId}
                   onPollCreated={handlePollCreated}
                   currentUserId={currentUser?.userId}
+                />
+              )}
+              {/* PopoutButton solo se non è già modalità standalone */}
+              {!isStandalone && !hasLeftChat && notificationId > 0 && !isNewMessage && (
+                <PopoutButton 
+                  notificationId={notificationId}
+                  title={title}
+                  onSuccess={closeChat} 
                 />
               )}
 

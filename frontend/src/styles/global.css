@@ -1975,3 +1975,35 @@ button:disabled {
     transform: scale(1);
   }
 }
+
+/* Assicura che il modale del sondaggio sia sempre sopra gli altri elementi */
+.poll-modal {
+  z-index: 9999 !important;
+  position: relative;
+}
+
+/* Sovrascrive lo z-index di react-modal */
+.ReactModal__Overlay {
+  z-index: 2000;
+}
+
+/* Specificamente per i modali di sondaggio */
+.poll-modal-overlay {
+  z-index: 3000 !important;
+}
+
+/* Per il contenitore SweetAlert */
+.swal2-container {
+  z-index: 10000 !important;
+}
+
+/* Importanza specifica per i componenti del sondaggio */
+.poll-component {
+  position: relative;
+  z-index: 1500 !important;
+}
+
+/* Per finestre di dialogo che appaiono sopra i sondaggi */
+.dialog-above-polls {
+  z-index: 11000 !important;
+}

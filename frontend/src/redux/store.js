@@ -1,8 +1,13 @@
 // src/redux/store.js
 import { configureStore } from '@reduxjs/toolkit';
 import notificationsReducer from './features/notifications/notificationsSlice';
+import messageReactionsReducer from './features/notifications/messageReactionsSlice';
+import messageManagementReducer from './features/notifications/messageManagementSlice';
+import pollsReducer from './features/notifications/pollsSlice';
+import highlightsReducer from './features/notifications/highlightsSlice';
+import documentLinksReducer from './features/notifications/documentLinksSlice';
 import notificationsWorkerMiddleware from './middleware/notificationsWorkerMiddleware';
-import windowSyncMiddleware from './middleware/windowSyncMiddleware'; // Nuovo middleware
+import windowSyncMiddleware from './middleware/windowSyncMiddleware';
 import { notificationSettingsSlice } from '../components/settings/NotificationSettings';
 import { enableMapSet } from 'immer';
 
@@ -13,6 +18,12 @@ export const store = configureStore({
   reducer: {
     notifications: notificationsReducer,
     notificationSettings: notificationSettingsSlice.reducer,
+    // Nuovi reducer per le funzionalità aggiuntive
+    messageReactions: messageReactionsReducer,
+    messageManagement: messageManagementReducer,
+    polls: pollsReducer,
+    highlights: highlightsReducer,
+    documentLinks: documentLinksReducer,
     // Qui potrai aggiungere altri reducer in futuro
   },
   // Attiva devTools solo in development

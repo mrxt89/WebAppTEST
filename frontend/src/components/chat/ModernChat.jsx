@@ -1,4 +1,3 @@
-// ModernChat.jsx - Fixed version
 import React, { useState, useEffect, useRef } from 'react';
 import ChatTopBar from './ChatTopBar';
 import ChatBottomBar from './ChatBottomBar';
@@ -14,7 +13,10 @@ const ModernChat = ({
   const [sending, setSending] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState(null);
   const chatListRef = useRef(null);
-  const { users, markMessageAsRead } = useNotificationContext();
+  const { 
+    markMessageAsRead,
+    toggleMessageReaction 
+  } = useNotifications();
   const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false);
   
   // Effetto per segnare i messaggi come letti all'apertura - IMPROVED VERSION
@@ -39,7 +41,8 @@ const ModernChat = ({
     notificationId,
     notificationCategoryId,
     hexColor,
-    chatLeft
+    chatLeft,
+    users = [] // Provide default empty array for users
   } = notification;
 
   // Determina se l'utente ha abbandonato la chat
@@ -48,8 +51,8 @@ const ModernChat = ({
   // Assicurati che i messaggi siano in formato array
   const parsedMessages = Array.isArray(messages) ? messages : JSON.parse(messages || '[]');
   
-  // Trova l'utente corrente
-  const currentUser = users.find(user => user.isCurrentUser);
+  // Get current user from users array - make sure it's defined
+  const currentUser = users.find && users.find(user => user.isCurrentUser);
 
   // Gestisci la risposta a un messaggio
   const handleReply = (message) => {
@@ -80,8 +83,9 @@ const ModernChat = ({
           categoryColor={hexColor}
           hasLeftChat={hasLeftChat}
           currentUser={currentUser}
-          users={users}
+          users={users || []} 
           notification={notification}
+          toggleMessageReaction={toggleMessageReaction} 
         />
       </div>
       
@@ -94,6 +98,8 @@ const ModernChat = ({
           setSending={setSending}
           replyToMessage={replyToMessage}
           setReplyToMessage={setReplyToMessage}
+          hasLeftChat={hasLeftChat} // Pass hasLeftChat to component
+          users={users || []} // Ensure users is an array
         />
       )}
       

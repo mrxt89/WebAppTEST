@@ -1,8 +1,10 @@
-// src/components/chat/PollsList.jsx
+// PollsList.jsx - File COMPLETO
+
 import React, { useState, useEffect } from 'react';
 import { BarChart, AlertTriangle, Check, Search, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
 
 const PollsList = ({ notificationId, onClose, onSelectPoll, currentUserId }) => {
   const [polls, setPolls] = useState([]);
@@ -12,7 +14,7 @@ const PollsList = ({ notificationId, onClose, onSelectPoll, currentUserId }) => 
   const [showClosed, setShowClosed] = useState(true);
   const [sortOrder, setSortOrder] = useState('newest'); // 'newest', 'oldest', 'mostVotes'
   
-  const { getNotificationPolls } = useNotificationContext();
+  const { getNotificationPolls } = useNotifications();
   
   // Carica i sondaggi
   useEffect(() => {
@@ -79,7 +81,7 @@ const PollsList = ({ notificationId, onClose, onSelectPoll, currentUserId }) => 
   };
   
   return (
-    <div className="bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-xl mx-auto overflow-hidden max-h-[80vh] flex flex-col">
+    <div className="bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-xl mx-auto overflow-hidden max-h-[80vh] flex flex-col" style={{ zIndex: 9999, position: 'relative' }}>
       <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
         <div className="flex items-center">
           <BarChart className="h-5 w-5 text-blue-500 mr-2" />

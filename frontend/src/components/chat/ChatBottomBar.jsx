@@ -404,15 +404,16 @@ const ChatBottomBar = ({
   }, [isUpdatingContentEditable, message]);
 
   // Cancella il messaggio di risposta quando l'utente clicca "Annulla"
-  const handleReplyCancel = () => {
-    if (hasLeftChat) return;
-    if (typeof setReplyToMessage === 'function') {
-      setReplyToMessage(null);
-    } else {
-      // Emetti un evento personalizzato se setReplyToMessage non è disponibile
-      document.dispatchEvent(new CustomEvent('clear-reply-message'));
-    }
-  };
+const handleReplyCancel = () => {
+  // Add check for hasLeftChat from props rather than from global scope
+  if (disabled) return; // Use disabled instead, which is already a prop
+  if (typeof setReplyToMessage === 'function') {
+    setReplyToMessage(null);
+  } else {
+    // Emetti un evento personalizzato se setReplyToMessage non è disponibile
+    document.dispatchEvent(new CustomEvent('clear-reply-message'));
+  }
+};
 
   // Gestione della posizione del cursore
   useLayoutEffect(() => {

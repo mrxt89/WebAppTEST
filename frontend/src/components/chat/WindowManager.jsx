@@ -61,7 +61,10 @@ const WindowManager = ({ openChats, onCloseChat, onMinimizeChat, restoreChat }) 
   const getZIndex = useCallback((id) => {
     const index = zIndexOrder.indexOf(id);
     if (index === -1) return 1000; // Base z-index for windows not in z-order
-    return 1000 + index; // Higher index = higher z-index
+    
+    // Limita il massimo z-index delle finestre di chat a 1999
+    // Questo garantisce che i modali dei sondaggi (con z-index 3000+) siano sempre sopra
+    return Math.min(1000 + index, 1999); 
   }, [zIndexOrder]);
   
   // Toggle window maximize state

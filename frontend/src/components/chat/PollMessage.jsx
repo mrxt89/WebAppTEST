@@ -1,3 +1,5 @@
+// PollMessage.jsx - File COMPLETO
+
 import React, { useState, useEffect } from 'react';
 import { BarChart, Check, CheckCircle, Clock, X } from 'lucide-react';
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
@@ -10,12 +12,11 @@ const PollMessage = ({ poll, onUpdate, showResults = false, currentUserId }) => 
   const [showingResults, setShowingResults] = useState(showResults);
   const [pollData, setPollData] = useState(poll);
   const [selectedOptions, setSelectedOptions] = useState([]);
-  const { votePoll, closePoll } = useNotificationContext();
+  const { votePoll, closePoll } = useNotifications();
   
   // Log poll data when received to help debug
   useEffect(() => {
     if (poll) {
-     
       setPollData(poll);
     }
   }, [poll]);
@@ -31,25 +32,20 @@ const PollMessage = ({ poll, onUpdate, showResults = false, currentUserId }) => 
   // Calcola percentuali e numeri per la visualizzazione
   const calculateStats = () => {
     if (!pollData) {
-     
       return { max: 0, totalVotes: 0, options: [] };
     }
     
     try {
-     
-      
       // Check if Options exists and parse it if needed
       let options = pollData.Options;
       
       if (!options) {
-        
         return { max: 0, totalVotes: 0, options: [] };
       }
       
       if (typeof options === 'string') {
         try {
           options = JSON.parse(options);
-        
         } catch (e) {
           console.error('Failed to parse options:', e);
           return { max: 0, totalVotes: 0, options: [] };
@@ -63,7 +59,6 @@ const PollMessage = ({ poll, onUpdate, showResults = false, currentUserId }) => 
       
       // Total voters
       const totalVotes = pollData.TotalVoters || 0;
-     
       
       let max = 0;
       
@@ -80,8 +75,6 @@ const PollMessage = ({ poll, onUpdate, showResults = false, currentUserId }) => 
           OptionText: option.OptionText || option.optionText || 'Option'
         };
       });
-      
-   
       
       return {
         max,
@@ -109,10 +102,9 @@ const PollMessage = ({ poll, onUpdate, showResults = false, currentUserId }) => 
       // Se non è consentito selezionare più opzioni, resetta la selezione
       if (!pollData.AllowMultipleAnswers) {
         setSelectedOptions([optionId]);
-       
+        
         const result = await votePoll(optionId);
         if (result) {
-         
           setPollData(result);
           setShowingResults(true);
           if (onUpdate) onUpdate(result);
@@ -129,7 +121,12 @@ const PollMessage = ({ poll, onUpdate, showResults = false, currentUserId }) => 
       }
     } catch (error) {
       console.error('Error voting:', error);
-      swal.fire('Errore', 'Si è verificato un errore durante il voto', 'error');
+      swal.fire({
+        title: 'Errore', 
+        text: 'Si è verificato un errore durante il voto', 
+        icon: 'error',
+        zIndex: 9999
+      });
     } finally {
       setIsVoting(false);
     }
@@ -141,7 +138,6 @@ const PollMessage = ({ poll, onUpdate, showResults = false, currentUserId }) => 
     
     try {
       setIsVoting(true);
-     
       
       // Vota per ogni opzione selezionata
       let finalResult;
@@ -150,14 +146,18 @@ const PollMessage = ({ poll, onUpdate, showResults = false, currentUserId }) => 
       }
       
       if (finalResult) {
-      
         setPollData(finalResult);
         setShowingResults(true);
         if (onUpdate) onUpdate(finalResult);
       }
     } catch (error) {
       console.error('Error submitting multiple votes:', error);
-      swal.fire('Errore', 'Si è verificato un errore durante il voto', 'error');
+      swal.fire({
+        title: 'Errore', 
+        text: 'Si è verificato un errore durante il voto', 
+        icon: 'error',
+        zIndex: 9999
+      });
     } finally {
       setIsVoting(false);
     }
@@ -172,30 +172,38 @@ const PollMessage = ({ poll, onUpdate, showResults = false, currentUserId }) => 
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sì, chiudi il sondaggio',
-        cancelButtonText: 'Annulla'
+        cancelButtonText: 'Annulla',
+        zIndex: 9999 // Aggiungi questa riga per aumentare lo z-index
       });
       
       if (confirmed.isConfirmed) {
-        
         const result = await closePoll(pollData.PollID);
         if (result) {
-        
           setPollData(result);
           setShowingResults(true);
           if (onUpdate) onUpdate(result);
-          swal.fire('Completato', 'Il sondaggio è stato chiuso', 'success');
+          swal.fire({
+            title: 'Completato', 
+            text: 'Il sondaggio è stato chiuso', 
+            icon: 'success',
+            zIndex: 9999 // Aggiungi questa riga per aumentare lo z-index
+          });
         }
       }
     } catch (error) {
       console.error('Error closing poll:', error.response);
-      swal.fire('Errore', error.response.data.message, 'error');
+      swal.fire({
+        title: 'Errore', 
+        text: error.response?.data?.message || 'Si è verificato un errore', 
+        icon: 'error',
+        zIndex: 9999 // Aggiungi questa riga per aumentare lo z-index
+      });
     }
   };
   
   // Controlla se l'utente corrente ha già votato
   const hasUserVoted = () => {
     if (!pollData || !pollData.Options) {
-      
       return false;
     }
     
@@ -207,7 +215,7 @@ const PollMessage = ({ poll, onUpdate, showResults = false, currentUserId }) => 
       
       // Check if any option has UserVoted = true
       const voted = options.some(option => option.UserVoted);
-     
+      
       return voted;
     } catch (error) {
       console.error('Error checking if user voted:', error);
@@ -218,7 +226,7 @@ const PollMessage = ({ poll, onUpdate, showResults = false, currentUserId }) => 
   // If poll data is not available or incomplete, show loading
   if (!pollData || !pollData.PollID) {
     return (
-      <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
+      <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center" style={{ zIndex: 1200, position: 'relative' }}>
         <BarChart className="h-5 w-5 text-blue-500 mx-auto mb-2" />
         <p className="text-gray-500">Caricamento sondaggio...</p>
       </div>
@@ -238,7 +246,7 @@ const PollMessage = ({ poll, onUpdate, showResults = false, currentUserId }) => 
   }, [userVoted, isPollClosed]);
   
   return (
-    <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+    <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden" style={{ zIndex: 1200, position: 'relative' }}>
       {/* Intestazione */}
       <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
         <div className="flex items-center justify-between">

@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Resizable } from 're-resizable';
 import ChatTopBar from './ChatTopBar';
-import ChatBottomBar from './ChatBottomBar';
 import ChatLayout from './ChatLayout';
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
 import { debounce } from 'lodash'; 
@@ -18,24 +17,34 @@ const ChatWindow = ({
   notification, 
   onClose, 
   onMinimize, 
-  windowManager
+  windowManager,
+  isStandalone = false, // Nuova prop per indicare se siamo in modalità standalone
+  standaloneData = null // Nuova prop per dati in modalità standalone
 }) => {
-  // Always declare hooks at the top level
-  const { 
+   const { 
     markMessageAsRead, 
     fetchNotificationById, 
     sendNotification,
-    users,
-    responseOptions,
+    users: hookUsers, // Rinominate per chiarezza
+    responseOptions: hookResponseOptions, // Rinominate per chiarezza
     fetchUsers,
     fetchResponseOptions,
     registerOpenChat,
     unregisterOpenChat,
     leaveChat,       
     archiveChat,    
-    unarchiveChat    
+    unarchiveChat,
+    uploadNotificationAttachment, // Assicuriamoci di aver importato questa funzione
+    captureAndUploadPhoto,       // E anche questa
+    refreshAttachments           // Aggiungiamo anche questa
   } = useNotifications();
   
+  // Usa i dati standalone se disponibili, altrimenti usa quelli dall'hook
+  const users = isStandalone && standaloneData?.users ? standaloneData.users : hookUsers;
+  const responseOptions = isStandalone && standaloneData?.responseOptions 
+    ? standaloneData.responseOptions 
+    : hookResponseOptions;
+    
   const windowRef = useRef(null);
   const nodeRef = useRef(null);
   const dragHandleRef = useRef(null);
@@ -116,7 +125,6 @@ const ChatWindow = ({
   const handleReply = useCallback((message) => {
     setReplyToMessage(message);
   }, []);
-
   
   // Funzione per aggiornare i messaggi localmente dal prop notification
   const updateMessagesFromNotification = useCallback(() => {
@@ -1404,9 +1412,9 @@ useEffect(() => {
     <div className="flex flex-col w-full h-full bg-white overflow-hidden">
       {/* Use the drag handle on the top bar */}
       <div 
-        className="chat-window-handle cursor-move" 
+        className={`${isStandalone ? '' : 'chat-window-handle cursor-move'}`}
         ref={dragHandleRef}
-        onMouseDown={handleDragStart}
+        onMouseDown={isStandalone ? null : handleDragStart}
       >
         <ChatTopBar 
           title={notification.title}
@@ -1415,7 +1423,7 @@ useEffect(() => {
           }}
           closeChat={handleClose}
           onMinimize={handleMinimize}
-          onMaximize={handleMaximize}
+          onMaximize={isStandalone ? null : handleMaximize} // Disabilita per standalone
           isMaximized={isMaximized}
           membersInfo={parsedMembersInfo}
           users={users?.filter(user => !user?.userDisabled) || []}
@@ -1432,6 +1440,7 @@ useEffect(() => {
           leaveChat={handleLeaveChat}       
           archiveChat={handleArchiveChat}   
           unarchiveChat={handleUnarchiveChat}
+          isStandalone={isStandalone} // Passa la prop isStandalone
         />
       </div>
       
@@ -1458,28 +1467,43 @@ useEffect(() => {
           hasLeftChat={hasLeftChat}
           hasNewMessages={hasNewMessages}
           onScrollToBottom={handleScrollToBottom}
+          // Nuove props per ChatBottomBar
+          replyToMessage={replyToMessage}
+          setReplyToMessage={setReplyToMessage}
+          setSending={setSending}
+          onSend={handleSendMessage}
+          responseOptions={responseOptions || []}
+          uploadNotificationAttachment={uploadNotificationAttachment}
+          captureAndUploadPhoto={captureAndUploadPhoto}
+          isNewMessage={false}
         />
       </div>
-      
-      {/* Chat input area */}
-      <ChatBottomBar 
-        notificationId={notification.notificationId}
-        title={notification.title}
-        notificationCategoryId={notification.notificationCategoryId}
-        hexColor={notification.hexColor}
-        disabled={hasLeftChat}
-        setSending={setSending}
-        onSend={handleSendMessage}
-        users={users?.filter(user => !user?.userDisabled) || []}
-        responseOptions={responseOptions || []}
-        receiversList={receiversList}
-        updateReceiversList={handleReceiversUpdate}
-        replyToMessage={replyToMessage}
-        setReplyToMessage={setReplyToMessage}
-        isNewMessage={false}
-      />
     </div>
   );
+  
+  // Render window based on isStandalone mode
+  if (isStandalone) {
+    // Standalone mode - full screen without Resizable
+    return (
+      <div 
+        ref={nodeRef}
+        className="chat-window standalone-chat"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          zIndex: 9999,
+          boxShadow: 'none',
+          border: 'none',
+          borderRadius: 0
+        }}
+      >
+        {windowContent}
+      </div>
+    );
+  }
   
   // Render maximized window
   if (isMaximized) {

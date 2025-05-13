@@ -893,6 +893,9 @@ useEffect(() => {
         
         {/* Global styles for windows */}
         <style jsx global>{`
+          .ReactModal__Overlay {
+            z-index: 2000 !important; /* Assicura che i modal di base abbiano un z-index definito */
+          }
           /* Chat window styles */
           .chat-window {
             transition: box-shadow 0.2s ease, border-color 0.2s ease;
@@ -979,6 +982,21 @@ useEffect(() => {
             gap: 8px;
             border: 1px solid rgba(0, 0, 0, 0.05);
             z-index: 1000;
+          }
+
+          /* Sovrascrivi lo z-index per i modali dei sondaggi */
+          .poll-modal .ReactModal__Overlay {
+            z-index: 3000 !important; /* Sempre sopra le finestre di chat */
+          }
+          
+          /* Contenuto dei modali dei sondaggi */
+          .poll-modal .ReactModal__Content {
+            z-index: 3001 !important; 
+          }
+          
+          /* Assicura che SweetAlert sia sempre visibile */
+          .swal2-container {
+            z-index: 10000 !important;
           }
         `}</style>
       </div>

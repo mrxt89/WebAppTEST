@@ -1,15 +1,13 @@
+// src/components/chat/ChatModal.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import Modal from 'react-modal';
 import ChatTopBar from './ChatTopBar';
-import ChatBottomBar from './ChatBottomBar';
 import ChatLayout from './ChatLayout';
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
 import { useUserSettings } from '../../context/UserSettingsContext';
 import { swal } from '../../lib/common'; 
-import FileDropZone from '@/components/ui/FileDropZone';
-import { AlertOctagon, CircleHelp, Search, Maximize2, Minimize2, X } from 'lucide-react';
+import { AlertOctagon, CircleHelp, Search, Maximize2, Minimize2, X, ExternalLink } from 'lucide-react';
 import { useWikiContext } from '../wiki/WikiContext';
-import InlineSearchBar from './InlineSearchBar';
 import ImprovedSearchBar from './ImprovedSearchBar';
 import EditMessageModal from './EditMessageModal';
 import VersionHistoryModal from './VersionHistoryModal';
@@ -24,8 +22,8 @@ const ChatModal = ({
   onMinimize,
   reopenChat,
   closeChat,
-  windowMode = false, // New prop to determine if running in window mode
-  windowManager = null // Optional window manager for advanced window management
+  windowMode = false, // Prop per determinare se siamo in modalità finestra
+  windowManager = null // Window manager opzionale per gestione avanzata delle finestre
 }) => {
   const { openWiki } = useWikiContext();
 
@@ -106,7 +104,12 @@ const ChatModal = ({
     getMessageReactions,
     toggleMessageReaction,
     uploadNotificationAttachment,
-    captureAndUploadPhoto
+    captureAndUploadPhoto,
+    // Funzioni per gestire chat in finestre separate
+    isStandaloneChat,
+    openChatInNewWindow,
+    registerStandaloneChat,
+    unregisterStandaloneChat
   } = useNotifications();
   
   const { chatWidth, updateChatWidth } = useUserSettings();
@@ -115,6 +118,9 @@ const ChatModal = ({
   const currentNotification = notifications.find((n) => 
     n.notificationId === notification?.notificationId
   ) || notification;
+
+  // Verifica se la chat è già aperta in una finestra separata
+  const isOpenInSeparateWindow = notification ? isStandaloneChat(notification.notificationId) : false;
 
   useEffect(() => {
     if (currentNotification && currentNotification.title) {
@@ -303,51 +309,67 @@ const ChatModal = ({
   }, [isOpen, notificationId, registerOpenChat, unregisterOpenChat]);
 
   // Main listener for all types of updates
-useEffect(() => {
-  // Gestore per aggiornamenti dello stato della chat
-  const handleChatStatusChange = async (event) => {
-    const { notificationId, action } = event.detail || {};
+  useEffect(() => {
+    // Handler for notification updates
+    const handleNotificationUpdate = (event) => {
+      const { notificationId: updatedNotificationId } = event.detail || {};
+      
+      // Only update if this is for the current notification
+      if (updatedNotificationId && notification && updatedNotificationId === notification.notificationId) {
+        console.log(`Notification update event received for ${updatedNotificationId}`);
+        
+        // Reload notification data
+        fetchNotificationById(updatedNotificationId)
+          .catch(error => {
+            console.error('Error reloading notification:', error);
+          });
+      }
+    };
     
-    // Verifica che questo evento sia per la chat corrente
-    if (notificationId && notification && parseInt(notificationId) === parseInt(notification.notificationId)) {
-      console.log(`Stato della chat ${notificationId} cambiato: ${action}`);
+    // Gestore per aggiornamenti dello stato della chat
+    const handleChatStatusChange = async (event) => {
+      const { notificationId, action } = event.detail || {};
       
-      // Ricarica i dati aggiornati
-      const updatedNotification = await fetchNotificationById(notificationId);
-      
-      if (updatedNotification) {
-        // Aggiorna gli stati locali in base all'azione
-        if (action === 'left') {
-          setHasLeftChat(true);
-        } else if (action === 'archived') {
-          setIsArchived(true);
-        } else if (action === 'unarchived') {
-          setIsArchived(false);
+      // Verifica che questo evento sia per la chat corrente
+      if (notificationId && notification && parseInt(notificationId) === parseInt(notification.notificationId)) {
+        console.log(`Stato della chat ${notificationId} cambiato: ${action}`);
+        
+        // Ricarica i dati aggiornati
+        const updatedNotification = await fetchNotificationById(notificationId);
+        
+        if (updatedNotification) {
+          // Aggiorna gli stati locali in base all'azione
+          if (action === 'left') {
+            setHasLeftChat(true);
+          } else if (action === 'archived') {
+            setIsArchived(true);
+          } else if (action === 'unarchived') {
+            setIsArchived(false);
+          }
         }
       }
-    }
-  };
-  
-  // Aggiungi listener per l'evento
-  document.addEventListener('chat-status-changed', handleChatStatusChange);
-  
-  // Aggiungi altri listener già esistenti
-  document.addEventListener('refreshNotifications', handleNotificationUpdate);
-  document.addEventListener('chat-message-sent', handleNotificationUpdate);
-  document.addEventListener('message-reaction-updated', handleNotificationUpdate);
-  document.addEventListener('message-updated', handleNotificationUpdate);
-  document.addEventListener('message-deleted', handleNotificationUpdate);
-  
-  // Pulizia dei listener
-  return () => {
-    document.removeEventListener('chat-status-changed', handleChatStatusChange);
-    document.removeEventListener('refreshNotifications', handleNotificationUpdate);
-    document.removeEventListener('chat-message-sent', handleNotificationUpdate);
-    document.removeEventListener('message-reaction-updated', handleNotificationUpdate);
-    document.removeEventListener('message-updated', handleNotificationUpdate);
-    document.removeEventListener('message-deleted', handleNotificationUpdate);
-  };
-}, [notification, fetchNotificationById, handleNotificationUpdate]);
+    };
+    
+    // Aggiungi listener per l'evento
+    document.addEventListener('chat-status-changed', handleChatStatusChange);
+    
+    // Aggiungi altri listener già esistenti
+    document.addEventListener('refreshNotifications', handleNotificationUpdate);
+    document.addEventListener('chat-message-sent', handleNotificationUpdate);
+    document.addEventListener('message-reaction-updated', handleNotificationUpdate);
+    document.addEventListener('message-updated', handleNotificationUpdate);
+    document.addEventListener('message-deleted', handleNotificationUpdate);
+    
+    // Pulizia dei listener
+    return () => {
+      document.removeEventListener('chat-status-changed', handleChatStatusChange);
+      document.removeEventListener('refreshNotifications', handleNotificationUpdate);
+      document.removeEventListener('chat-message-sent', handleNotificationUpdate);
+      document.removeEventListener('message-reaction-updated', handleNotificationUpdate);
+      document.removeEventListener('message-updated', handleNotificationUpdate);
+      document.removeEventListener('message-deleted', handleNotificationUpdate);
+    };
+  }, [notification, fetchNotificationById]);
 
   useEffect(() => {
     if (isOpen && notificationId && !attachmentsLoaded) {
@@ -541,74 +563,73 @@ useEffect(() => {
     }
   }, []);
 
-// Compare current messages with previous ones and handle scrolling
-useEffect(() => {
-  // Protect against updates of irrelevant notifications
-  if (notification && notification.notificationId !== currentNotificationIdRef.current) {
-    return; // Do nothing if this is not the currently open chat
-  }
-
-  // Only run when chatListRef is available
-  if (!chatListRef.current) return;
-
-  // Process current messages
-  const currentMessages = Array.isArray(parsedMessages) ? parsedMessages : [];
-  const prevMessages = Array.isArray(prevMessagesRef.current) ? prevMessagesRef.current : [];
-
-  // Determine if there are new messages
-  const hasNewMessages = currentMessages.length > prevMessages.length;
-  
-  // IMPORTANTE: Controlliamo se l'ultimo messaggio è dell'utente corrente
-  const isFromCurrentUser = hasNewMessages && 
-    currentMessages.length > 0 && 
-    prevMessages.length > 0 &&
-    currentMessages[currentMessages.length - 1]?.selectedUser === '1';
-  
-  // IMPORTANTE: Non scrollare automaticamente a meno che non sia:
-  // 1. Primo caricamento (prevMessages è vuoto)
-  // 2. L'utente ha inviato un messaggio
-  // Nessun altro caso dovrebbe forzare lo scrolling
-  if (prevMessages.length === 0 || isFromCurrentUser) {
-    console.log('[ChatModal] Scrolling to bottom - first load or user message');
-    // First load or user's own message - always scroll to bottom
-    requestAnimationFrame(() => {
-      if (chatListRef.current) {
-        chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
-      }
-    });
-  }
-  // In TUTTI gli altri casi, lascia che sia ModernChatList a gestire lo scrolling
-  // basandosi sul suo stato interno userHasScrolled
-  
-  // Update reference to previous messages
-  prevMessagesRef.current = [...currentMessages];
-}, [parsedMessages, notification]);
-
-
-// Add this effect to save scroll position during manual scrolling
-useEffect(() => {
-  const saveScrollPosition = (e) => {
-    if (chatListRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = chatListRef.current;
-      
-      // Only save position if not at the bottom
-      if (scrollTop + clientHeight < scrollHeight - 20) {
-        scrollPositionRef.current = scrollTop;
-      } else {
-        scrollPositionRef.current = 0; // Reset if at bottom
-      }
+  // Compare current messages with previous ones and handle scrolling
+  useEffect(() => {
+    // Protect against updates of irrelevant notifications
+    if (notification && notification.notificationId !== currentNotificationIdRef.current) {
+      return; // Do nothing if this is not the currently open chat
     }
-  };
 
-  if (chatListRef.current) {
-    chatListRef.current.addEventListener('scroll', saveScrollPosition, { passive: true });
-    return () => {
+    // Only run when chatListRef is available
+    if (!chatListRef.current) return;
+
+    // Process current messages
+    const currentMessages = Array.isArray(parsedMessages) ? parsedMessages : [];
+    const prevMessages = Array.isArray(prevMessagesRef.current) ? prevMessagesRef.current : [];
+
+    // Determine if there are new messages
+    const hasNewMessages = currentMessages.length > prevMessages.length;
+    
+    // IMPORTANTE: Controlliamo se l'ultimo messaggio è dell'utente corrente
+    const isFromCurrentUser = hasNewMessages && 
+      currentMessages.length > 0 && 
+      prevMessages.length > 0 &&
+      currentMessages[currentMessages.length - 1]?.selectedUser === '1';
+    
+    // IMPORTANTE: Non scrollare automaticamente a meno che non sia:
+    // 1. Primo caricamento (prevMessages è vuoto)
+    // 2. L'utente ha inviato un messaggio
+    // Nessun altro caso dovrebbe forzare lo scrolling
+    if (prevMessages.length === 0 || isFromCurrentUser) {
+      console.log('[ChatModal] Scrolling to bottom - first load or user message');
+      // First load or user's own message - always scroll to bottom
+      requestAnimationFrame(() => {
+        if (chatListRef.current) {
+          chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+        }
+      });
+    }
+    // In TUTTI gli altri casi, lascia che sia ModernChatList a gestire lo scrolling
+    // basandosi sul suo stato interno userHasScrolled
+    
+    // Update reference to previous messages
+    prevMessagesRef.current = [...currentMessages];
+  }, [parsedMessages, notification]);
+
+  // Add this effect to save scroll position during manual scrolling
+  useEffect(() => {
+    const saveScrollPosition = (e) => {
       if (chatListRef.current) {
-        chatListRef.current.removeEventListener('scroll', saveScrollPosition);
+        const { scrollTop, scrollHeight, clientHeight } = chatListRef.current;
+        
+        // Only save position if not at the bottom
+        if (scrollTop + clientHeight < scrollHeight - 20) {
+          scrollPositionRef.current = scrollTop;
+        } else {
+          scrollPositionRef.current = 0; // Reset if at bottom
+        }
       }
     };
-  }
-}, []);
+
+    if (chatListRef.current) {
+      chatListRef.current.addEventListener('scroll', saveScrollPosition, { passive: true });
+      return () => {
+        if (chatListRef.current) {
+          chatListRef.current.removeEventListener('scroll', saveScrollPosition);
+        }
+      };
+    }
+  }, []);
 
   // Watch modal size to update chat width
   useEffect(() => {
@@ -666,8 +687,6 @@ useEffect(() => {
     }, 100);
   };
 
-  
-
   const handleMinimize = () => {
     // Salva la posizione di scroll prima di minimizzare
     if (chatListRef?.current) {
@@ -686,17 +705,17 @@ useEffect(() => {
     }
   };
 
-const handleRestore = () => {
-  setIsMinimized(false);
-  setAnimationClass('chat-maximize');
-  
-  // Ripristina la posizione di scroll dopo un breve ritardo
-  setTimeout(() => {
-    if (chatListRef?.current && scrollPositionRef.current > 0) {
-      chatListRef.current.scrollTop = scrollPositionRef.current;
-    }
-  }, 100);
-};
+  const handleRestore = () => {
+    setIsMinimized(false);
+    setAnimationClass('chat-maximize');
+    
+    // Ripristina la posizione di scroll dopo un breve ritardo
+    setTimeout(() => {
+      if (chatListRef?.current && scrollPositionRef.current > 0) {
+        chatListRef.current.scrollTop = scrollPositionRef.current;
+      }
+    }, 100);
+  };
 
   const handleAnimationEnd = () => {
     if (!isOpen) {
@@ -759,121 +778,129 @@ const handleRestore = () => {
     setIsSearchVisible(!isSearchVisible);
   };
 
+  // Funzione per aprire la chat in una finestra separata
+  const handleOpenInSeparateWindow = () => {
+    if (!notification) return;
+    
+    // Usa la funzione dall'hook passando la callback onRequestClose
+    openChatInNewWindow(notification.notificationId, notification.title, onRequestClose);
+  };
+
   // Handle chat archiving
-const handleArchiveChat = async () => {
-  try {
-    console.log(`Attempting to archive chat with ID: ${notificationId}`);
-    
-    // Show loading indicator for immediate feedback
-    swal.fire({
-      title: 'Archiviazione in corso...',
-      allowOutsideClick: false,
-      showConfirmButton: false,
-      willOpen: () => {
-        swal.showLoading();
-      }
-    });
-    
-    if (!archiveChat) {
-      throw new Error('archiveChat function not available');
-    }
-    
-    const result = await archiveChat(notificationId);
-    console.log('Archive result:', result);
-    
-    if (result && result.success) {
-      // Importante: Ricarica i dati aggiornati della chat
-      await fetchNotificationById(notificationId);
+  const handleArchiveChat = async () => {
+    try {
+      console.log(`Attempting to archive chat with ID: ${notificationId}`);
       
-      // Aggiorna lo stato locale immediatamente
-      setIsArchived(true);
-      
+      // Show loading indicator for immediate feedback
       swal.fire({
-        icon: 'success',
-        title: 'Chat archiviata',
-        text: 'La chat è stata archiviata con successo',
-        timer: 2000,
-        showConfirmButton: false
+        title: 'Archiviazione in corso...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        willOpen: () => {
+          swal.showLoading();
+        }
       });
       
-      // Emetti un evento per notificare altri componenti
-      document.dispatchEvent(new CustomEvent('chat-status-changed', {
-        detail: { 
-          notificationId,
-          action: 'archived',
-          timestamp: new Date().getTime()
-        }
-      }));
-    } else {
-      throw new Error(result?.message || 'Cannot archive chat');
+      if (!archiveChat) {
+        throw new Error('archiveChat function not available');
+      }
+      
+      const result = await archiveChat(notificationId);
+      console.log('Archive result:', result);
+      
+      if (result && result.success) {
+        // Importante: Ricarica i dati aggiornati della chat
+        await fetchNotificationById(notificationId);
+        
+        // Aggiorna lo stato locale immediatamente
+        setIsArchived(true);
+        
+        swal.fire({
+          icon: 'success',
+          title: 'Chat archiviata',
+          text: 'La chat è stata archiviata con successo',
+          timer: 2000,
+          showConfirmButton: false
+        });
+        
+        // Emetti un evento per notificare altri componenti
+        document.dispatchEvent(new CustomEvent('chat-status-changed', {
+          detail: { 
+            notificationId,
+            action: 'archived',
+            timestamp: new Date().getTime()
+          }
+        }));
+      } else {
+        throw new Error(result?.message || 'Cannot archive chat');
+      }
+    } catch (error) {
+      console.error('Error archiving chat:', error);
+      swal.fire({
+        icon: 'error',
+        title: 'Errore',
+        text: error.message || 'Could not archive chat'
+      });
     }
-  } catch (error) {
-    console.error('Error archiving chat:', error);
-    swal.fire({
-      icon: 'error',
-      title: 'Errore',
-      text: error.message || 'Could not archive chat'
-    });
-  }
-};
+  };
 
   // Handle unarchiving chat
-const handleUnarchiveChat = async () => {
-  try {
-    console.log(`Attempting to unarchive chat with ID: ${notificationId}`);
-    
-    // Show loading indicator for immediate feedback
-    swal.fire({
-      title: 'Rimozione dall\'archivio in corso...',
-      allowOutsideClick: false,
-      showConfirmButton: false,
-      willOpen: () => {
-        swal.showLoading();
-      }
-    });
-    
-    if (!unarchiveChat) {
-      throw new Error('unarchiveChat function not available');
-    }
-    
-    const result = await unarchiveChat(notificationId);
-    console.log('Unarchive result:', result);
-    
-    if (result && result.success) {
-      // Importante: Ricarica i dati aggiornati della chat
-      await fetchNotificationById(notificationId);
+  const handleUnarchiveChat = async () => {
+    try {
+      console.log(`Attempting to unarchive chat with ID: ${notificationId}`);
       
-      // Aggiorna lo stato locale immediatamente
-      setIsArchived(false);
-      
+      // Show loading indicator for immediate feedback
       swal.fire({
-        icon: 'success',
-        title: 'Chat recuperata',
-        text: 'La chat è stata rimossa dall\'archivio',
-        timer: 2000,
-        showConfirmButton: false
+        title: 'Rimozione dall\'archivio in corso...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        willOpen: () => {
+          swal.showLoading();
+        }
       });
       
-      // Emetti un evento per notificare altri componenti
-      document.dispatchEvent(new CustomEvent('chat-status-changed', {
-        detail: { 
-          notificationId,
-          action: 'unarchived',
-          timestamp: new Date().getTime()
-        }
-      }));
-    } else {
-      throw new Error(result?.message || 'Cannot unarchive chat');
+      if (!unarchiveChat) {
+        throw new Error('unarchiveChat function not available');
+      }
+      
+      const result = await unarchiveChat(notificationId);
+      console.log('Unarchive result:', result);
+      
+      if (result && result.success) {
+        // Importante: Ricarica i dati aggiornati della chat
+        await fetchNotificationById(notificationId);
+        
+        // Aggiorna lo stato locale immediatamente
+        setIsArchived(false);
+        
+        swal.fire({
+          icon: 'success',
+          title: 'Chat recuperata',
+          text: 'La chat è stata rimossa dall\'archivio',
+          timer: 2000,
+          showConfirmButton: false
+        });
+        
+        // Emetti un evento per notificare altri componenti
+        document.dispatchEvent(new CustomEvent('chat-status-changed', {
+          detail: { 
+            notificationId,
+            action: 'unarchived',
+            timestamp: new Date().getTime()
+          }
+        }));
+      } else {
+        throw new Error(result?.message || 'Cannot unarchive chat');
+      }
+    } catch (error) {
+      console.error('Error unarchiving chat:', error);
+      swal.fire({
+        icon: 'error',
+        title: 'Errore',
+        text: error.message || 'Could not remove chat from archive'
+      });
     }
-  } catch (error) {
-    console.error('Error unarchiving chat:', error);
-    swal.fire({
-      icon: 'error',
-      title: 'Errore',
-      text: error.message || 'Could not remove chat from archive'
-    });
-  }
-};
+  };
 
   // Function to open the modal for editing a message
   const handleEditMessage = (message) => {
@@ -949,276 +976,96 @@ const handleUnarchiveChat = async () => {
     }
   };
 
-  // Add search button to topbar
-  const renderSearchButton = () => (
-    <button 
-      onClick={toggleSearch}
-      className={`p-2 rounded-full transition-colors ${isSearchVisible ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-200'}`}
-      title="Cerca nei messaggi"
-    >
-      <Search className="h-4 w-4" />
-    </button>
-  );
-
-  // Drag handlers
-  const handleDragStart = (e, data) => {
-    setIsDragging(true);
-    if (windowManager && windowManager.activateWindow) {
-      windowManager.activateWindow(notificationId);
-    }
-  };
-
-  const handleDrag = (e, data) => {
-    setPosition({ x: data.x, y: data.y });
-  };
-
-  const handleDragStop = (e, data) => {
-    setIsDragging(false);
-    setPosition({ x: data.x, y: data.y });
-    if (windowManager && windowManager.updatePosition) {
-      windowManager.updatePosition(notificationId, data.x, data.y);
-    }
-  };
-
-  // Resize handlers
-  const handleResizeStart = () => {
-    setIsResizing(true);
-    if (windowManager && windowManager.activateWindow) {
-      windowManager.activateWindow(notificationId);
-    }
-  };
-
-  const handleResize = (e, direction, ref, d) => {
-    setSize({
-      width: size.width + d.width,
-      height: size.height + d.height
-    });
-  };
-
-  const handleResizeStop = (e, direction, ref, d) => {
-    setIsResizing(false);
-    setSize({
-      width: size.width + d.width,
-      height: size.height + d.height
-    });
-    if (windowManager && windowManager.updateSize) {
-      windowManager.updateSize(notificationId, size.width + d.width, size.height + d.height);
-    }
-  };
-
-  // Window content - same for maximized and normal mode
-  const windowContent = (
-    <div className="flex flex-col w-full h-full bg-white overflow-hidden">
-      {/* Use the drag handle on the top bar */}
-      <div 
-        className="chat-window-handle cursor-move" 
-        ref={dragHandleRef}
-      >
-        <ChatTopBar 
-          title={notification.title}
-          setTitle={setLocalTitle}
-          closeChat={onRequestClose}
-          onMinimize={handleMinimize}
-          onMaximize={handleMaximize}
-          isMaximized={isMaximized}
-          membersInfo={parsedMembersInfo}
-          users={users.filter(user => !user.userDisabled)}
-          currentUser={users.find(user => user.isCurrentUser)}
-          notificationId={notification.notificationId}
-          notificationCategoryId={notification.notificationCategoryId}
-          notificationCategoryName={notification.notificationCategoryName}
-          hexColor={notification.hexColor}
-          tbCreated={notification.tbCreated}
-          hasLeftChat={hasLeftChat}
-          isArchived={isArchived}
-          receiversList={receiversList}
-          updateReceiversList={handleReceiversUpdate}
-          archiveChat={handleArchiveChat}
-          unarchiveChat={handleUnarchiveChat}
-          leaveChat={async (notificationId) => {
-            const result = await leaveChat(notificationId);
-            if (result) {
-              onRequestClose();
-              swal.fire({
-                title: 'Chat abbandonata',
-                text: 'Hai abbandonato questa conversazione',
-                icon: 'success',
-                timer: 2000,
-                showConfirmButton: false
-              });
-            }
-          }}
-          renderExtraButtons={renderSearchButton}
-        />
-      </div>
-      
-      {/* Banners for chat status */}
-      <div className="flex items-center justify-between bg-gray-50 border-b border-gray-200">
-        {/* Banner for abandoned chat */}
-        {hasLeftChat && (
-          <div className="bg-yellow-50 border-b border-yellow-200 p-2 flex items-center text-yellow-800 w-full">
-            <AlertOctagon className="h-4 w-4 mr-2 flex-shrink-0" />
-            <span className="text-sm">Hai abbandonato questa chat. Puoi solo visualizzare i messaggi precedenti ma non puoi più interagire.</span>
-          </div>
-        )}
-        
-        {/* Banner for archived chat */}
-        {isArchived && !hasLeftChat && (
-          <div className="bg-purple-50 border-b border-purple-200 p-2 flex items-center text-purple-800 w-full">
-            <AlertOctagon className="h-4 w-4 mr-2 flex-shrink-0" />
-            <span className="text-sm">Questa chat è archiviata. Puoi comunque interagire ma non apparirà nella lista principale.</span>
-          </div>
-        )}
-      </div>
-      
+  // Funzione per renderizzare pulsanti extra nella barra superiore
+  const renderExtraButtons = () => (
+    <>
+      {/* Pulsante di ricerca */}
       <button 
-        onClick={() => openWiki('chatmodal')}
-        className="p-2 rounded-full hover:bg-gray-200 transition-colors"
-        title="Guida Chat"
+        onClick={toggleSearch}
+        className={`p-2 rounded-full transition-colors ${isSearchVisible ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-200'}`}
+        title="Cerca nei messaggi"
       >
-        <CircleHelp className="w-4 h-4 text-gray-600" />
+        <Search className="w-4 h-4" />
       </button>
       
-      {/* Inline search component */}
-      {isSearchVisible && (
-        <ImprovedSearchBar 
-          notificationId={notificationId}
-          onResultSelected={scrollToMessage}
-          onClose={() => setIsSearchVisible(false)}
-        />
+      {/* Pulsante per aprire in finestra separata - mostralo solo se non siamo già in modalità finestra */}
+      {!windowMode && !hasLeftChat && notificationId > 0 && (
+        <button
+          onClick={handleOpenInSeparateWindow}
+          className="p-2 rounded-full hover:bg-gray-200 transition-colors"
+          title="Apri in finestra separata"
+        >
+          <ExternalLink className="w-4 h-4 text-gray-600" />
+        </button>
       )}
-      
-      {/* Chat content area */}
-      <div className="flex-1 overflow-hidden">
-        <ChatLayout 
-          messages={parsedMessages}
-          sending={sending}
-          notificationId={notification.notificationId}
-          isReadByUser={notification.isReadByUser || hasMarkedAsRead}
-          markMessageAsRead={markMessageAsRead}
-          chatListRef={chatListRef}
-          membersInfo={parsedMembersInfo}
-          users={users.filter(user => !user.userDisabled)}
-          updateReceiversList={handleReceiversUpdate}
-          currentUser={users.find(user => user.isCurrentUser)}
-          receivers={receiversList}
-          onReply={handleReply}
-          title={title}
-          createdAt={notification.tbCreated}
-          notificationCategoryId={notification.notificationCategoryId}
-          notificationCategoryName={notification.notificationCategoryName}
-          hexColor={notification.hexColor}
-          hasLeftChat={hasLeftChat}
-          // Force attachments sidebar open at start
-          initialSidebarOpen={true}
-          selectedMessageId={selectedMessageId}
-          onEditMessage={handleEditMessage}
-          onViewVersionHistory={handleViewVersionHistory}
-          onReactionSelect={handleReactionSelect}
-        />
-      </div>
-      
-      {/* Chat input area */}
-      <div style={{ height: hasLeftChat ? 'auto' : '100px' }}>
-        {hasLeftChat ? (
-          <div className="p-4 bg-gray-50 border-t border-gray-200 text-center text-gray-500">
-            <p>Hai abbandonato questa chat il {new Date().toLocaleDateString()} e non puoi più inviare messaggi.</p>
-          </div>
-        ) : (
-          <ChatBottomBar
-            notificationId={notificationId}
-            isClosed={isClosed}
-            title={title}
-            notificationCategoryId={currentNotification.notificationCategoryId}
-            responseOptions={responseOptions}
-            reopenChat={async () => {
-              const res = await reopenChat(notification.notificationId);
-              if (res) {
-                onRequestClose();
-                swal.fire({
-                  text: 'Chat riaperta con successo',
-                  icon: 'success',
-                  toast: true,
-                  position: 'top-end',
-                  showConfirmButton: false,
-                  timer: 1500,
-                  timerProgressBar: true
-                });
-              }
-            }}
-            closeChat={async () => {
-              const res = await closeChat(notification.notificationId);
-              if (res) {
-                onRequestClose();
-                swal.fire({
-                  text: 'Chat chiusa con successo',
-                  icon: 'success',
-                  toast: true,
-                  position: 'top-end',
-                  showConfirmButton: false,
-                  timer: 1500,
-                  timerProgressBar: true
-                });
-              }
-            }}
-            closingUser_Name={closingUser_Name}
-            closingDate={new Date(closingDate)}
-            users={users.filter(user => !user.userDisabled)}
-            receiversList={receiversList}
-            updateReceiversList={handleReceiversUpdate}
-            setSending={setSending}
-            onSend={handleSend}
-            replyToMessage={replyToMessage}
-            setReplyToMessage={setReplyToMessage}
-            hexColor={notification.hexColor}
-            disabled={hasLeftChat}
-            uploadNotificationAttachment={uploadNotificationAttachment}
-            captureAndUploadPhoto={captureAndUploadPhoto}
-            sendNotification={sendNotification}
-          />
-        )}
-      </div>
-      
-      {/* Edit Message Modal */}
-      <EditMessageModal 
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        message={messageToEdit}
-        users={users || []} 
-        messages={parsedMessages}
-        onMessageUpdated={(updatedNotificationId) => {
-          const idToUpdate = updatedNotificationId || notificationId;
-          if (idToUpdate) {
-            fetchNotificationById(idToUpdate)
-              .then(result => {
-                console.log("Notification updated successfully:", result);
-                
-                // Emit event to update other components
-                document.dispatchEvent(new CustomEvent('message-updated', { 
-                  detail: { 
-                    notificationId: idToUpdate,
-                    messageId: messageToEdit?.messageId
-                  } 
-                }));
-              })
-              .catch(error => {
-                console.error("Error updating notification:", error);
-              });
-          }
-        }}
-      />
-      
-      {/* Version History Modal */}
-      <VersionHistoryModal
-        isOpen={showVersionHistory}
-        onClose={() => setShowVersionHistory(false)}
-        versionData={selectedMessageVersions}
-        loadingVersions={loadingVersions}
-      />
-    </div>
+    </>
   );
 
-  // Traditional modal implementation
+  // Se la chat è già aperta in una finestra separata, mostra un messaggio invece della modale
+  if (isOpen && isOpenInSeparateWindow) {
+    return (
+      <Modal
+        isOpen={true}
+        onRequestClose={onRequestClose}
+        style={{
+          overlay: {
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            zIndex: 1000
+          },
+          content: {
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '400px',
+            maxWidth: '90%',
+            height: 'auto',
+            padding: '20px',
+            borderRadius: '10px',
+            background: 'white'
+          }
+        }}
+      >
+        <div className="text-center">
+          <div className="flex items-center justify-center mb-4">
+            <ExternalLink className="w-10 h-10 text-blue-500 mr-2" />
+            <h2 className="text-xl font-medium">Chat già aperta</h2>
+          </div>
+          <p className="mb-6 text-gray-600">
+            Questa chat è già aperta in una finestra separata. Vuoi passare a quella finestra?
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => {
+                // Prova a trovare e attivare la finestra
+                const win = window.open('', `chat_${notification.notificationId}`);
+                if (win && !win.closed) {
+                  win.focus();
+                } else {
+                  // Se la finestra non è più disponibile, apri una nuova
+                  openChatInNewWindow(notification.notificationId, notification.title);
+                }
+                onRequestClose();
+              }}
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+            >
+              Passa alla finestra
+            </button>
+            <button
+              onClick={onRequestClose}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
+            >
+              Annulla
+            </button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  // Calcola se è una nuova conversazione
+  const isNewMessage = notificationId === 0;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -1234,7 +1081,193 @@ const handleUnarchiveChat = async () => {
           className={'flex flex-col justify-between w-full h-full bg-white ' + animationClass}
           onAnimationEnd={handleAnimationEnd}
         >
-          {windowContent}
+          <div className="chat-window-handle cursor-move">
+            <ChatTopBar 
+              title={title}
+              setTitle={setLocalTitle}
+              closeChat={onRequestClose}
+              onMinimize={handleMinimize}
+              onMaximize={handleMaximize}
+              isMaximized={isMaximized}
+              membersInfo={parsedMembersInfo}
+              users={users?.filter(user => !user?.userDisabled) || []}
+              currentUser={users.find(user => user.isCurrentUser)}
+              notificationId={notificationId}
+              notificationCategoryId={notification.notificationCategoryId}
+              notificationCategoryName={notification.notificationCategoryName}
+              hexColor={notification.hexColor}
+              tbCreated={notification.tbCreated}
+              hasLeftChat={hasLeftChat}
+              isArchived={isArchived}
+              receiversList={receiversList}
+              updateReceiversList={handleReceiversUpdate}
+              leaveChat={async (notificationId) => {
+                const result = await leaveChat(notificationId);
+                if (result) {
+                  onRequestClose();
+                  // Messaggio di conferma
+                  swal.fire({
+                    title: 'Chat abbandonata',
+                    text: 'Hai abbandonato questa conversazione',
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
+                  });
+                }
+              }}
+              archiveChat={handleArchiveChat}
+              unarchiveChat={handleUnarchiveChat}
+              renderExtraButtons={renderExtraButtons}
+              isStandalone={windowMode} // Passa windowMode come isStandalone
+            />
+          </div>
+          
+          {/* Banners for chat status */}
+          <div className="flex items-center justify-between bg-gray-50 border-b border-gray-200">
+            {/* Banner for abandoned chat */}
+            {hasLeftChat && (
+              <div className="bg-yellow-50 border-b border-yellow-200 p-2 flex items-center text-yellow-800 w-full">
+                <AlertOctagon className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span className="text-sm">Hai abbandonato questa chat. Puoi solo visualizzare i messaggi precedenti ma non puoi più interagire.</span>
+              </div>
+            )}
+            
+            {/* Banner for archived chat */}
+            {isArchived && !hasLeftChat && (
+              <div className="bg-purple-50 border-b border-purple-200 p-2 flex items-center text-purple-800 w-full">
+                <AlertOctagon className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span className="text-sm">Questa chat è archiviata. Puoi comunque interagire ma non apparirà nella lista principale.</span>
+              </div>
+            )}
+          </div>
+          
+          <button 
+            onClick={() => openWiki('chatmodal')}
+            className="p-2 rounded-full hover:bg-gray-200 transition-colors"
+            title="Guida Chat"
+          >
+            <CircleHelp className="w-4 h-4 text-gray-600" />
+          </button>
+          
+          {/* Inline search component */}
+          {isSearchVisible && (
+            <ImprovedSearchBar 
+              notificationId={notificationId}
+              onResultSelected={scrollToMessage}
+              onClose={() => setIsSearchVisible(false)}
+            />
+          )}
+          
+          {/* Chat content area */}
+          <div className="flex-1 overflow-hidden">
+            <ChatLayout 
+              messages={parsedMessages}
+              sending={sending}
+              notificationId={notification.notificationId}
+              isReadByUser={notification.isReadByUser || hasMarkedAsRead}
+              markMessageAsRead={markMessageAsRead}
+              chatListRef={chatListRef}
+              membersInfo={parsedMembersInfo}
+              users={users.filter(user => !user.userDisabled)}
+              updateReceiversList={handleReceiversUpdate}
+              currentUser={users.find(user => user.isCurrentUser)}
+              receivers={receiversList}
+              onReply={handleReply}
+              title={title}
+              createdAt={notification.tbCreated}
+              notificationCategoryId={notification.notificationCategoryId}
+              notificationCategoryName={notification.notificationCategoryName}
+              hexColor={notification.hexColor}
+              hasLeftChat={hasLeftChat}
+              // Force attachments sidebar open at start
+              initialSidebarOpen={true}
+              selectedMessageId={selectedMessageId}
+              onEditMessage={handleEditMessage}
+              onViewVersionHistory={handleViewVersionHistory}
+              onReactionSelect={handleReactionSelect}
+              // Nuove props per ChatBottomBar
+              replyToMessage={replyToMessage}
+              setReplyToMessage={setReplyToMessage}
+              setSending={setSending}
+              onSend={handleSend}
+              responseOptions={responseOptions}
+              uploadNotificationAttachment={uploadNotificationAttachment}
+              captureAndUploadPhoto={captureAndUploadPhoto}
+              isNewMessage={isNewMessage}
+              isClosed={isClosed}
+              closingUser_Name={closingUser_Name}
+              closingDate={closingDate}
+              reopenChat={async () => {
+                const res = await reopenChat(notification.notificationId);
+                if (res) {
+                  onRequestClose();
+                  swal.fire({
+                    text: 'Chat riaperta con successo',
+                    icon: 'success',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 1500,
+                    timerProgressBar: true
+                  });
+                }
+              }}
+              closeChat={async () => {
+                const res = await closeChat(notification.notificationId);
+                if (res) {
+                  onRequestClose();
+                  swal.fire({
+                    text: 'Chat chiusa con successo',
+                    icon: 'success',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 1500,
+                    timerProgressBar: true
+                  });
+                }
+              }}
+            />
+          </div>
+          
+          {/* Rimuoviamo il rendering diretto di ChatBottomBar, ora viene gestito in ChatLayout */}
+          
+          {/* Edit Message Modal */}
+          <EditMessageModal 
+            isOpen={showEditModal}
+            onClose={() => setShowEditModal(false)}
+            message={messageToEdit}
+            users={users || []} 
+            messages={parsedMessages}
+            onMessageUpdated={(updatedNotificationId) => {
+              const idToUpdate = updatedNotificationId || notificationId;
+              if (idToUpdate) {
+                fetchNotificationById(idToUpdate)
+                  .then(result => {
+                    console.log("Notification updated successfully:", result);
+                    
+                    // Emit event to update other components
+                    document.dispatchEvent(new CustomEvent('message-updated', { 
+                      detail: { 
+                        notificationId: idToUpdate,
+                        messageId: messageToEdit?.messageId
+                      } 
+                    }));
+                  })
+                  .catch(error => {
+                    console.error("Error updating notification:", error);
+                  });
+              }
+            }}
+          />
+          
+          {/* Version History Modal */}
+          <VersionHistoryModal
+            isOpen={showVersionHistory}
+            onClose={() => setShowVersionHistory(false)}
+            versionData={selectedMessageVersions}
+            loadingVersions={loadingVersions}
+          />
         </div>
       ) : (
         <div className="flex items-center justify-between p-2 bg-gray-100 rounded-t-lg cursor-pointer" onClick={handleRestore}>

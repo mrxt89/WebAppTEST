@@ -1,7 +1,11 @@
 // src/redux/features/notifications/notificationsHooks.js
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { swal } from '../../../lib/common';
+import axios from 'axios';
+import { config } from '../../../config';
+
+// Importa le azioni e i selettori dal notificationsSlice
 import {
   fetchNotifications,
   fetchNotificationById,
@@ -34,9 +38,15 @@ import {
   selectLoadingHighlights,
   selectAttachmentsLoading,
   selectNotificationAttachments,
+  // Nuovi selettori e azioni per chat in finestre separate
+  selectStandaloneChats,
+  registerStandaloneChat,
+  unregisterStandaloneChat,
+  initializeStandaloneChats,
+  cleanupStandaloneChats
 } from './notificationsSlice';
 
-// Import additional actions
+// Importa azioni worker e altre azioni
 import {
   initializeNotificationsWorker,
   reloadNotifications,
@@ -49,11 +59,71 @@ import {
   sendNotificationWithAttachments
 } from './notificationsActions';
 
+// Importa funzionalità da messageReactionsSlice
+import {
+  fetchMessageReactions,
+  loadMessageReactions,
+  toggleMessageReaction,
+  removeMessageReaction,
+  selectMessageReactions,
+  selectReactionsLoading
+} from './messageReactionsSlice';
+
+// Importa funzionalità da messageManagementSlice
+import {
+  editMessage,
+  getMessageVersionHistory,
+  deleteMessage,
+  setMessageColor,
+  clearMessageColor,
+  filterMessages,
+  selectVersionHistory,
+  selectFilteredMessages,
+  selectMessageManagementLoading
+} from './messageManagementSlice';
+
+// Importa funzionalità da pollsSlice
+import {
+  createPoll,
+  votePoll,
+  getPoll,
+  getNotificationPolls,
+  closePoll,
+  selectPoll,
+  selectNotificationPolls,
+  selectMessagePoll,
+  selectPollsLoading
+} from './pollsSlice';
+
+// Importa funzionalità da highlightsSlice
+import {
+  fetchHighlights as fetchHighlightsAction,
+  addHighlight,
+  removeHighlight,
+  generateHighlights,
+  selectHighlights as selectHighlightsData,
+  selectHighlightsLoading as selectHighlightsDataLoading
+} from './highlightsSlice';
+
+// Importa funzionalità da documentLinksSlice
+import {
+  getLinkedDocuments,
+  searchDocuments,
+  linkDocument,
+  unlinkDocument,
+  searchChatsByDocument,
+  openChatInReadOnlyMode,
+  selectLinkedDocuments,
+  selectDocumentSearchResults,
+  selectChatsByDocument,
+  selectDocumentLinksLoading
+} from './documentLinksSlice';
+
 // Hook to provide all notification-related state and actions
 export const useNotifications = () => {
   const dispatch = useDispatch();
   
-  // Selectors
+  // Selectors from notificationsSlice
   const notifications = useSelector(selectNotifications);
   const unreadCount = useSelector(selectUnreadCount);
   const loading = useSelector(selectLoading);
@@ -66,10 +136,28 @@ export const useNotifications = () => {
   const loadingHighlights = useSelector(selectLoadingHighlights);
   const attachmentsLoading = useSelector(selectAttachmentsLoading);
   const notificationAttachments = useSelector(selectNotificationAttachments);
+  const standaloneChats = useSelector(selectStandaloneChats);
+  
+  // Selectors from new slices
+  const reactionsLoading = useSelector(selectReactionsLoading);
+  const messageManagementLoading = useSelector(selectMessageManagementLoading);
+  const pollsLoading = useSelector(selectPollsLoading);
+  const highlightsDataLoading = useSelector(selectHighlightsDataLoading);
+  const documentLinksLoading = useSelector(selectDocumentLinksLoading);
+  
+  // Stato locale per tracciare l'ultima volta che è stato eseguito un aggiornamento
+  const [lastUpdateTime, setLastUpdateTime] = useState(0);
+  // Ref per tenere traccia delle operazioni in corso
+  const pendingUpdatesRef = useRef(new Set());
+
+  // Inizializza lo stato delle chat in finestre separate
+  useEffect(() => {
+    dispatch(initializeStandaloneChats());
+  }, [dispatch]);
 
   // Worker management
-  const initializeWorker = useCallback(() => {
-    dispatch(initializeNotificationsWorker());
+  const initializeWorker = useCallback((forceInit = false) => {
+    dispatch(initializeNotificationsWorker(forceInit ? { forceWorkerInit: true } : undefined));
   }, [dispatch]);
 
   const restartNotificationWorker = useCallback((highPriority = false) => {
@@ -81,16 +169,78 @@ export const useNotifications = () => {
   
   // Basic notification actions
   const loadNotifications = useCallback(() => {
-    dispatch(fetchNotifications());
-  }, [dispatch]);
+    const now = Date.now();
+    // Evita aggiornamenti troppo frequenti (throttling)
+    if (now - lastUpdateTime < 2000 && pendingUpdatesRef.current.has('load')) {
+      console.log('Skipping loadNotifications due to throttling');
+      return Promise.resolve(null);
+    }
+    
+    pendingUpdatesRef.current.add('load');
+    setLastUpdateTime(now);
+    
+    return dispatch(fetchNotifications())
+      .finally(() => {
+        pendingUpdatesRef.current.delete('load');
+      });
+  }, [dispatch, lastUpdateTime]);
 
   const getNotificationById = useCallback((notificationId) => {
-    return dispatch(fetchNotificationById(notificationId)).unwrap();
-  }, [dispatch]);
+    const now = Date.now();
+    const key = `fetch_${notificationId}`;
+    
+    // Evita aggiornamenti troppo frequenti per lo stesso ID
+    if (now - lastUpdateTime < 1000 && pendingUpdatesRef.current.has(key)) {
+      console.log(`Skipping fetchNotificationById(${notificationId}) due to throttling`);
+      return Promise.resolve(null);
+    }
+    
+    pendingUpdatesRef.current.add(key);
+    setLastUpdateTime(now);
+    
+    return dispatch(fetchNotificationById(notificationId))
+      .unwrap()
+      .finally(() => {
+        pendingUpdatesRef.current.delete(key);
+      });
+  }, [dispatch, lastUpdateTime]);
 
   const DBNotificationsView = useCallback(() => {
     return dispatch(createDBNotificationsView()).unwrap();
   }, [dispatch]);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No token available');
+      
+      const response = await axios.get(`${config.API_BASE_URL}/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      throw error;
+    }
+  }, []);
+
+  const fetchResponseOptions = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No token available');
+      
+      // According to backend routes, this is the endpoint for notification categories
+      const response = await axios.get(`${config.API_BASE_URL}/notification-response-options`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching response options:', error);
+      throw error;
+    }
+  }, []);
 
   const handleSendNotification = useCallback((notificationData, isNewMessage = false) => {
     return dispatch(sendNotification(notificationData))
@@ -235,40 +385,40 @@ export const useNotifications = () => {
       });
   }, [dispatch]);
 
-const forceLoadNotifications = useCallback(() => {
-  console.log('Forzando il caricamento diretto delle notifiche...');
-  
-  // Usa setTimeout per evitare problemi con la chiamata durante un reducer
-  setTimeout(() => {
-    dispatch(fetchNotifications())
-      .then(result => {
-        console.log('Caricamento forzato completato, ricevute:', 
-          result?.payload ? result.payload.length : 0, 'notifiche');
-        
-        // Configura l'event listener per i nuovi messaggi in un altro setTimeout
-        // per assicurarsi che nessun reducer sia in esecuzione
-        setTimeout(() => {
-          const handleNewMessage = (event) => {
-            const { notificationId } = event.detail || {};
-            if (notificationId) {
-              console.log('Nuovo messaggio ricevuto, aggiornamento forzato per:', notificationId);
-              dispatch(fetchNotificationById(notificationId));
-            }
-          };
+  const forceLoadNotifications = useCallback(() => {
+    console.log('Forzando il caricamento diretto delle notifiche...');
+    
+    // Usa setTimeout per evitare problemi con la chiamata durante un reducer
+    setTimeout(() => {
+      dispatch(fetchNotifications())
+        .then(result => {
+          console.log('Caricamento forzato completato, ricevute:', 
+            result?.payload ? result.payload.length : 0, 'notifiche');
           
-          // Rimuovi prima listener esistenti per evitare duplicati
-          document.removeEventListener('new-message-received', handleNewMessage);
-          document.addEventListener('new-message-received', handleNewMessage);
-        }, 0);
-      })
-      .catch(error => {
-        console.error('Errore nel caricamento forzato:', error);
-      });
-  }, 0);
-  
-  // Restituisci una promise già risolta per compatibilità
-  return Promise.resolve(null);
-}, [dispatch]);
+          // Configura l'event listener per i nuovi messaggi in un altro setTimeout
+          // per assicurarsi che nessun reducer sia in esecuzione
+          setTimeout(() => {
+            const handleNewMessage = (event) => {
+              const { notificationId } = event.detail || {};
+              if (notificationId) {
+                console.log('Nuovo messaggio ricevuto, aggiornamento forzato per:', notificationId);
+                dispatch(fetchNotificationById(notificationId));
+              }
+            };
+            
+            // Rimuovi prima listener esistenti per evitare duplicati
+            document.removeEventListener('new-message-received', handleNewMessage);
+            document.addEventListener('new-message-received', handleNewMessage);
+          }, 0);
+        })
+        .catch(error => {
+          console.error('Errore nel caricamento forzato:', error);
+        });
+    }, 0);
+    
+    // Restituisci una promise già risolta per compatibilità
+    return Promise.resolve(null);
+  }, [dispatch]);
 
   const handleUpdateChatTitle = useCallback(async (notificationId, newTitle) => {
     try {
@@ -350,8 +500,341 @@ const forceLoadNotifications = useCallback(() => {
   }, [dispatch]);
 
   const handleReloadNotifications = useCallback((highPriority = false) => {
-  return dispatch(reloadNotifications(highPriority));
-}, [dispatch]);
+    return dispatch(reloadNotifications(highPriority));
+  }, [dispatch]);
+
+  // Gestione chat in finestre separate
+  const handleRegisterStandaloneChat = useCallback((notificationId) => {
+    dispatch(registerStandaloneChat(notificationId));
+  }, [dispatch]);
+  
+  const handleUnregisterStandaloneChat = useCallback((notificationId) => {
+    dispatch(unregisterStandaloneChat(notificationId));
+  }, [dispatch]);
+  
+  const isStandaloneChat = useCallback((notificationId) => {
+    return standaloneChats.has(parseInt(notificationId));
+  }, [standaloneChats]);
+  
+  // Funzione per aprire una chat in una finestra separata
+  const openChatInNewWindow = useCallback((notificationId, title, onSuccess = null) => {
+    if (!notificationId) {
+      console.error('openChatInNewWindow: notificationId mancante');
+      return false;
+    }
+    
+    try {
+      console.log(`Apertura chat ${notificationId} in finestra separata`);
+      
+      // Verifica se la chat è già aperta in una finestra separata
+      if (isStandaloneChat(notificationId)) {
+        console.log(`Chat ${notificationId} già aperta in finestra separata, tentativo di focus`);
+        
+        // Tenta di trovare e attivare la finestra esistente
+        const windowName = `chat_${notificationId}`;
+        const existingWindow = window.open('', windowName);
+        
+        if (existingWindow && !existingWindow.closed && existingWindow.location.href !== 'about:blank') {
+          existingWindow.focus();
+          
+          // Se abbiamo una callback di successo, chiamala per chiudere il modale
+          if (onSuccess && typeof onSuccess === 'function') {
+            onSuccess();
+          }
+          
+          return true;
+        }
+        
+        console.log(`Finestra esistente non trovata, registrazione nuova finestra`);
+      }
+      
+      // Registra la chat come aperta in finestra separata prima di aprirla
+      // Questo evita race condition se l'apertura è lenta
+      dispatch(registerStandaloneChat(notificationId));
+      
+      // Prepara URL e dimensioni ottimali
+      const url = `/standalone-chat/${notificationId}`;
+      
+      // Dimensiona la finestra in modo ottimale
+      const width = Math.min(window.innerWidth * 0.8, 1200);
+      const height = Math.min(window.innerHeight * 0.8, 800);
+      
+      // Centra la finestra rispetto alla finestra principale
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      // Configura il nome e parametri finestra
+      const windowName = `chat_${notificationId}`;
+      const windowFeatures = [
+        `width=${Math.floor(width)}`,
+        `height=${Math.floor(height)}`,
+        `left=${Math.floor(left)}`,
+        `top=${Math.floor(top)}`,
+        'resizable=yes',
+        'scrollbars=yes',
+        'status=yes',
+        'location=yes',
+        'toolbar=no',
+        'menubar=no'
+      ].join(',');
+      
+      // Apri la nuova finestra
+      const newWindow = window.open(url, windowName, windowFeatures);
+      
+      // Controlla se la finestra è stata bloccata dal browser
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        console.error('Apertura finestra bloccata dal browser');
+        
+        // Rimuovi la registrazione se la finestra non può essere aperta
+        dispatch(unregisterStandaloneChat(notificationId));
+        
+        // Notifica all'utente
+        swal.fire({
+          icon: 'warning',
+          title: 'Popup bloccato',
+          text: 'Il browser ha bloccato l\'apertura della nuova finestra. Abilita i popup per questo sito.'
+        });
+        return false;
+      }
+      
+      // Se l'apertura ha avuto successo e abbiamo una callback, chiamala (per chiudere il modale)
+      if (onSuccess && typeof onSuccess === 'function') {
+        onSuccess();
+      }
+      
+      // Registra un evento di chiusura nella finestra principale
+      // per ripulire quando la finestra viene chiusa esternamente
+      const checkWindowInterval = setInterval(() => {
+        if (newWindow.closed) {
+          console.log(`Finestra per chat ${notificationId} chiusa esternamente`);
+          clearInterval(checkWindowInterval);
+          dispatch(unregisterStandaloneChat(notificationId));
+        }
+      }, 5000);
+      
+      // Prova a impostare il focus sulla nuova finestra dopo un breve ritardo
+      setTimeout(() => {
+        if (newWindow && !newWindow.closed) {
+          try {
+            newWindow.focus();
+          } catch (e) {
+            console.warn('Errore durante il focus della finestra:', e);
+          }
+        }
+      }, 300);
+      
+      console.log(`Finestra standalone aperta con successo per chat ${notificationId}`);
+      return true;
+    } catch (error) {
+      console.error('Errore durante l\'apertura della finestra standalone:', error);
+      
+      // Ripulisci la registrazione in caso di errore
+      try {
+        dispatch(unregisterStandaloneChat(notificationId));
+      } catch (e) {
+        console.error('Errore durante la pulizia:', e);
+      }
+      
+      return false;
+    }
+  }, [dispatch, isStandaloneChat]);
+  
+  // Funzione per verificare se una finestra separata è ancora aperta
+  const isWindowStillOpen = useCallback((notificationId) => {
+    if (!isStandaloneChat(notificationId)) {
+      return false;
+    }
+    
+    try {
+      const windowName = `chat_${notificationId}`;
+      const win = window.open('', windowName);
+      
+      // Controlli migliorati per determinare se la finestra è effettivamente aperta
+      const isWindowOpen = win && 
+                         !win.closed && 
+                         win.location.href !== 'about:blank' &&
+                         win.location.href.includes('standalone-chat');
+      
+      // Se la finestra non è più disponibile, annulla la registrazione
+      if (!isWindowOpen) {
+        dispatch(unregisterStandaloneChat(notificationId));
+        return false;
+      }
+      
+      // Chiudi il riferimento e ritorna true
+      try {
+        win.focus();
+      } catch (e) {
+        console.warn('Errore durante focus:', e);
+        // Continua comunque, perché la finestra potrebbe essere comunque aperta
+      }
+      
+      return true;
+    } catch (e) {
+      // In caso di errore (ad es. per cross-origin), assumiamo che la finestra sia chiusa
+      console.error('Errore durante verifica finestra:', e);
+      dispatch(unregisterStandaloneChat(notificationId));
+      return false;
+    }
+  }, [dispatch, isStandaloneChat]);
+  
+  // Funzione per verificare e pulire le chat in finestre separate non più attive
+  const cleanupStandaloneWindows = useCallback(() => {
+    const toRemove = [];
+    
+    // Converti il Set in array
+    const chats = Array.from(standaloneChats);
+    
+    for (const id of chats) {
+      // Per ogni ID, verifica se la finestra è ancora aperta
+      try {
+        const windowName = `chat_${id}`;
+        const win = window.open('', windowName);
+        
+        // Controlli più dettagliati
+        if (!win || 
+            win.closed || 
+            win.location.href === 'about:blank' ||
+            !win.location.href.includes('standalone-chat')) {
+          
+          console.log(`Window for chat ${id} is no longer available, scheduling cleanup`);
+          toRemove.push(id);
+        } else {
+          // Finestra ancora aperta, chiudi solo il riferimento
+          console.log(`Window for chat ${id} is still open`);
+        }
+      } catch (e) {
+        console.error(`Error checking window for chat ${id}:`, e);
+        toRemove.push(id);
+      }
+    }
+    
+    // Esegui pulizia se necessario
+    if (toRemove.length > 0) {
+      console.log(`Cleaning up ${toRemove.length} standalone windows:`, toRemove);
+      dispatch(cleanupStandaloneChats(toRemove));
+    }
+    
+    return toRemove.length;
+  }, [dispatch, standaloneChats]);
+  
+  // Nuove funzioni per le reazioni ai messaggi
+  const getMessageReactions = useCallback((messageId) => {
+    return dispatch(fetchMessageReactions(messageId)).unwrap();
+  }, [dispatch]);
+  
+  const loadBatchMessageReactions = useCallback((messageIds) => {
+    return dispatch(loadMessageReactions(messageIds)).unwrap();
+  }, [dispatch]);
+  
+  const handleToggleMessageReaction = useCallback((messageId, reactionType) => {
+    return dispatch(toggleMessageReaction({ messageId, reactionType })).unwrap();
+  }, [dispatch]);
+  
+  const handleRemoveMessageReaction = useCallback((reactionId) => {
+    return dispatch(removeMessageReaction(reactionId)).unwrap();
+  }, [dispatch]);
+  
+  // Nuove funzioni per la gestione dei messaggi
+  const handleEditMessage = useCallback((messageId, newMessage) => {
+    return dispatch(editMessage({ messageId, newMessage })).unwrap();
+  }, [dispatch]);
+  
+  const handleGetMessageVersionHistory = useCallback((messageId) => {
+    return dispatch(getMessageVersionHistory(messageId)).unwrap();
+  }, [dispatch]);
+  
+  const handleDeleteMessage = useCallback((messageId) => {
+    return dispatch(deleteMessage(messageId)).unwrap();
+  }, [dispatch]);
+  
+  const handleSetMessageColor = useCallback((messageId, color) => {
+    return dispatch(setMessageColor({ messageId, color })).unwrap();
+  }, [dispatch]);
+  
+  const handleClearMessageColor = useCallback((messageId) => {
+    return dispatch(clearMessageColor(messageId)).unwrap();
+  }, [dispatch]);
+  
+  const handleFilterMessages = useCallback((notificationId, filter) => {
+    return dispatch(filterMessages({ notificationId, ...filter })).unwrap();
+  }, [dispatch]);
+  
+  // Nuove funzioni per i sondaggi
+  const handleCreatePoll = useCallback((pollData) => {
+    return dispatch(createPoll(pollData)).unwrap();
+  }, [dispatch]);
+  
+  const handleVotePoll = useCallback((optionId) => {
+    return dispatch(votePoll(optionId)).unwrap();
+  }, [dispatch]);
+  
+  const handleGetPoll = useCallback((pollId) => {
+    return dispatch(getPoll(pollId)).unwrap();
+  }, [dispatch]);
+  
+  const handleGetNotificationPolls = useCallback((notificationId) => {
+    return dispatch(getNotificationPolls(notificationId)).unwrap();
+  }, [dispatch]);
+  
+  const handleClosePoll = useCallback((pollId) => {
+    return dispatch(closePoll(pollId)).unwrap();
+  }, [dispatch]);
+  
+  // Nuove funzioni per punti importanti
+  const handleFetchHighlights = useCallback((notificationId) => {
+    return dispatch(fetchHighlightsAction(notificationId)).unwrap();
+  }, [dispatch]);
+  
+  const handleAddHighlight = useCallback((notificationId, highlightText, isAutoGenerated = false) => {
+    return dispatch(addHighlight({ notificationId, highlightText, isAutoGenerated })).unwrap();
+  }, [dispatch]);
+  
+  const handleRemoveHighlight = useCallback((highlightId, notificationId) => {
+    return dispatch(removeHighlight({ highlightId, notificationId })).unwrap();
+  }, [dispatch]);
+  
+  const handleGenerateHighlights = useCallback((notificationId) => {
+    return dispatch(generateHighlights(notificationId)).unwrap();
+  }, [dispatch]);
+  
+  // Nuove funzioni per collegamenti ai documenti
+  const handleGetLinkedDocuments = useCallback((notificationId) => {
+    return dispatch(getLinkedDocuments(notificationId)).unwrap();
+  }, [dispatch]);
+  
+  const handleSearchDocuments = useCallback((searchQuery) => {
+    return dispatch(searchDocuments(searchQuery)).unwrap();
+  }, [dispatch]);
+  
+  const handleLinkDocument = useCallback((notificationId, documentId) => {
+    return dispatch(linkDocument({ notificationId, documentId })).unwrap();
+  }, [dispatch]);
+  
+  const handleUnlinkDocument = useCallback((notificationId, documentId) => {
+    return dispatch(unlinkDocument({ notificationId, documentId })).unwrap();
+  }, [dispatch]);
+  
+  const handleSearchChatsByDocument = useCallback((searchType, searchValue) => {
+    return dispatch(searchChatsByDocument({ searchType, searchValue })).unwrap();
+  }, [dispatch]);
+  
+  const handleOpenChatInReadOnlyMode = useCallback((notificationId) => {
+    return dispatch(openChatInReadOnlyMode(notificationId)).unwrap();
+  }, [dispatch]);
+  
+  // Pulizia automatica delle finestre non più attive
+  useEffect(() => {
+    // Esegui pulizia all'avvio
+    cleanupStandaloneWindows();
+    
+    // Esegui pulizia periodica ogni 30 secondi
+    const interval = setInterval(() => {
+      cleanupStandaloneWindows();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [cleanupStandaloneWindows]);
 
   return {
     // State
@@ -367,6 +850,7 @@ const forceLoadNotifications = useCallback(() => {
     loadingHighlights,
     attachmentsLoading,
     notificationAttachments,
+    standaloneChats: Array.from(standaloneChats), // Convert Set to Array
     
     // Worker management
     initializeWorker,
@@ -379,6 +863,9 @@ const forceLoadNotifications = useCallback(() => {
     fetchNotificationById: getNotificationById,
     DBNotificationsView,
     sendNotification: handleSendNotification,
+    fetchUsers,
+    fetchResponseOptions,
+    
     
     // Message and notification status changes
     toggleReadUnread: handleToggleReadUnread,
@@ -412,14 +899,50 @@ const forceLoadNotifications = useCallback(() => {
     
     // Utility functions
     isNotificationMuted,
+    
+    // Standalone chat management
+    registerStandaloneChat: handleRegisterStandaloneChat,
+    unregisterStandaloneChat: handleUnregisterStandaloneChat,
+    isStandaloneChat,
+    openChatInNewWindow,
+    isWindowStillOpen,
+    cleanupStandaloneWindows,
+    
+    // Message reactions (new)
+    getMessageReactions,
+    loadMessageReactions: loadBatchMessageReactions,
+    toggleMessageReaction: handleToggleMessageReaction,
+    removeMessageReaction: handleRemoveMessageReaction,
+    
+    // Message management (new)
+    editMessage: handleEditMessage,
+    getMessageVersionHistory: handleGetMessageVersionHistory,
+    deleteMessage: handleDeleteMessage,
+    setMessageColor: handleSetMessageColor,
+    clearMessageColor: handleClearMessageColor,
+    filterMessages: handleFilterMessages,
+    
+    // Polls (new)
+    createPoll: handleCreatePoll,
+    votePoll: handleVotePoll,
+    getPoll: handleGetPoll,
+    getNotificationPolls: handleGetNotificationPolls,
+    closePoll: handleClosePoll,
+    
+    // Highlights (new)
+    fetchHighlights: handleFetchHighlights,
+    addHighlight: handleAddHighlight,
+    removeHighlight: handleRemoveHighlight,
+    generateHighlights: handleGenerateHighlights,
+    
+    // Document links (new)
+    getLinkedDocuments: handleGetLinkedDocuments,
+    searchDocuments: handleSearchDocuments,
+    linkDocument: handleLinkDocument,
+    unlinkDocument: handleUnlinkDocument,
+    searchChatsByDocument: handleSearchChatsByDocument,
+    openChatInReadOnlyMode: handleOpenChatInReadOnlyMode,
   };
-};
-
-// Adding a simple dummy NotificationProvider export to fix the import error
-// This doesn't actually provide any functionality but will make the import work
-export const NotificationProvider = ({ children }) => {
-  // In a real implementation, we would create a context provider here
-  return children;
 };
 
 export default useNotifications;

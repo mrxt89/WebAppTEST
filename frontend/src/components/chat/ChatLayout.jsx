@@ -4,6 +4,7 @@ import ModernChatList from './ModernChatList';
 import { motion, AnimatePresence } from "framer-motion";
 import FileViewer from '../ui/fileViewer';
 import ChatSidebar from "./ChatSidebar";
+import ChatBottomBar from "./ChatBottomBar"; // Aggiungi import per ChatBottomBar
 
 const ChatLayout = ({
   messages,
@@ -25,7 +26,17 @@ const ChatLayout = ({
   hexColor,
   hasLeftChat,
   initialSidebarOpen = true, // Nuovo parametro per decidere se aprire inizialmente la sidebar
-  selectedMessageId = null // Nuovo parametro per evidenziare un messaggio specifico
+  selectedMessageId = null, // Nuovo parametro per evidenziare un messaggio specifico
+  onEditMessage,
+  onViewVersionHistory,
+  onReactionSelect,
+  replyToMessage,      // Aggiungi per ricevere replyToMessage
+  setReplyToMessage,   // Aggiungi per ricevere setReplyToMessage
+  setSending,          // Aggiungi per ricevere setSending
+  onSend,              // Aggiungi per ricevere onSend
+  responseOptions,     // Aggiungi per ricevere responseOptions
+  uploadNotificationAttachment, // Aggiungi per l'upload di allegati
+  captureAndUploadPhoto // Aggiungi per la cattura foto
 }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
@@ -154,25 +165,58 @@ const ChatLayout = ({
   
       {/* Main chat area */}
       <div 
-        className={`flex-1 transition-all ${isSidebarOpen && !isMobile && !hasLeftChat ? 'ml-4' : ''}`}
+        className={`flex-1 transition-all ${isSidebarOpen && !isMobile && !hasLeftChat ? 'ml-4' : ''} flex flex-col`}
         style={{ 
           marginLeft: isSidebarOpen && !hasLeftChat ? (isMobile ? '0' : '') : '0',
           transition: 'margin-left 0.3s ease-in-out'
         }}
       >
-        <ModernChatList
-          messages={messages}
-          chatListRef={chatListRef}
-          sending={sending}
-          notificationId={notificationId}
-          isReadByUser={isReadByUser}
-          markMessageAsRead={markMessageAsRead}
-          onReply={onReply}
-          onMessageSelect={handleMessageSelect}
-          categoryColor={hexColor}
-          hasLeftChat={hasLeftChat}
-          selectedMessageId={selectedMessageId}
-        />
+        <div className="flex-1 overflow-hidden">
+          <ModernChatList
+            messages={messages}
+            chatListRef={chatListRef}
+            sending={sending}
+            notificationId={notificationId}
+            isReadByUser={isReadByUser}
+            markMessageAsRead={markMessageAsRead}
+            onReply={onReply}
+            onMessageSelect={handleMessageSelect}
+            categoryColor={hexColor}
+            hasLeftChat={hasLeftChat}
+            selectedMessageId={selectedMessageId}
+            onEditMessage={onEditMessage}
+            onViewVersionHistory={onViewVersionHistory}
+            onReactionSelect={onReactionSelect}
+            users={users} // Assicuriamoci di passare gli utenti
+          />
+        </div>
+        
+        {/* Aggiungiamo ChatBottomBar qui, passando tutte le props necessarie */}
+        <div style={{ height: hasLeftChat ? 'auto' : '100px' }}>
+          {hasLeftChat ? (
+            <div className="p-4 bg-gray-50 border-t border-gray-200 text-center text-gray-500">
+              <p>Hai abbandonato questa chat il {new Date().toLocaleDateString()} e non puoi più inviare messaggi.</p>
+            </div>
+          ) : (
+            <ChatBottomBar
+              notificationId={notificationId}
+              title={title}
+              notificationCategoryId={notificationCategoryId}
+              hexColor={hexColor}
+              disabled={hasLeftChat}
+              setSending={setSending}
+              onSend={onSend}
+              replyToMessage={replyToMessage}
+              setReplyToMessage={setReplyToMessage}
+              users={users} 
+              responseOptions={responseOptions} 
+              receiversList={receivers}
+              updateReceiversList={updateReceiversList}
+              uploadNotificationAttachment={uploadNotificationAttachment}
+              captureAndUploadPhoto={captureAndUploadPhoto}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,16 +1,29 @@
 // hooks/useWindowManager.js
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+/**
+ * Custom hook for managing windows in the application.
+ * Handles positioning, sizing, z-index, minimizing, and maximizing windows.
+ * 
+ * @param {string} chatPrefix - Optional prefix for window IDs
+ * @returns {Object} Window management methods and state
+ */
 export default function useWindowManager(chatPrefix = 'chat-window-') {
   // Window states storage
   const [windowStates, setWindowStates] = useState({});
   const [zIndexOrder, setZIndexOrder] = useState([]);
   const [activeWindowId, setActiveWindowId] = useState(null);
+  
+  // Refs for optimization
+  const windowStatesRef = useRef({});
+  const maxZIndexRef = useRef(1000);
   const snapDistance = 15; // px within which windows will snap
   
-  // Ref per tenere traccia del massimo z-index attuale
-  const currentMaxZIndexRef = useRef(1000);
-  
+  // Update ref whenever state changes to avoid stale closures
+  useEffect(() => {
+    windowStatesRef.current = windowStates;
+  }, [windowStates]);
+
   // Load saved window states from localStorage
   useEffect(() => {
     try {
@@ -18,11 +31,12 @@ export default function useWindowManager(chatPrefix = 'chat-window-') {
       if (savedStates) {
         const parsed = JSON.parse(savedStates);
         setWindowStates(parsed);
+        windowStatesRef.current = parsed;
         
         // Extract and restore z-index order
-        const sortedIds = Object.keys(parsed).sort((a, b) => {
-          return parsed[a].zIndex - parsed[b].zIndex;
-        });
+        const sortedIds = Object.keys(parsed).sort((a, b) => 
+          parsed[a].zIndex - parsed[b].zIndex
+        );
         
         setZIndexOrder(sortedIds);
         
@@ -32,46 +46,60 @@ export default function useWindowManager(chatPrefix = 'chat-window-') {
           setActiveWindowId(activeId);
         }
         
-        // Aggiorna il valore massimo di z-index
+        // Update max z-index value
         const maxZIndex = Object.values(parsed).reduce(
-          (max, window) => Math.max(max, window.zIndex || 1000), 1000
+          (max, window) => Math.max(max, window.zIndex || 1000), 
+          1000
         );
-        currentMaxZIndexRef.current = maxZIndex;
+        maxZIndexRef.current = maxZIndex;
       }
     } catch (error) {
       console.error('Error loading window states:', error);
     }
   }, []);
   
+  // Debounce function
+  const debounce = useCallback((func, wait) => {
+    let timeout;
+    return function(...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
+  }, []);
+  
   // Save window states to localStorage with debounce
-  const saveStateToStorage = useCallback(debounce(() => {
-    try {
-      localStorage.setItem('chat-window-states', JSON.stringify(windowStates));
-      if (activeWindowId) {
-        localStorage.setItem('chat-active-window', activeWindowId);
+  const saveStateToStorage = useCallback(
+    debounce(() => {
+      try {
+        localStorage.setItem('chat-window-states', JSON.stringify(windowStates));
+        if (activeWindowId) {
+          localStorage.setItem('chat-active-window', activeWindowId);
+        }
+      } catch (error) {
+        console.error('Error saving window states:', error);
       }
-    } catch (error) {
-      console.error('Error saving window states:', error);
-    }
-  }, 300), [windowStates, activeWindowId]);
+    }, 300), 
+    [windowStates, activeWindowId]
+  );
   
   // Save when window states change
   useEffect(() => {
     saveStateToStorage();
   }, [windowStates, saveStateToStorage]);
   
-  // Define activateWindow first, so it's available for createWindow
+  /**
+   * Activates a window by bringing it to the front
+   * @param {string|number} id - Window identifier
+   */
   const activateWindow = useCallback((id) => {
-    console.log(`activateWindow chiamato per ${id}`);
-    
-    if (!windowStates[id]) {
-      console.warn(`Impossibile attivare finestra ${id}: non esiste`);
+    if (!windowStatesRef.current[id]) {
+      console.warn(`Cannot activate window ${id}: does not exist`);
       return;
     }
     
-    // Incrementa lo zIndex massimo
-    const newZIndex = currentMaxZIndexRef.current + 1;
-    currentMaxZIndexRef.current = newZIndex;
+    // Increment max z-index
+    const newZIndex = maxZIndexRef.current + 1;
+    maxZIndexRef.current = newZIndex;
     
     setWindowStates(prev => ({
       ...prev,
@@ -83,75 +111,85 @@ export default function useWindowManager(chatPrefix = 'chat-window-') {
     
     setZIndexOrder(prev => [...prev.filter(wId => wId !== id), id]);
     setActiveWindowId(id);
-    
-    console.log(`Finestra ${id} attivata con nuovo z-index: ${newZIndex}`);
-  }, [windowStates]);
+  }, []);
   
-  // Create window state with centered positioning
+  /**
+   * Creates a new window with specified ID and title
+   * @param {string|number} id - Window identifier
+   * @param {string} title - Window title
+   * @param {Object} defaultPos - Optional default position and size
+   * @returns {string|number} The window ID
+   */
   const createWindow = useCallback((id, title, defaultPos = {}) => {
-    console.log(`createWindow chiamato per ${id} con titolo: ${title}`);
-    
-    // Se lo stato esiste già, attiva la finestra e ritorna l'ID
-    if (windowStates[id]) {
-      console.log(`Finestra ${id} già esistente, attivazione...`);
+    // If window already exists, activate it and return
+    if (windowStatesRef.current[id]) {
       activateWindow(id);
       return id;
     }
     
-    // Calcola la posizione centrale più in alto, sotto l'header
+    // Calculate centered position
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const windowWidth = defaultPos.width || 900;
     const windowHeight = defaultPos.height || 700;
     
-    // Posizione predefinita: centrata orizzontalmente, sotto l'header
     const defaultX = defaultPos.x !== undefined ? defaultPos.x : Math.floor((viewportWidth - windowWidth) / 2);
-    const defaultY = defaultPos.y !== undefined ? defaultPos.y : 20; // 20px sotto il top
+    const defaultY = defaultPos.y !== undefined ? defaultPos.y : 20; // 20px from top
     
-    // Incrementa lo zIndex massimo
-    const newZIndex = currentMaxZIndexRef.current + 1;
-    currentMaxZIndexRef.current = newZIndex;
+    // Increment max z-index
+    const newZIndex = maxZIndexRef.current + 1;
+    maxZIndexRef.current = newZIndex;
     
-    // Crea un nuovo stato finestra
-    setWindowStates(prev => ({
-      ...prev,
-      [id]: {
-        id,
-        title,
-        x: defaultX,
-        y: defaultY,
-        width: windowWidth,
-        height: windowHeight,
-        isMaximized: false,
-        isMinimized: false,
-        zIndex: newZIndex,
-        createdAt: Date.now()
-      }
-    }));
+    // Create new window state
+    setWindowStates(prev => {
+      const newState = {
+        ...prev,
+        [id]: {
+          id,
+          title,
+          x: defaultX,
+          y: defaultY,
+          width: windowWidth,
+          height: windowHeight,
+          isMaximized: false,
+          isMinimized: false,
+          zIndex: newZIndex,
+          createdAt: Date.now()
+        }
+      };
+      
+      // Update ref for immediate access
+      windowStatesRef.current = newState;
+      return newState;
+    });
     
-    // Aggiungi all'ordine z-index in cima
+    // Update z-index order
     setZIndexOrder(prev => [...prev.filter(wId => wId !== id), id]);
     setActiveWindowId(id);
     
-    console.log(`Finestra ${id} creata con z-index: ${newZIndex}, posizione: (${defaultX}, ${defaultY})`);
     return id;
-  }, [windowStates, activateWindow]);
+  }, [activateWindow]);
 
-    // Helper function to check for snapping
+  /**
+   * Checks if window position should snap to edges or other windows
+   * @param {string|number} id - Window identifier
+   * @param {number} x - X position
+   * @param {number} y - Y position
+   * @returns {Object} Snapped coordinates
+   */
   const checkForSnapping = useCallback((id, x, y) => {
-    // Validazione iniziale degli input
+    // Input validation
     if (typeof x !== 'number' || isNaN(x) || typeof y !== 'number' || isNaN(y)) {
-      console.warn(`checkForSnapping chiamato con valori non validi: id=${id}, x=${x}, y=${y}`);
-      // Ritorna i valori originali senza snapping
+      console.warn(`Invalid values in checkForSnapping: id=${id}, x=${x}, y=${y}`);
       return { snappedX: x || 0, snappedY: y || 0 };
     }
     
     // Get current window dimensions
-    const currentWindow = windowStates[id];
+    const currentWindow = windowStatesRef.current[id];
     if (!currentWindow) return { snappedX: x, snappedY: y };
     
-    const width = currentWindow.width || 900; // Valore predefinito se width manca
-    const height = currentWindow.height || 700; // Valore predefinito se height manca
+    const width = currentWindow.width || 900;
+    const height = currentWindow.height || 700;
     
     // Get viewport dimensions
     const vpWidth = window.innerWidth;
@@ -161,24 +199,16 @@ export default function useWindowManager(chatPrefix = 'chat-window-') {
     let snappedY = y;
     
     // Snap to screen edges
-    if (Math.abs(x) < snapDistance) {
-      snappedX = 0;
-    }
-    if (Math.abs(x + width - vpWidth) < snapDistance) {
-      snappedX = vpWidth - width;
-    }
-    if (Math.abs(y) < snapDistance) {
-      snappedY = 0;
-    }
-    if (Math.abs(y + height - vpHeight) < snapDistance) {
-      snappedY = vpHeight - height;
-    }
+    if (Math.abs(x) < snapDistance) snappedX = 0;
+    if (Math.abs(x + width - vpWidth) < snapDistance) snappedX = vpWidth - width;
+    if (Math.abs(y) < snapDistance) snappedY = 0;
+    if (Math.abs(y + height - vpHeight) < snapDistance) snappedY = vpHeight - height;
     
     // Snap to other windows
-    Object.entries(windowStates).forEach(([otherId, otherWindow]) => {
+    Object.entries(windowStatesRef.current).forEach(([otherId, otherWindow]) => {
       if (otherId === id) return;
       
-      // Assicurati che otherWindow abbia le proprietà necessarie
+      // Ensure otherWindow has needed properties
       if (!otherWindow || typeof otherWindow.x !== 'number' || 
           typeof otherWindow.y !== 'number' || 
           typeof otherWindow.width !== 'number' || 
@@ -207,54 +237,58 @@ export default function useWindowManager(chatPrefix = 'chat-window-') {
       }
     });
     
-    // Verifica finale di validità
+    // Final validation
     if (isNaN(snappedX) || isNaN(snappedY)) {
-      console.error(`checkForSnapping ha prodotto valori NaN: snappedX=${snappedX}, snappedY=${snappedY}`);
-      // Ritorna i valori originali
+      console.error(`Calculated NaN values in checkForSnapping: snappedX=${snappedX}, snappedY=${snappedY}`);
       return { snappedX: x, snappedY: y };
     }
     
     return { snappedX, snappedY };
-  }, [windowStates, snapDistance]);
+  }, []);
 
-  
-  // Update window position
-const updatePosition = useCallback((id, x, y) => {
-  if (!windowStates[id]) return;
-  
-  // Applica snapping se necessario
-  const { snappedX, snappedY } = checkForSnapping(id, x, y);
-  
-  // Limita il movimento all'interno del viewport
-  const maxX = window.innerWidth - windowStates[id].width;
-  const maxY = window.innerHeight - windowStates[id].height;
-  
-  const boundedX = Math.max(0, Math.min(snappedX, maxX));
-  const boundedY = Math.max(0, Math.min(snappedY, maxY));
-  
-  // Crea una copia dello stato corrente
-  const updatedState = {
-    ...windowStates[id],
-    x: boundedX,
-    y: boundedY,
-    isMaximized: false // Moving a window un-maximizes it
-  };
-  
-  // Aggiorna lo stato con la nuova posizione
-  setWindowStates(prev => ({
-    ...prev,
-    [id]: updatedState
-  }));
-  
-  console.log(`Posizione finestra ${id} aggiornata a: (${boundedX}, ${boundedY})`);
-  
-  return { x: boundedX, y: boundedY }; // Ritorna la posizione effettiva
-}, [windowStates, checkForSnapping]);
-  
+  /**
+   * Updates window position
+   * @param {string|number} id - Window identifier
+   * @param {number} x - New X position
+   * @param {number} y - New Y position
+   * @returns {Object} Updated position
+   */
+  const updatePosition = useCallback((id, x, y) => {
+    if (!windowStatesRef.current[id]) return;
+    
+    // Apply snapping if needed
+    const { snappedX, snappedY } = checkForSnapping(id, x, y);
+    
+    // Limit movement within viewport
+    const currWindow = windowStatesRef.current[id];
+    const maxX = window.innerWidth - currWindow.width;
+    const maxY = window.innerHeight - currWindow.height;
+    
+    const boundedX = Math.max(0, Math.min(snappedX, maxX));
+    const boundedY = Math.max(0, Math.min(snappedY, maxY));
+    
+    // Update state with new position
+    setWindowStates(prev => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        x: boundedX,
+        y: boundedY,
+        isMaximized: false // Moving a window un-maximizes it
+      }
+    }));
+    
+    return { x: boundedX, y: boundedY }; // Return actual position
+  }, [checkForSnapping]);
 
-  // Additional functions for window management
+  /**
+   * Updates window size
+   * @param {string|number} id - Window identifier
+   * @param {number} width - New width
+   * @param {number} height - New height
+   */
   const updateSize = useCallback((id, width, height) => {
-    if (!windowStates[id]) return;
+    if (!windowStatesRef.current[id]) return;
     
     const newWidth = Math.max(width, 300); // Minimum width
     const newHeight = Math.max(height, 400); // Minimum height
@@ -268,33 +302,37 @@ const updatePosition = useCallback((id, x, y) => {
         isMaximized: false // Resizing a window un-maximizes it
       }
     }));
-    
-    console.log(`Dimensioni finestra ${id} aggiornate a: ${newWidth}x${newHeight}`);
-  }, [windowStates]);
+  }, []);
   
+  /**
+   * Toggles window maximized state
+   * @param {string|number} id - Window identifier
+   */
   const toggleMaximize = useCallback((id) => {
-    if (!windowStates[id]) return;
+    if (!windowStatesRef.current[id]) return;
     
-    const newState = !windowStates[id].isMaximized;
+    const newState = !windowStatesRef.current[id].isMaximized;
     
     setWindowStates(prev => ({
       ...prev,
       [id]: {
         ...prev[id],
         isMaximized: newState,
-        isMinimized: false // Un-minimize if was minimized
+        isMinimized: false // Un-minimize if minimized
       }
     }));
     
     activateWindow(id);
-    
-    console.log(`Finestra ${id} ${newState ? 'massimizzata' : 'ripristinata'}`);
-  }, [windowStates, activateWindow]);
+  }, [activateWindow]);
   
+  /**
+   * Toggles window minimized state
+   * @param {string|number} id - Window identifier
+   */
   const toggleMinimize = useCallback((id) => {
-    if (!windowStates[id]) return;
+    if (!windowStatesRef.current[id]) return;
     
-    const newState = !windowStates[id].isMinimized;
+    const newState = !windowStatesRef.current[id].isMinimized;
     
     setWindowStates(prev => ({
       ...prev,
@@ -304,63 +342,73 @@ const updatePosition = useCallback((id, x, y) => {
       }
     }));
     
-    // If minimizing the active window, activate the next top window
+    // If minimizing active window, activate next top window
     if (activeWindowId === id && newState) {
       const newTopWindowId = zIndexOrder[zIndexOrder.length - 2]; // Get second to last
       if (newTopWindowId) {
         setActiveWindowId(newTopWindowId);
       }
     }
-    
-    console.log(`Finestra ${id} ${newState ? 'minimizzata' : 'ripristinata'}`);
-  }, [windowStates, activeWindowId, zIndexOrder]);
+  }, [activeWindowId, zIndexOrder]);
   
+  /**
+   * Closes a window
+   * @param {string|number} id - Window identifier
+   */
   const closeWindow = useCallback((id) => {
-    console.log(`closeWindow chiamato per ${id}`);
-    
-    if (!windowStates[id]) {
-      console.warn(`Impossibile chiudere finestra ${id}: non esiste`);
-      return;
-    }
+    if (!windowStatesRef.current[id]) return;
     
     setWindowStates(prev => {
       const newStates = {...prev};
       delete newStates[id];
+      
+      // Update ref for immediate access
+      windowStatesRef.current = newStates;
       return newStates;
     });
     
     setZIndexOrder(prev => prev.filter(wId => wId !== id));
     
-    // If this was the active window, activate the new top window
+    // If this was active window, activate new top window
     if (activeWindowId === id) {
       const newTopWindowId = zIndexOrder[zIndexOrder.length - 2]; // Get second to last
       setActiveWindowId(newTopWindowId);
     }
-    
-    console.log(`Finestra ${id} chiusa, nuova finestra attiva: ${activeWindowId !== id ? activeWindowId : 'nessuna'}`);
-  }, [windowStates, activeWindowId, zIndexOrder]);
+  }, [activeWindowId, zIndexOrder]);
   
-  // Add the missing getZIndex function
+  /**
+   * Gets z-index for a window
+   * @param {string|number} id - Window identifier
+   * @returns {number} Z-index value
+   */
   const getZIndex = useCallback((id) => {
-    if (!id || !windowStates[id]) return 1000; // Default z-index
-    
-    return windowStates[id].zIndex || 1000;
-  }, [windowStates]);
+    if (!id || !windowStatesRef.current[id]) return 1000; // Default z-index
+    return windowStatesRef.current[id].zIndex || 1000;
+  }, []);
   
-  // Add functions to get minimized and visible windows
+  /**
+   * Gets all minimized windows
+   * @returns {Array} List of minimized windows
+   */
   const getMinimizedWindows = useCallback(() => {
-    return Object.entries(windowStates)
+    return Object.entries(windowStatesRef.current)
       .filter(([_, state]) => state.isMinimized)
       .map(([id, state]) => ({ id, ...state }));
-  }, [windowStates]);
+  }, []);
   
+  /**
+   * Gets all visible (non-minimized) windows
+   * @returns {Array} List of visible windows
+   */
   const getVisibleWindows = useCallback(() => {
-    return Object.entries(windowStates)
+    return Object.entries(windowStatesRef.current)
       .filter(([_, state]) => !state.isMinimized)
       .map(([id, state]) => ({ id, ...state }));
-  }, [windowStates]);
+  }, []);
   
-  // Add window arrangement functions
+  /**
+   * Arranges windows in a grid pattern
+   */
   const arrangeWindowsGrid = useCallback(() => {
     const visibleWindows = getVisibleWindows();
     if (visibleWindows.length === 0) return;
@@ -378,6 +426,7 @@ const updatePosition = useCallback((id, x, y) => {
     const maxHeight = Math.floor(viewportHeight / rows);
     
     // Update each window
+    const updates = {};
     visibleWindows.forEach((window, index) => {
       const row = Math.floor(index / cols);
       const col = index % cols;
@@ -385,22 +434,26 @@ const updatePosition = useCallback((id, x, y) => {
       const x = col * maxWidth;
       const y = row * maxHeight + 60; // Add offset for header
       
-      setWindowStates(prev => ({
-        ...prev,
-        [window.id]: {
-          ...prev[window.id],
-          x,
-          y,
-          width: maxWidth,
-          height: maxHeight,
-          isMaximized: false
-        }
-      }));
+      updates[window.id] = {
+        ...windowStatesRef.current[window.id],
+        x,
+        y,
+        width: maxWidth,
+        height: maxHeight,
+        isMaximized: false
+      };
     });
     
-    console.log(`Disposizione a griglia applicata a ${visibleWindows.length} finestre`);
-  }, [getVisibleWindows, setWindowStates]);
+    // Batch update all windows at once
+    setWindowStates(prev => ({
+      ...prev,
+      ...updates
+    }));
+  }, [getVisibleWindows]);
   
+  /**
+   * Arranges windows horizontally (side by side)
+   */
   const tileWindowsHorizontally = useCallback(() => {
     const visibleWindows = getVisibleWindows();
     if (visibleWindows.length === 0) return;
@@ -411,26 +464,31 @@ const updatePosition = useCallback((id, x, y) => {
     const windowHeight = viewportHeight;
     const windowWidth = Math.floor(viewportWidth / visibleWindows.length);
     
+    // Update all windows at once
+    const updates = {};
     visibleWindows.forEach((window, index) => {
       const x = index * windowWidth;
       const y = 60; // Add offset for header
       
-      setWindowStates(prev => ({
-        ...prev,
-        [window.id]: {
-          ...prev[window.id],
-          x,
-          y,
-          width: windowWidth,
-          height: windowHeight,
-          isMaximized: false
-        }
-      }));
+      updates[window.id] = {
+        ...windowStatesRef.current[window.id],
+        x,
+        y,
+        width: windowWidth,
+        height: windowHeight,
+        isMaximized: false
+      };
     });
     
-    console.log(`Disposizione orizzontale applicata a ${visibleWindows.length} finestre`);
-  }, [getVisibleWindows, setWindowStates]);
+    setWindowStates(prev => ({
+      ...prev,
+      ...updates
+    }));
+  }, [getVisibleWindows]);
   
+  /**
+   * Arranges windows vertically (stacked)
+   */
   const tileWindowsVertically = useCallback(() => {
     const visibleWindows = getVisibleWindows();
     if (visibleWindows.length === 0) return;
@@ -441,26 +499,31 @@ const updatePosition = useCallback((id, x, y) => {
     const windowWidth = viewportWidth;
     const windowHeight = Math.floor(viewportHeight / visibleWindows.length);
     
+    // Update all windows at once
+    const updates = {};
     visibleWindows.forEach((window, index) => {
       const x = 0;
       const y = 60 + (index * windowHeight); // Add offset for header
       
-      setWindowStates(prev => ({
-        ...prev,
-        [window.id]: {
-          ...prev[window.id],
-          x,
-          y,
-          width: windowWidth,
-          height: windowHeight,
-          isMaximized: false
-        }
-      }));
+      updates[window.id] = {
+        ...windowStatesRef.current[window.id],
+        x,
+        y,
+        width: windowWidth,
+        height: windowHeight,
+        isMaximized: false
+      };
     });
     
-    console.log(`Disposizione verticale applicata a ${visibleWindows.length} finestre`);
-  }, [getVisibleWindows, setWindowStates]);
+    setWindowStates(prev => ({
+      ...prev,
+      ...updates
+    }));
+  }, [getVisibleWindows]);
   
+  /**
+   * Arranges windows in a cascading pattern
+   */
   const cascadeWindows = useCallback(() => {
     const visibleWindows = getVisibleWindows();
     if (visibleWindows.length === 0) return;
@@ -470,39 +533,28 @@ const updatePosition = useCallback((id, x, y) => {
     const startY = 80; // Account for header
     
     // Sort windows by z-index order for natural cascade
-    const sortedWindows = [...visibleWindows].sort((a, b) => {
-      return zIndexOrder.indexOf(a.id) - zIndexOrder.indexOf(b.id);
-    });
+    const sortedWindows = [...visibleWindows].sort((a, b) => 
+      zIndexOrder.indexOf(a.id) - zIndexOrder.indexOf(b.id)
+    );
     
+    // Update all windows at once
+    const updates = {};
     sortedWindows.forEach((window, index) => {
-      setWindowStates(prev => ({
-        ...prev,
-        [window.id]: {
-          ...prev[window.id],
-          x: startX + (index * offset),
-          y: startY + (index * offset),
-          width: 600, // Default width
-          height: 500, // Default height
-          isMaximized: false
-        }
-      }));
+      updates[window.id] = {
+        ...windowStatesRef.current[window.id],
+        x: startX + (index * offset),
+        y: startY + (index * offset),
+        width: 600, // Default width
+        height: 500, // Default height
+        isMaximized: false
+      };
     });
     
-    console.log(`Disposizione a cascata applicata a ${visibleWindows.length} finestre`);
-  }, [getVisibleWindows, zIndexOrder, setWindowStates]);
-  
-  // Function for debouncing
-  function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
-  }
+    setWindowStates(prev => ({
+      ...prev,
+      ...updates
+    }));
+  }, [getVisibleWindows, zIndexOrder]);
 
   return {
     windowStates,

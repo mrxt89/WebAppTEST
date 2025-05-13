@@ -900,33 +900,35 @@ const ModernChatList = ({
   };
 
   // Funzione per visualizzare la cronologia delle versioni di un messaggio
-  const handleViewVersionHistory = async (messageId) => {
-    if (hasLeftChat) return;
+const handleViewVersionHistory = async (messageId) => {
+  if (hasLeftChat) return; // Don't allow viewing history if user has left the chat
+
+  try {
+    setLoadingVersions(true);
     
-    try {
-      setLoadingVersions(true);
-      setEditingMessageId(null);
+    const result = await getMessageVersionHistory(messageId);
+    
+    console.log("Version history result:", result);
+    
+    if (result) {
+      // Format the data to match what the component expects
+      setSelectedMessageVersions({
+        currentMessage: result.currentMessage || result,
+        versionHistory: result.versionHistory || []
+      });
       
-      const result = await getMessageVersionHistory(messageId);
-    
-      if (result && result.success) {
-        setSelectedMessageVersions({
-          currentMessage: result.currentMessage,
-          versionHistory: result.versionHistory || []
-        });
-        
-        setShowVersionHistory(true);
-      } else {
-        console.error('Error fetching message versions:', result);
-        swal.fire('Errore', 'Impossibile recuperare la cronologia del messaggio', 'error');
-      }
-    } catch (error) {
-      console.error('Error fetching message versions:', error);
+      setShowVersionHistory(true);
+    } else {
+      console.error('Error fetching message versions:', result);
       swal.fire('Errore', 'Impossibile recuperare la cronologia del messaggio', 'error');
-    } finally {
-      setLoadingVersions(false);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching message versions:', error);
+    swal.fire('Errore', 'Impossibile recuperare la cronologia del messaggio', 'error');
+  } finally {
+    setLoadingVersions(false);
+  }
+};
 
   // Funzione per eliminare un messaggio
   const handleDeleteMessage = async (messageId) => {
@@ -1066,66 +1068,79 @@ const ModernChatList = ({
   };
 
   // Gestione delle reazioni ai messaggi
-  const handleReactionSelect = async (messageId, emoji) => {
-    if (hasLeftChat) return Promise.resolve();
+const handleReactionSelect = async (messageId, emoji) => {
+  if (hasLeftChat) return Promise.resolve(); // No reactions if user left chat
+
+  try {
+    setLoading(true); // Show loading indicator while processing
     
-    try {
-      setLoading(true);
+    // Check if toggleMessageReaction exists before calling it
+    if (!toggleMessageReaction) {
+      console.error('toggleMessageReaction function not available');
+      throw new Error('toggleMessageReaction function not available');
+    }
+    
+    // Get the current message to update locally
+    const currentMessage = localMessages.find(msg => msg.messageId === messageId);
+    if (currentMessage) {
+      const currentReactions = messageReactionsCache[messageId] || [];
       
-      const currentMessage = localMessages.find(msg => msg.messageId === messageId);
-      if (currentMessage) {
-        const currentReactions = messageReactionsCache[messageId] || [];
-        
-        const userHasReaction = currentReactions.some(r => 
-          r.UserID === currentUser?.userId && r.ReactionType === emoji
-        );
-        
-        if (userHasReaction) {
-          setMessageReactionsCache(prev => ({
-            ...prev,
-            [messageId]: (prev[messageId] || []).filter(r => 
-              !(r.UserID === currentUser?.userId && r.ReactionType === emoji)
-            )
-          }));
-        } else {
-          setMessageReactionsCache(prev => ({
-            ...prev,
-            [messageId]: [
-              ...(prev[messageId] || []),
-              {
-                ReactionID: `temp_${Date.now()}`,
-                UserID: currentUser?.userId,
-                ReactionType: emoji,
-                UserName: `${currentUser?.firstName} ${currentUser?.lastName}`
-              }
-            ]
-          }));
-        }
+      const userHasReaction = currentReactions.some(r => 
+        r.UserID === currentUser?.userId && r.ReactionType === emoji
+      );
+      
+      // Update the local cache optimistically
+      if (userHasReaction) {
+        setMessageReactionsCache(prev => ({
+          ...prev,
+          [messageId]: (prev[messageId] || []).filter(r => 
+            !(r.UserID === currentUser?.userId && r.ReactionType === emoji)
+          )
+        }));
+      } else {
+        setMessageReactionsCache(prev => ({
+          ...prev,
+          [messageId]: [
+            ...(prev[messageId] || []),
+            {
+              ReactionID: `temp_${Date.now()}`,
+              UserID: currentUser?.userId,
+              ReactionType: emoji,
+              UserName: `${currentUser?.firstName} ${currentUser?.lastName}`
+            }
+          ]
+        }));
       }
-      
-      await toggleMessageReaction(messageId, emoji);
-      
-      if (notificationId) {
+    }
+    
+    // Toggle the reaction
+    await toggleMessageReaction(messageId, emoji);
+    
+    if (notificationId) {
+      // Fetch updated notification if needed
+      if (fetchNotificationById) {
         await fetchNotificationById(notificationId);
       }
-      
-      const event = new CustomEvent('message-reaction-updated', { 
-        detail: { 
-          messageId: messageId,
-          notificationId: notificationId
-        } 
-      });
-      document.dispatchEvent(event);
-      
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Error toggling reaction:', error);
-      swal.fire('Errore', 'Impossibile aggiungere la reazione', 'error');
-      return Promise.reject(error);
-    } finally {
-      setLoading(false);
     }
-  };
+    
+    // Trigger update event
+    const event = new CustomEvent('message-reaction-updated', { 
+      detail: { 
+        messageId: messageId,
+        notificationId: notificationId
+      } 
+    });
+    document.dispatchEvent(event);
+    
+    return Promise.resolve();
+  } catch (error) {
+    console.error('Error toggling reaction:', error);
+    // Don't show swal here to avoid UI interruption
+    return Promise.reject(error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Funzione per lo scroll manuale al fondo
   const handleScrollToBottom = () => {

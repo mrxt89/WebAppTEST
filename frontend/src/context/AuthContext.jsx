@@ -159,7 +159,10 @@ export const AuthProvider = ({ children }) => {
     return user?.CompanyId || localStorage.getItem('companyId') || null;
   };
 
-  
+  // NUOVA FUNZIONE: Get token per standalone pages
+  const getToken = () => {
+    return localStorage.getItem('token');
+  };
 
   return (
     <AuthContext.Provider value={{ 
@@ -172,7 +175,8 @@ export const AuthProvider = ({ children }) => {
       setIsDBNotificationsViewExecuted,
       loading,
       resetSessionTimeout,
-      getCompanyId // Added new function to get CompanyId
+      getCompanyId, // Added new function to get CompanyId
+      getToken, // Nuova funzione per ottenere il token
     }}>
       {!loading && children}
     </AuthContext.Provider>

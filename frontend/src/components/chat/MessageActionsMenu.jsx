@@ -30,17 +30,24 @@ const MessageActionsMenu = ({
   onDelete,
   canEdit,
   isEdited,
-  hasLeftChat,
+  hasLeftChat = false,
   isCurrentUserMessage,
-  isCancelled = false // Nuovo parametro per messaggi eliminati
+  isCancelled = false
 }) => {
   if (!isOpen) return null;
 
-  // Function to handle reaction addition
+  // Function to handle reaction addition - with defensive check
   const handleAddReaction = (emoji) => {
-    // Call the onAddReaction function if provided and chat isn't left
-    if (onAddReaction && !hasLeftChat) {
-      onAddReaction(emoji);
+    // Only call onAddReaction if it exists and chat isn't left
+    if (typeof onAddReaction === 'function' && !hasLeftChat) {
+      try {
+        onAddReaction(emoji);
+      } catch (error) {
+        console.error('Error handling reaction in MessageActionsMenu:', error);
+        // Optionally show a user-friendly error toast/notification here
+      }
+    } else if (!onAddReaction) {
+      console.warn('onAddReaction function not provided to MessageActionsMenu');
     }
   };
 
@@ -55,7 +62,7 @@ const MessageActionsMenu = ({
     >
       <div className="py-1 px-1"> 
         {/* Non mostrare le reazioni se il messaggio è stato eliminato */}
-        {!hasLeftChat && !isCancelled && (
+        {!hasLeftChat && !isCancelled && typeof onAddReaction === 'function' && (
           <div className="flex flex-col bg-gray-100 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">
             <div className="mb-1 text-xs text-gray-500 font-medium">Reazioni rapide</div>
             <div className="flex flex-wrap gap-1">
@@ -78,7 +85,7 @@ const MessageActionsMenu = ({
         )}
         
         {/* Non mostrare l'opzione di risposta se il messaggio è stato eliminato */}
-        {!hasLeftChat && !isCancelled && (
+        {!hasLeftChat && !isCancelled && typeof onReply === 'function' && (
           <button
             className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
             onClick={onReply}
@@ -89,7 +96,7 @@ const MessageActionsMenu = ({
         )}
         
         {/* Non mostrare l'opzione di colore se il messaggio è stato eliminato */}
-        {!isCancelled && (
+        {!isCancelled && typeof onColorSelect === 'function' && (
           <button
             className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
             onClick={onColorSelect}
@@ -100,7 +107,7 @@ const MessageActionsMenu = ({
         )}
         
         {/* Non mostrare l'opzione di modifica se il messaggio è stato eliminato */}
-        {canEdit && !hasLeftChat && !isCancelled && (
+        {canEdit && !hasLeftChat && !isCancelled && typeof onEdit === 'function' && (
           <button
             className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
             onClick={onEdit}
@@ -111,7 +118,7 @@ const MessageActionsMenu = ({
         )}
         
         {/* Non mostrare l'opzione di eliminazione se il messaggio è già stato eliminato */}
-        {canEdit && !hasLeftChat && !isCancelled && (
+        {canEdit && !hasLeftChat && !isCancelled && typeof onDelete === 'function' && (
           <button
             className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md"
             onClick={onDelete}
@@ -122,7 +129,7 @@ const MessageActionsMenu = ({
         )}
        
         {/* Mostra l'opzione di cronologia versioni SOLO se il messaggio è stato modificato e non è stato eliminato */}
-        {isEdited && !isCancelled && (
+        {isEdited && !isCancelled && typeof onViewHistory === 'function' && (
           <button
             className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
             onClick={onViewHistory}

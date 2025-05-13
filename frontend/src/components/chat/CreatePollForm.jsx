@@ -1,4 +1,5 @@
-// src/components/chat/CreatePollForm.jsx
+// CreatePollForm.jsx - File COMPLETO
+
 import React, { useState } from 'react';
 import { BarChart, PlusCircle, XCircle, Calendar, AlertTriangle, Check } from 'lucide-react';
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
@@ -18,7 +19,12 @@ const CreatePollForm = ({ notificationId, messageId, onSuccess, onCancel }) => {
     if (options.length < 10) { // Massimo 10 opzioni
       setOptions([...options, '']);
     } else {
-      swal.fire('Limite raggiunto', 'Puoi inserire massimo 10 opzioni', 'warning');
+      swal.fire({
+        title: 'Limite raggiunto', 
+        text: 'Puoi inserire massimo 10 opzioni', 
+        icon: 'warning',
+        zIndex: 9999 // Assicura che il modal appaia sopra tutto
+      });
     }
   };
   
@@ -30,7 +36,12 @@ const CreatePollForm = ({ notificationId, messageId, onSuccess, onCancel }) => {
       newOptions.splice(index, 1);
       setOptions(newOptions);
     } else {
-      swal.fire('Non consentito', 'Il sondaggio deve avere almeno 2 opzioni', 'warning');
+      swal.fire({
+        title: 'Non consentito', 
+        text: 'Il sondaggio deve avere almeno 2 opzioni', 
+        icon: 'warning',
+        zIndex: 9999 // Assicura che il modal appaia sopra tutto
+      });
     }
   };
   
@@ -47,14 +58,24 @@ const CreatePollForm = ({ notificationId, messageId, onSuccess, onCancel }) => {
     
     // Validazione
     if (!question.trim()) {
-      swal.fire('Attenzione', 'Inserisci una domanda', 'warning');
+      swal.fire({
+        title: 'Attenzione', 
+        text: 'Inserisci una domanda', 
+        icon: 'warning',
+        zIndex: 9999
+      });
       return;
     }
     
     // Controlla che tutte le opzioni abbiano del testo
     const filledOptions = options.filter(opt => opt.trim() !== '');
     if (filledOptions.length < 2) {
-      swal.fire('Attenzione', 'Inserisci almeno 2 opzioni valide', 'warning');
+      swal.fire({
+        title: 'Attenzione', 
+        text: 'Inserisci almeno 2 opzioni valide', 
+        icon: 'warning',
+        zIndex: 9999
+      });
       return;
     }
     
@@ -68,7 +89,12 @@ const CreatePollForm = ({ notificationId, messageId, onSuccess, onCancel }) => {
         
         // Verifica che la data sia nel futuro
         if (expiration <= new Date()) {
-          swal.fire('Data non valida', 'La data di scadenza deve essere nel futuro', 'error');
+          swal.fire({
+            title: 'Data non valida', 
+            text: 'La data di scadenza deve essere nel futuro', 
+            icon: 'error',
+            zIndex: 9999
+          });
           setLoading(false);
           return;
         }
@@ -84,19 +110,29 @@ const CreatePollForm = ({ notificationId, messageId, onSuccess, onCancel }) => {
       );
       
       if (result) {
-        swal.fire('Completato', 'Sondaggio creato con successo', 'success');
+        swal.fire({
+          title: 'Completato', 
+          text: 'Sondaggio creato con successo', 
+          icon: 'success',
+          zIndex: 9999
+        });
         if (onSuccess) onSuccess(result);
       }
     } catch (error) {
       console.error('Error creating poll:', error);
-      swal.fire('Errore', 'Si è verificato un errore durante la creazione del sondaggio', 'error');
+      swal.fire({
+        title: 'Errore', 
+        text: 'Si è verificato un errore durante la creazione del sondaggio', 
+        icon: 'error',
+        zIndex: 9999
+      });
     } finally {
       setLoading(false);
     }
   };
   
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative" style={{ zIndex: 9999 }}>
       <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center">
         <BarChart className="h-5 w-5 text-blue-500 mr-2" />
         <h3 className="font-medium text-blue-800">Crea nuovo sondaggio</h3>

@@ -144,60 +144,68 @@ const MessageReactions = ({ messageId, notificationId, onReactionUpdated }) => {
   }, [messageId, notificationId]);
   
   // Gestisce il clic su una reazione
-  const handleReactionClick = async (reactionType, userReactionId = null) => {
-    try {
-      setLoading(true);
-      
-      if (!toggleMessageReaction) {
-        throw new Error('toggleMessageReaction function not available');
-      }
-      
-      // Importante: verifica se l'utente sta cliccando sulla SUA reazione
-      // (in quel caso rimuovila) oppure su una reazione altrui (non fare nulla)
-      if (userReactionId) {
-        // L'utente ha già questa reazione (è la sua), quindi rimuovila
-        if (removeMessageReaction) {
-          await removeMessageReaction(userReactionId);
-        } else {
-          // Fallback al toggle se removeMessageReaction non è disponibile
+const handleReactionClick = async (reactionType, userReactionId = null) => {
+  try {
+    setLoading(true);
+    
+    // Check if required functions are available
+    if (!toggleMessageReaction && !removeMessageReaction) {
+      throw new Error('Reaction functions not available');
+    }
+    
+    // Importante: verifica se l'utente sta cliccando sulla SUA reazione
+    // (in quel caso rimuovila) oppure su una reazione altrui (non fare nulla)
+    if (userReactionId) {
+      // L'utente ha già questa reazione (è la sua), quindi rimuovila
+      if (removeMessageReaction) {
+        await removeMessageReaction(userReactionId);
+      } else {
+        // Fallback al toggle se removeMessageReaction non è disponibile
+        if (toggleMessageReaction) {
           await toggleMessageReaction(messageId, reactionType);
+        } else {
+          throw new Error('No reaction function available');
+        }
+      }
+    } else {
+      // L'utente non ha questa reazione, aggiungiamola (ma solo se non ha già un'altra reazione)
+      const userHasAnyReaction = Object.values(groupReactionsByType(reactions)).some(
+        reactorGroup => reactorGroup.some(reactor => reactor.UserID === currentUserId)
+      );
+      
+      if (!userHasAnyReaction) {
+        if (toggleMessageReaction) {
+          await toggleMessageReaction(messageId, reactionType);
+        } else {
+          throw new Error('toggleMessageReaction function not available');
         }
       } else {
-        // L'utente non ha questa reazione, aggiungiamola (ma solo se non ha già un'altra reazione)
-        const userHasAnyReaction = Object.values(groupReactionsByType(reactions)).some(
-          reactorGroup => reactorGroup.some(reactor => reactor.UserID === currentUserId)
-        );
-        
-        if (!userHasAnyReaction) {
-          await toggleMessageReaction(messageId, reactionType);
-        } else {
-          // L'utente ha già una reazione diversa, non fare nulla
-
-          setLoading(false);
-          return;
-        }
+        // L'utente ha già una reazione diversa, non fare nulla
+        setLoading(false);
+        return;
       }
-      
-      // Ricarica le reazioni
-      await loadReactions();
-      
-      if (onReactionUpdated) {
-        onReactionUpdated();
-      }
-      
-      // Invia evento di aggiornamento
-      const event = new CustomEvent('message-reaction-updated', { 
-        detail: { messageId, notificationId } 
-      });
-      document.dispatchEvent(event);
-      
-    } catch (err) {
-      console.error('Error handling reaction click:', err);
-      setError('Error updating reaction');
-    } finally {
-      setLoading(false);
     }
-  };
+    
+    // Ricarica le reazioni
+    await loadReactions();
+    
+    if (onReactionUpdated) {
+      onReactionUpdated();
+    }
+    
+    // Invia evento di aggiornamento
+    const event = new CustomEvent('message-reaction-updated', { 
+      detail: { messageId, notificationId } 
+    });
+    document.dispatchEvent(event);
+    
+  } catch (err) {
+    console.error('Error handling reaction click:', err);
+    setError('Error updating reaction');
+  } finally {
+    setLoading(false);
+  }
+};
   
   // Raggruppa le reazioni per tipo
   const groupedReactions = groupReactionsByType(reactions);

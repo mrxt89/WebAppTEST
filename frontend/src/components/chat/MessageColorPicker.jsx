@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
 
 const MessageColorPicker = ({ messageId, onClose }) => {
-  const { setMessageColor, clearMessageColor } = useNotificationContext();
+  const { setMessageColor, clearMessageColor } = useNotifications();
   
   // Colori predefiniti
   const colors = [

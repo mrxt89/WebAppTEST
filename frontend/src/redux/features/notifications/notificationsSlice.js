@@ -575,43 +575,24 @@ const notificationsSlice = createSlice({
       }
     },
     // All'inizializzazione, caricare le chat aperte in finestre separate da localStorage
-    initializeStandaloneChats: (state) => {
+    initializeStandaloneChats: (state, action) => {
       try {
+        // Se l'azione contiene un payload, usalo direttamente
+        if (action.payload && Array.isArray(action.payload)) {
+          state.standaloneChats = new Set(action.payload.map(id => parseInt(id)));
+          return;
+        }
+        
+        // Altrimenti leggi da localStorage
         const storedChats = JSON.parse(localStorage.getItem('standalone_chats') || '[]');
         state.standaloneChats = new Set(storedChats.map(id => parseInt(id)));
         
-        // Verifica che le finestre siano effettivamente aperte
-        setTimeout(() => {
-          const toRemove = [];
-          
-          storedChats.forEach(id => {
-            // Prova ad accedere alla finestra
-            const win = window.open('', `chat_${id}`);
-            
-            // Se la finestra non esiste o è chiusa
-            if (!win || win.closed || win.location.href === 'about:blank') {
-              toRemove.push(parseInt(id));
-            } else {
-              // Chiudi il riferimento
-              win.focus(); // Focus per assicurarsi che la finestra sia visualizzata
-            }
-          });
-          
-          // Rimuovi chat che non sono più in finestre aperte
-          if (toRemove.length > 0) {
-            const current = JSON.parse(localStorage.getItem('standalone_chats') || '[]');
-            const filtered = current.filter(id => !toRemove.includes(parseInt(id)));
-            localStorage.setItem('standalone_chats', JSON.stringify(filtered));
-            
-            // Aggiorna anche lo stato Redux
-            store.dispatch({ 
-              type: 'notifications/cleanupStandaloneChats',
-              payload: toRemove
-            });
-          }
-        }, 1000);
+        // Nessuna verifica finestre in questa fase, sarà gestita separatamente
+        // per evitare problemi con accesso alle finestre durante l'inizializzazione
       } catch (e) {
         console.error('Error loading standalone chats from localStorage:', e);
+        // Assicurati che il set esista comunque
+        state.standaloneChats = new Set();
       }
     },
     

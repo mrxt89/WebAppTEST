@@ -18,7 +18,7 @@ import { swal } from '../../lib/common';
 import NotificationSidebar from '../NotificationSidebar';
 
 // Import the NotificationProvider (which is now a placeholder function)
-import { NotificationProvider } from '@/redux/features/notifications/notificationsHooks';
+import { NotificationProvider } from '@/redux/features/notifications/NotificationProvider';
 
 const MainContainer = ({
   menuItems,
