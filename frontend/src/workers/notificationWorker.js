@@ -25,7 +25,6 @@ let lastRequestTime = 0;
 function log(...args) {
   if (debugEnabled) {
     const timestamp = new Date().toISOString();
-    console.log(`[NotificationWorker ${timestamp}]`, ...args);
   }
 }
 
