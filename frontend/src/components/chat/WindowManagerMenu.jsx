@@ -21,13 +21,19 @@ import {
  * @param {Object} windowManager - The window manager instance with window arrangement functions
  * @param {Function} onCloseAll - Function to close all chat windows
  * @param {Array} openChats - Array of open chat objects
+ * @param {Array} minimizedChats - Array of minimized chat objects
+ * @param {Function} onMinimizeChat - Function to minimize a chat
+ * @param {Function} restoreChat - Function to restore a chat
  */
 const WindowManagerMenu = ({ 
   isOpen, 
   onClose, 
   windowManager, 
   onCloseAll,
-  openChats = []
+  openChats = [],
+  minimizedChats = [],
+  onMinimizeChat,
+  restoreChat
 }) => {
   // Don't render if closed or no chats
   if (!isOpen || openChats.length === 0) return null;
@@ -38,6 +44,40 @@ const WindowManagerMenu = ({
     visible: { opacity: 1, scale: 1, y: 0 }
   };
   
+  const handleMinimizeToggle = () => {
+    // Usa openChats come fonte di verità per lo stato delle chat
+    const visibleChats = openChats.filter(chat => 
+      !minimizedChats.some(minChat => minChat.notificationId === chat.notificationId)
+    );
+    
+    if (visibleChats.length > 0) {
+      // Minimizza tutte le chat visibili
+      visibleChats.forEach(chat => {
+        // Aggiorna il window manager
+        if (windowManager?.toggleMinimize) {
+          windowManager.toggleMinimize(chat.notificationId);
+        }
+        // Aggiorna lo stato delle chat minimizzate
+        if (onMinimizeChat) {
+          onMinimizeChat(chat);
+        }
+      });
+    } else {
+      // Ripristina tutte le chat minimizzate
+      minimizedChats.forEach(chat => {
+        // Aggiorna il window manager
+        if (windowManager?.toggleMinimize) {
+          windowManager.toggleMinimize(chat.notificationId);
+        }
+        // Ripristina la chat
+        if (restoreChat) {
+          restoreChat(chat);
+        }
+      });
+    }
+    onClose();
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -129,25 +169,7 @@ const WindowManagerMenu = ({
                 
                 <button
                   className="flex items-center justify-center p-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
-                  onClick={() => {
-                    // Toggle all windows to minimize or restore
-                    const visibleWindows = windowManager.getVisibleWindows();
-                    
-                    if (visibleWindows.length > 0) {
-                      // At least one window is visible - minimize all
-                      visibleWindows.forEach(window => {
-                        windowManager.toggleMinimize(window.id);
-                      });
-                    } else {
-                      // All windows are minimized - restore all
-                      const minimizedWindows = windowManager.getMinimizedWindows();
-                      minimizedWindows.forEach(window => {
-                        windowManager.toggleMinimize(window.id);
-                      });
-                    }
-                    
-                    onClose();
-                  }}
+                  onClick={handleMinimizeToggle}
                   title="Minimizza/Ripristina"
                 >
                   <Minimize className="h-4 w-4 mr-1" />
