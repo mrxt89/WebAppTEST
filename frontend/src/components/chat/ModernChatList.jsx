@@ -295,86 +295,86 @@ const ModernChatList = ({
   }, [notificationId, registerOpenChat, unregisterOpenChat]);
 
   // Gestione migliorata degli eventi relativi ai messaggi
-  useEffect(() => {
-    const handleMessageEvent = (event) => {
-      const { notificationId: eventNotificationId } = event.detail || {};
+  // useEffect(() => {
+  //   const handleMessageEvent = (event) => {
+  //     const { notificationId: eventNotificationId } = event.detail || {};
       
-      // Assicurati che l'evento sia per questa chat
-      if (eventNotificationId && parseInt(eventNotificationId) === parseInt(notificationId)) {
+  //     // Assicurati che l'evento sia per questa chat
+  //     if (eventNotificationId && parseInt(eventNotificationId) === parseInt(notificationId)) {
      
-        // Previeni troppe chiamate in rapida successione
-        const now = Date.now();
-        if (now - lastUpdateTimeRef.current < 500) {
+  //       // Previeni troppe chiamate in rapida successione
+  //       const now = Date.now();
+  //       if (now - lastUpdateTimeRef.current < 500) {
          
-          return;
-        }
+  //         return;
+  //       }
         
-        // Aggiorna timestamp dell'ultimo aggiornamento
-        lastUpdateTimeRef.current = now;
+  //       // Aggiorna timestamp dell'ultimo aggiornamento
+  //       lastUpdateTimeRef.current = now;
         
-        // Riavvia il timer di aggiornamento
-        if (updateTimerRef.current) {
-          clearTimeout(updateTimerRef.current);
-        }
+  //       // Riavvia il timer di aggiornamento
+  //       if (updateTimerRef.current) {
+  //         clearTimeout(updateTimerRef.current);
+  //       }
         
-        // Forza un aggiornamento immediato dall'API
-        updateTimerRef.current = setTimeout(() => {
-          fetchNotificationById(notificationId, true)
-            .then(updatedNotification => {
-              if (updatedNotification) {
-                const newMessages = Array.isArray(updatedNotification.messages) 
-                  ? updatedNotification.messages 
-                  : (typeof updatedNotification.messages === 'string' 
-                     ? JSON.parse(updatedNotification.messages || '[]') 
-                     : []);
+  //       // Forza un aggiornamento immediato dall'API
+  //       updateTimerRef.current = setTimeout(() => {
+  //         fetchNotificationById(notificationId, true)
+  //           .then(updatedNotification => {
+  //             if (updatedNotification) {
+  //               const newMessages = Array.isArray(updatedNotification.messages) 
+  //                 ? updatedNotification.messages 
+  //                 : (typeof updatedNotification.messages === 'string' 
+  //                    ? JSON.parse(updatedNotification.messages || '[]') 
+  //                    : []);
                 
-                // Aggiorna lo stato locale
-                setLocalMessages(newMessages);
+  //               // Aggiorna lo stato locale
+  //               setLocalMessages(newMessages);
                 
-                // Auto-scroll se necessario
-                if (!userHasScrolledRef.current && chatListRef.current) {
-                  scrollingToBottomRef.current = true;
-                  chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+  //               // Auto-scroll se necessario
+  //               if (!userHasScrolledRef.current && chatListRef.current) {
+  //                 scrollingToBottomRef.current = true;
+  //                 chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
                   
-                  setTimeout(() => {
-                    scrollingToBottomRef.current = false;
-                  }, 100);
-                } else if (userHasScrolledRef.current) {
-                  // Se l'utente ha scrollato, mostra l'indicatore di nuovo messaggio
-                  setShowScrollButton(true);
-                }
-              }
-            })
-            .catch(error => {
-              console.error('Errore durante l\'aggiornamento:', error);
-            });
+  //                 setTimeout(() => {
+  //                   scrollingToBottomRef.current = false;
+  //                 }, 100);
+  //               } else if (userHasScrolledRef.current) {
+  //                 // Se l'utente ha scrollato, mostra l'indicatore di nuovo messaggio
+  //                 setShowScrollButton(true);
+  //               }
+  //             }
+  //           })
+  //           .catch(error => {
+  //             console.error('Errore durante l\'aggiornamento:', error);
+  //           });
   
-          // Reset del timer
-          updateTimerRef.current = null;
-        }, 200);
-      }
-    };
+  //         // Reset del timer
+  //         updateTimerRef.current = null;
+  //       }, 200);
+  //     }
+  //   };
     
-    // Aggiungi i listener per tutti gli eventi relativi ai messaggi
-    document.addEventListener('new-message-received', handleMessageEvent);
-    document.addEventListener('chat-message-sent', handleMessageEvent);
-    document.addEventListener('open-chat-new-message', handleMessageEvent);
-    document.addEventListener('refreshNotifications', handleMessageEvent);
-    document.addEventListener('notification-updated', handleMessageEvent);
+  //   // Aggiungi i listener per tutti gli eventi relativi ai messaggi
+  //   document.addEventListener('new-message-received', handleMessageEvent);
+  //   document.addEventListener('chat-message-sent', handleMessageEvent);
+  //   document.addEventListener('open-chat-new-message', handleMessageEvent);
+  //   document.addEventListener('refreshNotifications', handleMessageEvent);
+  //   document.addEventListener('notification-updated', handleMessageEvent);
     
-    // Pulizia
-    return () => {
-      if (updateTimerRef.current) {
-        clearTimeout(updateTimerRef.current);
-      }
+  //   // Pulizia
+  //   return () => {
+  //     if (updateTimerRef.current) {
+  //       clearTimeout(updateTimerRef.current);
+  //     }
       
-      document.removeEventListener('new-message-received', handleMessageEvent);
-      document.removeEventListener('chat-message-sent', handleMessageEvent);
-      document.removeEventListener('open-chat-new-message', handleMessageEvent);
-      document.removeEventListener('refreshNotifications', handleMessageEvent);
-      document.removeEventListener('notification-updated', handleMessageEvent);
-    };
-  }, [notificationId, fetchNotificationById]);
+  //     document.removeEventListener('new-message-received', handleMessageEvent);
+  //     document.removeEventListener('chat-message-sent', handleMessageEvent);
+  //     document.removeEventListener('open-chat-new-message', handleMessageEvent);
+  //     document.removeEventListener('refreshNotifications', handleMessageEvent);
+  //     document.removeEventListener('notification-updated', handleMessageEvent);
+  //   };
+  // }, [notificationId, fetchNotificationById]);
 
 
   // NUOVO: Verifica direttamente dal context globale per i nuovi messaggi

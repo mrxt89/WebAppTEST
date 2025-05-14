@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Resizable } from 're-resizable';
 import ChatTopBar from './ChatTopBar';
 import ChatLayout from './ChatLayout';
@@ -70,7 +70,6 @@ const ChatWindow = ({
     unarchiveChat,
     uploadNotificationAttachment,
     captureAndUploadPhoto,
-    refreshAttachments,
     notifications // Aggiungo questo per accedere direttamente alle notifiche dal Redux
   } = useNotifications();
   
@@ -125,8 +124,6 @@ const ChatWindow = ({
   const [receiversList, setReceiversList] = useState('');
   const [fetchedNotifications, setFetchedNotifications] = useState([]);
   const [fetchedUsers, setFetchedUsers] = useState([]);
-  const updateInProgressRef = useRef(false);
-  const updateQueuedRef = useRef(false);
   const isMountedRef = useRef(true);
   // Flag di controllo per l'aggiornamento della posizione
   const positionUpdatedByUserRef = useRef(false);
@@ -422,268 +419,335 @@ const ChatWindow = ({
     }
   }, [notification, sendNotification, replyToMessage, users, forceUpdateFromServer]);
 
-useEffect(() => {
-  const handleNotificationUpdate = async (event) => {
-    // Ignora gli eventi se il componente è stato smontato
-    if (!isMountedRef.current) return;
+  // Unifico tutti gli event listener in un unico useEffect
+  useEffect(() => {
+    isMountedRef.current = true;
+    let updateTimeoutId = null;
+    let isUpdating = false;
+    let pendingUpdate = false;
     
-    const eventType = event.type;
-    const detail = event.detail || {};
-    
-    // Estrai l'ID notifica dall'evento
-    const eventNotificationId = detail.notificationId;
-    
-    // Se l'evento non è per questa chat, ignoralo
-    if (eventNotificationId && notification && parseInt(eventNotificationId) !== parseInt(notification.notificationId)) {
-      return;
-    }
-    
-    // Forza alta priorità per gli aggiornamenti da eventi di nuovi messaggi
-    const highPriority = eventType === 'open-chat-new-message' || eventType === 'chat-message-sent';
-    
-    // Evita aggiornamenti troppo frequenti
-    if (updateInProgressRef.current) {
-      updateQueuedRef.current = true;
-      return;
-    }
-    
-    updateInProgressRef.current = true;
-    
-    try {
-      // Aggiorna con priorità alta per i nuovi messaggi
-      const updatedNotification = await fetchNotificationById(notification.notificationId, highPriority);
+    const handleChatUpdate = (event) => {
+      if (!isMountedRef.current) return;
       
-      if (updatedNotification) {
-        // Se è un nuovo messaggio e l'utente non ha scrollato manualmente verso l'alto,
-        // scorri fino in fondo alla chat
-        if ((eventType === 'open-chat-new-message' || eventType === 'chat-message-sent') && 
-            !userHasScrolledRef.current) {
-         
-          // Segnala che stiamo scrollando programmaticamente
-          scrollingToBottomRef.current = true;
+      const detail = event.detail || {};
+      const eventNotificationId = detail.notificationId;
+      
+      // Se l'evento non è per questa chat, ignoralo
+      if (eventNotificationId && notification && parseInt(eventNotificationId) !== parseInt(notification.notificationId)) {
+        return;
+      }
+
+      // Se c'è già un aggiornamento in corso, marca come pending e esci
+      if (isUpdating) {
+        pendingUpdate = true;
+        return;
+      }
+
+      // Funzione per processare l'aggiornamento
+      const processUpdate = async () => {
+        if (!isMountedRef.current) return;
+        
+        isUpdating = true;
+        pendingUpdate = false;
+
+        try {
+          // Emetti un evento personalizzato per richiedere l'aggiornamento
+          const updateEvent = new CustomEvent('request-notification-update', {
+            detail: {
+              notificationId: notification.notificationId,
+              timestamp: Date.now()
+            }
+          });
+          document.dispatchEvent(updateEvent);
+
+          // Aspetta il prossimo frame per assicurarsi che il reducer sia completato
+          await new Promise(resolve => requestAnimationFrame(resolve));
           
-          setTimeout(() => {
-            if (chatListRef.current) {
-              chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+          // Aggiorna lo stato locale usando i dati dall'evento
+          const updateState = (updatedData) => {
+            if (!updatedData || !isMountedRef.current) return;
+
+            const messages = Array.isArray(updatedData.messages) 
+              ? updatedData.messages 
+              : (typeof updatedData.messages === 'string' 
+                ? JSON.parse(updatedData.messages || '[]') 
+                : []);
+            
+            setParsedMessages(messages);
+            
+            const membersInfo = Array.isArray(updatedData.membersInfo) 
+              ? updatedData.membersInfo 
+              : (typeof updatedData.membersInfo === 'string' 
+                ? JSON.parse(updatedData.membersInfo || '[]') 
+                : []);
+            
+            setParsedMembersInfo(membersInfo);
+            setHasLeftChat(updatedData.chatLeft === 1 || updatedData.chatLeft === true);
+            setIsArchived(updatedData.archived === 1 || updatedData.archived === true);
+            
+            // Gestione dello scroll
+            const lastMessage = messages[messages.length - 1];
+            const hasNewMessages = messages.length > lastReduxMessageCountRef.current || 
+              (lastMessage && (!lastMessageIdRef.current || lastMessage.messageId !== lastMessageIdRef.current));
+            
+            if (hasNewMessages) {
+              if (userHasScrolledRef.current) {
+                setHasNewMessages(true);
+              } else {
+                scrollingToBottomRef.current = true;
+                if (chatListRef.current) {
+                  chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+                  setTimeout(() => {
+                    scrollingToBottomRef.current = false;
+                  }, 500);
+                }
+              }
             }
             
-            // Riattiva la rilevazione dello scroll dopo un breve ritardo
-            setTimeout(() => {
-              scrollingToBottomRef.current = false;
-            }, 500);
-          }, 100);
-        }
-      }
-    } catch (error) {
-      console.error('Error updating notification:', error);
-    } finally {
-      updateInProgressRef.current = false;
-      
-      // Se ci sono aggiornamenti in coda, pianificali
-      if (updateQueuedRef.current) {
-        updateQueuedRef.current = false;
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            forceUpdateFromServer();
+            // Aggiorna i refs
+            if (lastMessage) {
+              lastMessageIdRef.current = lastMessage.messageId;
+            }
+            lastReduxMessageCountRef.current = messages.length;
+            previousMessagesRef.current = messages;
+          };
+
+          // Listener per ricevere i dati aggiornati
+          const handleUpdateData = (updateEvent) => {
+            const { notificationId, data } = updateEvent.detail;
+            if (notificationId === notification.notificationId) {
+              updateState(data);
+              document.removeEventListener('notification-update-data', handleUpdateData);
+            }
+          };
+
+          document.addEventListener('notification-update-data', handleUpdateData);
+
+          // Timeout di sicurezza per rimuovere il listener
+          setTimeout(() => {
+            document.removeEventListener('notification-update-data', handleUpdateData);
+          }, 5000);
+
+        } catch (error) {
+          console.error('Error updating notification:', error);
+        } finally {
+          isUpdating = false;
+          
+          // Se c'è un aggiornamento pendente, processalo
+          if (pendingUpdate && isMountedRef.current) {
+            setTimeout(processUpdate, 1000);
           }
-        }, 300);
-      }
-    }
-  };
+        }
+      };
 
-  // Add listeners for various update events
-  document.addEventListener('refreshNotifications', handleNotificationUpdate);
-  document.addEventListener('chat-message-sent', handleNotificationUpdate);
-  document.addEventListener('message-reaction-updated', handleNotificationUpdate);
-  document.addEventListener('message-updated', handleNotificationUpdate);
-  document.addEventListener('message-deleted', handleNotificationUpdate);
-  // Aggiungi un listener specifico per l'evento open-chat-new-message
-  document.addEventListener('open-chat-new-message', handleNotificationUpdate);
-  
-  // Clean up listeners on unmount
-  return () => {
-    document.removeEventListener('refreshNotifications', handleNotificationUpdate);
-    document.removeEventListener('chat-message-sent', handleNotificationUpdate);
-    document.removeEventListener('message-reaction-updated', handleNotificationUpdate);
-    document.removeEventListener('message-updated', handleNotificationUpdate);
-    document.removeEventListener('message-deleted', handleNotificationUpdate);
-    document.removeEventListener('open-chat-new-message', handleNotificationUpdate);
-  };
-}, [notification, fetchNotificationById]);
-
-
-
-  useEffect(() => {
-  if (notification?.notificationId) {
-    // Registra questa chat come aperta
-    registerOpenChat(notification.notificationId);
-    
-    return () => {
-      // Quando il componente viene smontato, rimuovi la chat dall'elenco
-      unregisterOpenChat(notification.notificationId);
+      // Avvia il processo di aggiornamento
+      processUpdate();
     };
-  }
-}, [notification?.notificationId, registerOpenChat, unregisterOpenChat]);
-
-useEffect(() => {
-  // Gestore per aggiornamenti dello stato della chat
-  const handleChatStatusChange = async (event) => {
-    const { notificationId, action } = event.detail || {};
     
-    // Verifica che questo evento sia per la chat corrente
-    if (notificationId && notification && notificationId === notification.notificationId) {
-     
-      // Ricarica i dati aggiornati
-      await fetchNotificationById(notificationId);
-      
-      // Aggiorna gli stati locali in base all'azione
-      if (action === 'left') {
-        setHasLeftChat(true);
-      } else if (action === 'archived') {
-        setIsArchived(true);
-      } else if (action === 'unarchived') {
-        setIsArchived(false);
-      }
-    }
-  };
-  
-  // Aggiungi listener per l'evento
-  document.addEventListener('chat-status-changed', handleChatStatusChange);
-  
-  // Pulizia del listener
-  return () => {
-    document.removeEventListener('chat-status-changed', handleChatStatusChange);
-  };
-}, [notification, fetchNotificationById]);
-
-const handleDragStart = useCallback((e) => {
-  // Verifica se il trascinamento inizia dall'handle (barra superiore)
-  const isHandleElement = e.target.closest('.chat-window-handle');
-  if (!isHandleElement) {
-    return; // Non procedere se non stiamo trascinando dall'handle
-  }
-  
-  // Previeni il comportamento predefinito solo sui click, non sui drag
-  if (e.type === 'mousedown') {
-    e.preventDefault();
-  }
-  
-  // Aggiorna stato e riferimento
-  setIsDragging(true);
-  isDraggingRef.current = true;
-  
-  // Attiva la finestra
-  handleActivate();
-  
-  // Posizione iniziale del mouse
-  const startX = e.clientX;
-  const startY = e.clientY;
-  
-  // Assicuriamoci che nodeRef.current sia definito prima di iniziare
-  if (!nodeRef.current) {
-    console.error('nodeRef.current è null o non definito durante il trascinamento');
-    setIsDragging(false);
-    isDraggingRef.current = false;
-    return;
-  }
-  
-  // Posizione iniziale della finestra - leggiamo direttamente dallo stile corrente
-  let startWindowX = position.x;
-  let startWindowY = position.y;
-  
-  // Se i valori di posizione non sono validi, leggiamo direttamente dallo stile computato
-  if (isNaN(startWindowX) || isNaN(startWindowY)) {
-    const computedStyle = window.getComputedStyle(nodeRef.current);
-    // Usiamo parseFloat per estrarre il valore numerico e rimuovere 'px'
-    startWindowX = parseFloat(computedStyle.left);
-    startWindowY = parseFloat(computedStyle.top);
+    // Registra tutti gli eventi che richiedono un aggiornamento
+    const eventTypes = [
+      'notification-updated',
+      'chat-message-sent',
+      'message-updated',
+      'message-deleted',
+      'message-reaction-updated',
+      'attachment-updated',
+      'poll-updated',
+      'message-color-changed',
+      'refreshNotifications',
+      'open-chat-new-message'
+    ];
     
-    // Aggiorna lo stato con i valori corretti
-    setPosition({
-      x: startWindowX,
-      y: startWindowY
+    // Registra i listener per tutti gli eventi
+    eventTypes.forEach(eventType => {
+      document.addEventListener(eventType, handleChatUpdate);
     });
-  }
-  
-  // Funzione di movimento
-  const handleMouseMove = (moveEvent) => {
-    if (!isDraggingRef.current || !nodeRef.current) return;
     
-    // Calcola lo spostamento
-    const deltaX = moveEvent.clientX - startX;
-    const deltaY = moveEvent.clientY - startY;
-    
-    // Nuova posizione
-    const newX = startWindowX + deltaX;
-    const newY = startWindowY + deltaY;
-    
-    // Limita il movimento all'interno del viewport
-    const maxX = window.innerWidth - size.width;
-    const maxY = window.innerHeight - size.height;
-    
-    const boundedX = Math.max(0, Math.min(newX, maxX));
-    const boundedY = Math.max(0, Math.min(newY, maxY));
-    
-    // Verifica che i valori siano numeri validi prima di applicarli
-    if (!isNaN(boundedX) && !isNaN(boundedY)) {
-      nodeRef.current.style.left = `${boundedX}px`;
-      nodeRef.current.style.top = `${boundedY}px`;
-    }
-  };
-  
-  // Funzione di rilascio
-  const handleMouseUp = () => {
-    // Rimuovi i listener
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-    
-    // Aggiorna stato e riferimento
-    setIsDragging(false);
-    isDraggingRef.current = false;
-    
-    // Resetta il flag immediatamente dopo l'aggiornamento della posizione
-    positionUpdatedByUserRef.current = true;
-    
-    // Leggi la posizione finale dal DOM
-    if (nodeRef.current) {
-      // Estrai i valori CSS e converti in numeri
-      const computedStyle = window.getComputedStyle(nodeRef.current);
-      const leftValue = computedStyle.left;
-      const topValue = computedStyle.top;
+    // Cleanup
+    return () => {
+      isMountedRef.current = false;
       
-      // Converti in numeri rimuovendo 'px' e verificando che siano validi
-      let finalX = parseFloat(leftValue);
-      let finalY = parseFloat(topValue);
-      
-      // Verifica aggiuntiva di validità
-      if (isNaN(finalX) || isNaN(finalY)) {
-        console.warn('Valori di posizione non validi dopo il trascinamento:', leftValue, topValue);
-        finalX = position.x;
-        finalY = position.y;
-      }
-      
-      // Aggiorna lo stato React con la posizione finale
-      setPosition({
-        x: finalX,
-        y: finalY
+      eventTypes.forEach(eventType => {
+        document.removeEventListener(eventType, handleChatUpdate);
       });
       
-      // Aggiorna il window manager
-      if (windowManager && windowManager.updatePosition && notification?.notificationId) {
-        windowManager.updatePosition(notification.notificationId, finalX, finalY);
+      if (updateTimeoutId) {
+        clearTimeout(updateTimeoutId);
       }
+    };
+  }, [notification]);
+
+  useEffect(() => {
+    if (notification?.notificationId) {
+      // Registra questa chat come aperta
+      registerOpenChat(notification.notificationId);
       
-      // Imposta un timeout per resettare il flag dopo che tutte le altre operazioni sono completate
-      setTimeout(() => {
-        positionUpdatedByUserRef.current = false;
-      }, 50);
+      return () => {
+        // Quando il componente viene smontato, rimuovi la chat dall'elenco
+        unregisterOpenChat(notification.notificationId);
+      };
     }
-  };
-  
-  // Aggiungi listener
-  document.addEventListener('mousemove', handleMouseMove);
-  document.addEventListener('mouseup', handleMouseUp);
-}, [position, size.width, size.height, handleActivate, windowManager, notification]);
+  }, [notification?.notificationId, registerOpenChat, unregisterOpenChat]);
+
+  useEffect(() => {
+    // Gestore per aggiornamenti dello stato della chat
+    const handleChatStatusChange = async (event) => {
+      const { notificationId, action } = event.detail || {};
+      
+      // Verifica che questo evento sia per la chat corrente
+      if (notificationId && notification && notificationId === notification.notificationId) {
+       
+        // Ricarica i dati aggiornati
+        await fetchNotificationById(notificationId);
+        
+        // Aggiorna gli stati locali in base all'azione
+        if (action === 'left') {
+          setHasLeftChat(true);
+        } else if (action === 'archived') {
+          setIsArchived(true);
+        } else if (action === 'unarchived') {
+          setIsArchived(false);
+        }
+      }
+    };
+    
+    // Aggiungi listener per l'evento
+    document.addEventListener('chat-status-changed', handleChatStatusChange);
+    
+    // Pulizia del listener
+    return () => {
+      document.removeEventListener('chat-status-changed', handleChatStatusChange);
+    };
+  }, [notification, fetchNotificationById]);
+
+  const handleDragStart = useCallback((e) => {
+    // Verifica se il trascinamento inizia dall'handle (barra superiore)
+    const isHandleElement = e.target.closest('.chat-window-handle');
+    if (!isHandleElement) {
+      return; // Non procedere se non stiamo trascinando dall'handle
+    }
+    
+    // Previeni il comportamento predefinito solo sui click, non sui drag
+    if (e.type === 'mousedown') {
+      e.preventDefault();
+    }
+    
+    // Aggiorna stato e riferimento
+    setIsDragging(true);
+    isDraggingRef.current = true;
+    
+    // Attiva la finestra
+    handleActivate();
+    
+    // Posizione iniziale del mouse
+    const startX = e.clientX;
+    const startY = e.clientY;
+    
+    // Assicuriamoci che nodeRef.current sia definito prima di iniziare
+    if (!nodeRef.current) {
+      console.error('nodeRef.current è null o non definito durante il trascinamento');
+      setIsDragging(false);
+      isDraggingRef.current = false;
+      return;
+    }
+    
+    // Posizione iniziale della finestra - leggiamo direttamente dallo stile corrente
+    let startWindowX = position.x;
+    let startWindowY = position.y;
+    
+    // Se i valori di posizione non sono validi, leggiamo direttamente dallo stile computato
+    if (isNaN(startWindowX) || isNaN(startWindowY)) {
+      const computedStyle = window.getComputedStyle(nodeRef.current);
+      // Usiamo parseFloat per estrarre il valore numerico e rimuovere 'px'
+      startWindowX = parseFloat(computedStyle.left);
+      startWindowY = parseFloat(computedStyle.top);
+      
+      // Aggiorna lo stato con i valori corretti
+      setPosition({
+        x: startWindowX,
+        y: startWindowY
+      });
+    }
+    
+    // Funzione di movimento
+    const handleMouseMove = (moveEvent) => {
+      if (!isDraggingRef.current || !nodeRef.current) return;
+      
+      // Calcola lo spostamento
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+      
+      // Nuova posizione
+      const newX = startWindowX + deltaX;
+      const newY = startWindowY + deltaY;
+      
+      // Limita il movimento all'interno del viewport
+      const maxX = window.innerWidth - size.width;
+      const maxY = window.innerHeight - size.height;
+      
+      const boundedX = Math.max(0, Math.min(newX, maxX));
+      const boundedY = Math.max(0, Math.min(newY, maxY));
+      
+      // Verifica che i valori siano numeri validi prima di applicarli
+      if (!isNaN(boundedX) && !isNaN(boundedY)) {
+        nodeRef.current.style.left = `${boundedX}px`;
+        nodeRef.current.style.top = `${boundedY}px`;
+      }
+    };
+    
+    // Funzione di rilascio
+    const handleMouseUp = () => {
+      // Rimuovi i listener
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      
+      // Aggiorna stato e riferimento
+      setIsDragging(false);
+      isDraggingRef.current = false;
+      
+      // Resetta il flag immediatamente dopo l'aggiornamento della posizione
+      positionUpdatedByUserRef.current = true;
+      
+      // Leggi la posizione finale dal DOM
+      if (nodeRef.current) {
+        // Estrai i valori CSS e converti in numeri
+        const computedStyle = window.getComputedStyle(nodeRef.current);
+        const leftValue = computedStyle.left;
+        const topValue = computedStyle.top;
+        
+        // Converti in numeri rimuovendo 'px' e verificando che siano validi
+        let finalX = parseFloat(leftValue);
+        let finalY = parseFloat(topValue);
+        
+        // Verifica aggiuntiva di validità
+        if (isNaN(finalX) || isNaN(finalY)) {
+          console.warn('Valori di posizione non validi dopo il trascinamento:', leftValue, topValue);
+          finalX = position.x;
+          finalY = position.y;
+        }
+        
+        // Aggiorna lo stato React con la posizione finale
+        setPosition({
+          x: finalX,
+          y: finalY
+        });
+        
+        // Aggiorna il window manager
+        if (windowManager && windowManager.updatePosition && notification?.notificationId) {
+          windowManager.updatePosition(notification.notificationId, finalX, finalY);
+        }
+        
+        // Imposta un timeout per resettare il flag dopo che tutte le altre operazioni sono completate
+        setTimeout(() => {
+          positionUpdatedByUserRef.current = false;
+        }, 50);
+      }
+    };
+    
+    // Aggiungi listener
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [position, size.width, size.height, handleActivate, windowManager, notification]);
 
   const handleResizeStart = useCallback(() => {
     setIsResizing(true);
@@ -834,156 +898,6 @@ const handleDragStart = useCallback((e) => {
     };
   }, [notification?.notificationId, sendNotification, forceUpdateFromServer]);
 
-  // Modifico l'effetto per la gestione degli eventi di aggiornamento
-  useEffect(() => {
-    isMountedRef.current = true;
-    
-    // Funzione per gestire tutti gli eventi di aggiornamento relativi alle chat
-    const handleChatUpdate = (event) => {
-      // Ignora gli eventi se il componente è stato smontato
-      if (!isMountedRef.current) return;
-      
-      const eventType = event.type;
-      const detail = event.detail || {};
-      
-      // Estrai l'ID notifica dall'evento
-      const eventNotificationId = detail.notificationId;
-      
-      // Se l'evento non è per questa chat, ignoralo
-      if (eventNotificationId && notification && parseInt(eventNotificationId) !== parseInt(notification.notificationId)) {
-        return;
-      }
-      
-      // Imposta un flag per evitare aggiornamenti troppo frequenti
-      if (updateInProgressRef.current) {
-        updateQueuedRef.current = true;
-        return;
-      }
-      
-      updateInProgressRef.current = true;
-      
-      // Usa requestAnimationFrame per assicurarsi che il reducer sia completato
-      requestAnimationFrame(() => {
-        // Usa setTimeout per un ulteriore livello di sicurezza
-        setTimeout(() => {
-          forceUpdateFromServer()
-            .finally(() => {
-              if (!isMountedRef.current) return;
-              
-              updateInProgressRef.current = false;
-              
-              // Se ci sono aggiornamenti in coda, eseguili
-              if (updateQueuedRef.current) {
-                updateQueuedRef.current = false;
-                requestAnimationFrame(() => {
-                  setTimeout(() => {
-                    if (isMountedRef.current) {
-                      forceUpdateFromServer();
-                    }
-                  }, 0);
-                });
-              }
-            });
-        }, 0);
-      });
-    };
-    
-    // Aggiungi il listener per l'evento
-    document.addEventListener('notification-updated', handleChatUpdate);
-    
-    // Pulizia del listener
-    return () => {
-      document.removeEventListener('notification-updated', handleChatUpdate);
-    };
-  }, [notification, forceUpdateFromServer]);
-  
-  // Modifico anche l'effetto per la gestione degli eventi di chat
-  useEffect(() => {
-    isMountedRef.current = true;
-    
-    // Funzione per gestire tutti gli eventi di aggiornamento relativi alle chat
-    const handleChatUpdate = (event) => {
-      // Ignora gli eventi se il componente è stato smontato
-      if (!isMountedRef.current) return;
-      
-      const eventType = event.type;
-      const detail = event.detail || {};
-      
-      // Estrai l'ID notifica dall'evento
-      const eventNotificationId = detail.notificationId;
-      
-      // Se l'evento non è per questa chat, ignoralo
-      if (eventNotificationId && notification && parseInt(eventNotificationId) !== parseInt(notification.notificationId)) {
-        return;
-      }
-      
-      // Imposta un flag per evitare aggiornamenti troppo frequenti
-      if (updateInProgressRef.current) {
-        updateQueuedRef.current = true;
-        return;
-      }
-      
-      updateInProgressRef.current = true;
-      
-      // Usa requestAnimationFrame per assicurarsi che il reducer sia completato
-      requestAnimationFrame(() => {
-        // Usa setTimeout per un ulteriore livello di sicurezza
-        setTimeout(() => {
-          forceUpdateFromServer()
-            .finally(() => {
-              if (!isMountedRef.current) return;
-              
-              updateInProgressRef.current = false;
-              
-              // Se ci sono aggiornamenti in coda, eseguili
-              if (updateQueuedRef.current) {
-                updateQueuedRef.current = false;
-                requestAnimationFrame(() => {
-                  setTimeout(() => {
-                    if (isMountedRef.current) {
-                      forceUpdateFromServer();
-                    }
-                  }, 0);
-                });
-              }
-            });
-        }, 0);
-      });
-    };
-    
-    // Registra tutti gli eventi che richiedono un aggiornamento
-    const eventTypes = [
-      'chat-message-sent',
-      'message-updated',
-      'message-deleted',
-      'message-reaction-updated',
-      'attachment-updated',
-      'poll-updated',
-      'message-color-changed',
-      'refreshNotifications'
-    ];
-    
-    // Registra i listener per tutti gli eventi
-    eventTypes.forEach(eventType => {
-      document.addEventListener(eventType, handleChatUpdate);
-    });
-    
-    // Cleanup
-    return () => {
-      isMountedRef.current = false;
-      
-      eventTypes.forEach(eventType => {
-        document.removeEventListener(eventType, handleChatUpdate);
-      });
-      
-      // Pulisci eventuali timeout
-      if (messageUpdateTimeoutRef.current) {
-        clearTimeout(messageUpdateTimeoutRef.current);
-        messageUpdateTimeoutRef.current = null;
-      }
-    };
-  }, [notification, forceUpdateFromServer]);
-  
   // Effetto per inizializzare e aggiornare i messaggi quando cambia notificationId
   useEffect(() => {
     // Use a local flag to track if we've already marked this notification as read
@@ -1115,45 +1029,45 @@ const handleDragStart = useCallback((e) => {
     }
   }, [windowManager, notification, initialX, initialY, initialLoaded]);
   
-// Separate effect for state changes from window manager
-useEffect(() => {
-  if (windowManager && notification && initialLoaded) {
-    const windowId = notification.notificationId;
-    const windowState = windowManager.windowStates?.[windowId];
-    
-    if (windowState) {
-      // Only update minimized and maximized states from window manager
-      setIsMinimized(windowState.isMinimized || false);
-      setIsMaximized(windowState.isMaximized || false);
+  // Separate effect for state changes from window manager
+  useEffect(() => {
+    if (windowManager && notification && initialLoaded) {
+      const windowId = notification.notificationId;
+      const windowState = windowManager.windowStates?.[windowId];
       
-      // Update z-index
-      if (windowManager.getZIndex) {
-        setZIndex(windowManager.getZIndex(windowId));
-      }
-      
-      // Only update position if not currently dragging and not updated by user
-      if (!isDraggingRef.current && !positionUpdatedByUserRef.current) {
-        setPosition({ 
-          x: windowState.x !== undefined ? windowState.x : initialX, 
-          y: windowState.y !== undefined ? windowState.y : initialY
-        });
-      }
-      
-      // Only update size if not currently resizing and not updated by user
-      if (!isResizing && !sizeUpdatedByUserRef.current) {
-        setSize({ 
-          width: windowState.width || 900, 
-          height: windowState.height || 700 
-        });
+      if (windowState) {
+        // Only update minimized and maximized states from window manager
+        setIsMinimized(windowState.isMinimized || false);
+        setIsMaximized(windowState.isMaximized || false);
         
-        sizeRef.current = {
-          width: windowState.width || 900, 
-          height: windowState.height || 700
-        };
+        // Update z-index
+        if (windowManager.getZIndex) {
+          setZIndex(windowManager.getZIndex(windowId));
+        }
+        
+        // Only update position if not currently dragging and not updated by user
+        if (!isDraggingRef.current && !positionUpdatedByUserRef.current) {
+          setPosition({ 
+            x: windowState.x !== undefined ? windowState.x : initialX, 
+            y: windowState.y !== undefined ? windowState.y : initialY
+          });
+        }
+        
+        // Only update size if not currently resizing and not updated by user
+        if (!isResizing && !sizeUpdatedByUserRef.current) {
+          setSize({ 
+            width: windowState.width || 900, 
+            height: windowState.height || 700 
+          });
+          
+          sizeRef.current = {
+            width: windowState.width || 900, 
+            height: windowState.height || 700
+          };
+        }
       }
     }
-  }
-}, [windowManager, notification, initialX, initialY, initialLoaded, isResizing]);
+  }, [windowManager, notification, initialX, initialY, initialLoaded, isResizing]);
   
   // MODIFICA: rimuovo il listener di scroll esistente e aggiungo uno che rispetta lo scrolling manuale
   useEffect(() => {
@@ -1201,7 +1115,6 @@ useEffect(() => {
     }
   }, [chatListRef?.current]);
   
- 
   useEffect(() => {
     // Implementazione semplificata che esegue solo lo scroll iniziale
     if (parsedMessages.length > 0 && !initialScrollDone) {
@@ -1219,283 +1132,6 @@ useEffect(() => {
     prevMessagesRef.current = [...parsedMessages];
   }, [parsedMessages, initialScrollDone]);
   
-  useEffect(() => {
-    isMountedRef.current = true;
-    
-    // Funzione per gestire tutti gli eventi di aggiornamento relativi alle chat
-    const handleChatUpdate = (event) => {
-      // Ignora gli eventi se il componente è stato smontato
-      if (!isMountedRef.current) return;
-      
-      const eventType = event.type;
-      const detail = event.detail || {};
-      
-      // Estrai l'ID notifica dall'evento
-      const eventNotificationId = detail.notificationId;
-      
-      // Se l'evento non è per questa chat, ignoralo
-      if (eventNotificationId && notification && parseInt(eventNotificationId) !== parseInt(notification.notificationId)) {
-        return;
-      }
-      
-      // Imposta un flag per evitare aggiornamenti troppo frequenti
-      if (updateInProgressRef.current) {
-        updateQueuedRef.current = true;
-        return;
-      }
-      
-      updateInProgressRef.current = true;
-      
-      // Usa requestAnimationFrame per assicurarsi che il reducer sia completato
-      requestAnimationFrame(() => {
-        // Usa setTimeout per un ulteriore livello di sicurezza
-        setTimeout(() => {
-          forceUpdateFromServer()
-            .finally(() => {
-              if (!isMountedRef.current) return;
-              
-              updateInProgressRef.current = false;
-              
-              // Se ci sono aggiornamenti in coda, eseguili
-              if (updateQueuedRef.current) {
-                updateQueuedRef.current = false;
-                requestAnimationFrame(() => {
-                  setTimeout(() => {
-                    if (isMountedRef.current) {
-                      forceUpdateFromServer();
-                    }
-                  }, 0);
-                });
-              }
-            });
-        }, 0);
-      });
-    };
-    
-    // Aggiungi il listener per l'evento
-    document.addEventListener('notification-updated', handleChatUpdate);
-    
-    // Pulizia del listener
-    return () => {
-      document.removeEventListener('notification-updated', handleChatUpdate);
-    };
-  }, [notification, forceUpdateFromServer]);
-
-  // Pulizia quando il componente viene smontato
-  useEffect(() => {
-    return () => {
-      // Pulisci eventuali timeout
-      if (messageUpdateTimeoutRef.current) {
-        clearTimeout(messageUpdateTimeoutRef.current);
-        messageUpdateTimeoutRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-  const handleWindowResize = () => {
-    // Resetta i flag di controllo per consentire l'adattamento automatico
-    positionUpdatedByUserRef.current = false;
-    sizeUpdatedByUserRef.current = false;
-  };
-  
-  window.addEventListener('resize', handleWindowResize);
-  
-  return () => {
-    window.removeEventListener('resize', handleWindowResize);
-  };
-}, []);
-  
-  
-  const handleLeaveChat = useCallback(async (notificationId) => {
-    if (!notification || !notificationId) return;
-    
-    try {
-      // Mostra un indicatore di caricamento
-      swal.fire({
-        title: 'Abbandono in corso...',
-        allowOutsideClick: false,
-        showConfirmButton: false,
-        willOpen: () => {
-          swal.showLoading();
-        }
-      });
-      
-      const result = await leaveChat(notificationId);
-      
-      if (result) {
-        // Importante: Ricarica i dati aggiornati della chat
-        await fetchNotificationById(notificationId);
-        
-        // Aggiorna lo stato locale
-        setHasLeftChat(true);
-        
-        // Mostra un messaggio di conferma
-        swal.fire({
-          title: 'Chat abbandonata',
-          text: 'Hai abbandonato questa conversazione',
-          icon: 'success',
-          timer: 2000,
-          showConfirmButton: false
-        });
-        
-        // Emetti un evento per notificare altri componenti
-        document.dispatchEvent(new CustomEvent('chat-status-changed', {
-          detail: { 
-            notificationId,
-            action: 'left',
-            timestamp: new Date().getTime()
-          }
-        }));
-      }
-    } catch (error) {
-      console.error('Errore nell\'abbandono della chat:', error);
-      swal.fire({
-        icon: 'error',
-        title: 'Errore',
-        text: error.message || 'Si è verificato un errore durante l\'abbandono della chat'
-      });
-    }
-  }, [notification, fetchNotificationById, leaveChat]);
-
-  const handleArchiveChat = useCallback(async () => {
-    if (!notification?.notificationId) return;
-    
-    try {
-    
-      // Mostra un indicatore di caricamento
-      swal.fire({
-        title: 'Archiviazione in corso...',
-        allowOutsideClick: false,
-        showConfirmButton: false,
-        willOpen: () => {
-          swal.showLoading();
-        }
-      });
-      
-      const result = await archiveChat(notification.notificationId);
-      
-      if (result && result.success) {
-        // Importante: Ricarica i dati aggiornati della chat
-        await fetchNotificationById(notification.notificationId);
-        
-        // Aggiorna lo stato locale
-        setIsArchived(true);
-        
-        swal.fire({
-          icon: 'success',
-          title: 'Chat archiviata',
-          text: 'La chat è stata archiviata con successo',
-          timer: 2000,
-          showConfirmButton: false
-        });
-        
-        // Emetti un evento per notificare altri componenti
-        document.dispatchEvent(new CustomEvent('chat-status-changed', {
-          detail: { 
-            notificationId: notification.notificationId,
-            action: 'archived',
-            timestamp: new Date().getTime()
-          }
-        }));
-      } else {
-        throw new Error(result?.message || 'Impossibile archiviare la chat');
-      }
-    } catch (error) {
-      console.error('Error archiving chat:', error);
-      swal.fire({
-        icon: 'error',
-        title: 'Errore',
-        text: error.message || 'Si è verificato un errore durante l\'archiviazione'
-      });
-    }
-  }, [notification, fetchNotificationById, archiveChat]);
-
-  const handleUnarchiveChat = useCallback(async () => {
-    if (!notification?.notificationId) return;
-    
-    try {
-     
-      // Mostra un indicatore di caricamento
-      swal.fire({
-        title: 'Rimozione dall\'archivio in corso...',
-        allowOutsideClick: false,
-        showConfirmButton: false,
-        willOpen: () => {
-          swal.showLoading();
-        }
-      });
-      
-      const result = await unarchiveChat(notification.notificationId);
-      
-      if (result && result.success) {
-        // Importante: Ricarica i dati aggiornati della chat
-        await fetchNotificationById(notification.notificationId);
-        
-        // Aggiorna lo stato locale
-        setIsArchived(false);
-        
-        swal.fire({
-          icon: 'success',
-          title: 'Chat recuperata',
-          text: 'La chat è stata rimossa dall\'archivio',
-          timer: 2000,
-          showConfirmButton: false
-        });
-        
-        
-        // Emetti un evento per notificare altri componenti
-        document.dispatchEvent(new CustomEvent('chat-status-changed', {
-          detail: { 
-            notificationId: notification.notificationId,
-            action: 'unarchived',
-            timestamp: new Date().getTime()
-          }
-        }));
-      } else {
-        throw new Error(result?.message || 'Impossibile rimuovere la chat dall\'archivio');
-      }
-    } catch (error) {
-      console.error('Error unarchiving chat:', error);
-      swal.fire({
-        icon: 'error',
-        title: 'Errore',
-        text: error.message || 'Si è verificato un errore durante la rimozione dall\'archivio'
-      });
-    }
-  }, [notification, fetchNotificationById, unarchiveChat]);
-
-  useEffect(() => {
-  // Gestore per aggiornamenti dello stato della chat
-  const handleChatStatusChange = async (event) => {
-    const { notificationId, action } = event.detail || {};
-    
-    // Verifica che questo evento sia per la chat corrente
-    if (notificationId && notification && notificationId === notification.notificationId) {
-   
-      // Ricarica i dati aggiornati
-      await fetchNotificationById(notificationId);
-      
-      // Aggiorna gli stati locali in base all'azione
-      if (action === 'left') {
-        setHasLeftChat(true);
-      } else if (action === 'archived') {
-        setIsArchived(true);
-      } else if (action === 'unarchived') {
-        setIsArchived(false);
-      }
-    }
-  };
-  
-  // Aggiungi listener per l'evento
-  document.addEventListener('chat-status-changed', handleChatStatusChange);
-  
-  // Pulizia del listener
-  return () => {
-    document.removeEventListener('chat-status-changed', handleChatStatusChange);
-  };
-}, [notification, fetchNotificationById]);
-
   // Aggiungi un effetto per gestire lo scroll verso il basso quando l'utente clicca sull'icona
   const handleScrollToBottom = useCallback(() => {
     if (chatListRef.current) {
@@ -1551,13 +1187,6 @@ useEffect(() => {
     }
   }, [chatListRef?.current]);
 
-  // Aggiorna il titolo ogni volta che la notifica cambia
-  useEffect(() => {
-    if (notification && notification.title) {
-      setChatTitle(notification.title);
-    }
-  }, [notification]);
-
   // Listener per l'aggiornamento del titolo della chat
   useEffect(() => {
     const handleTitleUpdate = (event) => {
@@ -1583,6 +1212,164 @@ useEffect(() => {
       document.removeEventListener('chat-title-updated', handleTitleUpdate);
     };
   }, [notification, windowManager]);
+
+  // Funzione per gestire l'abbandono della chat
+  const handleLeaveChat = useCallback(async (notificationId) => {
+    if (!notification || !notificationId) return;
+    
+    try {
+      // Mostra un indicatore di caricamento
+      swal.fire({
+        title: 'Abbandono in corso...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        willOpen: () => {
+          swal.showLoading();
+        }
+      });
+      
+      const result = await leaveChat(notificationId);
+      
+      if (result) {
+        // Importante: Ricarica i dati aggiornati della chat
+        await fetchNotificationById(notificationId);
+        
+        // Aggiorna lo stato locale
+        setHasLeftChat(true);
+        
+        // Mostra un messaggio di conferma
+        swal.fire({
+          title: 'Chat abbandonata',
+          text: 'Hai abbandonato questa conversazione',
+          icon: 'success',
+          timer: 2000,
+          showConfirmButton: false
+        });
+        
+        // Emetti un evento per notificare altri componenti
+        document.dispatchEvent(new CustomEvent('chat-status-changed', {
+          detail: { 
+            notificationId,
+            action: 'left',
+            timestamp: new Date().getTime()
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Errore nell\'abbandono della chat:', error);
+      swal.fire({
+        icon: 'error',
+        title: 'Errore',
+        text: error.message || 'Si è verificato un errore durante l\'abbandono della chat'
+      });
+    }
+  }, [notification, fetchNotificationById, leaveChat]);
+
+  // Funzione per gestire l'archiviazione della chat
+  const handleArchiveChat = useCallback(async () => {
+    if (!notification?.notificationId) return;
+    
+    try {
+      // Mostra un indicatore di caricamento
+      swal.fire({
+        title: 'Archiviazione in corso...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        willOpen: () => {
+          swal.showLoading();
+        }
+      });
+      
+      const result = await archiveChat(notification.notificationId);
+      
+      if (result && result.success) {
+        // Importante: Ricarica i dati aggiornati della chat
+        await fetchNotificationById(notification.notificationId);
+        
+        // Aggiorna lo stato locale
+        setIsArchived(true);
+        
+        swal.fire({
+          icon: 'success',
+          title: 'Chat archiviata',
+          text: 'La chat è stata archiviata con successo',
+          timer: 2000,
+          showConfirmButton: false
+        });
+        
+        // Emetti un evento per notificare altri componenti
+        document.dispatchEvent(new CustomEvent('chat-status-changed', {
+          detail: { 
+            notificationId: notification.notificationId,
+            action: 'archived',
+            timestamp: new Date().getTime()
+          }
+        }));
+      } else {
+        throw new Error(result?.message || 'Impossibile archiviare la chat');
+      }
+    } catch (error) {
+      console.error('Error archiving chat:', error);
+      swal.fire({
+        icon: 'error',
+        title: 'Errore',
+        text: error.message || 'Si è verificato un errore durante l\'archiviazione'
+      });
+    }
+  }, [notification, fetchNotificationById, archiveChat]);
+
+  // Funzione per gestire la rimozione dall'archivio
+  const handleUnarchiveChat = useCallback(async () => {
+    if (!notification?.notificationId) return;
+    
+    try {
+      // Mostra un indicatore di caricamento
+      swal.fire({
+        title: 'Rimozione dall\'archivio in corso...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        willOpen: () => {
+          swal.showLoading();
+        }
+      });
+      
+      const result = await unarchiveChat(notification.notificationId);
+      
+      if (result && result.success) {
+        // Importante: Ricarica i dati aggiornati della chat
+        await fetchNotificationById(notification.notificationId);
+        
+        // Aggiorna lo stato locale
+        setIsArchived(false);
+        
+        swal.fire({
+          icon: 'success',
+          title: 'Chat recuperata',
+          text: 'La chat è stata rimossa dall\'archivio',
+          timer: 2000,
+          showConfirmButton: false
+        });
+        
+        // Emetti un evento per notificare altri componenti
+        document.dispatchEvent(new CustomEvent('chat-status-changed', {
+          detail: { 
+            notificationId: notification.notificationId,
+            action: 'unarchived',
+            timestamp: new Date().getTime()
+          }
+        }));
+      } else {
+        throw new Error(result?.message || 'Impossibile rimuovere la chat dall\'archivio');
+      }
+    } catch (error) {
+      console.error('Error unarchiving chat:', error);
+      swal.fire({
+        icon: 'error',
+        title: 'Errore',
+        text: error.message || 'Si è verificato un errore durante la rimozione dall\'archivio'
+      });
+    }
+  }, [notification, fetchNotificationById, unarchiveChat]);
 
   // Don't render anything if component is unmounted or window is minimized
   if (!notification || isMinimized) {
