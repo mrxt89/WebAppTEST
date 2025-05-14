@@ -75,12 +75,14 @@ const NotificationSidebar = ({
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   // Filtro per le chat abbandonate
   const [filterLeftChats, setFilterLeftChats] = useState(false);
-  // Nuovo filtro per le chat archiviate
+  // Filtro per le chat archiviate
   const [filterArchivedChats, setFilterArchivedChats] = useState(false);
   // Filtro per le chat silenziate
   const [filterMutedChats, setFilterMutedChats] = useState(false);
   // Stato per gestire la visibilità della sezione documenti
   const [isDocumentSearchVisible, setIsDocumentSearchVisible] = useState(false);
+  // Conteggio delle notifiche archiviate non lette
+  const [archivedUnreadCount, setArchivedUnreadCount] = useState(0);
 
   // Nuovi stati per la ricerca di chat legate a documenti
   const [documentTab, setDocumentTab] = useState('customers'); // Tipo di documento attivo
@@ -110,15 +112,37 @@ const NotificationSidebar = ({
   useEffect(() => {
     // Forza il caricamento quando la sidebar diventa visibile
     if (visible === true) {
-     
       forceLoadNotifications();
     }
   }, [visible, forceLoadNotifications]);
 
-    // Funzione per filtrare le notifiche
+  // Effetto per calcolare il conteggio delle notifiche archiviate non lette
+  useEffect(() => {
+    if (notifications && notifications.length > 0) {
+      const count = notifications.filter(notification => 
+        (notification.archived === 1 || notification.archived === true) && 
+        !notification.isReadByUser
+      ).length;
+      setArchivedUnreadCount(count);
+    }
+  }, [notifications]);
+
+  // Funzione per filtrare le notifiche
   const filterNotifications = () => {
     // Prima filtra in base ai criteri di ricerca
     const filtered = (notifications || []).filter(notification => {
+      // Gestione delle notifiche archiviate
+      const isArchived = notification.archived === 1 || notification.archived === true;
+      
+      // Se filterArchivedChats è attivo, mostra SOLO le notifiche archiviate
+      // Se filterArchivedChats NON è attivo, mostra SOLO le notifiche NON archiviate
+      if (filterArchivedChats && !isArchived) {
+        return false;
+      }
+      if (!filterArchivedChats && isArchived) {
+        return false;
+      }
+      
       if (filterMentioned && !notification.isMentioned) {
         return false;
       }
@@ -148,16 +172,6 @@ const NotificationSidebar = ({
       // Filtro per chat silenziate
       if (filterMutedChats && !isNotificationMuted(notification)) {
         return false;
-      }
-      // Se non è attivo, nascondi le chat archiviate
-      if (filterArchivedChats) {
-        if (notification.archived !== 1) {
-          return false;
-        }
-      } else {
-        if (notification.archived === 1) {
-          return false;
-        }
       }
       
       if (searchTerm) {
@@ -221,21 +235,18 @@ const NotificationSidebar = ({
       document.removeEventListener('notifications-updated', handleNotificationsUpdated);
       document.removeEventListener('new-message-received', handleNewMessage);
     };
-  }, [visible, forceLoadNotifications, fetchNotificationById, filterNotifications]);
+  }, [visible, forceLoadNotifications, fetchNotificationById]);
   
   // Aggiungi un effetto per verificare la visibilità della sidebar
   useEffect(() => {
     const sidebarElement = document.querySelector('.notification-sidebar');
     if (sidebarElement) {
- 
       // Verifica se le classi CSS corrispondono allo stato 'visible'
       const hasShowClass = sidebarElement.classList.contains('show');
       if (visible && !hasShowClass) {
-    
         sidebarElement.classList.add('show');
         sidebarElement.classList.remove('hide');
       } else if (!visible && hasShowClass) {
-       
         sidebarElement.classList.remove('show');
         sidebarElement.classList.add('hide');
       }
@@ -249,8 +260,17 @@ const NotificationSidebar = ({
   // Aggiungiamo l'hook per il contesto Wiki
   const { openWiki } = useWikiContext();
 
+  // Inizializza le notifiche filtrate all'avvio
   useEffect(() => {
-    setFilteredNotifications(notifications);
+    if (notifications && notifications.length > 0) {
+      // All'inizio, mostra solo le notifiche NON archiviate
+      const nonArchivedNotifications = notifications.filter(notification => 
+        !(notification.archived === 1 || notification.archived === true)
+      );
+      setFilteredNotifications(nonArchivedNotifications);
+    } else {
+      setFilteredNotifications([]);
+    }
   }, [notifications]);
   
   // Effetto per filtrare le notifiche ogni volta che cambiano o cambia un filtro
@@ -271,10 +291,11 @@ const NotificationSidebar = ({
     filterFavorites,
     completedFilter,
     filterLeftChats,
-    filterArchivedChats  // Aggiungi il nuovo filtro per le archiviate
+    filterArchivedChats,
+    filterMutedChats
   ]);
 
-// Effetto per gestire il click fuori dai filtri espansi e chiuderli
+  // Effetto per gestire il click fuori dai filtri espansi e chiuderli
   useEffect(() => {
     const handleClickOutside = (event) => {
       // Se i filtri sono espansi e il click è fuori dal pannello dei filtri
@@ -315,18 +336,18 @@ const NotificationSidebar = ({
 
 
   // Aggiungi anche questo useEffect per gestire la chiusura del dropdown quando si clicca fuori
-useEffect(() => {
-  const handleClickOutside = (event) => {
-    if (isDocTypesOpen && !event.target.closest('.document-type-dropdown')) {
-      setIsDocTypesOpen(false);
-    }
-  };
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isDocTypesOpen && !event.target.closest('.document-type-dropdown')) {
+        setIsDocTypesOpen(false);
+      }
+    };
 
-  document.addEventListener('mousedown', handleClickOutside);
-  return () => {
-    document.removeEventListener('mousedown', handleClickOutside);
-  };
-}, [isDocTypesOpen]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDocTypesOpen]);
 
   // Handler per il pulsante Wiki nella sidebar
   const handleOpenWiki = (e) => {
@@ -334,8 +355,6 @@ useEffect(() => {
     openWiki('notifications', true); // Specifichiamo che stiamo aprendo dalla sidebar notifiche
   };
   
-
-
   const parseMessages = (messages) => {
     if (!messages) return [];
     if (typeof messages === 'string') {
@@ -433,7 +452,6 @@ useEffect(() => {
       
       if (response.data.success) {
         // Se l'utente è stato aggiunto con successo o già ha accesso
-     
         // Poi apri la chat
         openChatModal(notificationId);
       } else {
@@ -489,27 +507,25 @@ useEffect(() => {
     }
   };
 
-const handleNotificationClick = (notification, e) => {
-  // Ferma la propagazione dell'evento per evitare che il click arrivi al document
-  // e venga interpretato come un click outside
-  e.stopPropagation();
-  
-
-  // Rendi la funzione più robusta
-  if (notification && notification.notificationId && openChatModal) {
-  
-    // Prova con piccolo delay per assicurarti che eventuali altri eventi siano completati
-    setTimeout(() => {
-      openChatModal(notification.notificationId);
-    }, 100);
-  } else {
-    console.error('Impossibile aprire la chat - parametri mancanti:', { 
-      hasNotification: !!notification, 
-      hasNotificationId: !!(notification && notification.notificationId), 
-      hasOpenChatModal: !!openChatModal 
-    });
-  }
-};
+  const handleNotificationClick = (notification, e) => {
+    // Ferma la propagazione dell'evento per evitare che il click arrivi al document
+    // e venga interpretato come un click outside
+    e.stopPropagation();
+    
+    // Rendi la funzione più robusta
+    if (notification && notification.notificationId && openChatModal) {
+      // Prova con piccolo delay per assicurarti che eventuali altri eventi siano completati
+      setTimeout(() => {
+        openChatModal(notification.notificationId);
+      }, 100);
+    } else {
+      console.error('Impossibile aprire la chat - parametri mancanti:', { 
+        hasNotification: !!notification, 
+        hasNotificationId: !!(notification && notification.notificationId), 
+        hasOpenChatModal: !!openChatModal 
+      });
+    }
+  };
 
   const handleOpenNewMessageModal = () => {
     setIsModalOpen(true);
@@ -576,7 +592,6 @@ const handleNotificationClick = (notification, e) => {
     archiveChat(notificationId).then(result => {
       if (result && result.success) {
         // The state will be updated by Redux
-     
       }
     });
   };
@@ -588,7 +603,6 @@ const handleNotificationClick = (notification, e) => {
     unarchiveChat(notificationId).then(result => {
       if (result && result.success) {
         // The state will be updated by Redux
-      
       }
     });
   };
@@ -716,139 +730,64 @@ const handleNotificationClick = (notification, e) => {
     toggleFavorite(notificationId, !currentFavoriteStatus);
   };
 
-// Gestisci il toggling di "letto/non letto" senza propagazione
-const handleToggleReadUnread = (notificationId, isRead, e) => {
-  e.stopPropagation();
-  
-  // Instead of immediately applying the update to filtered notifications,
-  // we should only update the specific notification's read status
-  // while preserving the current filters
-  
-  // First find if the notification is in the current filtered set
-  const notificationInView = filteredNotifications.find(
-    notification => notification.notificationId === notificationId
-  );
-  
-  // Only perform UI update if the notification is currently visible
-  if (notificationInView) {
-    // Update only that specific notification in the filtered set
-    setFilteredNotifications(prevFilteredNotifications => 
-      prevFilteredNotifications.map(notification => 
-        notification.notificationId === notificationId
-          ? { ...notification, isReadByUser: !isRead }
-          : notification
-      )
-    );
-  }
-  
-  // Then call the API to update the read status server-side
-  toggleReadUnread(notificationId, !isRead).catch(error => {
-    console.error('Error toggling read status:', error);
+  // Gestisci il toggling di "letto/non letto" senza propagazione
+  const handleToggleReadUnread = (notificationId, isRead, e) => {
+    e.stopPropagation();
     
-    // If there was an error, revert the local change only if it was in view
+    // Instead of immediately applying the update to filtered notifications,
+    // we should only update the specific notification's read status
+    // while preserving the current filters
+    
+    // First find if the notification is in the current filtered set
+    const notificationInView = filteredNotifications.find(
+      notification => notification.notificationId === notificationId
+    );
+    
+    // Only perform UI update if the notification is currently visible
     if (notificationInView) {
+      // Update only that specific notification in the filtered set
       setFilteredNotifications(prevFilteredNotifications => 
         prevFilteredNotifications.map(notification => 
           notification.notificationId === notificationId
-            ? { ...notification, isReadByUser: isRead }
+            ? { ...notification, isReadByUser: !isRead }
             : notification
         )
       );
     }
-  });
-};
-
-
-useEffect(() => {
-  if (notifications && notifications.length > 0) {
-    // Use a debounced function to avoid multiple rapid filter operations
-    const timer = setTimeout(() => {
-      // Apply filters while preserving archived state
-      const filtered = (notifications || []).filter(notification => {
-        // Skip archived notifications unless the filter is active
-        if (!filterArchivedChats && notification.archived === 1) {
-          return false;
-        }
-        
-        // Apply other filters
-        if (filterMentioned && !notification.isMentioned) {
-          return false;
-        }
-        if (filterMessagesSent && !notification.messagesSent) {
-          return false;
-        }
-        if (showUnreadOnly && notification.isReadByUser) {
-          return false;
-        }
-        if (filterFavorites && !notification.favorite) {
-          return false;
-        }
-        if (selectedCategory !== 'all' && notification.notificationCategoryId.toString() !== selectedCategory) {
-          return false;
-        }
-        // Remaining filters
-        if (completedFilter === 'completed' && !notification.isClosed) {
-          return false;
-        }
-        if (completedFilter === 'active' && notification.isClosed) {
-          return false;
-        }
-        if (filterLeftChats && notification.chatLeft !== 1) {
-          return false;
-        }
-        if (filterMutedChats && !isNotificationMuted(notification)) {
-          return false;
-        }
-        // Search text filter
-        if (searchTerm) {
-          const lowerSearchTerm = searchTerm.toLowerCase();
-          const messages = parseMessages(notification.messages);
-          if (!notification.title.toLowerCase().includes(lowerSearchTerm) &&
-              !messages.some(message => message.message && message.message.toLowerCase().includes(lowerSearchTerm))) {
-            return false;
-          }
-        }
-        return true;
-      });
-      
-      // Sort the filtered notifications (keep your existing sorting logic)
-      const sortedFiltered = [...filtered].sort((a, b) => {
-        // First by pin status
-        if (a.pinned && !b.pinned) return -1;
-        if (!a.pinned && b.pinned) return 1;
-        
-        // Then by date
-        const messagesA = parseMessages(a.messages);
-        const messagesB = parseMessages(b.messages);
-        
-        const lastMessageA = messagesA.length > 0 ? messagesA[messagesA.length - 1] : null;
-        const lastMessageB = messagesB.length > 0 ? messagesB[messagesB.length - 1] : null;
-        
-        const dateA = lastMessageA ? new Date(lastMessageA.tbCreated) : new Date(a.tbCreated || 0);
-        const dateB = lastMessageB ? new Date(lastMessageB.tbCreated) : new Date(b.tbCreated || 0);
-        
-        return dateB - dateA;
-      });
-      
-      setFilteredNotifications(sortedFiltered);
-    }, 50); // Small delay to debounce multiple filter operations
     
-    return () => clearTimeout(timer);
-  }
-}, [
-  notifications, 
-  filterMentioned, 
-  filterMessagesSent, 
-  showUnreadOnly, 
-  searchTerm, 
-  selectedCategory, 
-  filterFavorites,
-  completedFilter,
-  filterLeftChats,
-  filterArchivedChats,
-  filterMutedChats,
-  isNotificationMuted
-]);
+    // Then call the API to update the read status server-side
+    toggleReadUnread(notificationId, !isRead).then(() => {
+      // Aggiorna il conteggio delle notifiche archiviate non lette
+      if (notifications && notifications.length > 0) {
+        const notification = notifications.find(n => n.notificationId === notificationId);
+        if (notification && (notification.archived === 1 || notification.archived === true)) {
+          const newCount = !isRead 
+            ? archivedUnreadCount - 1 
+            : archivedUnreadCount + 1;
+          setArchivedUnreadCount(Math.max(0, newCount));
+        }
+      }
+    }).catch(error => {
+      console.error('Error toggling read status:', error);
+      
+      // If there was an error, revert the local change only if it was in view
+      if (notificationInView) {
+        setFilteredNotifications(prevFilteredNotifications => 
+          prevFilteredNotifications.map(notification => 
+            notification.notificationId === notificationId
+              ? { ...notification, isReadByUser: isRead }
+              : notification
+          )
+        );
+      }
+    });
+  };
+
+  // Quando si cambia il filtro di archiviazione, invertiamo completamente la visualizzazione
+  const handleToggleArchivedFilter = () => {
+    setFilterArchivedChats(!filterArchivedChats);
+    // Il filterNotifications() verrà chiamato attraverso l'useEffect che monitora filterArchivedChats
+  };
 
   useEffect(() => {
     return () => {
@@ -903,8 +842,8 @@ useEffect(() => {
                 className="w-full p-2 pl-9 pr-9 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 id="notification-search-input"
               />
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-               
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none w-100 justify-content-end px-2.5">
+                <Search className="w-4 h-4 text-gray-400" />
               </div>
               {searchTerm && (
                 <button 
@@ -921,7 +860,7 @@ useEffect(() => {
           {/* Visible filters */}
           <div className="flex items-center justify-center w-100 z-50 px-2 mb-1">
             <div className="flex w-100 z-50 items-center space-x-2">
-            <button
+              <button
                 className={`p-2 flex items-center justify-center ${isFilterExpanded ? 'bg-blue-50 text-blue-600' : 'bg-white text-gray-700'} border border-gray-200 rounded-lg hover:bg-gray-50`}
                 style={{ zIndex: 100 }}
                 onClick={toggleFilterExpansion}
@@ -988,467 +927,467 @@ useEffect(() => {
               overflowY: 'auto'
             }}
           >
-    {/* Header con titolo e pulsante di chiusura */}
-    <div className="flex items-center justify-between mb-3 pb-2 border-b">
-      <h3 className="text-sm font-semibold">Filtri notifiche</h3>
-      <button 
-        className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
-        onClick={toggleFilterExpansion}
-        id="notification-filter-close"  
-      >
-        <X className="w-4 h-4" />
-      </button>
-    </div>
-    
-    {/* Non disturbare */}
-    <div className="mb-4">
-      <DoNotDisturbToggle />
-    </div>
-
-    {/* Filtri di base - layout a griglia */}
-    <div className="mb-4">
-      <h4 className="text-xs font-medium text-gray-500 mb-2">Filtri principali</h4>
-      <div className="grid grid-cols-2 gap-2">
-         {/* Filtro notifiche non lette - usando checkbox standard HTML */}
-      <div 
-        className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-          showUnreadOnly ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50 border border-transparent'
-        }`}
-        onClick={() => setShowUnreadOnly(!showUnreadOnly)}
-      >
-        <input 
-          type="checkbox"
-          id="notification-unread-switch"
-          checked={showUnreadOnly}
-          onChange={(e) => setShowUnreadOnly(e.target.checked)}
-          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-        />
-        <label htmlFor="notification-unread-switch" className="text-sm cursor-pointer">
-          Solo non lette
-        </label>
-    </div>
-        
-        {/* Filtro preferiti */}
-        <div 
-          className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-            filterFavorites ? 'bg-yellow-50 border border-yellow-200 text-yellow-700' : 'hover:bg-gray-50 border border-transparent text-gray-700'
-          }`}
-          onClick={() => setFilterFavorites(!filterFavorites)}
-          id="notification-favorites-filter"
-        >
-          <Star className={`w-4 h-4 ${filterFavorites ? 'fill-yellow-500 text-yellow-500' : ''}`} />
-          <span className="text-sm">Preferiti</span>
-        </div>
-      </div>
-    </div>
-    
-    {/* Filtri per tipo - layout a griglia */}
-    <div className="mb-4">
-      <h4 className="text-xs font-medium text-gray-500 mb-2">Tipo di notifiche</h4>
-      <div className="grid grid-cols-2 gap-2">
-        {/* Filtro menzioni */}
-        <div 
-          className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-            filterMentioned ? 'bg-indigo-50 border border-indigo-200 text-indigo-700' : 'hover:bg-gray-50 border border-transparent text-gray-700'
-          }`}
-          onClick={() => setFilterMentioned(!filterMentioned)}
-          id="notification-mentioned-filter"
-        >
-          <AtSign className="w-4 h-4" />
-          <span className="text-sm">Menzioni</span>
-        </div>
-        
-        {/* Filtro messaggi inviati */}
-        <div 
-          className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-            filterMessagesSent ? 'bg-green-50 border border-green-200 text-green-700' : 'hover:bg-gray-50 border border-transparent text-gray-700'
-          }`}
-          onClick={() => setFilterMessagesSent(!filterMessagesSent)}
-          id="notification-sent-filter"
-        >
-          <Send className="w-4 h-4" />
-          <span className="text-sm">Miei messaggi</span>
-        </div>
-      </div>
-    </div>
-    
-    {/* Filtri per stato - layout a griglia */}
-    <div className="mb-4">
-      <h4 className="text-xs font-medium text-gray-500 mb-2">Stato</h4>
-      <div className="grid grid-cols-2 gap-2">
-        {/* Filtro chat abbandonate */}
-        <div 
-          className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-            filterLeftChats ? 'bg-amber-50 border border-amber-200 text-amber-700' : 'hover:bg-gray-50 border border-transparent text-gray-700'
-          }`}
-          onClick={() => setFilterLeftChats(!filterLeftChats)}
-          id="notification-left-chats-filter"
-        >
-          <LogOut className="w-4 h-4" />
-          <span className="text-sm">Abbandonate</span>
-        </div>
-        
-        {/* Filtro chat archiviate */}
-        <div 
-          className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-            filterArchivedChats ? 'bg-purple-50 border border-purple-200 text-purple-700' : 'hover:bg-gray-50 border border-transparent text-gray-700'
-          }`}
-          onClick={() => setFilterArchivedChats(!filterArchivedChats)}
-          id="notification-archived-chats-filter"
-        >
-          <Archive className="w-4 h-4" />
-          <span className="text-sm">Archiviate</span>
-        </div>
-        
-        {/* Filtro chat silenziate */}
-        <div 
-          className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-            filterMutedChats ? 'bg-rose-50 border border-rose-200 text-rose-700' : 'hover:bg-gray-50 border border-transparent text-gray-700'
-          }`}
-          onClick={() => setFilterMutedChats(!filterMutedChats)}
-          id="notification-muted-filter"
-        >
-          <BellOff className="w-4 h-4" />
-          <span className="text-sm">Silenziate</span>
-        </div>
-      </div>
-    </div>
-    
-    {/* Filtro stato completamento */}
-    <div className="mb-4">
-      <label className="text-xs font-medium text-gray-500 mb-2 block">Stato completamento</label>
-      <div className="flex justify-between bg-white border border-gray-200 rounded-lg p-0.5" id="notification-completion-filter">
-        <button
-          className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-            completedFilter === 'all' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
-          }`}
-          onClick={() => handleCompletedFilterChange('all')}
-          id="notification-filter-all"
-        >
-          Tutte
-        </button>
-        <button
-          className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-            completedFilter === 'active' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
-          }`}
-          onClick={() => handleCompletedFilterChange('active')}
-          id="notification-filter-active"
-        >
-          Attive
-        </button>
-        <button
-          className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-            completedFilter === 'completed' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
-          }`}
-          onClick={() => handleCompletedFilterChange('completed')}
-          id="notification-filter-completed"
-        >
-          Completate
-        </button>
-      </div>
-    </div>
-    
-    {/* Pulsante per reimpostare tutti i filtri */}
-    <div className="mt-4 pt-3 border-t border-gray-100 text-center">
-      <button 
-        className="w-full py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg"
-        onClick={() => {
-          setShowUnreadOnly(false);
-          setFilterFavorites(false);
-          setFilterMentioned(false);
-          setFilterMessagesSent(false);
-          setSelectedCategory('all');
-          setSearchTerm('');
-          setCompletedFilter('all');
-          setFilterLeftChats(false);
-          setFilterArchivedChats(false);
-          setFilterMutedChats(false);
-        }}
-      >
-        Reimposta tutti i filtri
-      </button>
-    </div>
-  </div>
-)}
-        </div>
-      </div>
-
-
-{/* Document Search Section */}
-{isDocumentSearchVisible && (
-  <div className="document-search-section bg-white border-b border-gray-200 p-3">
-    <div className="flex justify-between items-center mb-3">
-      <h3 className="text-sm font-medium">Cerca chat per documento</h3>
-      <button 
-        onClick={toggleDocumentSearch}
-        className="text-gray-400 hover:text-gray-600"
-      >
-        <X className="h-4 w-4" />
-      </button>
-    </div>
-    
-    {/* Document Type Dropdown */}
-    <div className="mb-3 relative document-type-dropdown">
-      <div 
-        className="p-2 border rounded-lg flex justify-between items-center cursor-pointer bg-white hover:bg-gray-50"
-        onClick={() => setIsDocTypesOpen(!isDocTypesOpen)}
-      >
-        <div className="flex items-center">
-          {React.cloneElement(documentTypes.find(t => t.id === documentTab)?.icon || <Link />, { className: 'h-4 w-4 mr-2' })}
-          <span className="text-sm">{documentTypes.find(t => t.id === documentTab)?.label || 'Seleziona categoria'}</span>
-        </div>
-        <ChevronDown className={`h-4 w-4 transition-transform ${isDocTypesOpen ? 'rotate-180' : ''}`} />
-      </div>
-      
-      {/* Dropdown menu */}
-      {isDocTypesOpen && (
-        <div className="absolute left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 document-type-menu max-h-48 overflow-y-auto">
-          {documentTypes.map(type => (
-            <button
-              key={type.id}
-              className={`w-full flex items-center py-2 px-3 text-sm hover:bg-gray-50 ${
-                documentTab === type.id ? 'bg-blue-50 text-blue-600 font-medium' : ''
-              }`}
-              onClick={() => {
-                setDocumentTab(type.id);
-                setDocumentsSearchResults([]);
-                setSelectedDocument(null);
-                setDocumentChats([]);
-                setIsDocTypesOpen(false);
-              }}
-            >
-              {React.cloneElement(type.icon, { className: 'h-4 w-4 mr-2' })}
-              <span>{type.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-    
-    {/* Document Search Bar */}
-    <div className="relative mb-3">
-      <input 
-        type="text" 
-        placeholder={`Cerca ${documentTypes.find(t => t.id === documentTab)?.label.toLowerCase() || 'documenti'}...`} 
-        value={documentsSearchTerm} 
-        onChange={handleDocumentsSearchChange} 
-        className="w-full p-2 pl-9 pr-9 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-      />
-      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-      
-      </div>
-      {documentsSearchTerm && (
-        <button 
-          onClick={handleClearDocumentsSearch} 
-          className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      )}
-    </div>
-    
-    <button
-      onClick={searchDocuments}
-      className="w-full py-2 px-3 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-      disabled={documentsSearchTerm.length < 2 || documentsLoading}
-    >
-      {documentsLoading ? (
-        <span className="flex items-center justify-center">
-          <i className="bi bi-arrow-repeat spin mr-2"></i> Ricerca in corso...
-        </span>
-      ) : (
-        'Cerca Documenti'
-      )}
-    </button>
-    
-    {/* Document Results and Chat List */}
-    <div  className="mt-3"
-          style={{ height: '50vh', overflowY: 'auto' }}
-    >
-      {/* Document Search Results */}
-      {documentsSearchResults.length > 0 && (
-        <div  className="mb-3"
-              style={{ height: '50vh', overflowY: 'auto' }}
-        >
-          <h4 className="text-xs font-medium text-gray-600 mb-2">
-            Documenti trovati ({documentsSearchResults.length})
-          </h4>
-          <div className="space-y-2 overflow-y-auto pr-1 documents-list">
-            {documentsSearchResults.map(doc => (
-              <div 
-                key={`doc-${doc.DocumentType}-${doc.DocumentId}`}
-                className={`document-item p-2 border rounded-lg cursor-pointer transition-colors ${
-                  selectedDocument?.DocumentId === doc.DocumentId
-                    ? 'bg-blue-50 border-blue-200'
-                    : 'bg-white border-gray-200 hover:bg-gray-50'
-                }`}
-                onClick={() => searchChatsByDocument(doc)}
+            {/* Header con titolo e pulsante di chiusura */}
+            <div className="flex items-center justify-between mb-3 pb-2 border-b">
+              <h3 className="text-sm font-semibold">Filtri notifiche</h3>
+              <button 
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
+                onClick={toggleFilterExpansion}
+                id="notification-filter-close"  
               >
-                <div className="flex items-start">
-                  <div className="flex-shrink-0 mr-2 bg-gray-100 p-1.5 rounded-md">
-                    {documentTypes.find(t => t.id === documentTab)?.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {doc.DocumentNumber}
-                      {doc.Status && (
-                        <span className="ml-2 text-xs px-1.5 py-0.5 bg-gray-100 rounded-full">
-                          {doc.Status}
-                        </span>
-                      )}
-                    </p>
-                    
-                    {doc.DocumentReference && (
-                      <p className="text-xs text-gray-500 truncate">
-                        {doc.DocumentReference}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500 truncate">{doc.DocumentDescription}</p>
-                    {doc.DocumentDate && (
-                      <p className="text-xs text-gray-400 flex items-center mt-1">
-                        <Calendar className="h-3 w-3 mr-1" />
-                        {new Date(doc.DocumentDate).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
-                  <ChevronDown 
-                    className={`h-4 w-4 text-gray-400 transform transition-transform ${
-                      selectedDocument?.DocumentId === doc.DocumentId ? 'rotate-180' : ''
-                    }`} 
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            {/* Non disturbare */}
+            <div className="mb-4">
+              <DoNotDisturbToggle />
+            </div>
+
+            {/* Filtri di base - layout a griglia */}
+            <div className="mb-4">
+              <h4 className="text-xs font-medium text-gray-500 mb-2">Filtri principali</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Filtro notifiche non lette - usando checkbox standard HTML */}
+                <div 
+                  className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
+                    showUnreadOnly ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50 border border-transparent'
+                  }`}
+                  onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+                >
+                  <input 
+                    type="checkbox"
+                    id="notification-unread-switch"
+                    checked={showUnreadOnly}
+                    onChange={(e) => setShowUnreadOnly(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                   />
+                  <label htmlFor="notification-unread-switch" className="text-sm cursor-pointer">
+                    Solo non lette
+                  </label>
+                </div>
+                
+                {/* Filtro preferiti */}
+                <div 
+                  className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
+                    filterFavorites ? 'bg-yellow-50 border border-yellow-200 text-yellow-700' : 'hover:bg-gray-50 border border-transparent text-gray-700'
+                  }`}
+                  onClick={() => setFilterFavorites(!filterFavorites)}
+                  id="notification-favorites-filter"
+                >
+                  <Star className={`w-4 h-4 ${filterFavorites ? 'fill-yellow-500 text-yellow-500' : ''}`} />
+                  <span className="text-sm">Preferiti</span>
                 </div>
               </div>
-            ))}
+            </div>
+            
+            {/* Filtri per tipo - layout a griglia */}
+            <div className="mb-4">
+              <h4 className="text-xs font-medium text-gray-500 mb-2">Tipo di notifiche</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Filtro menzioni */}
+                <div 
+                  className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
+                    filterMentioned ? 'bg-indigo-50 border border-indigo-200 text-indigo-700' : 'hover:bg-gray-50 border border-transparent text-gray-700'
+                  }`}
+                  onClick={() => setFilterMentioned(!filterMentioned)}
+                  id="notification-mentioned-filter"
+                >
+                  <AtSign className="w-4 h-4" />
+                  <span className="text-sm">Menzioni</span>
+                </div>
+                
+                {/* Filtro messaggi inviati */}
+                <div 
+                  className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
+                    filterMessagesSent ? 'bg-green-50 border border-green-200 text-green-700' : 'hover:bg-gray-50 border border-transparent text-gray-700'
+                  }`}
+                  onClick={() => setFilterMessagesSent(!filterMessagesSent)}
+                  id="notification-sent-filter"
+                >
+                  <Send className="w-4 h-4" />
+                  <span className="text-sm">Miei messaggi</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Filtri per stato - layout a griglia */}
+            <div className="mb-4">
+              <h4 className="text-xs font-medium text-gray-500 mb-2">Stato</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Filtro chat abbandonate */}
+                <div 
+                  className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
+                    filterLeftChats ? 'bg-amber-50 border border-amber-200 text-amber-700' : 'hover:bg-gray-50 border border-transparent text-gray-700'
+                  }`}
+                  onClick={() => setFilterLeftChats(!filterLeftChats)}
+                  id="notification-left-chats-filter"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="text-sm">Abbandonate</span>
+                </div>
+                
+                {/* Filtro chat archiviate */}
+                <div 
+                  className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
+                    filterArchivedChats ? 'bg-purple-50 border border-purple-200 text-purple-700' : 'hover:bg-gray-50 border border-transparent text-gray-700'
+                  }`}
+                  onClick={handleToggleArchivedFilter}
+                  id="notification-archived-chats-filter"
+                >
+                  <Archive className="w-4 h-4" />
+                  <span className="text-sm">Archiviate</span>
+                  {archivedUnreadCount > 0 && !filterArchivedChats && (
+                    <span className="flex items-center justify-center ml-1 bg-red-500 text-white text-xs font-semibold h-5 w-5 rounded-full">
+                      {archivedUnreadCount}
+                    </span>
+                  )}
+                </div>
+                
+                {/* Filtro chat silenziate */}
+                <div 
+                  className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
+                    filterMutedChats ? 'bg-rose-50 border border-rose-200 text-rose-700' : 'hover:bg-gray-50 border border-transparent text-gray-700'
+                  }`}
+                  onClick={() => setFilterMutedChats(!filterMutedChats)}
+                  id="notification-muted-filter"
+                >
+                  <BellOff className="w-4 h-4" />
+                  <span className="text-sm">Silenziate</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Filtro stato completamento */}
+            <div className="mb-4">
+              <label className="text-xs font-medium text-gray-500 mb-2 block">Stato completamento</label>
+              <div className="flex justify-between bg-white border border-gray-200 rounded-lg p-0.5" id="notification-completion-filter">
+                <button
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    completedFilter === 'all' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                  onClick={() => handleCompletedFilterChange('all')}
+                  id="notification-filter-all"
+                >
+                  Tutte
+                </button>
+                <button
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    completedFilter === 'active' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                  onClick={() => handleCompletedFilterChange('active')}
+                  id="notification-filter-active"
+                >
+                  Attive
+                </button>
+                <button
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    completedFilter === 'completed' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                  onClick={() => handleCompletedFilterChange('completed')}
+                  id="notification-filter-completed"
+                >
+                  Completate
+                </button>
+              </div>
+            </div>
+            
+            {/* Pulsante per reimpostare tutti i filtri */}
+            <div className="mt-4 pt-3 border-t border-gray-100 text-center">
+              <button 
+                className="w-full py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg"
+                onClick={() => {
+                  setShowUnreadOnly(false);
+                  setFilterFavorites(false);
+                  setFilterMentioned(false);
+                  setFilterMessagesSent(false);
+                  setSelectedCategory('all');
+                  setSearchTerm('');
+                  setCompletedFilter('all');
+                  setFilterLeftChats(false);
+                  setFilterArchivedChats(false);
+                  setFilterMutedChats(false);
+                }}
+              >
+                Reimposta tutti i filtri
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-      
-      {/* Document-Related Chats */}
-      {selectedDocument && (
-        <div className="mt-4">
-          <h4 className="text-xs font-medium text-gray-600 mb-2 flex items-center">
-            <MessageSquare className="h-3.5 w-3.5 mr-1" />
-            Chat legate a: 
-            <span className="ml-1 font-semibold text-blue-600">
-              {selectedDocument.DocumentNumber}
-            </span>
-          </h4>
-          
-          {documentChatsLoading ? (
-            <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg">
-              <i className="bi bi-arrow-repeat spin mr-2"></i>
-              <span className="text-sm text-gray-500">Caricamento chat...</span>
-            </div>
-          ) : documentChats.length > 0 ? (
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-{documentChats.map((chat, index) => (
-  <div 
-  key={`doc-chat-${chat.notificationId}-${index}`}
-    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-      chat.isUserMember 
-        ? 'bg-white border-gray-200 hover:bg-gray-50' 
-        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-    }`}
-    onClick={() => chat.isUserMember 
-      ? openChatModal(chat.notificationId) 
-      : openChatInReadOnlyMode(chat.notificationId)
-    }
-  >
-    <div className="flex items-center justify-between mb-1">
-      <div className="flex items-center">
-        <span 
-          className="w-3 h-3 rounded-full mr-2"
-          style={{ backgroundColor: chat.hexColor || '#6366f1' }}
-        ></span>
-        <h5 className="text-sm font-medium truncate">{chat.title}</h5>
+        )}
       </div>
-      {!chat.isUserMember && (
-        <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full flex items-center">
-          <Eye className="h-3 w-3 mr-1" />
-          Sola lettura
-        </span>
-      )}
     </div>
-    
-    <p className="text-xs text-gray-500 line-clamp-2 mb-2">
-      {chat.lastMessage || "Nessun messaggio"}
-    </p>
-    
-    <div className="flex items-center justify-between text-xs text-gray-400">
-      <span className="flex items-center">
-        <User className="h-3 w-3 mr-1" />
-        {chat.participantCount} partecipanti
-      </span>
-      <span className="flex items-center">
-        <Calendar className="h-3 w-3 mr-1" />
-        {new Date(chat.tbCreated).toLocaleDateString()}
-      </span>
-    </div>
-  </div>
-))}
+
+
+    {/* Document Search Section */}
+    {isDocumentSearchVisible && (
+      <div className="document-search-section bg-white border-b border-gray-200 p-3">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-medium">Cerca chat per documento</h3>
+          <button 
+            onClick={toggleDocumentSearch}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        
+        {/* Document Type Dropdown */}
+        <div className="mb-3 relative document-type-dropdown">
+          <div 
+            className="p-2 border rounded-lg flex justify-between items-center cursor-pointer bg-white hover:bg-gray-50"
+            onClick={() => setIsDocTypesOpen(!isDocTypesOpen)}
+          >
+            <div className="flex items-center">
+              {React.cloneElement(documentTypes.find(t => t.id === documentTab)?.icon || <Link />, { className: 'h-4 w-4 mr-2' })}
+              <span className="text-sm">{documentTypes.find(t => t.id === documentTab)?.label || 'Seleziona categoria'}</span>
             </div>
+            <ChevronDown className={`h-4 w-4 transition-transform ${isDocTypesOpen ? 'rotate-180' : ''}`} />
+          </div>
+          
+          {/* Dropdown menu */}
+          {isDocTypesOpen && (
+            <div className="absolute left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 document-type-menu max-h-48 overflow-y-auto">
+              {documentTypes.map(type => (
+                <button
+                  key={type.id}
+                  className={`w-full flex items-center py-2 px-3 text-sm hover:bg-gray-50 ${
+                    documentTab === type.id ? 'bg-blue-50 text-blue-600 font-medium' : ''
+                  }`}
+                  onClick={() => {
+                    setDocumentTab(type.id);
+                    setDocumentsSearchResults([]);
+                    setSelectedDocument(null);
+                    setDocumentChats([]);
+                    setIsDocTypesOpen(false);
+                  }}
+                >
+                  {React.cloneElement(type.icon, { className: 'h-4 w-4 mr-2' })}
+                  <span>{type.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Document Search Bar */}
+        <div className="relative mb-3">
+          <input 
+            type="text" 
+            placeholder={`Cerca ${documentTypes.find(t => t.id === documentTab)?.label.toLowerCase() || 'documenti'}...`} 
+            value={documentsSearchTerm} 
+            onChange={handleDocumentsSearchChange} 
+            className="w-full p-2 pl-9 pr-9 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <Search className="w-4 h-4 text-gray-400" />
+          </div>
+          {documentsSearchTerm && (
+            <button 
+              onClick={handleClearDocumentsSearch} 
+              className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        
+        <button
+          onClick={searchDocuments}
+          className="w-full py-2 px-3 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          disabled={documentsSearchTerm.length < 2 || documentsLoading}
+        >
+          {documentsLoading ? (
+            <span className="flex items-center justify-center">
+              <i className="bi bi-arrow-repeat spin mr-2"></i> Ricerca in corso...
+            </span>
           ) : (
-            <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg">
-              <MessageSquare className="h-8 w-8 text-gray-300 mb-2" />
+            'Cerca Documenti'
+          )}
+        </button>
+        
+        {/* Document Results and Chat List */}
+        <div className="mt-3" style={{ height: '50vh', overflowY: 'auto' }}>
+          {/* Document Search Results */}
+          {documentsSearchResults.length > 0 && (
+            <div className="mb-3" style={{ height: '50vh', overflowY: 'auto' }}>
+              <h4 className="text-xs font-medium text-gray-600 mb-2">
+                Documenti trovati ({documentsSearchResults.length})
+              </h4>
+              <div className="space-y-2 overflow-y-auto pr-1 documents-list">
+                {documentsSearchResults.map(doc => (
+                  <div 
+                    key={`doc-${doc.DocumentType}-${doc.DocumentId}`}
+                    className={`document-item p-2 border rounded-lg cursor-pointer transition-colors ${
+                      selectedDocument?.DocumentId === doc.DocumentId
+                        ? 'bg-blue-50 border-blue-200'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    }`}
+                    onClick={() => searchChatsByDocument(doc)}
+                  >
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 mr-2 bg-gray-100 p-1.5 rounded-md">
+                        {documentTypes.find(t => t.id === documentTab)?.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {doc.DocumentNumber}
+                          {doc.Status && (
+                            <span className="ml-2 text-xs px-1.5 py-0.5 bg-gray-100 rounded-full">
+                              {doc.Status}
+                            </span>
+                          )}
+                        </p>
+                        
+                        {doc.DocumentReference && (
+                          <p className="text-xs text-gray-500 truncate">
+                            {doc.DocumentReference}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500 truncate">{doc.DocumentDescription}</p>
+                        {doc.DocumentDate && (
+                          <p className="text-xs text-gray-400 flex items-center mt-1">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {new Date(doc.DocumentDate).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                      <ChevronDown 
+                        className={`h-4 w-4 text-gray-400 transform transition-transform ${
+                          selectedDocument?.DocumentId === doc.DocumentId ? 'rotate-180' : ''
+                        }`} 
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Document-Related Chats */}
+          {selectedDocument && (
+            <div className="mt-4">
+              <h4 className="text-xs font-medium text-gray-600 mb-2 flex items-center">
+                <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                Chat legate a: 
+                <span className="ml-1 font-semibold text-blue-600">
+                  {selectedDocument.DocumentNumber}
+                </span>
+              </h4>
+              
+              {documentChatsLoading ? (
+                <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg">
+                  <i className="bi bi-arrow-repeat spin mr-2"></i>
+                  <span className="text-sm text-gray-500">Caricamento chat...</span>
+                </div>
+              ) : documentChats.length > 0 ? (
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {documentChats.map((chat, index) => (
+                    <div 
+                      key={`doc-chat-${chat.notificationId}-${index}`}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        chat.isUserMember 
+                          ? 'bg-white border-gray-200 hover:bg-gray-50' 
+                          : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                      }`}
+                      onClick={() => chat.isUserMember 
+                        ? openChatModal(chat.notificationId) 
+                        : openChatInReadOnlyMode(chat.notificationId)
+                      }
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center">
+                          <span 
+                            className="w-3 h-3 rounded-full mr-2"
+                            style={{ backgroundColor: chat.hexColor || '#6366f1' }}
+                          ></span>
+                          <h5 className="text-sm font-medium truncate">{chat.title}</h5>
+                        </div>
+                        {!chat.isUserMember && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full flex items-center">
+                            <Eye className="h-3 w-3 mr-1" />
+                            Sola lettura
+                          </span>
+                        )}
+                      </div>
+                      
+                      <p className="text-xs text-gray-500 line-clamp-2 mb-2">
+                        {chat.lastMessage || "Nessun messaggio"}
+                      </p>
+                      
+                      <div className="flex items-center justify-between text-xs text-gray-400">
+                        <span className="flex items-center">
+                          <User className="h-3 w-3 mr-1" />
+                          {chat.participantCount} partecipanti
+                        </span>
+                        <span className="flex items-center">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          {new Date(chat.tbCreated).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg">
+                  <MessageSquare className="h-8 w-8 text-gray-300 mb-2" />
+                  <p className="text-sm text-gray-500 text-center">
+                    Nessuna chat trovata per questo documento.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Empty State for Document Search */}
+          {!documentsSearchResults.length && !documentsLoading && !selectedDocument && documentsSearchTerm.length >= 2 && (
+            <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg mt-3">
+              <Link className="h-8 w-8 text-gray-300 mb-2" />
               <p className="text-sm text-gray-500 text-center">
-                Nessuna chat trovata per questo documento.
+                Nessun documento trovato. Prova a modificare i criteri di ricerca.
+              </p>
+            </div>
+          )}
+          
+          {/* Help Text for Document Search */}
+          {!documentsSearchResults.length && !documentsLoading && documentsSearchTerm.length < 2 && (
+            <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+              <p className="text-xs text-blue-700">
+                <strong>Suggerimento:</strong> Digita almeno 2 caratteri per cercare documenti. 
+                Puoi cercare {documentTypes.find(t => t.id === documentTab)?.label.toLowerCase()} per codice, descrizione o altri dati rilevanti.
               </p>
             </div>
           )}
         </div>
-      )}
-      
-      {/* Empty State for Document Search */}
-      {!documentsSearchResults.length && !documentsLoading && !selectedDocument && documentsSearchTerm.length >= 2 && (
-        <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg mt-3">
-          <Link className="h-8 w-8 text-gray-300 mb-2" />
-          <p className="text-sm text-gray-500 text-center">
-            Nessun documento trovato. Prova a modificare i criteri di ricerca.
-          </p>
-        </div>
-      )}
-      
-      {/* Help Text for Document Search */}
-      {!documentsSearchResults.length && !documentsLoading && documentsSearchTerm.length < 2 && (
-        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-          <p className="text-xs text-blue-700">
-            <strong>Suggerimento:</strong> Digita almeno 2 caratteri per cercare documenti. 
-            Puoi cercare {documentTypes.find(t => t.id === documentTab)?.label.toLowerCase()} per codice, descrizione o altri dati rilevanti.
-          </p>
-        </div>
-      )}
-    </div>
-  </div>
-)}
+      </div>
+    )}
 
-      <div className="notifications-list" ref={notificationBarRef} id="notification-list-container">
-        {/* La sezione delle notifiche visibile solo quando non è attiva la ricerca per documenti */}
-        {!isDocumentSearchVisible && (
-          filteredNotifications && filteredNotifications.length > 0 ? (
-            filteredNotifications.map((notification) => {
-  
-              const messages = parseMessages(notification.messages);
-              const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-              const categoryColor = notification.hexColor;
-              // Verifica se questa chat è stata abbandonata dall'utente
-              const hasLeftChat = notification.chatLeft == '1' || notification.chatLeft === true;
-              // Verifica se questa chat è stata archiviata dall'utente
-              const isArchived = notification.archived == '1' || notification.archived === true;
-  
-              return (
-                <div
-                  key={`notification-${notification.notificationId}-${lastMessage ? lastMessage.messageId : ''}`}
-                  className={`notification-item ${notification.isReadByUser ? 'read' : 'unread'} ${notification.isClosed ? 'isClosed' : ''} ${hasLeftChat ? 'chat-left' : ''} ${isArchived ? 'archived' : ''}
-                              ${animatingItemId === notification.notificationId && animationPhase === 'exit' ? 'pin-exit-active' : ''}
-                              ${animatingItemId === notification.notificationId && animationPhase === 'enter' ? 'pin-enter-active' : ''}`}
-                  onClick={(e) => handleNotificationClick(notification, e)}
-                  id={`notification-item-${notification.notificationId}`}
-                  data-notification-id={notification.notificationId}
-                  data-is-read={notification.isReadByUser ? "true" : "false"}
-                  data-is-pinned={notification.pinned ? "true" : "false"}
-                  data-is-closed={notification.isClosed ? "true" : "false"}
-                  data-has-left={hasLeftChat ? "true" : "false"}
-                  data-is-archived={isArchived ? "true" : "false"}
+    <div className="notifications-list" ref={notificationBarRef} id="notification-list-container">
+      {/* La sezione delle notifiche visibile solo quando non è attiva la ricerca per documenti */}
+      {!isDocumentSearchVisible && (
+        filteredNotifications && filteredNotifications.length > 0 ? (
+          filteredNotifications.map((notification) => {
+            const messages = parseMessages(notification.messages);
+            const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+            const categoryColor = notification.hexColor;
+            // Verifica se questa chat è stata abbandonata dall'utente
+            const hasLeftChat = notification.chatLeft === 1 || notification.chatLeft === true;
+            // Verifica se questa chat è stata archiviata dall'utente
+            const isArchived = notification.archived === 1 || notification.archived === true;
+
+            return (
+              <div
+                key={`notification-${notification.notificationId}-${lastMessage ? lastMessage.messageId : ''}`}
+                className={`notification-item ${notification.isReadByUser ? 'read' : 'unread'} ${notification.isClosed ? 'isClosed' : ''} ${hasLeftChat ? 'chat-left' : ''} ${isArchived ? 'archived' : ''}
+                          ${animatingItemId === notification.notificationId && animationPhase === 'exit' ? 'pin-exit-active' : ''}
+                          ${animatingItemId === notification.notificationId && animationPhase === 'enter' ? 'pin-enter-active' : ''}`}
+                onClick={(e) => handleNotificationClick(notification, e)}
+                id={`notification-item-${notification.notificationId}`}
+                data-notification-id={notification.notificationId}
+                data-is-read={notification.isReadByUser ? "true" : "false"}
+                data-is-pinned={notification.pinned ? "true" : "false"}
+                data-is-closed={notification.isClosed ? "true" : "false"}
+                data-has-left={hasLeftChat ? "true" : "false"}
+                data-is-archived={isArchived ? "true" : "false"}
                 >
                   <div 
                     className="category-vertical-bar" 

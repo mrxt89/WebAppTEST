@@ -7,7 +7,7 @@ import { WikiButton } from '../wiki';
 const NotificationButton = memo(({ unreadCount, toggleSidebar }) => {
   return (
     <button 
-      onClick={() => toggleSidebar(true)}
+      onClick={toggleSidebar}
       className="relative p-2 text-white hover:bg-[var(--secondary)] rounded-full transition-colors"
       id="notification-button"
       aria-label={`Notifiche${unreadCount > 0 ? ` (${unreadCount} non lette)` : ''}`}
@@ -47,12 +47,10 @@ const Header = ({
   
   // Funzione per gestire l'apertura del dropdown e la chiusura della sidebar
   const handleDropdownToggle = () => {
-    // Se il dropdown non è visibile (stiamo per aprirlo), chiudiamo prima la sidebar
+    toggleDropdown();
     if (!dropdownVisible) {
       toggleSidebar(false); // Chiude la sidebar quando si apre il menu
     }
-    // Alterna lo stato del dropdown
-    toggleDropdown();
   };
 
   // Funzione per gestire la navigazione ai percorsi del profilo utente
@@ -62,16 +60,6 @@ const Header = ({
     setBreadcrumb([]);        
     navigate(route);         
     toggleDropdown();        
-  };
-
-  // Funzione per gestire il click sul pulsante notifiche
-  const handleNotificationClick = () => {
-    // Se stiamo per aprire la sidebar, chiudiamo prima il dropdown
-    if (dropdownVisible) {
-      toggleDropdown();
-    }
-    // Alterna lo stato della sidebar
-    toggleSidebar(true);
   };
 
   return (
@@ -98,7 +86,7 @@ const Header = ({
             <div className="flex items-center space-x-4">
               <NotificationButton 
                 unreadCount={unreadCount} 
-                toggleSidebar={handleNotificationClick} 
+                toggleSidebar={toggleSidebar} 
               />
             </div>
 
