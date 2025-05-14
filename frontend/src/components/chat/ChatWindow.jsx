@@ -70,7 +70,8 @@ const ChatWindow = ({
     unarchiveChat,
     uploadNotificationAttachment,
     captureAndUploadPhoto,
-    refreshAttachments
+    refreshAttachments,
+    notifications // Aggiungo questo per accedere direttamente alle notifiche dal Redux
   } = useNotifications();
   
   // Aggiungo lo stato per il titolo della chat
@@ -134,10 +135,14 @@ const ChatWindow = ({
   const lastMessageIdRef = useRef(null);
   const previousMessagesRef = useRef([]);
   const [hasNewMessages, setHasNewMessages] = useState(false);
+
   
   // Stato specifico per gli utenti della chat
   const [chatUsers, setChatUsers] = useState([]);
   const { users: memoizedUsers, updateUsers, shouldFetchUsers } = useMemoizedUsers(standaloneData?.users || hookUsers);
+
+  // Aggiungo un ref per tenere traccia dell'ultimo conteggio dei messaggi dal Redux
+  const lastReduxMessageCountRef = useRef(0);
 
   // Funzione dedicata per il caricamento degli utenti
   const loadUsers = useCallback(async () => {
@@ -213,46 +218,51 @@ const ChatWindow = ({
     if (!notification || !isMountedRef.current) return;
     
     try {
-      // Parse messages
-      const messages = Array.isArray(notification.messages) 
-        ? notification.messages 
-        : (typeof notification.messages === 'string' 
-          ? JSON.parse(notification.messages || '[]') 
+      // Ottieni la notifica aggiornata direttamente dal Redux store
+      const updatedNotification = notifications?.find(n => n.notificationId === notification.notificationId);
+      if (!updatedNotification) return;
+
+      // Parse messages dalla notifica aggiornata del Redux
+      const messages = Array.isArray(updatedNotification.messages) 
+        ? updatedNotification.messages 
+        : (typeof updatedNotification.messages === 'string' 
+          ? JSON.parse(updatedNotification.messages || '[]') 
           : []);
       
-      // Verifica se ci sono effettivamente nuovi messaggi confrontando l'ID dell'ultimo messaggio
+      // Verifica se ci sono nuovi messaggi confrontando il conteggio dal Redux
       const lastMessage = messages[messages.length - 1];
-      const hasNewMessagesReceived = lastMessage && 
-        (!lastMessageIdRef.current || lastMessage.messageId !== lastMessageIdRef.current);
+      const hasNewMessagesReceived = 
+        messages.length > lastReduxMessageCountRef.current || // Nuovo messaggio aggiunto (dal Redux)
+        (lastMessage && (!lastMessageIdRef.current || lastMessage.messageId !== lastMessageIdRef.current)); // ID diverso
       
-      // Aggiorna l'ID dell'ultimo messaggio
+      // Aggiorna i riferimenti
       if (lastMessage) {
         lastMessageIdRef.current = lastMessage.messageId;
       }
+      lastReduxMessageCountRef.current = messages.length;
+      previousMessagesRef.current = messages;
       
       // Aggiorna lo stato dei nuovi messaggi solo se l'utente ha scrollato verso l'alto
-      console.log('hasNewMessagesReceived', hasNewMessagesReceived);
       if (hasNewMessagesReceived && userHasScrolledRef.current) {
         setHasNewMessages(true);
       } else if (!userHasScrolledRef.current) {
         setHasNewMessages(false);
       }
       
-      // Aggiorna il riferimento ai messaggi precedenti prima di aggiornare lo stato
-      previousMessagesRef.current = messages;
+      // Aggiorna lo stato dei messaggi
       setParsedMessages(messages);
       
-      // Parse members info
-      const membersInfo = Array.isArray(notification.membersInfo) 
-        ? notification.membersInfo 
-        : (typeof notification.membersInfo === 'string' 
-          ? JSON.parse(notification.membersInfo || '[]') 
+      // Parse members info dalla notifica aggiornata
+      const membersInfo = Array.isArray(updatedNotification.membersInfo) 
+        ? updatedNotification.membersInfo 
+        : (typeof updatedNotification.membersInfo === 'string' 
+          ? JSON.parse(updatedNotification.membersInfo || '[]') 
           : []);
       setParsedMembersInfo(membersInfo);
       
-      // Set other states
-      setHasLeftChat(notification.chatLeft === 1 || notification.chatLeft === true);
-      setIsArchived(notification.archived === 1 || notification.archived === true);
+      // Set other states dalla notifica aggiornata
+      setHasLeftChat(updatedNotification.chatLeft === 1 || updatedNotification.chatLeft === true);
+      setIsArchived(updatedNotification.archived === 1 || updatedNotification.archived === true);
 
       // Se ci sono nuovi messaggi e l'utente non ha scrollato manualmente verso l'alto
       if (hasNewMessagesReceived && !userHasScrolledRef.current) {
@@ -274,9 +284,9 @@ const ChatWindow = ({
         }, 100);
       }
     } catch (err) {
-      console.error("Errore nell'aggiornamento dei messaggi da prop:", err);
+      console.error("Errore nell'aggiornamento dei messaggi da Redux:", err);
     }
-  }, [notification]);
+  }, [notification, notifications]); // Aggiungo notifications come dipendenza
   
   // Funzione per aggiornare la lista dei destinatari
   const handleReceiversUpdate = useCallback((updatedList) => {
@@ -1262,36 +1272,12 @@ useEffect(() => {
       });
     };
     
-    // Registra tutti gli eventi che richiedono un aggiornamento
-    const eventTypes = [
-      'chat-message-sent',
-      'message-updated',
-      'message-deleted',
-      'message-reaction-updated',
-      'attachment-updated',
-      'poll-updated',
-      'message-color-changed',
-      'refreshNotifications'
-    ];
+    // Aggiungi il listener per l'evento
+    document.addEventListener('notification-updated', handleChatUpdate);
     
-    // Registra i listener per tutti gli eventi
-    eventTypes.forEach(eventType => {
-      document.addEventListener(eventType, handleChatUpdate);
-    });
-    
-    // Cleanup
+    // Pulizia del listener
     return () => {
-      isMountedRef.current = false;
-      
-      eventTypes.forEach(eventType => {
-        document.removeEventListener(eventType, handleChatUpdate);
-      });
-      
-      // Pulisci eventuali timeout
-      if (messageUpdateTimeoutRef.current) {
-        clearTimeout(messageUpdateTimeoutRef.current);
-        messageUpdateTimeoutRef.current = null;
-      }
+      document.removeEventListener('notification-updated', handleChatUpdate);
     };
   }, [notification, forceUpdateFromServer]);
 
