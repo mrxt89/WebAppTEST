@@ -158,13 +158,14 @@ const WindowManager = ({ openChats, onCloseChat, onMinimizeChat, restoreChat }) 
     // Enforce minimum and maximum dimensions
     const minWidth = 400;
     const minHeight = 350;
-    const maxWidth = window.innerWidth * 0.95;
-    const maxHeight = window.innerHeight * 0.95;
+    const maxWidth = Math.min(window.innerWidth * 0.95, window.innerWidth - 20); // 20px di margine
+    const maxHeight = Math.min(window.innerHeight * 0.95, window.innerHeight - 80); // 80px per l'header
     
     // Apply constraints
     const constrainedWidth = Math.max(minWidth, Math.min(width, maxWidth));
     const constrainedHeight = Math.max(minHeight, Math.min(height, maxHeight));
     
+    // Update state with constrained dimensions
     setWindowStates(prev => ({
       ...prev,
       [id]: {

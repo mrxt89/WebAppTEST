@@ -36,7 +36,8 @@ const ChatLayout = ({
   onSend,              // Aggiungi per ricevere onSend
   responseOptions,     // Aggiungi per ricevere responseOptions
   uploadNotificationAttachment, // Aggiungi per l'upload di allegati
-  captureAndUploadPhoto // Aggiungi per la cattura foto
+  captureAndUploadPhoto, // Aggiungi per la cattura foto
+  hasNewMessages
 }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
@@ -47,10 +48,6 @@ const ChatLayout = ({
   // Calcola online status per compatibilità con vecchio componente
   const [onlineStatus, setOnlineStatus] = useState({});
   const sidebarRef = useRef(null);
-  const { 
-    filterMessages,
-    getNotificationAttachments
-  } = useNotifications();
 
   // Gestione della visualizzazione mobile/desktop
   useEffect(() => {
@@ -188,6 +185,7 @@ const ChatLayout = ({
             onViewVersionHistory={onViewVersionHistory}
             onReactionSelect={onReactionSelect}
             users={users} // Assicuriamoci di passare gli utenti
+            newMessage={hasNewMessages}
           />
         </div>
         

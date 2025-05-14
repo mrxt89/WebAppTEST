@@ -290,8 +290,13 @@ export default function useWindowManager(chatPrefix = 'chat-window-') {
   const updateSize = useCallback((id, width, height) => {
     if (!windowStatesRef.current[id]) return;
     
-    const newWidth = Math.max(width, 300); // Minimum width
-    const newHeight = Math.max(height, 400); // Minimum height
+    const minWidth = 400;
+    const minHeight = 350;
+    const maxWidth = Math.min(window.innerWidth * 0.95, window.innerWidth - 20);
+    const maxHeight = Math.min(window.innerHeight * 0.95, window.innerHeight - 80);
+    
+    const newWidth = Math.max(minWidth, Math.min(width, maxWidth));
+    const newHeight = Math.max(minHeight, Math.min(height, maxHeight));
     
     setWindowStates(prev => ({
       ...prev,
@@ -299,7 +304,7 @@ export default function useWindowManager(chatPrefix = 'chat-window-') {
         ...prev[id],
         width: newWidth,
         height: newHeight,
-        isMaximized: false // Resizing a window un-maximizes it
+        isMaximized: false
       }
     }));
   }, []);

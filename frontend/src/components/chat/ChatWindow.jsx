@@ -231,6 +231,7 @@ const ChatWindow = ({
       }
       
       // Aggiorna lo stato dei nuovi messaggi solo se l'utente ha scrollato verso l'alto
+      console.log('hasNewMessagesReceived', hasNewMessagesReceived);
       if (hasNewMessagesReceived && userHasScrolledRef.current) {
         setHasNewMessages(true);
       } else if (!userHasScrolledRef.current) {
@@ -684,16 +685,25 @@ const handleDragStart = useCallback((e) => {
     const newWidth = sizeRef.current.width + d.width;
     const newHeight = sizeRef.current.height + d.height;
     
+    // Limita le dimensioni ai massimi consentiti
+    const maxWidth = window.innerWidth * 0.95;
+    const maxHeight = window.innerHeight * 0.95;
+    const minWidth = 400;
+    const minHeight = 350;
+    
+    const constrainedWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
+    const constrainedHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
+    
     // Aggiorna le dimensioni direttamente nel DOM per un feedback immediato
     if (ref) {
-      ref.style.width = `${newWidth}px`;
-      ref.style.height = `${newHeight}px`;
+      ref.style.width = `${constrainedWidth}px`;
+      ref.style.height = `${constrainedHeight}px`;
     }
     
-    // Aggiorna lo stato React (questo può essere meno frequente per performance)
+    // Aggiorna lo stato React con le dimensioni limitate
     setSize({
-      width: newWidth,
-      height: newHeight
+      width: constrainedWidth,
+      height: constrainedHeight
     });
   }, []);
   

@@ -168,7 +168,8 @@ const ModernChatList = ({
   onViewVersionHistory,
   onReactionSelect,
   animatedEditId,
-  searchHighlightedId
+  searchHighlightedId,
+  newMessage
 }) => {
   // Ottieni direttamente l'accesso al context
   const { 
@@ -215,7 +216,6 @@ const ModernChatList = ({
   const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const [newMessage, setNewMessage] = useState(false);
   const [userHasScrolled, setUserHasScrolled] = useState(false);
   const [localMessages, setLocalMessages] = useState([]);
   const [messageAttachments, setMessageAttachments] = useState({});
@@ -341,7 +341,6 @@ const ModernChatList = ({
                   }, 100);
                 } else if (userHasScrolledRef.current) {
                   // Se l'utente ha scrollato, mostra l'indicatore di nuovo messaggio
-                  setNewMessage(true);
                   setShowScrollButton(true);
                 }
               }
@@ -426,7 +425,6 @@ const ModernChatList = ({
               }, 100);
             } else {
               // Altrimenti mostra indicatore nuovo messaggio
-              setNewMessage(true);
               setShowScrollButton(true);
             }
           }
@@ -468,7 +466,6 @@ const ModernChatList = ({
         userHasScrolledRef.current = false;
         setUserHasScrolled(false);
         setShowScrollButton(false);
-        setNewMessage(false); // Rimuovi anche l'indicatore di nuovo messaggio
       }
     };
     
@@ -1149,7 +1146,6 @@ const handleReactionSelect = async (messageId, emoji) => {
       scrollingToBottomRef.current = true;
       chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
       setShowScrollButton(false);
-      setNewMessage(false);
       setUserHasScrolled(false);
       userHasScrolledRef.current = false;
       
