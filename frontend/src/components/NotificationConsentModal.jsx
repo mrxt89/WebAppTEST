@@ -1,13 +1,17 @@
-// src/components/NotificationConsentModal.jsx
+// Modifica al file NotificationConsentModal.jsx
+
 import React, { useState, useEffect } from 'react';
 import { Bell, Volume2, X } from 'lucide-react';
 import notificationService from '../services/notifications/NotificationService';
 
 const NotificationConsentModal = () => {
   const [showModal, setShowModal] = useState(false);
-  const [audioInitialized, setAudioInitialized] = useState(notificationService.audioInitialized);
+  // Aggiungi reference a notificationService
+  const [audioInitialized, setAudioInitialized] = useState(
+    notificationService?.audioInitialized || false
+  );
   const [notificationsEnabled, setNotificationsEnabled] = useState(
-    Notification.permission === "granted"
+    Notification?.permission === "granted" || false
   );
 
   useEffect(() => {
@@ -17,35 +21,59 @@ const NotificationConsentModal = () => {
     
     if (!hasInteractedWithNotifications) {
       // Mostra il modal solo se non è già stato mostrato in precedenza
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setShowModal(true);
       }, 1000); // Ritardo breve dopo il caricamento della pagina
+      
+      return () => clearTimeout(timer);
     }
   }, []);
 
-  const handleInitAudio = () => {
-    // Inizializza l'audio
-    notificationService.initAudio().then(success => {
-      setAudioInitialized(success);
-      
-      // Se l'inizializzazione ha avuto successo, riproduci un suono di test
-      if (success) {
-        setTimeout(() => {
-          notificationService.playNotificationSound();
-        }, 500);
+  // Aggiorna lo stato quando lo stato di notificationService cambia
+  useEffect(() => {
+    const checkStatus = () => {
+      if (notificationService) {
+        setAudioInitialized(notificationService.audioInitialized);
+        setNotificationsEnabled(
+          notificationService.webNotificationsEnabled && 
+          Notification?.permission === "granted"
+        );
       }
-    });
+    };
+    
+    // Controlla lo stato iniziale
+    checkStatus();
+    
+    // Imposta un controllo periodico per aggiornamenti di stato
+    const interval = setInterval(checkStatus, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleInitAudio = async () => {
+    // Inizializza l'audio
+    const success = await notificationService.initAudio();
+    setAudioInitialized(success);
+    
+    // Se l'inizializzazione ha avuto successo, riproduci un suono di test
+    if (success) {
+      setTimeout(() => {
+        notificationService.playNotificationSound();
+      }, 500);
+    }
   };
 
-  const handleRequestNotifications = () => {
+  const handleRequestNotifications = async () => {
     if ('Notification' in window) {
-      Notification.requestPermission().then(permission => {
-        setNotificationsEnabled(permission === 'granted');
+      try {
+        const result = await notificationService.requestNotificationPermission();
+        setNotificationsEnabled(result);
+        
         // Imposta il flag che indica che l'utente ha interagito con la richiesta
         localStorage.setItem('notificationPermissionRequested', 'true');
-        // Aggiorna l'impostazione nel servizio
-        notificationService.setWebNotificationSetting(permission === 'granted');
-      });
+      } catch (err) {
+        console.error("Errore nella richiesta permessi:", err);
+      }
     }
   };
 

@@ -42,8 +42,6 @@ const notificationsWorkerMiddleware = store => {
       
       // Crea un nuovo worker
       worker = new NotificationWorker();
-      // Crea un nuovo worker
-      worker = new NotificationWorker();
       isWorkerInitialized = true;
       const token = localStorage.getItem('token');
       
@@ -114,114 +112,112 @@ const notificationsWorkerMiddleware = store => {
               break;
               
             case 'new_message':
-              if (notificationId) {
-                // Gestione sicura per finestre standalone
-                try {
-                  setTimeout(() => {
-                    const state = store.getState();
+            if (notificationId) {
+              try {
+                // Controlli di sicurezza
+                if (!notificationId) {
+                  console.error('ID notifica non valido per nuovo messaggio');
+                  return;
+                }
+                
+                // Fetch notifica dallo state Redux
+                const state = store.getState();
+                
+                // Controlla se ci sono i dati necessari nello state
+                if (!state?.notifications?.notifications) {
+                  console.warn('Stato Redux incompleto, impossibile inviare notifica');
+                  return;
+                }
+                
+                // Trova la notifica negli stati
+                const notification = state.notifications.notifications?.find(n => n.notificationId === parseInt(notificationId));
+                
+                // Titolo e contenuto per la notifica
+                const notificationTitle = notification?.title || 'Nuovo messaggio';
+                console.log('DEBUG: Notifica:', notification);
+                const notificationBody = `Hai ricevuto ${newMessageCount > 1 ? `${newMessageCount} nuovi messaggi` : 'un nuovo messaggio'}`;
+                
+                // Callback per il click sulla notifica
+                const handleNotificationClick = () => {
+                  if (window.openChatModal) {
+                    window.openChatModal(notificationId);
+                  }
+                };
+                
+                // IMPLEMENTAZIONE DIRETTA - Bypass NotificationService
+                // Accedi direttamente all'API Notification del browser
+                if (window.Notification && Notification.permission === 'granted') {
+                  try {
+                    console.log('DEBUG: Creazione notifica diretta per:', notificationTitle);
                     
-                    // Controlla se ci sono i dati necessari nello state
-                    if (!state?.notifications) {
-                      console.warn('Stato Redux incompleto, impossibile inviare notifica');
-                      return;
-                    }
+                    const desktopNotification = new Notification(notificationTitle, {
+                      body: notificationBody,
+                      icon: '/icons/app-icon.png'
+                    });
                     
-                    // Trova la notifica negli stati
-                    const notification = state.notifications.notifications?.find(n => n.notificationId === notificationId);
-                    if (!notification) {
-                      // Aggiorna la notifica specifica
-                      store.dispatch(fetchNotificationById(notificationId));
-                      return;
-                    }
-                    
-                    // Controlla se la chat è aperta (sia standalone che normale)
-                    const isStandaloneChat = (state.notifications.standaloneChats || new Set()).has(parseInt(notificationId));
-                    const isOpenChat = (state.notifications.openChatIds || new Set()).has(parseInt(notificationId));
-                    
-                    // Prepara il callback per click notifica
-                    const handleNotificationClick = () => {
-                      if (isStandaloneChat) {
-                        // Focus sulla finestra esistente o apri nuova
-                        const windowName = `chat_${notificationId}`;
-                        const standaloneWindow = window.open('', windowName);
-                        
-                        if (standaloneWindow && !standaloneWindow.closed) {
-                          standaloneWindow.focus();
-                        } else {
-                          // Se la finestra non è più disponibile, apri una nuova
-                          window.open(`/standalone-chat/${notificationId}`, windowName);
-                        }
-                      } else if (window.openChatModal) {
-                        window.openChatModal(notificationId);
-                      }
+                    desktopNotification.onclick = () => {
+                      window.focus();
+                      handleNotificationClick();
+                      desktopNotification.close();
                     };
                     
-                    // Invia notifica usando il servizio appropriato
+                    setTimeout(() => desktopNotification.close(), 8000);
+                    
+                    console.log('DEBUG: Notifica desktop creata con successo');
+                  } catch (e) {
+                    console.error('Errore nella creazione della notifica desktop:', e);
+                    
+                    // FALLBACK - Se fallisce l'implementazione diretta, tenta con NotificationService
                     if (window.notificationService) {
-                      window.notificationService.notifySystem(
-                        notification?.title || 'Nuovo messaggio', 
-                        `Hai ricevuto ${newMessageCount > 1 ? `${newMessageCount} nuovi messaggi` : 'un nuovo messaggio'}`,
-                        handleNotificationClick
-                      );
-                    } 
-                    // Fallback a Notification API
-                    else if (window.Notification && Notification.permission === 'granted') {
-                      const webNotification = new Notification('Nuovo messaggio', {
-                        body: `Hai ricevuto ${newMessageCount > 1 ? `${newMessageCount} nuovi messaggi` : 'un nuovo messaggio'}`,
-                        icon: '/icons/app-icon.png'
-                      });
-                      
-                      webNotification.onclick = () => {
-                        window.focus();
-                        handleNotificationClick();
-                        webNotification.close();
-                      };
+                      try {
+                        window.notificationService.notifySystem(
+                          notificationTitle,
+                          notificationBody,
+                          handleNotificationClick
+                        );
+                      } catch (nse) {
+                        console.error('Errore anche nel fallback NotificationService:', nse);
+                      }
                     }
-                    
-                    // Forza un aggiornamento del contatore tramite eventi
-                    document.dispatchEvent(new CustomEvent('unread-count-changed', {
-                      detail: {
-                        notificationId,
-                        newMessageCount,
-                        timestamp: Date.now()
-                      }
-                    }));
-                    
-                    // Emetti eventi standard per nuovi messaggi
-                    document.dispatchEvent(new CustomEvent('new-message-received', {
-                      detail: {
-                        notificationId,
-                        newMessageCount
-                      }
-                    }));
-                    
-                    document.dispatchEvent(new CustomEvent('open-chat-new-message', {
-                      detail: {
-                        notificationId,
-                        newMessageCount,
-                        timestamp: Date.now()
-                      }
-                    }));
-                    
-                    // Fetch della notifica aggiornata
-                    store.dispatch(fetchNotificationById(notificationId));
-                    
-                    // Messaggio non letto (solo se necessario)
-                    if (!isOpenChat && !isStandaloneChat) {
-                      store.dispatch(addUnreadMessage({
-                        notificationId,
-                        messageId: Date.now(), // Placeholder
-                        title: notification.title,
-                        message: 'Nuovo messaggio' // Messaggio generico
-                      }));
-                    }
-                  }, 0);
-                } catch (e) {
-                  console.error('Errore elaborazione nuovo messaggio:', e);
+                  }
+                } else {
+                  console.log('DEBUG: Impossibile mostrare notifica desktop. Permesso:', 
+                            Notification?.permission);
+                            
+                  // Se non abbiamo i permessi e NotificationService è disponibile, prova con quello
+                  if (window.notificationService) {
+                    window.notificationService.notifySystem(
+                      notificationTitle,
+                      notificationBody,
+                      handleNotificationClick
+                    );
+                  }
                 }
+                
+                // Emetti eventi per aggiornare UI e contatori
+                document.dispatchEvent(new CustomEvent('unread-count-changed', {
+                  detail: {
+                    notificationId,
+                    newMessageCount,
+                    timestamp: Date.now()
+                  }
+                }));
+                
+                document.dispatchEvent(new CustomEvent('new-message-received', {
+                  detail: {
+                    notificationId,
+                    newMessageCount
+                  }
+                }));
+                
+                // Aggiorna la notifica nello store Redux
+                store.dispatch(fetchNotificationById(notificationId));
+                
+              } catch (e) {
+                console.error('Errore elaborazione nuovo messaggio:', e);
               }
-              break;
-              
+            }
+            break;
             case 'ready':
               break;
               

@@ -83,6 +83,7 @@ const MainContainer = ({
         )}
         
         <main className="page-content">
+          
           {/* Posiziona Routes in modo che funzioni in entrambi i casi */}
           <Routes>
             <Route path="/" element={<ProtectedRoute />} />

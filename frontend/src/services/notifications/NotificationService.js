@@ -1,6 +1,4 @@
-// Versione aggiornata di NotificationService.js
-import { config } from '../../config';
-
+// /src/services/notifications/NotificationService.js
 class NotificationService {
   constructor() {
     this.audioUrl = '/audio/notificationReceived.wav';
@@ -106,10 +104,26 @@ class NotificationService {
     this.soundEnabled = enabled;
   }
   
+  // CORREZIONE: Implementazione completa di setWebNotificationSetting
 setWebNotificationSetting(enabled) {
- 
+  console.log('NOTIFICATION DEBUG: setWebNotificationSetting chiamata con:', enabled);
+  localStorage.setItem('webNotificationsEnabled', enabled);
+  this.webNotificationsEnabled = enabled;
+  
+  // Se stiamo abilitando le notifiche web, verifica che abbiamo il permesso
+  if (enabled && 'Notification' in window && Notification.permission !== 'granted') {
+    console.log('NOTIFICATION DEBUG: Avvio richiesta permessi durante setWebNotificationSetting');
+    this.requestNotificationPermission();
+  }
+  
+  // Emetti un evento per notificare il cambiamento
+  const event = new CustomEvent('webNotificationSettingChanged', {
+    detail: { enabled }
+  });
+  document.dispatchEvent(event);
+  
+  return enabled;
 }
-
 
   getDoNotDisturbSetting() {
     return localStorage.getItem('doNotDisturbEnabled') === 'true';
@@ -189,6 +203,8 @@ resetService() {
  * Sostituisci il metodo esistente con questo
  */
 requestNotificationPermission() {
+  console.log('NOTIFICATION DEBUG: Richiesta permessi notifiche');
+  console.log('NOTIFICATION DEBUG: Stato attuale permessi =', Notification.permission);
   if (!("Notification" in window)) {
     console.warn("NotificationService: This browser doesn't support desktop notifications");
     return Promise.resolve(false);
@@ -356,8 +372,6 @@ async initAudio() {
   // Precarica il suono di notifica
   async preloadSound() {
     try {
-     
-      const response = await fetch(this.audioUrl);
       
       if (!response.ok) {
         throw new Error(`HTTP error loading audio! status: ${response.status}`);
@@ -399,55 +413,6 @@ async initAudio() {
       return true;
     } catch (error) {
       console.error('Error decoding audio:', error);
-      return false;
-    }
-  }
-
-  // Riproduce il suono di notifica
-  playNotificationSound() {
-    if (!this.soundEnabled) return false;
-    
-    // Tenta di riprodurre un suono di fallback se l'audio non è inizializzato
-    if (!this.audioInitialized || !this.audioContext || !this.decodedAudioData) {
-   
-      // Fallback: prova a riprodurre un suono di base
-      try {
-        const fallbackAudio = new Audio(this.audioUrl);
-        fallbackAudio.volume = 0.7;
-        fallbackAudio.play().catch(err => {
-          console.warn('Failed to play fallback audio:', err);
-        });
-        return true;
-      } catch (err) {
-        console.warn('Failed to create fallback audio:', err);
-        return false;
-      }
-    }
-    
-    try {
-      // Verifica se l'AudioContext è sospeso (politiche autoplay)
-      if (this.audioContext.state === 'suspended') {
-        this.audioContext.resume();
-      }
-      
-      // Crea una sorgente audio
-      const source = this.audioContext.createBufferSource();
-      source.buffer = this.decodedAudioData;
-      
-      // Aggiungi un gain node per il controllo del volume
-      const gainNode = this.audioContext.createGain();
-      gainNode.gain.value = 0.7; // Volume al 70%
-      
-      // Collega la sorgente al gain node e poi all'output
-      source.connect(gainNode);
-      gainNode.connect(this.audioContext.destination);
-      
-      // Riproduci il suono
-      source.start(0);
-  
-      return true;
-    } catch (error) {
-      console.error('Failed to play notification sound:', error);
       return false;
     }
   }
@@ -515,42 +480,56 @@ restartNotificationSystem() {
   return true;
 }
 
-
-  
 /**
- * Implementazione sicura di showWebNotification senza rischio di ricorsione
+ * Implementazione corretta di showWebNotification per garantire la visualizzazione delle notifiche
  */
 showWebNotification(title, message, notificationId) {
-  // Controlli di sicurezza
-  if (!this.webNotificationsEnabled) {
-    console.warn('NotificationService: Web notifications are disabled');
+  console.log('NOTIFICATION DEBUG: Tentativo di mostrare notifica', { title, message, notificationId });
+  
+  // Controllo basilare per permessi
+  if (!('Notification' in window)) {
+    console.warn('NotificationService: Notifiche non supportate dal browser');
     return false;
   }
   
+  // Verifica permessi prima di continuare
   if (Notification.permission !== 'granted') {
+    console.warn('NotificationService: Permesso notifiche non concesso');
     Notification.requestPermission().then(permission => {
       if (permission === 'granted') {
+        // Richiama questa funzione se il permesso viene concesso
         this.showWebNotification(title, message, notificationId);
       }
-    }).catch(e => console.error('Error requesting notification permission:', e));
+    });
+    return false;
+  }
+  
+  // Verifica impostazioni interne
+  if (!this.webNotificationsEnabled) {
+    console.warn('NotificationService: Notifiche web disabilitate nelle impostazioni');
     return false;
   }
   
   // Controllo per chat mute
-  if (notificationId) {
-    const isMuted = this.isChatMuted(notificationId);
-    if (isMuted) {
-      console.log(`NotificationService: Web notification blocked for muted chat: ${notificationId}`);
-      return false;
+  if (notificationId && this.isChatMuted(notificationId)) {
+    console.log(`NotificationService: Notifica bloccata per chat silenziata: ${notificationId}`);
+    return false;
+  }
+  
+  // Verifica modalità Non Disturbare
+  if (this.doNotDisturbEnabled) {
+    console.log('NotificationService: Modalità Non Disturbare attiva, notifica bloccata');
+    if (notificationId) {
+      this.dndNotifiedChatIds.add(notificationId);
     }
+    return false;
   }
   
   try {
-    // Semplifica il codice per massimizzare la compatibilità
+    // Creazione semplificata della notifica
     const notification = new Notification(title, {
       body: message,
       icon: '/icons/app-icon.png',
-      requireInteraction: false,
       silent: true // Gestiremo il suono separatamente
     });
     
@@ -562,35 +541,20 @@ showWebNotification(title, message, notificationId) {
         try {
           window.openChatModal(notificationId);
         } catch (e) {
-          console.error('NotificationService: Error opening chat:', e);
+          console.error('Error opening chat:', e);
         }
       }
       
       notification.close();
-      
-      if (notificationId && this.activeNotifications.has(notificationId)) {
-        clearTimeout(this.activeNotifications.get(notificationId).timerId);
-        this.activeNotifications.delete(notificationId);
-      }
     };
     
-    // Auto-chiusura
-    const timerId = setTimeout(() => {
-      notification.close();
-    }, 8000);
+    // Auto-chiusura dopo 8 secondi
+    setTimeout(() => notification.close(), 8000);
     
-    // Tracking
-    if (notificationId) {
-      this.activeNotifications.set(notificationId, {
-        notification,
-        timerId
-      });
-    }
-    
-    console.log(`NotificationService: Web notification shown: ${title}`);
+    console.log(`NotificationService: Notifica web mostrata con successo: ${title}`);
     return true;
   } catch (error) {
-    console.error('NotificationService: Error showing web notification:', error);
+    console.error('NotificationService: Errore durante la visualizzazione della notifica:', error);
     return false;
   }
 }
@@ -672,12 +636,6 @@ showWebNotification(title, message, notificationId) {
      
       this.pendingNotifications = [];
       return;
-    }
-    
-    // Se l'audio è inizializzato, riproduci il suono
-    if (this.audioInitialized && this.soundEnabled) {
-     
-      this.playNotificationSound();
     }
     
     // Processa tutte le notifiche non silenziate rimaste in coda
@@ -878,17 +836,9 @@ notifyNewMessage(message, senderName, notificationId) {
       };
       
       this.pendingNotifications.push(notificationItem);
-      this.initAudio().then(success => {
-        console.log('NotificationService: Audio initialization completed:', success);
-        
-        // Try to play sound immediately after initialization
-        if (success) {
-          this.playNotificationSound();
-        }
-      });
     } else {
       console.log('NotificationService: Playing notification sound');
-      this.playNotificationSound();
+    
     }
   }
   
@@ -919,11 +869,7 @@ notifySystem(title, message, onClick = null) {
   }
   
   if (!this.notificationsEnabled) return;
-  
-  // Suono
-  if (this.soundEnabled) {
-    this.playNotificationSound();
-  }
+
   
   // Notifica in-app
   this.showInAppNotification(title, message, onClick);

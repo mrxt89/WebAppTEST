@@ -386,49 +386,49 @@ export const useNotifications = () => {
       });
   }, [dispatch]);
 
-  const forceLoadNotifications = useCallback(() => {
-    // Usa un flag per tracciare se un aggiornamento è già in corso
-    if (pendingUpdatesRef.current.has('forceLoad')) {
-      console.log('Skipping forceLoadNotifications - update already in progress');
-      return Promise.resolve(null);
-    }
+const forceLoadNotifications = useCallback(() => {
+  // Usa un flag per tracciare se un aggiornamento è già in corso
+  if (pendingUpdatesRef.current.has('forceLoad')) {
+    console.log('Skipping forceLoadNotifications - update already in progress');
+    return Promise.resolve(null);
+  }
 
-    pendingUpdatesRef.current.add('forceLoad');
-    
-    // Usa una Promise per gestire l'aggiornamento in modo asincrono
-    return new Promise((resolve) => {
-      // Usa setTimeout per assicurarsi che nessun reducer sia in esecuzione
-      setTimeout(() => {
-        // Esegui l'aggiornamento in modo sicuro
-        dispatch(fetchNotifications())
-          .then(() => {
-            // Configura l'event listener per i nuovi messaggi in modo sicuro
-            const handleNewMessage = (event) => {
-              const { notificationId } = event.detail || {};
-              if (notificationId) {
-                // Usa setTimeout per evitare chiamate durante l'esecuzione del reducer
-                setTimeout(() => {
-                  dispatch(fetchNotificationById(notificationId));
-                }, 0);
-              }
-            };
-            
-            // Rimuovi prima listener esistenti per evitare duplicati
-            document.removeEventListener('new-message-received', handleNewMessage);
-            document.addEventListener('new-message-received', handleNewMessage);
-            
-            resolve(null);
-          })
-          .catch(error => {
-            console.error('Errore nel caricamento forzato:', error);
-            resolve(null);
-          })
-          .finally(() => {
-            pendingUpdatesRef.current.delete('forceLoad');
-          });
-      }, 0);
-    });
-  }, [dispatch]);
+  pendingUpdatesRef.current.add('forceLoad');
+  
+  // Usa una Promise per gestire l'aggiornamento in modo asincrono
+  return new Promise((resolve) => {
+    // Usa setTimeout per assicurarsi che nessun reducer sia in esecuzione
+    setTimeout(() => {
+      // Esegui l'aggiornamento in modo sicuro
+      dispatch(fetchNotifications())
+        .then(() => {
+          // Configura l'event listener per i nuovi messaggi in modo sicuro
+          const handleNewMessage = (event) => {
+            const { notificationId } = event.detail || {};
+            if (notificationId) {
+              // Usa setTimeout per evitare chiamate durante l'esecuzione del reducer
+              setTimeout(() => {
+                dispatch(fetchNotificationById(notificationId));
+              }, 0);
+            }
+          };
+          
+          // Rimuovi prima listener esistenti per evitare duplicati
+          document.removeEventListener('new-message-received', handleNewMessage);
+          document.addEventListener('new-message-received', handleNewMessage);
+          
+          resolve(null);
+        })
+        .catch(error => {
+          console.error('Errore nel caricamento forzato:', error);
+          resolve(null);
+        })
+        .finally(() => {
+          pendingUpdatesRef.current.delete('forceLoad');
+        });
+    }, 0);
+  });
+}, [dispatch]);
 
   const handleUpdateChatTitle = useCallback(async (notificationId, newTitle) => {
     try {

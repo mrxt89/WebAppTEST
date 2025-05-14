@@ -100,34 +100,52 @@ const MainPage = () => {
   }, []);
 
   // Aggiungi - esponi notificationService alla window
-useEffect(() => {
-  // Inizializza il servizio di notifica
-  import('@/services/notifications/NotificationService')
-    .then(module => {
-      window.notificationService = module.default;
+  useEffect(() => {
+    // Inizializza il servizio di notifica
+    import('@/services/notifications/NotificationService')
+      .then(module => {
+        window.notificationService = module.default;
+        
+        // Inizializza esplicitamente il servizio
+        if (window.notificationService) {
+          // Forza l'inizializzazione dell'audio alla prima interazione
+          const initAudioOnce = () => {
+            window.notificationService.initAudio()
+              .then(success => {
+                if (success) {
+                  notificationServiceInitialized.current = true;
+                  // Rimuovi gli event listener se l'inizializzazione ha successo
+                  document.removeEventListener('click', initAudioOnce);
+                  document.removeEventListener('keydown', initAudioOnce);
+                  document.removeEventListener('touchstart', initAudioOnce);
+                }
+              });
+          };
+          
+          // Aggiungi listener per eventi che possono sbloccare l'audio
+          document.addEventListener('click', initAudioOnce, { once: false });
+          document.addEventListener('keydown', initAudioOnce, { once: false });
+          document.addEventListener('touchstart', initAudioOnce, { once: false });
+          
+          // Richiedi permessi per le notifiche (solo se non già negati)
+          if (Notification.permission !== 'denied') {
+            window.notificationService.requestNotificationPermission();
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Errore nell\'inizializzazione del servizio di notifica:', error);
+      });
       
-      // Inizializza esplicitamente il servizio
-      if (window.notificationService && !notificationServiceInitialized.current) {
-        window.notificationService.initAudio();
-        window.notificationService.requestNotificationPermission()
-          .then(permissionGranted => {
-            if (permissionGranted) {
-              notificationServiceInitialized.current = true;
-            } else {
-              console.warn('Permesso notifiche negato');
-            }
-          });
+    return () => {
+      // Pulizia: rimuovi il riferimento globale e chiama cleanup
+      if (window.notificationService) {
+        window.notificationService.cleanup ? window.notificationService.cleanup() : 
+          (window.notificationService.destroy ? window.notificationService.destroy() : null);
+        delete window.notificationService;
       }
-    })
-    .catch(error => {
-      console.error('Errore nell\'inizializzazione del servizio di notifica:', error);
-    });
-    
-  return () => {
-    // Rimuovi il riferimento globale al servizio quando il componente viene smontato
-    delete window.notificationService;
-  };
-}, []);
+    };
+  }, []);
 
   // Helper per parsing messaggio
   const parseMessages = (messages) => {
@@ -156,7 +174,7 @@ useEffect(() => {
     };
   }, []);
 
-    // Enhanced open chat modal function
+  // Enhanced open chat modal function
   const openChatModal = async (notificationId) => {
     // Validazione dell'input
     if (!notificationId) {
@@ -241,37 +259,40 @@ useEffect(() => {
     }
   };
 
-
-  // Gestisci l'evento di nuovo messaggio
+// Gestisci l'evento di nuovo messaggio
 useEffect(() => {
   const handleNewMessage = (event) => {
     const { notificationId, newMessageCount } = event.detail || {};
     
     if (notificationId && newMessageCount) {
-      // Se la notifica non è già in una chat aperta, mostrala
-      const isOpen = openChats.some(chat => chat.notificationId === notificationId);
+      // Trova la notifica corrispondente
+      const notification = notifications.find(n => n.notificationId === parseInt(notificationId));
       
-      if (!isOpen) {
-        // Forza una notifica anche tramite API nativa
+      // Bypass NotificationService per garantire la notifica
+      if ('Notification' in window && Notification.permission === 'granted') {
         try {
-          const notification = notifications.find(n => n.notificationId === notificationId);
-          if (notification && window.Notification && Notification.permission === 'granted') {
-            const n = new Notification(notification.title || 'Nuovo messaggio', {
-              body: `Hai ${newMessageCount > 1 ? `${newMessageCount} nuovi messaggi` : 'un nuovo messaggio'}`,
-              icon: '/icons/app-icon.png'
-            });
-            n.onclick = () => {
-              window.focus();
-              openChatModal(notificationId);
-              n.close();
-            };
-          }
+          const title = notification?.title || 'Nuovo messaggio';
+          const message = `Hai ricevuto ${newMessageCount > 1 ? `${newMessageCount} nuovi messaggi` : 'un nuovo messaggio'}`;
+          
+          const webNotification = new Notification(title, {
+            body: message,
+            icon: '/icons/app-icon.png'
+          });
+          
+          webNotification.onclick = () => {
+            window.focus();
+            openChatModal(notificationId);
+            webNotification.close();
+          };
+          
+          // Auto-chiusura dopo 8 secondi
+          setTimeout(() => webNotification.close(), 8000);
         } catch (e) {
-          console.error('Error showing notification:', e);
+          console.error('Error showing direct notification:', e);
         }
       }
       
-      // Forza l'aggiornamento della notifica specifica
+      // Comunque tenta anche l'aggiornamento normale
       fetchNotificationById(notificationId);
     }
   };
@@ -281,38 +302,42 @@ useEffect(() => {
   return () => {
     document.removeEventListener('new-message-received', handleNewMessage);
   };
-}, [notifications, openChats, openChatModal, fetchNotificationById]);
+}, [notifications, fetchNotificationById, openChatModal]);
 
-
-  // Expose openChatModal globally for notifications to use
+  // Ascolta specificamente eventuali errori di notifica per debug
   useEffect(() => {
-    window.openChatModal = (notificationId) => {
-      // Find the notification
-      const notification = notifications.find(n => n.notificationId === notificationId);
-      if (notification) {
-        // Use the existing function to open the chat
-        openChatModal(notificationId);
-      }
+    const handleNotificationError = (error) => {
+      console.error('Notification error:', error);
     };
     
+    // Intercetta eventuali errori globali relativi alle notifiche
+    window.addEventListener('error', (event) => {
+      if (event.message && (
+        event.message.includes('notification') || 
+        event.message.includes('Notification') || 
+        event.message.includes('permission')
+      )) {
+        handleNotificationError(event);
+      }
+    });
+    
     return () => {
-      delete window.openChatModal;
+      window.removeEventListener('error', handleNotificationError);
     };
-  }, [notifications, openChatModal]);
+  }, []);
 
-
-// Ascolta specificamente l'evento unread-count-changed per aggiornare il contatore
-useEffect(() => {
-  const handleUnreadCountChanged = () => {
-    // Forza il ricaricamento delle notifiche immediatamente
-    forceLoadNotifications();
-  };
-  
-  document.addEventListener('unread-count-changed', handleUnreadCountChanged);
-  return () => {
-    document.removeEventListener('unread-count-changed', handleUnreadCountChanged);
-  };
-}, [forceLoadNotifications]);
+  // Ascolta specificamente l'evento unread-count-changed per aggiornare il contatore
+  useEffect(() => {
+    const handleUnreadCountChanged = () => {
+      // Forza il ricaricamento delle notifiche immediatamente
+      forceLoadNotifications();
+    };
+    
+    document.addEventListener('unread-count-changed', handleUnreadCountChanged);
+    return () => {
+      document.removeEventListener('unread-count-changed', handleUnreadCountChanged);
+    };
+  }, [forceLoadNotifications]);
 
   useEffect(() => {
     // Handler per gestire gli aggiornamenti di stato delle chat (archiviate, abbandonate, ecc.)
@@ -357,6 +382,22 @@ useEffect(() => {
       document.removeEventListener('chat-status-changed', handleChatStatusChange);
     };
   }, [openChats, fetchNotificationById]);
+
+  // Expose openChatModal globally for notifications to use
+  useEffect(() => {
+    window.openChatModal = (notificationId) => {
+      // Find the notification
+      const notification = notifications.find(n => n.notificationId === notificationId);
+      if (notification) {
+        // Use the existing function to open the chat
+        openChatModal(notificationId);
+      }
+    };
+    
+    return () => {
+      delete window.openChatModal;
+    };
+  }, [notifications, openChatModal]);
 
   // Close chat function
   const closeChatModal = (notificationId) => {

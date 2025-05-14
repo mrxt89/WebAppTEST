@@ -1,3 +1,5 @@
+// Patch per il file useNotificationSettings.js
+
 // src/redux/features/notifications/useNotificationSettings.js
 import { useSelector, useDispatch } from 'react-redux';
 import { 
@@ -6,7 +8,7 @@ import {
   setWebNotificationsEnabled, 
   setWebNotificationsPermission 
 } from './notificationSettingsSlice';
-import notificationService from '../../services/notifications/NotificationService';
+import notificationService from '../../../services/notifications/NotificationService';
 
 /**
  * Hook per accedere e manipolare le impostazioni delle notifiche nello store Redux
@@ -30,8 +32,15 @@ export const useNotificationSettings = () => {
     notificationService.setSoundSetting(enabled);
     
     // Se stiamo attivando il suono, assicuriamoci che l'audio sia inizializzato
-    if (enabled && !notificationService.audioInitialized) {
-      notificationService.initAudio();
+    if (enabled) {
+      notificationService.initAudio().then(success => {
+        if (success && enabled) {
+          // Riproduci un suono di test se l'inizializzazione ha successo
+          setTimeout(() => {
+            notificationService.playNotificationSound();
+          }, 500);
+        }
+      });
     }
     
     return enabled;
@@ -43,14 +52,19 @@ export const useNotificationSettings = () => {
     
     // Se stiamo attivando le notifiche e non abbiamo ancora il permesso, richiediamolo
     if (newValue && settings.webNotificationsPermission !== 'granted') {
-      const result = await notificationService.requestNotificationPermission();
-      if (result) {
-        dispatch(setWebNotificationsPermission('granted'));
-        dispatch(setWebNotificationsEnabled(true));
-        notificationService.setWebNotificationSetting(true);
-        return true;
+      try {
+        const result = await notificationService.requestNotificationPermission();
+        if (result) {
+          dispatch(setWebNotificationsPermission('granted'));
+          dispatch(setWebNotificationsEnabled(true));
+          notificationService.setWebNotificationSetting(true);
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Errore nella richiesta dei permessi:', error);
+        return false;
       }
-      return false;
     } else {
       dispatch(setWebNotificationsEnabled(newValue));
       notificationService.setWebNotificationSetting(newValue);
@@ -67,10 +81,24 @@ export const useNotificationSettings = () => {
   
   // Metodo per mostrare una notifica di test
   const showTestNotification = () => {
-    notificationService.notifySystem(
-      'Notifica di prova',
-      'Questo è un esempio di come appariranno le notifiche'
-    );
+    if (!settings.webNotificationsEnabled && settings.webNotificationsPermission !== 'granted') {
+      // Se le notifiche non sono abilitate, richiedi prima il permesso
+      requestNotificationPermission().then(granted => {
+        if (granted) {
+          // Solo se il permesso è stato dato, mostra la notifica di test
+          notificationService.notifySystem(
+            'Notifica di prova',
+            'Questo è un esempio di come appariranno le notifiche'
+          );
+        }
+      });
+    } else {
+      // Se le notifiche sono già abilitate, mostra direttamente la notifica
+      notificationService.notifySystem(
+        'Notifica di prova',
+        'Questo è un esempio di come appariranno le notifiche'
+      );
+    }
   };
   
   // Metodo per richiedere i permessi per le notifiche web
