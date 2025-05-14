@@ -296,6 +296,17 @@ useEffect(() => {
   };
 }, [notifications, fetchNotificationById, openChatModal]);
 
+// Esponi openChatModal globalmente per le notifiche
+useEffect(() => {
+  // Rendi la funzione disponibile globalmente
+  window.openChatModal = openChatModal;
+  
+  return () => {
+    // Pulizia quando il componente viene smontato
+    delete window.openChatModal;
+  };
+}, [openChatModal]);
+
   // Ascolta specificamente eventuali errori di notifica per debug
   useEffect(() => {
     const handleNotificationError = (error) => {

@@ -67,8 +67,7 @@ class NotificationService {
     
     // Se stiamo disattivando la modalità "Non disturbare"
     if (!enabled) {
-      console.log('Disattivazione modalità "Non disturbare". Pulizia delle notifiche bloccate...');
-      
+    
       // Pulisci l'elenco delle chat notificate durante questo periodo
       this.dndNotifiedChatIds.clear();
       
@@ -106,13 +105,13 @@ class NotificationService {
   
   // CORREZIONE: Implementazione completa di setWebNotificationSetting
 setWebNotificationSetting(enabled) {
-  console.log('NOTIFICATION DEBUG: setWebNotificationSetting chiamata con:', enabled);
+ 
   localStorage.setItem('webNotificationsEnabled', enabled);
   this.webNotificationsEnabled = enabled;
   
   // Se stiamo abilitando le notifiche web, verifica che abbiamo il permesso
   if (enabled && 'Notification' in window && Notification.permission !== 'granted') {
-    console.log('NOTIFICATION DEBUG: Avvio richiesta permessi durante setWebNotificationSetting');
+   
     this.requestNotificationPermission();
   }
   
@@ -154,8 +153,7 @@ setWebNotificationSetting(enabled) {
  * Da utilizzare quando si disattiva la modalità "Non disturbare" 
  */
 resetService() {
-  console.log('Resettando il servizio di notifica...');
-  
+ 
   // Pulisci le chat notificate durante la modalità "Non disturbare"
   this.dndNotifiedChatIds = new Set();
   
@@ -203,8 +201,7 @@ resetService() {
  * Sostituisci il metodo esistente con questo
  */
 requestNotificationPermission() {
-  console.log('NOTIFICATION DEBUG: Richiesta permessi notifiche');
-  console.log('NOTIFICATION DEBUG: Stato attuale permessi =', Notification.permission);
+  
   if (!("Notification" in window)) {
     console.warn("NotificationService: This browser doesn't support desktop notifications");
     return Promise.resolve(false);
@@ -224,10 +221,9 @@ requestNotificationPermission() {
     return Promise.resolve(false);
   }
   
-  console.log("NotificationService: Requesting notification permission");
+  
   return Notification.requestPermission().then(permission => {
-    console.log(`NotificationService: Permission result: ${permission}`);
-    
+  
     const granted = permission === "granted";
     
     // Imposta direttamente la variabile locale invece di richiamare il metodo
@@ -347,7 +343,7 @@ async initAudio() {
     // Resume context if needed (autoplay policy)
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
-      console.log('NotificationService: AudioContext resumed');
+     
     }
     
     // If we've already loaded the buffer, decode it
@@ -442,8 +438,7 @@ async preloadSound() {
  * Utile quando si verificano problemi
  */
 restartNotificationSystem() {
-  console.log('NotificationService: Restarting notification system');
-  
+
   // Ripulisci le notifiche attive
   this.activeNotifications.forEach((data, id) => {
     clearTimeout(data.timerId);
@@ -475,7 +470,7 @@ restartNotificationSystem() {
     });
   } else if (!this.audioInitialized) {
     this.preloadSound().then(() => {
-      console.log('NotificationService: Sound preloaded after restart');
+    
     });
   }
   
@@ -486,23 +481,41 @@ restartNotificationSystem() {
  * Implementazione corretta di showWebNotification per garantire la visualizzazione delle notifiche
  */
 showWebNotification(title, message, notificationId) {
+  console.log('NOTIFICATION DEBUG: Tentativo di mostrare notifica', { title, message, notificationId });
+  
+  // Controllo basilare per permessi
   if (!('Notification' in window)) {
+    console.warn('NotificationService: Notifiche non supportate dal browser');
     return false;
   }
   
+  // Verifica permessi prima di continuare
   if (Notification.permission !== 'granted') {
+    console.warn('NotificationService: Permesso notifiche non concesso');
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        // Richiama questa funzione se il permesso viene concesso
+        this.showWebNotification(title, message, notificationId);
+      }
+    });
     return false;
   }
   
+  // Verifica impostazioni interne
   if (!this.webNotificationsEnabled) {
+    console.warn('NotificationService: Notifiche web disabilitate nelle impostazioni');
     return false;
   }
   
+  // Controllo per chat mute
   if (notificationId && this.isChatMuted(notificationId)) {
+    console.log(`NotificationService: Notifica bloccata per chat silenziata: ${notificationId}`);
     return false;
   }
   
+  // Verifica modalità Non Disturbare
   if (this.doNotDisturbEnabled) {
+    console.log('NotificationService: Modalità Non Disturbare attiva, notifica bloccata');
     if (notificationId) {
       this.dndNotifiedChatIds.add(notificationId);
     }
@@ -510,54 +523,73 @@ showWebNotification(title, message, notificationId) {
   }
   
   try {
+    // Creazione della notifica con requireInteraction e tag per garantire persistenza
     const options = {
       body: message,
       icon: '/icons/app-icon.png',
-      tag: `chat-${notificationId}`,
-      requireInteraction: true,
-      silent: true
+      tag: `chat-${notificationId}`, // Aggiunto tag per consolidare notifiche multiple
+      requireInteraction: true, // Forza la notifica a rimanere visibile
+      silent: true // Gestiremo il suono separatamente
     };
     
     const notification = new Notification(title, options);
     
+    // Gestione click con log e garanzia di apertura chat
     notification.onclick = () => {
-      window.focus();
+      console.log('Notifica cliccata per chat:', notificationId);
       
-      let chatOpened = false;
-      if (typeof window.openChatModal === 'function') {
-        try {
+      try {
+        // Focus sulla finestra principale
+        window.focus();
+        
+        // CORREZIONE CRITICA: Usa la funzione corretta per aprire la chat
+        // Prova tutte le varianti con più log per debug
+        if (typeof window.openChatModal === 'function') {
+          console.log('Apertura chat con openChatModal');
           window.openChatModal(notificationId);
-          chatOpened = true;
-        } catch (e) {}
-      }
-      
-      if (!chatOpened && typeof window.openChatInNewWindow === 'function') {
-        try {
-          window.openChatInNewWindow(notificationId, title);
-          chatOpened = true;
-        } catch (e) {}
-      }
-      
-      if (!chatOpened) {
-        try {
+        }
+        else if (typeof window.parent?.openChatModal === 'function') {
+          console.log('Apertura chat con parent.openChatModal');
+          window.parent.openChatModal(notificationId);
+        }
+        else if (window.opener && typeof window.opener.openChatModal === 'function') {
+          console.log('Apertura chat con opener.openChatModal');
+          window.opener.openChatModal(notificationId);
+        }
+        else {
+          console.warn('openChatModal non trovato, tentativo fallback navigazione');
+          // Fallback: naviga direttamente alla chat
           const chatUrl = `/chat/${notificationId}`;
           window.location.href = chatUrl;
-        } catch (e) {}
+        }
+      } catch (clickError) {
+        console.error('Errore durante apertura chat:', clickError);
+        // Fallback ancora più semplice
+        try {
+          window.location.href = `/chat/${notificationId}`;
+        } catch (e) {
+          console.error('Fallback navigazione fallito:', e);
+        }
       }
       
+      // Chiudi sempre la notifica
       notification.close();
     };
     
+    // Imposta un timeout più lungo (2 minuti)
     const timerId = setTimeout(() => {
       try {
         notification.close();
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Error closing notification:', e);
+      }
       
       if (this.activeNotifications) {
         this.activeNotifications.delete(notificationId);
       }
     }, 120000); // 2 minuti
     
+    // Aggiungi alla mappa delle notifiche attive per poterle gestire
     if (this.activeNotifications) {
       this.activeNotifications.set(notificationId, {
         notification,
@@ -566,8 +598,10 @@ showWebNotification(title, message, notificationId) {
       });
     }
     
+    console.log(`NotificationService: Notifica web mostrata con successo: ${title} (durata: 2 minuti)`);
     return true;
   } catch (error) {
+    console.error('NotificationService: Errore durante la visualizzazione della notifica:', error);
     return false;
   }
 }
@@ -594,7 +628,7 @@ showWebNotification(title, message, notificationId) {
             const latestMessage = messages[messages.length - 1];
             if (latestMessage && latestMessage.messageId) {
               window.notificationsContext.markMessageAsReceived(notificationId, latestMessage.messageId);
-              console.log(`Messaggio ID ${latestMessage.messageId} della chat ${notificationId} segnato come ricevuto automaticamente`);
+             
               return true;
             }
           }
@@ -706,7 +740,7 @@ showWebNotification(title, message, notificationId) {
           // Se la notifica esiste, verifica il silenziamento
           if (notification) {
             const isMuted = window.notificationsContext.isNotificationMuted(notification);
-            console.log(`Chat ${notifId} muted status from context function:`, isMuted);
+           
             return isMuted;
           }
         } catch (e) {
@@ -723,8 +757,7 @@ showWebNotification(title, message, notificationId) {
         if (notification) {
           // Controlla direttamente la proprietà isMuted
           if (notification.isMuted) {
-            console.log(`Chat ${notifId} is muted in notificationsContext`);
-            
+           
             // Se non c'è data di scadenza, è silenziata per sempre
             if (!notification.muteExpiryDate) return true;
             
@@ -739,7 +772,7 @@ showWebNotification(title, message, notificationId) {
             
             return true;
           } else {
-            console.log(`Chat ${notifId} is NOT muted in notificationsContext`);
+          
             return false;
           }
         }
@@ -754,13 +787,13 @@ showWebNotification(title, message, notificationId) {
       const chatInfo = mutedChats[notificationId] || mutedChats[notifId];
       
       if (!chatInfo || !chatInfo.isMuted) {
-        console.log(`Chat ${notifId} non è silenziata nel localStorage`);
+      
         return false;
       }
       
       // Se non c'è data di scadenza, è silenziata per sempre
       if (!chatInfo.expiryDate) {
-        console.log(`Chat ${notifId} è silenziata permanentemente`);
+    
         return true;
       }
       
@@ -770,13 +803,13 @@ showWebNotification(title, message, notificationId) {
       
       if (now > expiryDate) {
         // La data di scadenza è passata, rimuovi dal localStorage
-        console.log(`Chat ${notifId}: il silenziamento è scaduto`);
+      
         delete mutedChats[notificationId];
         localStorage.setItem('mutedChats', JSON.stringify(mutedChats));
         return false;
       }
       
-      console.log(`Chat ${notifId} è silenziata fino a ${expiryDate}`);
+  
       return true;
     } catch (e) {
       console.error('Error checking muted status in localStorage:', e);
@@ -910,7 +943,7 @@ notifyNewMessage(message, senderName, notificationId) {
 notifySystem(title, message, onClick = null) {
   // Controlli di sicurezza
   if (this.doNotDisturbEnabled) {
-    console.log('NotificationService: Do Not Disturb mode active, notification blocked');
+   
     return;
   }
   
