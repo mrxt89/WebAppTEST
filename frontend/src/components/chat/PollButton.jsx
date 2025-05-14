@@ -22,7 +22,7 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
   const modalStyle = {
     overlay: {
       backgroundColor: 'rgba(0, 0, 0, 0.75)',
-      zIndex: 1000
+      zIndex: 10000
     },
     content: {
       top: '50%',

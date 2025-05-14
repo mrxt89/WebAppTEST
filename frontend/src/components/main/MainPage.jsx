@@ -820,7 +820,7 @@ useEffect(() => {
 
   // Only show window management UI if there are open chats
   const showWindowControls = openChats.length > 0;
-
+  
   return (
     <WikiProvider>
       <div className="min-h-screen flex flex-col relative">

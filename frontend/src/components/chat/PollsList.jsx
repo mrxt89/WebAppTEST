@@ -22,11 +22,15 @@ const PollsList = ({ notificationId, onClose, onSelectPoll, currentUserId }) => 
       try {
         setLoading(true);
         const pollsData = await getNotificationPolls(notificationId);
+        // Assicuriamoci che pollsData sia un array
         if (pollsData) {
-          setPolls(pollsData);
+          setPolls(Array.isArray(pollsData) ? pollsData : []);
+        } else {
+          setPolls([]);
         }
       } catch (error) {
         console.error('Error loading polls:', error);
+        setPolls([]);
       } finally {
         setLoading(false);
       }
@@ -38,7 +42,9 @@ const PollsList = ({ notificationId, onClose, onSelectPoll, currentUserId }) => 
   }, [notificationId, getNotificationPolls]);
   
   // Filtra e ordina i sondaggi
-  const filteredPolls = polls.filter(poll => {
+  const filteredPolls = Array.isArray(polls) ? polls.filter(poll => {
+    if (!poll) return false;
+    
     // Filtra per stato
     if (!showActive && poll.Status === 'Active') return false;
     if (!showClosed && poll.Status === 'Closed') return false;
@@ -46,11 +52,11 @@ const PollsList = ({ notificationId, onClose, onSelectPoll, currentUserId }) => 
     // Filtra per termine di ricerca
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      return poll.Question.toLowerCase().includes(term);
+      return poll.Question?.toLowerCase().includes(term) ?? false;
     }
     
     return true;
-  });
+  }) : [];
   
   // Ordina i sondaggi
   const sortedPolls = [...filteredPolls].sort((a, b) => {
