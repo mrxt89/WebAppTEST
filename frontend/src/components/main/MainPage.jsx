@@ -178,6 +178,28 @@ useEffect(() => {
         // Check if this chat is already in minimized state
         const isMinimized = minimizedChats.some(chat => chat.notificationId === notification.notificationId);
         
+        // Se la chat è già nel window manager, attivala
+        if (windowManager?.windowStates?.[notification.notificationId]) {
+          windowManager.activateWindow(notification.notificationId);
+        } else {
+          // Altrimenti, crea una nuova finestra nel window manager
+          const defaultPos = {
+            x: Math.max(0, (window.innerWidth - 900) / 2),
+            y: 0,
+            width: 900,
+            height: 700
+          };
+          
+          // Crea la finestra nel window manager
+          if (windowManager?.createWindow) {
+            windowManager.createWindow(
+              notification.notificationId,
+              notification.notificationTitle || 'Nuova Chat',
+              defaultPos
+            );
+          }
+        }
+        
         // If the chat is minimized, we need to restore it properly
         if (isMinimized) {
           // Restore it (toggle minimized state to false in window manager)
@@ -189,52 +211,22 @@ useEffect(() => {
           setMinimizedChats(prevMinimized => 
             prevMinimized.filter(chat => chat.notificationId !== notification.notificationId)
           );
-          
-          // Make sure it's in the open chats list
-          setOpenChats(prevChats => {
-            if (!prevChats.some(chat => chat.notificationId === notification.notificationId)) {
-              return [...prevChats, notification];
-            }
-            return prevChats.map(chat => 
-              chat.notificationId === notification.notificationId ? notification : chat
-            );
-          });
-          
-          // Activate this window (bring to front)
-          activateWindow(notification.notificationId);
-          return;
         }
         
-        // Create or activate window in window manager
-        createWindow(notification.notificationId, notification.title, {
-          x: Math.max(0, (window.innerWidth - 550) / 2),
-          y: 80 // Position below header
-        });
-        
-        // Update open chats state - keep existing chats and add/update the current one
+        // Make sure it's in the open chats list
         setOpenChats(prevChats => {
-          const existingChatIndex = prevChats.findIndex(chat => chat.notificationId === notification.notificationId);
-          
-          if (existingChatIndex !== -1) {
-            // Replace existing chat with updated data
-            const updatedChats = [...prevChats];
-            updatedChats[existingChatIndex] = notification;
-            return updatedChats;
-          } else {
-            // Add new chat
+          if (!prevChats.some(chat => chat.notificationId === notification.notificationId)) {
             return [...prevChats, notification];
           }
+          return prevChats.map(chat => 
+            chat.notificationId === notification.notificationId ? notification : chat
+          );
         });
         
-        // If this chat was minimized, remove it from minimized state
-        setMinimizedChats(prevMinimized => 
-          prevMinimized.filter(chat => chat.notificationId !== notification.notificationId)
-        );
-        
         // Activate this window (bring to front)
-        activateWindow(notification.notificationId);
-      } else {
-        console.error('Notification not found:', notificationId);
+        if (windowManager?.activateWindow) {
+          windowManager.activateWindow(notification.notificationId);
+        }
       }
     } catch (error) {
       console.error('Errore durante l\'apertura della chat:', error);
@@ -358,36 +350,6 @@ useEffect(() => {
     };
   }, [openChats, fetchNotificationById]);
 
-  // Close chat function
-  const closeChatModal = (notificationId) => {
-    // Validazione dell'input 
-    if (!notificationId) {
-      console.error('closeChatModal chiamato senza un ID notifica valido');
-      return;
-    }
-    
-    // Close window in window manager
-    if (closeWindow) {
-      closeWindow(notificationId);
-    }
-    
-    // Unregister chat from Redux store
-    if (unregisterOpenChat) {
-      unregisterOpenChat(notificationId);
-    }
-    
-    // Remove from open chats state
-    setOpenChats(prevChats => {
-      const newChats = prevChats.filter(chat => chat.notificationId !== notificationId);
-      return newChats;
-    });
-    
-    // Also remove from minimized chats if it was there
-    setMinimizedChats(prevMinimized => 
-      prevMinimized.filter(chat => chat.notificationId !== notificationId)
-    );
-  };
-
   // Minimize chat function
   const minimizeChat = (notification) => {
     // Validazione dell'input
@@ -395,18 +357,27 @@ useEffect(() => {
       console.error('minimizeChat chiamato con parametri non validi:', notification);
       return;
     }
- 
-    // Toggle minimize in window manager
-    if (toggleMinimize) {
-      toggleMinimize(notification.notificationId);
+
+    // Aggiorna lo stato nel window manager
+    if (windowManager?.toggleMinimize) {
+      windowManager.toggleMinimize(notification.notificationId);
     }
     
-    // Add to minimized chats if not already there
+    // Aggiorna lo stato delle chat minimizzate
     setMinimizedChats(prevMinimized => {
+      // Se la chat non è già minimizzata, aggiungila
       if (!prevMinimized.some(chat => chat.notificationId === notification.notificationId)) {
         return [...prevMinimized, notification];
       }
       return prevMinimized;
+    });
+
+    // Assicurati che la chat rimanga in openChats
+    setOpenChats(prevChats => {
+      if (!prevChats.some(chat => chat.notificationId === notification.notificationId)) {
+        return [...prevChats, notification];
+      }
+      return prevChats;
     });
   };
 
@@ -417,29 +388,62 @@ useEffect(() => {
       console.error('restoreChat chiamato con parametri non validi:', notification);
       return;
     }
- 
-    // Toggle minimize in window manager (un-minimize)
-    if (toggleMinimize) {
-      toggleMinimize(notification.notificationId);
+
+    // Aggiorna lo stato nel window manager
+    if (windowManager?.toggleMinimize) {
+      windowManager.toggleMinimize(notification.notificationId);
     }
     
-    // Remove from minimized chats
-    setMinimizedChats(prevMinimized => 
-      prevMinimized.filter(chat => chat.notificationId !== notification.notificationId)
-    );
+    // Rimuovi la chat dalle chat minimizzate
+    setMinimizedChats(prevMinimized => {
+      return prevMinimized.filter(chat => chat.notificationId !== notification.notificationId);
+    });
     
-    // Make sure it's in the open chats
+    // Assicurati che la chat sia in openChats
     setOpenChats(prevChats => {
       if (!prevChats.some(chat => chat.notificationId === notification.notificationId)) {
         return [...prevChats, notification];
       }
-      return prevChats;
+      return prevChats.map(chat => 
+        chat.notificationId === notification.notificationId ? notification : chat
+      );
     });
     
-    // Activate this window (bring to front)
-    if (activateWindow) {
-      activateWindow(notification.notificationId);
+    // Attiva la finestra (porta in primo piano)
+    if (windowManager?.activateWindow) {
+      windowManager.activateWindow(notification.notificationId);
     }
+  };
+
+  // Close chat function
+  const closeChatModal = (notificationId) => {
+    // Validazione dell'input 
+    if (!notificationId) {
+      console.error('closeChatModal chiamato senza un ID notifica valido');
+      return;
+    }
+
+    // Chiudi la finestra nel window manager
+    if (windowManager?.closeWindow) {
+      windowManager.closeWindow(notificationId);
+    }
+    
+    // Rimuovi la chat dallo store Redux
+    if (unregisterOpenChat) {
+      unregisterOpenChat(notificationId);
+    }
+    
+    // Rimuovi la chat da openChats
+    setOpenChats(prevChats => {
+      const newChats = prevChats.filter(chat => chat.notificationId !== notificationId);
+      return newChats;
+    });
+    
+    // Rimuovi la chat da minimizedChats se presente
+    setMinimizedChats(prevMinimized => {
+      const newMinimized = prevMinimized.filter(chat => chat.notificationId !== notificationId);
+      return newMinimized;
+    });
   };
 
   // Close all chats function
@@ -853,7 +857,7 @@ useEffect(() => {
         
         {/* Window arrangement menu button - only shown when there are open chats */}
         {showWindowControls && (
-          <div className="fixed top-20 right-10 z-[2500]">
+          <div className="fixed top-20 right-10 z-[10049]">
             <button
               id="window-manager-menu-button"
               className="bg-yellow-300 text-gray-700 p-2 rounded-full shadow-xl hover:bg-gray-100 transition-colors z-[2501]"
@@ -874,6 +878,9 @@ useEffect(() => {
               windowManager={windowManager}
               onCloseAll={closeAllChats}
               openChats={openChats}
+              minimizedChats={minimizedChats}
+              onMinimizeChat={minimizeChat}
+              restoreChat={restoreChat}
             />
           </div>
         )}
