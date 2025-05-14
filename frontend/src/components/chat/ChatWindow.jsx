@@ -73,6 +73,9 @@ const ChatWindow = ({
     refreshAttachments
   } = useNotifications();
   
+  // Aggiungo lo stato per il titolo della chat
+  const [chatTitle, setChatTitle] = useState(notification?.title || '');
+  
   // Usa i dati standalone se disponibili, altrimenti usa quelli dall'hook
   const users = isStandalone && standaloneData?.users ? standaloneData.users : hookUsers;
   const responseOptions = isStandalone && standaloneData?.responseOptions 
@@ -1552,13 +1555,43 @@ useEffect(() => {
     }
   }, [chatListRef?.current]);
 
+  // Aggiorna il titolo ogni volta che la notifica cambia
+  useEffect(() => {
+    if (notification && notification.title) {
+      setChatTitle(notification.title);
+    }
+  }, [notification]);
+
+  // Listener per l'aggiornamento del titolo della chat
+  useEffect(() => {
+    const handleTitleUpdate = (event) => {
+      const { notificationId, newTitle } = event.detail;
+      
+      // Verifica che l'evento sia per questa chat
+      if (notificationId && notification && notification.notificationId === parseInt(notificationId)) {
+        // Aggiorna il titolo locale
+        setChatTitle(newTitle);
+        
+        // Aggiorna anche il titolo nel windowManager se necessario
+        if (windowManager && typeof windowManager.updateTitle === 'function') {
+          windowManager.updateTitle(notificationId, newTitle);
+        }
+      }
+    };
+    
+    // Aggiungi l'event listener
+    document.addEventListener('chat-title-updated', handleTitleUpdate);
+    
+    // Pulizia
+    return () => {
+      document.removeEventListener('chat-title-updated', handleTitleUpdate);
+    };
+  }, [notification, windowManager]);
+
   // Don't render anything if component is unmounted or window is minimized
   if (!notification || isMinimized) {
     return null;
   }
-  
-  // Find the current user - MOVED inside rendering for safety
-  const currentUser = users ? users.find(user => user?.isCurrentUser) : null;
   
   // Window content - same for maximized and normal mode
   const windowContent = (
@@ -1570,10 +1603,8 @@ useEffect(() => {
         onMouseDown={isStandalone ? null : handleDragStart}
       >
         <ChatTopBar 
-          title={notification.title}
-          setTitle={(newTitle) => {
-            // Implement title update if needed
-          }}
+          title={chatTitle}
+          setTitle={setChatTitle}
           closeChat={handleClose}
           onMinimize={handleMinimize}
           onMaximize={isStandalone ? null : handleMaximize} // Disabilita per standalone

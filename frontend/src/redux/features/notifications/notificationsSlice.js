@@ -476,6 +476,14 @@ export const updateChatTitle = createAsyncThunk(
       // Reload the notification to get updated data
       dispatch(fetchNotificationById(notificationId));
       
+      // Emetti un evento per notificare altre parti dell'app dell'aggiornamento del titolo
+      document.dispatchEvent(new CustomEvent('chat-title-updated', { 
+        detail: { 
+          notificationId, 
+          newTitle 
+        } 
+      }));
+      
       return { notificationId, title: newTitle };
     } catch (error) {
       return rejectWithValue(error.message || 'Failed to update chat title');

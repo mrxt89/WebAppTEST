@@ -114,7 +114,7 @@ const NotificationSidebar = ({
     if (visible === true) {
       forceLoadNotifications();
     }
-  }, [visible, forceLoadNotifications]);
+  }, [visible]);
 
   // Effetto per calcolare il conteggio delle notifiche archiviate non lette
   useEffect(() => {
@@ -209,11 +209,13 @@ const NotificationSidebar = ({
     setFilteredNotifications(sortedFiltered);
   };
 
-  // Ascolta gli aggiornamenti delle notifiche per forzare il ricaricamento
+  // Effetto per forzare il caricamento delle notifiche
   useEffect(() => {
     const handleNotificationsUpdated = () => {
       if (visible) {
         forceLoadNotifications();
+        // Forza il ri-filtraggio dopo il caricamento
+        setTimeout(filterNotifications, 300);
       }
     };
     
@@ -794,6 +796,63 @@ const NotificationSidebar = ({
       if (animationTimeoutRef.current) {
         clearTimeout(animationTimeoutRef.current);
       }
+    };
+  }, []);
+
+  // Listener per l'aggiornamento del titolo della chat
+  useEffect(() => {
+    const handleTitleUpdate = (event) => {
+      const { notificationId, newTitle } = event.detail;
+      
+      // Aggiorna il titolo nella lista delle notifiche
+      setFilteredNotifications(prevNotifications => 
+        prevNotifications.map(notification => 
+          notification.notificationId === parseInt(notificationId)
+            ? { ...notification, title: newTitle }
+            : notification
+        )
+      );
+
+      // Forza un aggiornamento del componente specifico dopo un breve timeout
+      const notificationElement = document.getElementById(`notification-item-${notificationId}`);
+      if (notificationElement) {
+        // Aggiungi una classe temporanea per forzare il re-render
+        notificationElement.classList.add('title-updating');
+        
+        // Rimuovi la classe dopo un breve timeout
+        setTimeout(() => {
+          notificationElement.classList.remove('title-updating');
+          
+          // Forza un aggiornamento del titolo specifico
+          const titleElement = document.getElementById(`notification-title-${notificationId}`);
+          if (titleElement) {
+            titleElement.textContent = newTitle;
+          }
+        }, 100);
+      }
+    };
+    
+    // Aggiungi l'event listener
+    document.addEventListener('chat-title-updated', handleTitleUpdate);
+    
+    // Pulizia
+    return () => {
+      document.removeEventListener('chat-title-updated', handleTitleUpdate);
+    };
+  }, []);
+
+  // Aggiungi lo stile CSS per l'animazione
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .notification-item.title-updating {
+        transition: background-color 0.1s ease-in-out;
+        background-color: rgba(59, 130, 246, 0.05);
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
     };
   }, []);
 
