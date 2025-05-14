@@ -9,6 +9,9 @@ let forcedRefreshRequested = false;
 let highPriorityUpdate = false; // Flag per gli aggiornamenti ad alta priorità
 let debugEnabled = true; // Set to true to enable extensive logging
 
+// Set per prevenire notifiche duplicate ravvicinate
+let recentNotifications = new Set();
+
 // Constants
 const POLLING_INTERVAL = 10000; // 10 seconds
 const FORCED_REFRESH_INTERVAL = 300; // 300ms for forced refresh (reduced from 2000ms)
@@ -238,6 +241,22 @@ async function fetchNotifications() {
             
             // Extract message preview for notification
             const messagePreview = extractLastMessagePreview(notification.messages);
+            
+            // Verifica se questa notifica è già stata inviata recentemente (30 secondi)
+            const notificationKey = `${notification.notificationId}_${Math.floor(Date.now() / 30000)}`;
+            if (recentNotifications.has(notificationKey)) {
+              log(`Notifica duplicata ignorata per chat ${notification.notificationId}`);
+              continue;
+            }
+            
+            // Registra questa notifica
+            recentNotifications.add(notificationKey);
+            
+            // Limita dimensioni del set
+            if (recentNotifications.size > 100) {
+              const oldKeys = Array.from(recentNotifications).slice(0, 50);
+              oldKeys.forEach(key => recentNotifications.delete(key));
+            }
             
             // Emit explicit message for each chat with new messages
             self.postMessage({ 

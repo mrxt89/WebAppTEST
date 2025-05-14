@@ -264,7 +264,7 @@ useEffect(() => {
       if ('Notification' in window && Notification.permission === 'granted') {
         try {
           const title = notification?.title || 'Nuovo messaggio';
-          const message = `Hai ricevuto ${newMessageCount > 1 ? `${newMessageCount} nuovi messaggi` : 'un nuovo messaggio'}`;
+          const message = `Hai ricevuto nuovi messaggi`;
           
           const webNotification = new Notification(title, {
             body: message,
@@ -278,7 +278,7 @@ useEffect(() => {
           };
           
           // Auto-chiusura dopo 8 secondi
-          setTimeout(() => webNotification.close(), 8000);
+          setTimeout(() => webNotification.close(), 120000);
         } catch (e) {
           console.error('Error showing direct notification:', e);
         }

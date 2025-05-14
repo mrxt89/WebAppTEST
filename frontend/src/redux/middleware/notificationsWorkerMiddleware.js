@@ -65,7 +65,9 @@ const notificationsWorkerMiddleware = store => {
             notifications: newNotifications,
             error: workerError,
             notificationId,
-            newMessageCount
+            newMessageCount,
+            senderName,
+            messagePreview
           } = event.data;
           
           switch (type) {
@@ -112,112 +114,113 @@ const notificationsWorkerMiddleware = store => {
               break;
               
             case 'new_message':
-            if (notificationId) {
-              try {
-                // Controlli di sicurezza
-                if (!notificationId) {
-                  console.error('ID notifica non valido per nuovo messaggio');
-                  return;
-                }
-                
-                // Fetch notifica dallo state Redux
-                const state = store.getState();
-                
-                // Controlla se ci sono i dati necessari nello state
-                if (!state?.notifications?.notifications) {
-                  console.warn('Stato Redux incompleto, impossibile inviare notifica');
-                  return;
-                }
-                
-                // Trova la notifica negli stati
-                const notification = state.notifications.notifications?.find(n => n.notificationId === parseInt(notificationId));
-                
-                // Titolo e contenuto per la notifica
-                const notificationTitle = notification?.title || 'Nuovo messaggio';
-                console.log('DEBUG: Notifica:', notification);
-                const notificationBody = `Hai ricevuto ${newMessageCount > 1 ? `${newMessageCount} nuovi messaggi` : 'un nuovo messaggio'}`;
-                
-                // Callback per il click sulla notifica
-                const handleNotificationClick = () => {
-                  if (window.openChatModal) {
-                    window.openChatModal(notificationId);
+              if (notificationId) {
+                try {
+                  const state = store.getState();
+                  if (!state?.notifications?.notifications) {
+                    return;
                   }
-                };
-                
-                // IMPLEMENTAZIONE DIRETTA - Bypass NotificationService
-                // Accedi direttamente all'API Notification del browser
-                if (window.Notification && Notification.permission === 'granted') {
+                  
+                  const notification = state.notifications.notifications?.find(n => n.notificationId === parseInt(notificationId));
+                  if (!notification) {
+                    return;
+                  }
+                  
+                  const notificationCache = window._notificationCache = window._notificationCache || {};
+                  const now = Date.now();
+                  
+                  if (notificationCache[notificationId] && (now - notificationCache[notificationId].timestamp < 30000)) {
+                    return;
+                  }
+                  
+                  let messages = [];
                   try {
-                    console.log('DEBUG: Creazione notifica diretta per:', notificationTitle);
-                    
-                    const desktopNotification = new Notification(notificationTitle, {
-                      body: notificationBody,
-                      icon: '/icons/app-icon.png'
-                    });
-                    
-                    desktopNotification.onclick = () => {
-                      window.focus();
-                      handleNotificationClick();
-                      desktopNotification.close();
-                    };
-                    
-                    setTimeout(() => desktopNotification.close(), 8000);
-                    
-                    console.log('DEBUG: Notifica desktop creata con successo');
+                    messages = Array.isArray(notification.messages) 
+                      ? notification.messages 
+                      : JSON.parse(notification.messages || '[]');
                   } catch (e) {
-                    console.error('Errore nella creazione della notifica desktop:', e);
-                    
-                    // FALLBACK - Se fallisce l'implementazione diretta, tenta con NotificationService
-                    if (window.notificationService) {
-                      try {
-                        window.notificationService.notifySystem(
-                          notificationTitle,
-                          notificationBody,
-                          handleNotificationClick
-                        );
-                      } catch (nse) {
-                        console.error('Errore anche nel fallback NotificationService:', nse);
-                      }
-                    }
+                    console.error('Errore parsing messaggi:', e);
+                    return;
                   }
-                } else {
-                  console.log('DEBUG: Impossibile mostrare notifica desktop. Permesso:', 
-                            Notification?.permission);
-                            
-                  // Se non abbiamo i permessi e NotificationService è disponibile, prova con quello
+                  
+                  let currentUserId = null;
+                  try {
+                    const userStr = localStorage.getItem('user');
+                    if (userStr) {
+                      const userData = JSON.parse(userStr);
+                      currentUserId = userData.userId || userData.UserId || userData.id || userData.ID;
+                    }
+                  } catch (e) {}
+                  
+                  if (!currentUserId) {
+                    currentUserId = -1;
+                  }
+                  
+                  const unreadMessages = messages.filter(msg => {
+                    if (msg.senderId == currentUserId) return false;
+                    
+                    const msgTime = new Date(msg.timestamp || msg.createdAt || msg.messageDate || now);
+                    const fiveMinutesAgo = new Date(now - 5 * 60 * 1000);
+                    if (msgTime > fiveMinutesAgo) return true;
+                    
+                    const readByCurrentUser = (msg.readedByUsers && 
+                      (Array.isArray(msg.readedByUsers) 
+                        ? msg.readedByUsers.some(u => u.userId == currentUserId || u.UserId == currentUserId)
+                        : (typeof msg.readedByUsers === 'object' && 
+                          (msg.readedByUsers.userId == currentUserId || msg.readedByUsers.UserId == currentUserId))
+                      )
+                    );
+                    
+                    return !readByCurrentUser;
+                  });
+                  
+                  if (unreadMessages.length === 0) {
+                    return;
+                  }
+                  
+                  const latestMessage = unreadMessages[unreadMessages.length - 1];
+                  const senderName = latestMessage.senderName || notification.title || 'Nuovo messaggio';
+                  let notificationBody = latestMessage.message || 'Nuovo messaggio';
+                  
+                  if (unreadMessages.length > 1) {
+                    notificationBody = `${notificationBody} (e altri ${unreadMessages.length - 1} messaggi)`;
+                  }
+                  
+                  notificationCache[notificationId] = {
+                    timestamp: now,
+                    messageId: latestMessage.messageId
+                  };
+                  
                   if (window.notificationService) {
-                    window.notificationService.notifySystem(
-                      notificationTitle,
+                    window.notificationService.notifyNewMessage(
                       notificationBody,
-                      handleNotificationClick
+                      senderName,
+                      notificationId
                     );
                   }
+                  
+                  document.dispatchEvent(new CustomEvent('unread-count-changed', {
+                    detail: {
+                      notificationId,
+                      newMessageCount: unreadMessages.length,
+                      timestamp: now
+                    }
+                  }));
+                  
+                  document.dispatchEvent(new CustomEvent('new-message-received', {
+                    detail: {
+                      notificationId,
+                      newMessageCount: unreadMessages.length
+                    }
+                  }));
+                  
+                  store.dispatch(fetchNotificationById(notificationId));
+                  
+                } catch (e) {
+                  console.error('Errore elaborazione nuovo messaggio:', e);
                 }
-                
-                // Emetti eventi per aggiornare UI e contatori
-                document.dispatchEvent(new CustomEvent('unread-count-changed', {
-                  detail: {
-                    notificationId,
-                    newMessageCount,
-                    timestamp: Date.now()
-                  }
-                }));
-                
-                document.dispatchEvent(new CustomEvent('new-message-received', {
-                  detail: {
-                    notificationId,
-                    newMessageCount
-                  }
-                }));
-                
-                // Aggiorna la notifica nello store Redux
-                store.dispatch(fetchNotificationById(notificationId));
-                
-              } catch (e) {
-                console.error('Errore elaborazione nuovo messaggio:', e);
               }
-            }
-            break;
+              break;
             case 'ready':
               break;
               

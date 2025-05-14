@@ -103,7 +103,7 @@ async function markNotificationAsRead(notificationId, userId, isReadByUser) {
       .input('userId', sql.Int, userId)
       .input('isReadByUser', sql.Bit, isReadByUser)
       .query(`
-        DISABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
+      
 
         UPDATE  AR_NotificationDetails
         SET     isReadByUser = @isReadByUser
@@ -118,7 +118,7 @@ async function markNotificationAsRead(notificationId, userId, isReadByUser) {
 
         UPDATE AR_Users SET LastOnline = GETDATE() WHERE UserId = @UserId;
 
-        ENABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
+        
       `);
   } catch (err) {
     console.error('Error marking notification as read:', err);
