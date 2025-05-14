@@ -113,174 +113,161 @@ const notificationsWorkerMiddleware = store => {
               });
               break;
               
-            case 'new_message':
-    if (notificationId) {
-      try {
-        // Controlli di sicurezza
-        const state = store.getState();
-        if (!state?.notifications?.notifications) {
-          return;
-        }
-        
-        // Trova la notifica attuale
-        const notification = state.notifications.notifications?.find(n => n.notificationId === parseInt(notificationId));
-        if (!notification) {
-          return;
-        }
-        
-        // Evita notifiche troppo frequenti usando la cache
-        const notificationCache = window._notificationCache = window._notificationCache || {};
-        const now = Date.now();
-        
-        // Se la notifica è già stata mostrata negli ultimi 30 secondi, ignora
-        if (notificationCache[notificationId] && (now - notificationCache[notificationId].timestamp < 30000)) {
-          return;
-        }
-        
-        // Ottieni ID utente corrente
-        let currentUserId = null;
-        try {
-          const userStr = localStorage.getItem('user');
-          if (userStr) {
-            const userData = JSON.parse(userStr);
-            currentUserId = userData.userId || userData.UserId || userData.id || userData.ID;
-          }
-        } catch (e) {
-          console.error('Errore recupero userId:', e);
-        }
-        
-        if (!currentUserId) {
-          currentUserId = -1;
-        }
-        
-        // SOLUZIONE OTTIMIZZATA
-        // Verifica se c'è stato un incremento di messaggi rispetto alla cache
-        let shouldNotify = false;
-        let latestMessagePreview = "Nuovo messaggio";
-        let latestMessageSender = notification.title || "Nuovo messaggio";
-        let messageId = null;
-        
-        try {
-          // Ottieni i messaggi
-          const messages = Array.isArray(notification.messages) ? 
-            notification.messages : JSON.parse(notification.messages || '[]');
-            
-          // Verifica se abbiamo una entry nella cache per questa notifica
-          if (notificationCache[notificationId]) {
-            // Contiamo i messaggi non inviati dall'utente corrente
-            const relevantMessages = messages.filter(msg => msg.senderId != currentUserId);
-            const lastCachedCount = notificationCache[notificationId].messageCount || 0;
-            const currentCount = relevantMessages.length;
-            
-            // Notifica solo se il conteggio è aumentato
-            if (currentCount > lastCachedCount) {
-              shouldNotify = true;
-              
-              // Determina quanti messaggi nuovi ci sono rispetto all'ultimo stato
-              const newMessageCount = currentCount - lastCachedCount;
-              
-              // Ottieni l'ultimo messaggio per la preview
-              if (relevantMessages.length > 0) {
-                const latestMessage = relevantMessages[relevantMessages.length - 1];
-                latestMessagePreview = latestMessage.message || "Nuovo messaggio";
-                latestMessageSender = latestMessage.senderName || notification.title || "Nuovo messaggio";
-                messageId = latestMessage.messageId;
-                
-                // Se ci sono più messaggi nuovi, aggiorna il testo
-                if (newMessageCount > 1) {
-                  latestMessagePreview = `${latestMessagePreview} (e altri ${newMessageCount - 1} messaggi)`;
+           case 'new_message':
+              if (notificationId) {
+                try {
+                  // Controlli di sicurezza
+                  const state = store.getState();
+                  if (!state?.notifications?.notifications) {
+                    return;
+                  }
+                  
+                  // Trova la notifica attuale
+                  const notification = state.notifications.notifications?.find(n => n.notificationId === parseInt(notificationId));
+                  if (!notification) {
+                    return;
+                  }
+                  
+                  // Evita notifiche troppo frequenti usando la cache
+                  const notificationCache = window._notificationCache = window._notificationCache || {};
+                  const now = Date.now();
+                  
+                  // Se la notifica è già stata mostrata negli ultimi 30 secondi, ignora
+                  if (notificationCache[notificationId] && (now - notificationCache[notificationId].timestamp < 30000)) {
+                    return;
+                  }
+                  
+                  // Ottieni ID utente corrente
+                  let currentUserId = null;
+                  try {
+                    const userStr = localStorage.getItem('user');
+                    if (userStr) {
+                      const userData = JSON.parse(userStr);
+                      currentUserId = userData.userId || userData.UserId || userData.id || userData.ID;
+                    }
+                  } catch (e) {
+                    console.error('Errore recupero userId:', e);
+                  }
+                  
+                  if (!currentUserId) {
+                    currentUserId = -1;
+                  }
+                  
+                  // SOLUZIONE OTTIMIZZATA
+                  // Verifica se c'è stato un incremento di messaggi rispetto alla cache
+                  let shouldNotify = false;
+                  let latestMessagePreview = "Nuovo messaggio";
+                  let latestMessageSender = notification.title || "Nuovo messaggio";
+                  let messageId = null;
+                  
+                  try {
+                    // Ottieni i messaggi
+                    const messages = Array.isArray(notification.messages) ? 
+                      notification.messages : JSON.parse(notification.messages || '[]');
+                      
+                    // Verifica se abbiamo una entry nella cache per questa notifica
+                    if (notificationCache[notificationId]) {
+                      // Contiamo i messaggi non inviati dall'utente corrente
+                      const relevantMessages = messages.filter(msg => msg.senderId != currentUserId);
+                      const lastCachedCount = notificationCache[notificationId].messageCount || 0;
+                      const currentCount = relevantMessages.length;
+                      
+                      // Notifica solo se il conteggio è aumentato
+                      if (currentCount > lastCachedCount) {
+                        shouldNotify = true;
+                        
+                        // Ottieni l'ultimo messaggio per la preview
+                        if (relevantMessages.length > 0) {
+                          const latestMessage = relevantMessages[relevantMessages.length - 1];
+                          latestMessagePreview = latestMessage.message || "Nuovo messaggio";
+                          latestMessageSender = latestMessage.senderName || notification.title || "Nuovo messaggio";
+                          messageId = latestMessage.messageId;
+                        }
+                      }
+                    } else {
+                      // Prima volta che vediamo questa notifica
+                      // Considera tutti i messaggi non inviati dall'utente come nuovi
+                      const relevantMessages = messages.filter(msg => msg.senderId != currentUserId);
+                      
+                      if (relevantMessages.length > 0) {
+                        shouldNotify = true;
+                        
+                        // Ottieni l'ultimo messaggio per la preview
+                        const latestMessage = relevantMessages[relevantMessages.length - 1];
+                        latestMessagePreview = latestMessage.message || "Nuovo messaggio";
+                        latestMessageSender = latestMessage.senderName || notification.title || "Nuovo messaggio";
+                        messageId = latestMessage.messageId;
+                      }
+                    }
+                    
+                    // Aggiorna la cache con il nuovo conteggio
+                    if (messages.length > 0) {
+                      notificationCache[notificationId] = {
+                        timestamp: now,
+                        messageCount: messages.filter(msg => msg.senderId != currentUserId).length,
+                        messageId: messageId
+                      };
+                    }
+                  } catch (e) {
+                    console.error('Errore nel confronto dei messaggi:', e);
+                    shouldNotify = false;
+                  }
+                  
+                  // Mostra la notifica solo se necessario
+                  if (shouldNotify) {
+                    // Usa il servizio di notifiche centralizzato
+                    if (window.notificationService) {
+                      console.log(`Notifica per chat ${notificationId}: ${latestMessagePreview}`);
+                      window.notificationService.notifyNewMessage(
+                        latestMessagePreview,
+                        latestMessageSender,
+                        notificationId
+                      );
+                    } else {
+                      // Fallback: Notifica diretta se il servizio non è disponibile
+                      console.log('NotificationService non disponibile, utilizzo notifica diretta');
+                      if ('Notification' in window && Notification.permission === 'granted') {
+                        const webNotification = new Notification(latestMessageSender, {
+                          body: latestMessagePreview,
+                          icon: '/icons/app-icon.png',
+                          requireInteraction: true
+                        });
+                        
+                        webNotification.onclick = () => {
+                          window.focus();
+                          if (typeof window.openChatModal === 'function') {
+                            window.openChatModal(notificationId);
+                          }
+                          webNotification.close();
+                        };
+                        
+                        setTimeout(() => webNotification.close(), 120000);
+                      }
+                    }
+                    
+                    // Emetti eventi per aggiornare UI e contatori
+                    document.dispatchEvent(new CustomEvent('unread-count-changed', {
+                      detail: {
+                        notificationId,
+                        timestamp: now
+                      }
+                    }));
+                    
+                    document.dispatchEvent(new CustomEvent('new-message-received', {
+                      detail: {
+                        notificationId
+                      }
+                    }));
+                    
+                    // Aggiorna la notifica nello store Redux
+                    store.dispatch(fetchNotificationById(notificationId));
+                  }
+                  
+                } catch (e) {
+                  console.error('Errore elaborazione nuovo messaggio:', e);
                 }
               }
-            }
-          } else {
-            // Prima volta che vediamo questa notifica
-            // Considera tutti i messaggi non inviati dall'utente come nuovi
-            const relevantMessages = messages.filter(msg => msg.senderId != currentUserId);
-            
-            if (relevantMessages.length > 0) {
-              shouldNotify = true;
-              
-              // Ottieni l'ultimo messaggio per la preview
-              const latestMessage = relevantMessages[relevantMessages.length - 1];
-              latestMessagePreview = latestMessage.message || "Nuovo messaggio";
-              latestMessageSender = latestMessage.senderName || notification.title || "Nuovo messaggio";
-              messageId = latestMessage.messageId;
-              
-              // Se ci sono più messaggi, aggiorna il testo
-              if (relevantMessages.length > 1) {
-                latestMessagePreview = `${latestMessagePreview} (e altri ${relevantMessages.length - 1} messaggi)`;
-              }
-            }
-          }
-          
-          // Aggiorna la cache con il nuovo conteggio
-          if (messages.length > 0) {
-            notificationCache[notificationId] = {
-              timestamp: now,
-              messageCount: messages.filter(msg => msg.senderId != currentUserId).length,
-              messageId: messageId
-            };
-          }
-        } catch (e) {
-          console.error('Errore nel confronto dei messaggi:', e);
-          shouldNotify = false;
-        }
-        
-        // Mostra la notifica solo se necessario
-        if (shouldNotify) {
-          // Usa il servizio di notifiche centralizzato
-          if (window.notificationService) {
-            console.log(`Notifica per chat ${notificationId}: ${latestMessagePreview}`);
-            window.notificationService.notifyNewMessage(
-              latestMessagePreview,
-              latestMessageSender,
-              notificationId
-            );
-          } else {
-            // Fallback: Notifica diretta se il servizio non è disponibile
-            console.log('NotificationService non disponibile, utilizzo notifica diretta');
-            if ('Notification' in window && Notification.permission === 'granted') {
-              const webNotification = new Notification(latestMessageSender, {
-                body: latestMessagePreview,
-                icon: '/icons/app-icon.png',
-                requireInteraction: true
-              });
-              
-              webNotification.onclick = () => {
-                window.focus();
-                if (typeof window.openChatModal === 'function') {
-                  window.openChatModal(notificationId);
-                }
-                webNotification.close();
-              };
-              
-              setTimeout(() => webNotification.close(), 120000);
-            }
-          }
-          
-          // Emetti eventi per aggiornare UI e contatori
-          document.dispatchEvent(new CustomEvent('unread-count-changed', {
-            detail: {
-              notificationId,
-              timestamp: now
-            }
-          }));
-          
-          document.dispatchEvent(new CustomEvent('new-message-received', {
-            detail: {
-              notificationId
-            }
-          }));
-          
-          // Aggiorna la notifica nello store Redux
-          store.dispatch(fetchNotificationById(notificationId));
-        }
-        
-      } catch (e) {
-        console.error('Errore elaborazione nuovo messaggio:', e);
-      }
-    }
-    break;
+              break;
             case 'ready':
               break;
               
