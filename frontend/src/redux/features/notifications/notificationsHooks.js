@@ -56,7 +56,8 @@ import {
   refreshAttachments,
   deleteNotificationAttachment,
   downloadNotificationAttachment,
-  sendNotificationWithAttachments
+  sendNotificationWithAttachments,
+  removeUserFromChat
 } from './notificationsActions';
 
 // Importa funzionalità da messageReactionsSlice
@@ -66,7 +67,8 @@ import {
   toggleMessageReaction,
   removeMessageReaction,
   selectMessageReactions,
-  selectReactionsLoading
+  selectReactionsLoading,
+  
 } from './messageReactionsSlice';
 
 // Importa funzionalità da messageManagementSlice
@@ -844,6 +846,53 @@ export const useNotifications = () => {
     return () => clearInterval(interval);
   }, [cleanupStandaloneWindows]);
 
+  const handleRemoveUserFromChat = useCallback(async (notificationId, userToRemoveId) => {
+  try {
+    console.log('Rimozione utente:', userToRemoveId, 'dalla chat:', notificationId);
+    // Mostra una conferma all'utente
+    const { isConfirmed } = await swal.fire({
+      title: 'Rimuovere utente',
+      text: 'Sei sicuro di voler rimuovere questo utente dalla chat?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sì, rimuovi',
+      cancelButtonText: 'Annulla',
+      confirmButtonColor: '#d33'
+    });
+    
+    if (!isConfirmed) return false;
+    
+    const result = await dispatch(removeUserFromChat({ 
+      notificationId, 
+      userToRemoveId 
+    })).unwrap();
+    
+    if (result.success) {
+      // Mostra un messaggio di conferma
+      swal.fire({
+        title: 'Utente rimosso',
+        text: 'L\'utente è stato rimosso dalla chat',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false
+      });
+      
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error removing user from chat:', error);
+    swal.fire({
+      title: 'Errore',
+      text: error.message || 'Impossibile rimuovere l\'utente dalla chat',
+      icon: 'error'
+    });
+    return false;
+  }
+}, [dispatch]);
+
+
   return {
     // State
     notifications,
@@ -889,7 +938,8 @@ export const useNotifications = () => {
     leaveChat: handleLeaveChat,
     toggleMuteChat: handleToggleMuteChat,
     updateChatTitle: handleUpdateChatTitle,
-    
+    removeUserFromChat: handleRemoveUserFromChat,
+
     // Open chat tracking
     registerOpenChat: handleRegisterOpenChat,
     unregisterOpenChat: handleUnregisterOpenChat,

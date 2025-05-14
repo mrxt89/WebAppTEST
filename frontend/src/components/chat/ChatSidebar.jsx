@@ -52,7 +52,8 @@ const ChatSidebar = forwardRef((props, ref) => {
     getLinkedDocuments,
     unlinkDocument,
     documents,
-    documentsLoading
+    documentsLoading,
+    removeUserFromChat 
   } = useNotifications();
 
   const { 

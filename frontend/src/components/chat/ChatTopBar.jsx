@@ -6,7 +6,7 @@ import {
   Paperclip, ArrowLeftRight, MessageSquareText, Bell, Globe, Building,
   ChevronDown, Loader2, LogOut, Trash2, CheckCircle, XCircle, CheckSquare, XSquare,
   AlertOctagon, Archive, ArchiveX, MoreVertical, ChevronLeft, BarChart, Edit2, Link,
-  Maximize2, Square, Minus, Proportions   
+  Maximize2, Square, Minus, Proportions, UserMinus, Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
@@ -63,7 +63,7 @@ const ChatTopBar = ({
   const [isMobile, setIsMobile] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   
-  const { notifications, filterMessages, updateChatTitle, fetchNotificationById } = useNotifications();
+  const { notifications, filterMessages, updateChatTitle, fetchNotificationById, removeUserFromChat } = useNotifications();
   const infoDropdownRef = useRef(null);
   const infoButtonRef = useRef(null);
   const moreMenuRef = useRef(null);
@@ -1051,85 +1051,98 @@ useEffect(() => {
             
             {/* MEMBERS TAB */}
             {activeTab === 'members' && (
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-sm" style={{ color: categoryColor }}>
-                    Partecipanti ({membersInfo.length})
-                  </h3>
-                  
-                  {!hasLeftChat && (
-                    <button 
-                      className="text-xs flex items-center text-blue-600 hover:underline"
-                      onClick={() => setActiveTab('add')}
-                    >
-                      <UserPlus className="w-3 h-3 mr-1" /> Aggiungi
-                    </button>
-                  )}
-                </div>
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium text-sm" style={{ color: categoryColor }}>
+                  Partecipanti ({membersInfo.length})
+                </h3>
                 
-                <div className="space-y-3 mt-3">
-                  {membersInfo.map((member, index) => (
-                    <div key={index} className="flex border-b border-gray-100 pb-3">
-                      <div className="relative">
-                        <div 
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm mr-3 flex-shrink-0"
-                          style={{ backgroundColor: `hsl(${(index * 55) % 360}, 70%, 50%)` }}
-                        >
-                          {member.firstName?.charAt(0).toUpperCase() || ''}
-                          {member.lastName?.charAt(0).toUpperCase() || ''}
+                {!hasLeftChat && (
+                  <button 
+                    className="text-xs flex items-center text-blue-600 hover:underline"
+                    onClick={() => setActiveTab('add')}
+                  >
+                    <UserPlus className="w-3 h-3 mr-1" /> Aggiungi
+                  </button>
+                )}
+              </div>
+              
+              <div className="space-y-3 mt-3">
+                {membersInfo.map((member, index) => (
+                  <div key={index} className="flex border-b border-gray-100 pb-3">
+                    <div className="relative">
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm mr-3 flex-shrink-0"
+                        style={{ backgroundColor: `hsl(${(index * 55) % 360}, 70%, 50%)` }}
+                      >
+                        {member.firstName?.charAt(0).toUpperCase() || ''}
+                        {member.lastName?.charAt(0).toUpperCase() || ''}
+                      </div>
+                      <div 
+                        className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
+                          getOnlineStatus(member) === 'online' ? 'bg-green-500' :
+                          getOnlineStatus(member) === 'away' ? 'bg-yellow-500' : 'bg-gray-400'
+                        }`}
+                        title={
+                          getOnlineStatus(member) === 'online' ? 'Online' :
+                          getOnlineStatus(member) === 'away' ? 'Recentemente attivo' : 'Offline'
+                        }
+                      ></div>
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium text-sm">
+                            {member.firstName} {member.lastName}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {member.role || ''}
+                            {member.companyName && (
+                              <span className="ml-1 text-gray-400 text-indigo-500">
+                                - {member.companyName}
+                              </span>
+                            )}
+                          </p>
                         </div>
-                        <div 
-                          className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
-                            getOnlineStatus(member) === 'online' ? 'bg-green-500' :
-                            getOnlineStatus(member) === 'away' ? 'bg-yellow-500' : 'bg-gray-400'
-                          }`}
-                          title={
-                            getOnlineStatus(member) === 'online' ? 'Online' :
-                            getOnlineStatus(member) === 'away' ? 'Recentemente attivo' : 'Offline'
-                          }
-                        ></div>
+                        <span className="text-xs text-gray-400 whitespace-nowrap">
+                          {getLastActiveTime(member.lastOnline)}
+                        </span>
                       </div>
                       
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="font-medium text-sm">
-                              {member.firstName} {member.lastName}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {member.role || ''}
-                              {member.companyName && (
-                                <span className="ml-1 text-gray-400 text-indigo-500">
-                                  - {member.companyName}
-                                </span>
-                              )}
-                            </p>
+                      <div className="flex flex-col space-y-1 mt-1">
+                        {member.email && (
+                          <div className="flex items-center text-xs text-gray-600">
+                            <Mail className="h-3 w-3 mr-1 text-gray-400" />
+                            <span className="truncate">{member.email}</span>
                           </div>
-                          <span className="text-xs text-gray-400 whitespace-nowrap">
-                            {getLastActiveTime(member.lastOnline)}
-                          </span>
-                        </div>
-                        
-                        <div className="flex flex-col space-y-1 mt-1">
-                          {member.email && (
-                            <div className="flex items-center text-xs text-gray-600">
-                              <Mail className="h-3 w-3 mr-1 text-gray-400" />
-                              <span className="truncate">{member.email}</span>
-                            </div>
-                          )}
-                          {member.phoneNumber && (
-                            <div className="flex items-center text-xs text-gray-600">
-                              <Phone className="h-3 w-3 mr-1 text-gray-400" />
-                              <span>{member.phoneNumber}</span>
-                            </div>
-                          )}
-                        </div>
+                        )}
+                        {member.phoneNumber && (
+                          <div className="flex items-center text-xs text-gray-600">
+                            <Phone className="h-3 w-3 mr-1 text-gray-400" />
+                            <span>{member.phoneNumber}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
+                    
+                    {/* Aggiungiamo il pulsante di rimozione */}
+                    {!hasLeftChat  && (
+                      <div className="flex items-center ml-2">
+                        <button
+                          onClick={() => removeUserFromChat(notificationId, member.userId)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
+                          title="Rimuovi dalla chat"
+                        >
+                          <UserMinus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+          )}
             
             {/* ADD USERS/CHANNELS TAB */}
             {activeTab === 'add' && (

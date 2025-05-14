@@ -105,7 +105,7 @@ export const useNotificationSettings = () => {
     toggleWebNotificationsEnabled,
     playTestSound,
     showTestNotification,
-    requestNotificationPermission
+    requestNotificationPermission,
   };
 };
 

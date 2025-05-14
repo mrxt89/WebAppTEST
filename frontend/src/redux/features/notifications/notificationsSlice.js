@@ -3,7 +3,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { enableMapSet } from 'immer';
 import axios from 'axios';
 import { config } from '../../../config';
-
+import { removeUserFromChat } from './notificationsActions';
 // Abilita il supporto per Map e Set in Immer
 enableMapSet();
 
@@ -814,6 +814,18 @@ const notificationsSlice = createSlice({
       })
       .addCase(sendNotification.rejected, (state, action) => {
         state.sending = false;
+        state.error = action.payload;
+      })
+      .addCase(removeUserFromChat.fulfilled, (state, action) => {
+        const { notificationId, removedUserId } = action.payload;
+        
+        // Non dobbiamo aggiornare lo stato qui poiché fetchNotificationById verrà chiamato
+        // e aggiornerà già lo stato con i dati più recenti
+        
+        // Eventualmente potremmo aggiungere un flag o un messaggio temporaneo
+        // per indicare che un utente è stato rimosso
+      })
+      .addCase(removeUserFromChat.rejected, (state, action) => {
         state.error = action.payload;
       })
       

@@ -289,4 +289,46 @@ export const sendNotificationWithAttachments = createAsyncThunk(
   }
 );
 
+export const removeUserFromChat = createAsyncThunk(
+  'notifications/removeUserFromChat',
+  async ({ notificationId, userToRemoveId }, { rejectWithValue, dispatch }) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return rejectWithValue('No token available');
+      
+      const res = await axios.post(
+        `${config.API_BASE_URL}/remove-user-from-chat`,
+        { notificationId, userToRemoveId },
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+
+      if (!res.data.success) {
+        return rejectWithValue(res.data.message || 'Failed to remove user from chat');
+      }
+
+      // Aggiorna la notifica per riflettere i cambiamenti
+      await dispatch(fetchNotificationById(notificationId));
+      
+      // Notifica altri componenti del cambiamento
+      document.dispatchEvent(new CustomEvent('user-removed-from-chat', {
+        detail: { 
+          notificationId, 
+          removedUserId: userToRemoveId,
+          removedUserName: res.data.removedUserName,
+          timestamp: new Date().getTime()
+        }
+      }));
+      
+      return {
+        success: true,
+        notificationId,
+        removedUserId: userToRemoveId,
+        message: res.data.message
+      };
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to remove user from chat');
+    }
+  }
+);
+
 // Aggiungi qui altre action creator per funzionalità avanzate

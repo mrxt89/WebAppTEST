@@ -45,6 +45,7 @@ const { getNotifications
         , deleteMessage 
         , getBatchReactions
         , getBatchPolls
+        , removeUserFromChat
       } = require('../queries/notificationsManagement');
 
 const {
@@ -1335,6 +1336,40 @@ router.get('/notifications/:notificationId/messages', authenticateToken, async (
       message: 'Errore durante il recupero dei messaggi della notifica',
       error: error.message
     });
+  }
+});
+
+// Route per rimuovere un utente da una chat
+router.post('/remove-user-from-chat', authenticateToken, async (req, res) => {
+  const { notificationId, userToRemoveId } = req.body;
+  const adminUserId = req.user.UserId;
+  
+  try {
+    // Verifica i parametri
+    if (!notificationId || !userToRemoveId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID notifica e ID utente da rimuovere sono campi obbligatori'
+      });
+    }
+    
+    const result = await removeUserFromChat(notificationId, adminUserId, userToRemoveId);
+    
+    if (!result.Success) {
+      return res.status(400).json({
+        success: false,
+        message: result.Message || 'Errore durante la rimozione dell\'utente'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: result.Message,
+      removedUserName: result.RemovedUserName
+    });
+  } catch (err) {
+    console.error('Error removing user from chat:', err);
+    res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 

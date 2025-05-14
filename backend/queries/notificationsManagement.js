@@ -1470,6 +1470,29 @@ async function getBatchPolls(notificationId, messageIds, userId) {
   }
 }
 
+/**
+ * Rimuove un utente da una chat
+ * @param {number} notificationId - ID della notifica/chat
+ * @param {number} adminUserId - ID dell'utente che sta rimuovendo
+ * @param {number} userToRemoveId - ID dell'utente da rimuovere
+ * @returns {Promise<Object>} - Risultato dell'operazione
+ */
+async function removeUserFromChat(notificationId, adminUserId, userToRemoveId) {
+  try {
+    let pool = await sql.connect(config.dbConfig);
+    const result = await pool.request()
+      .input('notificationId', sql.Int, notificationId)
+      .input('adminUserId', sql.Int, adminUserId)
+      .input('userToRemoveId', sql.Int, userToRemoveId)
+      .execute('RemoveUserFromChat');
+    
+    return result.recordset[0];
+  } catch (err) {
+    console.error('Error removing user from chat:', err);
+    throw err;
+  }
+}
+
 module.exports = {
   getNotifications,
   getUserNotifications,
@@ -1512,7 +1535,8 @@ module.exports = {
   getNotificationIdForMessage,
   deleteMessage,
   getBatchReactions,
-  getBatchPolls
+  getBatchPolls,
+  removeUserFromChat
   
 
 };
