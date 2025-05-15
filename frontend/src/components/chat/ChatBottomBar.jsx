@@ -68,7 +68,7 @@ const ChatBottomBar = ({
  const lastSelectionRef = useRef(null);
  
  // Use functions from context
- const contextFunctions = useNotifications();
+ const { getNotificationAttachments, ...contextFunctions } = useNotifications();
  // Ottieni riferimenti diretti alle funzioni
  const sendNotificationWithAttachments = contextFunctions.sendNotificationWithAttachments;
  const sendNotification = contextFunctions.sendNotification;
@@ -704,14 +704,7 @@ const handleSendWithAttachments = async () => {
        type: file.type
      }))
    };
-   
-   // Emetti un evento per mostrare il messaggio temporaneo
-   document.dispatchEvent(new CustomEvent('temp-message-created', { 
-     detail: { 
-       message: tempMessage,
-       notificationId
-     }
-   }));
+  
    
    const notificationData = {
      notificationId,
@@ -789,6 +782,22 @@ const handleSendWithAttachments = async () => {
        if (contextFunctions.fetchNotificationById) {
          setTimeout(() => {
            contextFunctions.fetchNotificationById(result.notificationId || notificationId, true);
+           // Aggiorna gli allegati
+           getNotificationAttachments(result.notificationId || notificationId)
+             .then(data => {
+               if (Array.isArray(data)) {
+                 // Emetti un evento per aggiornare ChatSidebar
+                 document.dispatchEvent(new CustomEvent('attachments-updated', { 
+                   detail: { 
+                     notificationId: result.notificationId || notificationId,
+                     attachments: data
+                   } 
+                 }));
+               }
+             })
+             .catch(err => {
+               console.error('Error refreshing attachments:', err);
+             });
          }, 100);
        }
      } else {
@@ -861,14 +870,6 @@ const handleSend = async (msg = message) => {
      tbCreated: new Date().toISOString(),
      replyToMessageId: replyToMessage ? replyToMessage.messageId : 0
    };
-   
-   // Emetti un evento personalizzato per aggiungere il messaggio temporaneo alla vista
-   document.dispatchEvent(new CustomEvent('temp-message-created', { 
-     detail: { 
-       message: tempMessage,
-       notificationId: notificationId
-     }
-   }));
    
    // Preserva i ritorni a capo - non aggiungere manipolazioni extra al messaggio
    const notificationData = {

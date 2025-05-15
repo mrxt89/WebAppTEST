@@ -73,10 +73,14 @@ const ChatSidebar = forwardRef((props, ref) => {
   
   // Carica gli allegati all'inizio e quando cambia la tab o la notifica
   useEffect(() => {
-    if (activeTab === 'attachments' && notificationId) {
-      setLoading(true);
-      getNotificationAttachments(notificationId)
+    const handleAttachmentsUpdate = (event) => {
+      console.log('handleAttachmentsUpdate', event);
+      if (activeTab === 'attachments' && notificationId) {
+        setLoading(true);
+        console.log('getNotificationAttachments', notificationId);
+        getNotificationAttachments(notificationId)
         .then(data => {
+          console.log('data', data);
           if (Array.isArray(data)) {
             setAttachments(data);
           } else {
@@ -90,7 +94,17 @@ const ChatSidebar = forwardRef((props, ref) => {
         .finally(() => {
           setLoading(false);
         });
-    }
+      }
+    };
+
+    handleAttachmentsUpdate();
+
+    document.addEventListener('attachments-updated', handleAttachmentsUpdate);
+    document.addEventListener('new-message-received', handleAttachmentsUpdate);
+    return () => {
+      document.removeEventListener('attachments-updated', handleAttachmentsUpdate);
+      document.removeEventListener('new-message-received', handleAttachmentsUpdate);
+    };
   }, [activeTab, notificationId, getNotificationAttachments]);
 
   // useEffect per caricare i documenti quando si apre la tab
@@ -189,6 +203,23 @@ const ChatSidebar = forwardRef((props, ref) => {
         const updatedAttachments = await refreshAttachments(notificationId);
         setAttachments(updatedAttachments || []);
         swal.fire('Eliminato!', 'L\'allegato è stato eliminato.', 'success');
+        // Aggiorna gli allegati
+        getNotificationAttachments(notificationId)
+        .then(data => {
+          console.log('data', data);
+          if (Array.isArray(data)) {
+            setAttachments(data);
+          } else {
+            setAttachments([]);
+          }
+        })
+        .catch(err => {
+          console.error('Error loading attachments:', err);
+          setAttachments([]);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
       }
     } catch (error) {
       console.error('Error deleting attachment:', error);
@@ -324,7 +355,7 @@ const ChatSidebar = forwardRef((props, ref) => {
               <div className="flex-1 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
               </div>
-            ) : attachments.length === 0 ? (
+            ) : !Array.isArray(attachments) || attachments.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
                 <Paperclip className="h-10 w-10 text-gray-300 mb-2" />
                 <p className="text-gray-500 text-sm">Nessun allegato presente</p>

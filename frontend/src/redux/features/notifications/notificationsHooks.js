@@ -424,6 +424,8 @@ const forceLoadNotifications = useCallback(() => {
               // Usa setTimeout per evitare chiamate durante l'esecuzione del reducer
               setTimeout(() => {
                 dispatch(fetchNotificationById(notificationId));
+                // Aggiorna anche gli allegati
+                dispatch(refreshAttachments(notificationId));
               }, 0);
             }
           };
@@ -431,6 +433,13 @@ const forceLoadNotifications = useCallback(() => {
           // Rimuovi prima listener esistenti per evitare duplicati
           document.removeEventListener('new-message-received', handleNewMessage);
           document.addEventListener('new-message-received', handleNewMessage);
+          
+          // Aggiorna gli allegati per le chat aperte
+          if (openChatIds && openChatIds.length > 0) {
+            // Seleziona fino a 5 chat aperte per aggiornare gli allegati
+            const chatIdsToUpdate = openChatIds.slice(0, 5);
+            dispatch(batchFetchNotificationAttachments(chatIdsToUpdate));
+          }
           
           resolve(null);
         })
@@ -443,7 +452,7 @@ const forceLoadNotifications = useCallback(() => {
         });
     }, 0);
   });
-}, [dispatch]);
+}, [dispatch, openChatIds]);
 
   const handleUpdateChatTitle = useCallback(async (notificationId, newTitle) => {
     try {
@@ -522,6 +531,7 @@ const forceLoadNotifications = useCallback(() => {
   }, [dispatch]);
 
   const handleRefreshAttachments = useCallback((notificationId) => {
+    console.log('refreshAttachments', notificationId);
     return dispatch(refreshAttachments(notificationId)).unwrap();
   }, [dispatch]);
 

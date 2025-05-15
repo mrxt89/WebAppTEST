@@ -20,19 +20,47 @@ export const stopNotificationsWorker = () => ({
   type: 'notifications/stopWorker'
 });
 
+
+export const batchFetchNotificationAttachments = createAsyncThunk(
+  'notifications/batchFetchAttachments',
+  async (notificationIds, { dispatch }) => {
+    try {
+      if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
+        return {};
+      }
+      
+      // Usa Promise.all per gestire più richieste in parallelo, ma limita a 5 richieste simultanee
+      const results = {};
+      const MAX_CONCURRENT = 5;
+      
+      for (let i = 0; i < notificationIds.length; i += MAX_CONCURRENT) {
+        const batch = notificationIds.slice(i, i + MAX_CONCURRENT);
+        await Promise.all(
+          batch.map(async (notificationId) => {
+            try {
+              const attachments = await dispatch(fetchNotificationAttachments(notificationId)).unwrap();
+              results[notificationId] = attachments;
+            } catch (err) {
+              console.warn(`Error fetching attachments for notification ${notificationId}:`, err);
+            }
+          })
+        );
+      }
+      
+      return results;
+    } catch (error) {
+      console.error('Error in batch fetching attachments:', error);
+      return {};
+    }
+  }
+);
+
 // Thunk per gestire gli allegati
 export const fetchNotificationAttachments = createAsyncThunk(
   'notifications/fetchAttachments',
   async (notificationId, { dispatch, getState }) => {
     try {
-      // Controlla se gli allegati sono già in cache
-      const state = getState();
-      const attachments = state.notifications.notificationAttachments[notificationId];
-      
-      if (attachments) {
-        return attachments;
-      }
-      
+     
       dispatch(setAttachmentsLoading(true));
       
       const token = localStorage.getItem('token');
@@ -44,25 +72,15 @@ export const fetchNotificationAttachments = createAsyncThunk(
           },
         }
       );
-      
+     
       if (response.data) {
-        // Organizzare gli allegati per messageId
-        const attachmentsByMessageId = {};
-        
-        response.data.forEach(att => {
-          if (att.MessageID) {
-            attachmentsByMessageId[att.MessageID] = attachmentsByMessageId[att.MessageID] || [];
-            attachmentsByMessageId[att.MessageID].push(att);
-          }
-        });
-        
         // Memorizzare i risultati
         dispatch(setNotificationAttachments({
           notificationId,
-          attachments: attachmentsByMessageId
+          attachments: response.data
         }));
         
-        return attachmentsByMessageId;
+        return response.data;
       }
       
       return {};

@@ -251,7 +251,6 @@ const notificationsWorkerMiddleware = store => {
                         timestamp: now
                       }
                     }));
-                    
                     document.dispatchEvent(new CustomEvent('new-message-received', {
                       detail: {
                         notificationId
