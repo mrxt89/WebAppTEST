@@ -174,7 +174,6 @@ export const useNotifications = () => {
     const now = Date.now();
     // Evita aggiornamenti troppo frequenti (throttling)
     if (now - lastUpdateTime < 2000 && pendingUpdatesRef.current.has('load')) {
-      console.log('Skipping loadNotifications due to throttling');
       return Promise.resolve(null);
     }
     
@@ -187,25 +186,42 @@ export const useNotifications = () => {
       });
   }, [dispatch, lastUpdateTime]);
 
-  const getNotificationById = useCallback((notificationId) => {
-    const now = Date.now();
-    const key = `fetch_${notificationId}`;
+  const handleNotificationUpdate = useCallback(async (notificationId, highPriority = false) => {
+    if (!notificationId || pendingUpdatesRef.current.has(notificationId)) return;
     
-    // Evita aggiornamenti troppo frequenti per lo stesso ID
-    if (now - lastUpdateTime < 1000 && pendingUpdatesRef.current.has(key)) {
-      console.log(`Skipping fetchNotificationById(${notificationId}) due to throttling`);
-      return Promise.resolve(null);
+    try {
+      pendingUpdatesRef.current.add(notificationId);
+      
+      // Usa requestAnimationFrame per assicurarsi che il reducer sia completato
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      
+      // Aggiungi un piccolo delay per assicurarsi che il reducer sia completato
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      // Ora è sicuro chiamare fetchNotificationById
+      await dispatch(fetchNotificationById(notificationId, highPriority)).unwrap();
+      
+    } catch (error) {
+      console.error('Error updating notification:', error);
+    } finally {
+      pendingUpdatesRef.current.delete(notificationId);
     }
+  }, [dispatch]);
+
+  const getNotificationById = useCallback(async (notificationId, highPriority = false) => {
+    if (!notificationId) return null;
     
-    pendingUpdatesRef.current.add(key);
-    setLastUpdateTime(now);
-    
-    return dispatch(fetchNotificationById(notificationId))
-      .unwrap()
-      .finally(() => {
-        pendingUpdatesRef.current.delete(key);
-      });
-  }, [dispatch, lastUpdateTime]);
+    try {
+      // Usa handleNotificationUpdate invece di dispatch direttamente
+      await handleNotificationUpdate(notificationId, highPriority);
+      
+      // Ritorna la notifica dal selettore che è già disponibile
+      return notifications.find(n => n.notificationId === parseInt(notificationId));
+    } catch (error) {
+      console.error('Error fetching notification by ID:', error);
+      throw error;
+    }
+  }, [handleNotificationUpdate, notifications]);
 
   const DBNotificationsView = useCallback(() => {
     return dispatch(createDBNotificationsView()).unwrap();
@@ -389,7 +405,6 @@ export const useNotifications = () => {
 const forceLoadNotifications = useCallback(() => {
   // Usa un flag per tracciare se un aggiornamento è già in corso
   if (pendingUpdatesRef.current.has('forceLoad')) {
-    console.log('Skipping forceLoadNotifications - update already in progress');
     return Promise.resolve(null);
   }
 
@@ -534,12 +549,8 @@ const forceLoadNotifications = useCallback(() => {
     }
     
     try {
-      console.log(`Apertura chat ${notificationId} in finestra separata`);
-      
       // Verifica se la chat è già aperta in una finestra separata
       if (isStandaloneChat(notificationId)) {
-        console.log(`Chat ${notificationId} già aperta in finestra separata, tentativo di focus`);
-        
         // Tenta di trovare e attivare la finestra esistente
         const windowName = `chat_${notificationId}`;
         const existingWindow = window.open('', windowName);
@@ -554,8 +565,6 @@ const forceLoadNotifications = useCallback(() => {
           
           return true;
         }
-        
-        console.log(`Finestra esistente non trovata, registrazione nuova finestra`);
       }
       
       // Registra la chat come aperta in finestra separata prima di aprirla
@@ -616,7 +625,6 @@ const forceLoadNotifications = useCallback(() => {
       // per ripulire quando la finestra viene chiusa esternamente
       const checkWindowInterval = setInterval(() => {
         if (newWindow.closed) {
-          console.log(`Finestra per chat ${notificationId} chiusa esternamente`);
           clearInterval(checkWindowInterval);
           dispatch(unregisterStandaloneChat(notificationId));
         }
@@ -633,7 +641,6 @@ const forceLoadNotifications = useCallback(() => {
         }
       }, 300);
       
-      console.log(`Finestra standalone aperta con successo per chat ${notificationId}`);
       return true;
     } catch (error) {
       console.error('Errore durante l\'apertura della finestra standalone:', error);
@@ -707,11 +714,7 @@ const forceLoadNotifications = useCallback(() => {
             win.location.href === 'about:blank' ||
             !win.location.href.includes('standalone-chat')) {
           
-          console.log(`Window for chat ${id} is no longer available, scheduling cleanup`);
           toRemove.push(id);
-        } else {
-          // Finestra ancora aperta, chiudi solo il riferimento
-          console.log(`Window for chat ${id} is still open`);
         }
       } catch (e) {
         console.error(`Error checking window for chat ${id}:`, e);
@@ -721,7 +724,6 @@ const forceLoadNotifications = useCallback(() => {
     
     // Esegui pulizia se necessario
     if (toRemove.length > 0) {
-      console.log(`Cleaning up ${toRemove.length} standalone windows:`, toRemove);
       dispatch(cleanupStandaloneChats(toRemove));
     }
     
@@ -848,7 +850,6 @@ const forceLoadNotifications = useCallback(() => {
 
   const handleRemoveUserFromChat = useCallback(async (notificationId, userToRemoveId) => {
   try {
-    console.log('Rimozione utente:', userToRemoveId, 'dalla chat:', notificationId);
     // Mostra una conferma all'utente
     const { isConfirmed } = await swal.fire({
       title: 'Rimuovere utente',

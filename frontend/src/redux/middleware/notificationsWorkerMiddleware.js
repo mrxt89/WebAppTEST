@@ -217,7 +217,6 @@ const notificationsWorkerMiddleware = store => {
                   if (shouldNotify) {
                     // Usa il servizio di notifiche centralizzato
                     if (window.notificationService) {
-                      console.log(`Notifica per chat ${notificationId}: ${latestMessagePreview}`);
                       window.notificationService.notifyNewMessage(
                         latestMessagePreview,
                         latestMessageSender,
@@ -225,7 +224,7 @@ const notificationsWorkerMiddleware = store => {
                       );
                     } else {
                       // Fallback: Notifica diretta se il servizio non è disponibile
-                      console.log('NotificationService non disponibile, utilizzo notifica diretta');
+                      console.warn('NotificationService non disponibile, utilizzo notifica diretta');
                       if ('Notification' in window && Notification.permission === 'granted') {
                         const webNotification = new Notification(latestMessageSender, {
                           body: latestMessagePreview,

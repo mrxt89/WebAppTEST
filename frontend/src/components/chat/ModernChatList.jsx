@@ -160,7 +160,8 @@ const ModernChatList = ({
   currentUser,
   users = [],
   animatedEditId,
-  newMessage
+  newMessage,
+  onScrollToBottom
 }) => {
   // Ottieni direttamente l'accesso al context
   const { 
@@ -168,20 +169,14 @@ const ModernChatList = ({
     fetchNotificationById,
     downloadNotificationAttachment, 
     getNotificationAttachments, 
-    getPoll, 
     getNotificationPolls,
-    votePoll, 
-    closePoll,
-    editMessage,
     getMessageVersionHistory,
     getMessageReactions,
     toggleMessageReaction,
-    refreshAttachments,
-    setMessageColor,
-    clearMessageColor,
     restartNotificationWorker,
     registerOpenChat,
-    unregisterOpenChat
+    unregisterOpenChat,
+    toggleReadUnread
   } = useNotifications();
 
   // Riferimenti al DOM e altri stati interni
@@ -189,19 +184,12 @@ const ModernChatList = ({
   const messageRefs = useRef({});
   const scrollingToBottomRef = useRef(false);
   const userHasScrolledRef = useRef(false);
-  const prevMessagesRef = useRef([]);
-  const lastFetchTimeRef = useRef(0);
-  const messageUpdateTimeoutRef = useRef(null);
-  const lastUpdateTimestampRef = useRef(Date.now());
   const pollRequestTimeoutRef = useRef(null);
   const pollsRequestedRef = useRef(false);
   const processedPollMessagesRef = useRef(new Set());
   const pendingReactionsRequestsRef = useRef({});
   const fetchedReactionsRef = useRef(new Set());
   const visibleMessagesRef = useRef(new Set());
-  const lastMessagesCountRef = useRef(0);
-  const updateTimerRef = useRef(null);
-  const lastUpdateTimeRef = useRef(0);
   
   // Stati locali
   const [selectedFile, setSelectedFile] = useState(null);
@@ -229,9 +217,6 @@ const ModernChatList = ({
     if (!notifications || !notificationId) return null;
     return notifications.find(n => n.notificationId === parseInt(notificationId));
   }, [notifications, notificationId]);
-
-
-
 
   // Effetto per aggiornare i messaggi locali dal context quando la notifica corrente cambia
   useEffect(() => {
@@ -273,178 +258,130 @@ const ModernChatList = ({
     if (notificationId && registerOpenChat) {
       // Registra la chat come aperta
       registerOpenChat(notificationId);
-    
       
       // Pulizia quando il componente viene smontato
       return () => {
         if (unregisterOpenChat) {
           unregisterOpenChat(notificationId);
-      
         }
       };
     }
   }, [notificationId, registerOpenChat, unregisterOpenChat]);
 
-  // Gestione migliorata degli eventi relativi ai messaggi
-  useEffect(() => {
-    const handleMessageEvent = (event) => {
-      const { notificationId: eventNotificationId } = event.detail || {};
-      
-      // Assicurati che l'evento sia per questa chat
-      if (eventNotificationId && parseInt(eventNotificationId) === parseInt(notificationId)) {
-     
-        // Previeni troppe chiamate in rapida successione
-        const now = Date.now();
-        if (now - lastUpdateTimeRef.current < 500) {
-         
-          return;
-        }
-        
-        // Aggiorna timestamp dell'ultimo aggiornamento
-        lastUpdateTimeRef.current = now;
-        
-        // Riavvia il timer di aggiornamento
-        if (updateTimerRef.current) {
-          clearTimeout(updateTimerRef.current);
-        }
-        
-        // Forza un aggiornamento immediato dall'API
-        updateTimerRef.current = setTimeout(() => {
-          fetchNotificationById(notificationId, true)
-            .then(updatedNotification => {
-              if (updatedNotification) {
-                const newMessages = Array.isArray(updatedNotification.messages) 
-                  ? updatedNotification.messages 
-                  : (typeof updatedNotification.messages === 'string' 
-                     ? JSON.parse(updatedNotification.messages || '[]') 
-                     : []);
-                
-                // Aggiorna lo stato locale
-                setLocalMessages(newMessages);
-                
-                // Auto-scroll se necessario
-                if (!userHasScrolledRef.current && chatListRef.current) {
-                  scrollingToBottomRef.current = true;
-                  chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
-                  
-                  setTimeout(() => {
-                    scrollingToBottomRef.current = false;
-                  }, 100);
-                } else if (userHasScrolledRef.current) {
-                  // Se l'utente ha scrollato, mostra l'indicatore di nuovo messaggio
-                  setShowScrollButton(true);
-                }
-              }
-            })
-            .catch(error => {
-              console.error('Errore durante l\'aggiornamento:', error);
-            });
-  
-          // Reset del timer
-          updateTimerRef.current = null;
-        }, 200);
-      }
-    };
-    
-    // Aggiungi i listener per tutti gli eventi relativi ai messaggi
-    document.addEventListener('new-message-received', handleMessageEvent);
-    document.addEventListener('chat-message-sent', handleMessageEvent);
-    document.addEventListener('open-chat-new-message', handleMessageEvent);
-    document.addEventListener('refreshNotifications', handleMessageEvent);
-    document.addEventListener('notification-updated', handleMessageEvent);
-    
-    // Pulizia
-    return () => {
-      if (updateTimerRef.current) {
-        clearTimeout(updateTimerRef.current);
-      }
-      
-      document.removeEventListener('new-message-received', handleMessageEvent);
-      document.removeEventListener('chat-message-sent', handleMessageEvent);
-      document.removeEventListener('open-chat-new-message', handleMessageEvent);
-      document.removeEventListener('refreshNotifications', handleMessageEvent);
-      document.removeEventListener('notification-updated', handleMessageEvent);
-    };
-  }, [notificationId, fetchNotificationById]);
-
-
   // NUOVO: Verifica direttamente dal context globale per i nuovi messaggi
-  useEffect(() => {
-    // Solo se notificationId è valido
-    if (!notificationId) return;
+  // useEffect(() => {
+  //   // Solo se notificationId è valido
+  //   if (!notificationId) return;
     
-    // Funzione per verificare nuovi messaggi nel context globale
-    const checkForNewMessages = () => {
-      try {
-        // Controlla se il context esiste e ha la notifica corrente
-        if (window.notificationsContext && 
-            window.notificationsContext.notifications && 
-            Array.isArray(window.notificationsContext.notifications)) {
+  //   // Funzione per verificare nuovi messaggi nel context globale
+  //   const checkForNewMessages = () => {
+  //     try {
+  //       // Controlla se il context esiste e ha la notifica corrente
+  //       if (window.notificationsContext && 
+  //           window.notificationsContext.notifications && 
+  //           Array.isArray(window.notificationsContext.notifications)) {
           
-          // Trova la notifica corrente nel context globale
-          const contextNotification = window.notificationsContext.notifications.find(
-            n => n.notificationId === parseInt(notificationId)
-          );
+  //         // Trova la notifica corrente nel context globale
+  //         const contextNotification = window.notificationsContext.notifications.find(
+  //           n => n.notificationId === parseInt(notificationId)
+  //         );
           
-          if (!contextNotification) return;
+  //         if (!contextNotification) return;
           
-          // Estrai i messaggi dalla notifica
-          const contextMessages = Array.isArray(contextNotification.messages) 
-            ? contextNotification.messages 
-            : (typeof contextNotification.messages === 'string' 
-              ? JSON.parse(contextNotification.messages || '[]') 
-              : []);
+  //         // Estrai i messaggi dalla notifica
+  //         const contextMessages = Array.isArray(contextNotification.messages) 
+  //           ? contextNotification.messages 
+  //           : (typeof contextNotification.messages === 'string' 
+  //             ? JSON.parse(contextNotification.messages || '[]') 
+  //             : []);
           
-          // Confronta con lo stato locale
-          if (!isEqual(contextMessages, localMessages)) {
-           
+  //         // Confronta con lo stato locale
+  //         if (!isEqual(contextMessages, localMessages)) {
+  //           // Aggiorna lo stato locale
+  //           setLocalMessages(contextMessages);
             
-            // Aggiorna lo stato locale
-            setLocalMessages(contextMessages);
+  //           // Controlla se siamo in fondo alla chat
+  //           if (chatListRef.current) {
+  //             const { scrollTop, scrollHeight, clientHeight } = chatListRef.current;
+  //             const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+              
+  //             // Se siamo in fondo alla chat (entro 50px) e ci sono nuovi messaggi
+  //             if (distanceFromBottom < 50 && notificationId) {
+  //               // Marca come letta
+  //               toggleReadUnread(notificationId, true).then(() => {
+  //                 fetchNotificationById(notificationId, true).then(() => {
+  //                   document.dispatchEvent(new CustomEvent('notification-updated', {
+  //                     detail: { notificationId }
+  //                   }));
+  //                   if (onScrollToBottom) {
+  //                     onScrollToBottom();
+  //                   }
+  //                 });
+  //               });
+  //             }
+  //           }
             
-            // Auto-scroll se necessario
-            if (!userHasScrolledRef.current && chatListRef.current) {
-              // Prevenzione loop degli eventi
-              scrollingToBottomRef.current = true;
+  //           // Auto-scroll se necessario
+  //           if (!userHasScrolledRef.current && chatListRef.current) {
+  //             // Prevenzione loop degli eventi
+  //             scrollingToBottomRef.current = true;
               
-              // Scroll
-              chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+  //             // Scroll
+  //             chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
               
-              // Reset flag
-              setTimeout(() => {
-                scrollingToBottomRef.current = false;
-              }, 100);
-            } else {
-              // Altrimenti mostra indicatore nuovo messaggio
-              setShowScrollButton(true);
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Errore nel controllare nuovi messaggi:', err);
-      }
-    };
+  //             // Reset flag
+  //             setTimeout(() => {
+  //               scrollingToBottomRef.current = false;
+  //             }, 100);
+  //           } else {
+  //             // Altrimenti mostra indicatore nuovo messaggio
+  //             setShowScrollButton(true);
+  //           }
+  //         }
+  //       }
+  //     } catch (err) {
+  //       console.error('Errore nel controllare nuovi messaggi:', err);
+  //     }
+  //   };
     
-    // Esegui subito e imposta intervallo per controlli periodici
-    checkForNewMessages();
-    const intervalId = setInterval(checkForNewMessages, 1000);
+  //   // Esegui subito e imposta intervallo per controlli periodici
+  //   checkForNewMessages();
+  //   const intervalId = setInterval(checkForNewMessages, 1000);
     
-    // Cleanup
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [notificationId, localMessages, chatListRef]);
+  //   // Cleanup
+  //   return () => {
+  //     clearInterval(intervalId);
+  //   };
+  // }, [notificationId, localMessages, chatListRef, toggleReadUnread, fetchNotificationById, onScrollToBottom]);
 
-  // NUOVO: Rilevamento scrolling manuale migliorato
+  // Modifico l'effetto di scroll per includere la logica di lettura
   useEffect(() => {
     if (!chatListRef.current) return;
-    
+
     const handleScroll = () => {
       // Ignora scrolling programmatico
       if (scrollingToBottomRef.current) return;
-      
+
       const { scrollTop, scrollHeight, clientHeight } = chatListRef.current;
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      
+      // Se l'utente è in fondo alla chat (entro 50px) e ci sono nuovi messaggi non letti
+      if (distanceFromBottom < 50 && notificationId && newMessage) {
+        // Usa toggleReadUnread dal context per aggiornare sia il backend che il Redux
+        toggleReadUnread(notificationId, true).then(() => {
+          // Dopo aver aggiornato lo stato, forza un refresh della notifica
+          fetchNotificationById(notificationId, true).then(() => {
+            // Emetti un evento per aggiornare la sidebar
+            document.dispatchEvent(new CustomEvent('notification-updated', {
+              detail: { notificationId }
+            }));
+            // Notifica il componente padre che siamo arrivati in fondo
+            if (onScrollToBottom) {
+              onScrollToBottom();
+            }
+          });
+        });
+      }
       
       // Se l'utente ha scrollato significativamente verso l'alto
       if (distanceFromBottom > 150 && !userHasScrolledRef.current) {
@@ -457,6 +394,10 @@ const ModernChatList = ({
         userHasScrolledRef.current = false;
         setUserHasScrolled(false);
         setShowScrollButton(false);
+        // Notifica il componente padre che siamo tornati in fondo
+        if (onScrollToBottom) {
+          onScrollToBottom();
+        }
       }
     };
     
@@ -482,7 +423,7 @@ const ModernChatList = ({
         chatListRef.current.removeEventListener('wheel', handleWheel);
       }
     };
-  }, [chatListRef.current]);
+  }, [chatListRef.current, newMessage, notificationId, toggleReadUnread, fetchNotificationById, onScrollToBottom]);
 
   // Funzione per determinare se un messaggio contiene un sondaggio
   const isPollMessage = (message) => {
@@ -1133,12 +1074,26 @@ const handleReactionSelect = async (messageId, emoji) => {
   // Funzione per lo scroll manuale al fondo
   const handleScrollToBottom = () => {
     if (chatListRef?.current) {
-     
       scrollingToBottomRef.current = true;
       chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
       setShowScrollButton(false);
       setUserHasScrolled(false);
       userHasScrolledRef.current = false;
+      
+      // Aggiungo la logica per marcare i messaggi come letti
+      if (notificationId && newMessage) {
+        toggleReadUnread(notificationId, true).then(() => {
+          fetchNotificationById(notificationId, true).then(() => {
+            document.dispatchEvent(new CustomEvent('notification-updated', {
+              detail: { notificationId }
+            }));
+            // Notifica il componente padre che siamo arrivati in fondo
+            if (onScrollToBottom) {
+              onScrollToBottom();
+            }
+          });
+        });
+      }
       
       setTimeout(() => {
         scrollingToBottomRef.current = false;
