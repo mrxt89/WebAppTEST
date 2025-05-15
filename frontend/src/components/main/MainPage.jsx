@@ -687,16 +687,7 @@ const MainPage = () => {
     }
   }, [isDBNotificationsViewExecuted, DBNotificationsView, setIsDBNotificationsViewExecuted]);
   
-  useEffect(() => {
-    const executeDBNotificationsView = async () => {
-      if (user && !isDBNotificationsViewExecuted) {
-        await DBNotificationsView();
-        setIsDBNotificationsViewExecuted(true);
-      }
-    };
 
-    executeDBNotificationsView();
-  }, [user, isDBNotificationsViewExecuted, DBNotificationsView, setIsDBNotificationsViewExecuted]);
 
   useEffect(() => {
     const fetchMenuItems = async () => {
