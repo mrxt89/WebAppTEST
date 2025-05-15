@@ -1,6 +1,6 @@
-// Fix for the PollButton component in PollButton.jsx
+// PollButton.jsx - Versione corretta
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart } from 'lucide-react';
 import Modal from 'react-modal';
 import CreatePollForm from './CreatePollForm';
@@ -17,6 +17,45 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
   const [selectedPoll, setSelectedPoll] = useState(null);
   
   const { sendNotification, createPoll } = useNotifications();
+  
+  // Usa useCallback per memorizzare le funzioni tra i render
+  const handleShowPollModal = useCallback(() => {
+    console.log("Event 'show-poll-modal' received - Opening poll creation modal");
+    setIsCreateModalOpen(true);
+  }, []);
+  
+  const handleShowPollsList = useCallback(() => {
+    console.log("Event 'show-polls-list' received - Opening polls list");
+    setIsListModalOpen(true);
+  }, []);
+  
+  // Esponi le funzioni come metodi pubblici del componente
+  React.useImperativeHandle(React.useRef(), () => ({
+    openCreateModal: () => setIsCreateModalOpen(true),
+    openListModal: () => setIsListModalOpen(true)
+  }));
+  
+  // Aggiungi gli event listener con dipendenze appropriate
+  useEffect(() => {
+    // Aggiungi gli event listener
+    document.addEventListener('show-poll-modal', handleShowPollModal);
+    document.addEventListener('show-polls-list', handleShowPollsList);
+    
+    console.log("PollButton: Event listeners registered for 'show-poll-modal' and 'show-polls-list'");
+    
+    // Cleanup: rimuovi gli event listener quando il componente viene smontato
+    return () => {
+      document.removeEventListener('show-poll-modal', handleShowPollModal);
+      document.removeEventListener('show-polls-list', handleShowPollsList);
+      console.log("PollButton: Event listeners removed");
+    };
+  }, [handleShowPollModal, handleShowPollsList]);
+  
+  // Aggiungi un handler diretto per il click sul pulsante
+  const handlePollButtonClick = () => {
+    console.log("Poll button clicked directly");
+    setIsCreateModalOpen(true);
+  };
   
   // Stile per il modale
   const modalStyle = {
@@ -46,6 +85,11 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
     
     try {
       console.log('Creating poll with data:', poll);
+      
+      // Chiama la funzione onPollCreated se disponibile
+      if (typeof onPollCreated === 'function') {
+        onPollCreated(poll);
+      }
     } catch (error) {
       console.error('Error in poll creation flow:', error);
       swal.fire('Errore', 'Si è verificato un errore durante la creazione del sondaggio: ' + error.message, 'error');
@@ -77,9 +121,10 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
       <div className="relative inline-block">
         <div className="flex">
           <button
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={handlePollButtonClick}
             className="p-2 rounded-l-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
             title="Crea sondaggio"
+            data-testid="create-poll-button"
           >
             <BarChart className="h-5 w-5" />
           </button>
@@ -88,6 +133,7 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
             onClick={() => setIsListModalOpen(true)}
             className="p-2 rounded-r-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 border-l-0"
             title="Visualizza sondaggi"
+            data-testid="view-polls-button"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M8 6h13"></path>

@@ -1,28 +1,33 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, Users, AlertCircle, PieChartIcon, Info, Layout, Package, ArrowLeft, Circle} from 'lucide-react';
-import { swal } from '../../../lib/common';
-import TasksKanban from './ProjectTasksKanban';
-import ProjectGanttView from './ProjectGanttView'; 
-import { hasAdminPermission, canEditMemberRole } from '@/lib/taskPermissionsUtils';
-import ProjectTasksTableImproved from './ProjectTasksTable'; // Importa il componente tabella
-import TasksViewToggler from './TasksViewToggler'; // Importa il componente toggles
-import TasksLegend from './TasksLegend'; // Importa il componente legenda
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Calendar, Users, AlertCircle, ChevronDown, ChevronUp, Search, Filter, X, Plus, Eye, PieChart, CheckCircle2, TriangleAlert, ListTodo, Info, Layout, Package, ArrowLeft, Circle } from 'lucide-react';
 import ProjectEditModalWithTemplate from './ProjectEditModalWithTemplate';
-import TeamMemberWithRole from './TeamMemberWithRole';
 import useProjectActions from '../../../hooks/useProjectManagementActions';
-import NewTaskForm from './NewTaskForm'; 
+import { CustomerSearchSelect } from './ProjectComponents';
+import TasksKanban from './ProjectTasksKanban';
+import ProjectGanttView from './ProjectGanttView';
+import { hasAdminPermission, canEditMemberRole } from '@/lib/taskPermissionsUtils';
+import ProjectTasksTableImproved from './ProjectTasksTable';
+import TasksViewToggler from './TasksViewToggler';
+import TasksLegend from './TasksLegend';
+import TeamMemberWithRole from './TeamMemberWithRole';
+import useProjectCustomersActions from "../../../hooks/useProjectCustomersActions";
+import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
+import NewTaskForm from './NewTaskForm';
 import TaskDetailsDialog from './TaskDetailsDialog';
 import ProjectEditModal from './ProjectEditModal';
 import ProjectArticlesTab from './articoli/ProjectArticlesTab';
@@ -30,6 +35,18 @@ import ProjectAttachmentsTab from './ProjectAttachmentsTab';
 import ProjectTeamSection from './ProjectTeamSection';
 import ProjectAnalyticsTab from './analytics/ProjectAnalyticsTab';
 import useUsers from '../../../hooks/useUsersActions';
+import { swal } from '../../../lib/common';
+
+// Mini-componente per le statistiche in dashboard
+const StatisticCard = ({ title, value, color = "text-gray-900", icon: Icon }) => (
+  <div className="bg-gray-100 p-3 rounded-md flex items-center justify-between">
+    <div className="flex items-center gap-2">
+      {Icon && <Icon className="h-4 w-4 text-gray-600" />}
+      <span className="text-xs text-gray-600">{title}</span>
+    </div>
+    <span className={`text-base font-semibold ${color}`}>{value}</span>
+  </div>
+);
 
 // TeamMember component (unchanged)
 const TeamMember = ({ member, onRemove, checkAdminPermission, project }) => (
@@ -189,8 +206,8 @@ const ProjectOverview = ({ project }) => (
   </div>
 );
 
-const ProjectDetail = () => {
-  const { projectId } = useParams();
+// Componente per il dettaglio del progetto incorporato
+const ProjectDetailContainer = ({ projectId }) => {
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -212,10 +229,6 @@ const ProjectDetail = () => {
   const refreshInProgress = useRef(false);
   const preventDialogOpen = useRef(false); // Per evitare l'apertura del dialog durante modifiche in-line
 
-  const handleBack = () => {
-    navigate('/progetti/dashboard');
-  };
-
   const {
     loading,
     getProjectById,
@@ -229,6 +242,7 @@ const ProjectDetail = () => {
     updateProjectMemberRole,
     updateTaskSequence,
   } = useProjectActions();
+
   // Get the current user ID from localStorage
   const [currentUserId, setCurrentUserId] = useState(() => {
     try {
@@ -261,7 +275,7 @@ const ProjectDetail = () => {
           };
         });
       }
-      console.log("Chiamata a getProjectById con ID:", projectId);
+      
       const projectData = await getProjectById(parseInt(projectId));
       if (!isMounted.current) return;
   
@@ -287,13 +301,11 @@ const ProjectDetail = () => {
           
           // Se sono state aggiunte o rimosse attività, aggiorna completamente
           if (hasNewTasks || hasRemovedTasks) {
-            console.log("Attività aggiunte o rimosse, aggiorno completamente il progetto");
             return projectData;
           }
           
           // Altrimenti, fai un aggiornamento "intelligente" che preserva i riferimenti
           // per le attività che non sono cambiate di stato
-          console.log("Aggiornamento intelligente delle attività per evitare scatti nel kanban/gantt");
           
           // Crea una mappa delle nuove attività per facile accesso
           const newTasksMap = {};
@@ -359,7 +371,7 @@ const ProjectDetail = () => {
         }
       }, 300);
     }
-  }, [projectId, selectedTask, activeTab, tasksViewMode, project]);
+  }, [projectId, selectedTask, activeTab, tasksViewMode, project, getProjectById]);
   
   // Cleanup effect
   useEffect(() => {
@@ -377,8 +389,10 @@ const ProjectDetail = () => {
   }, []);
 
   useEffect(() => {
-    loadProject();
-  }, [projectId]);
+    if (projectId) {
+      loadProject();
+    }
+  }, [projectId, loadProject]);
 
   useEffect(() => {
     fetchUsers();
@@ -415,7 +429,7 @@ const ProjectDetail = () => {
         console.error('Error updating project:', error);
         swal.fire('Errore', 'Errore nell\'aggiornamento del progetto', 'error');
     }
-};
+  };
 
   const handleDisableProject = async () => {
     const disabledProject = {
@@ -448,7 +462,7 @@ const ProjectDetail = () => {
       const result = await addUpdateProjectTask(formattedTask);
       if (result.success) {
         setIsAddTaskDialogOpen(false);
-        await loadProject(); // Usa loadProject invece di getProjectById
+        await loadProject();
         swal.fire('Successo', 'Attività aggiunta con successo', 'success');
       }
     } catch (error) {
@@ -482,11 +496,7 @@ const ProjectDetail = () => {
         }
       }
       
-      // Log dei dati che stiamo inviando
-      console.log('ProjectDetail invia:', completeTaskData);
-      
       const result = await addUpdateProjectTask(completeTaskData);
-      console.log('ProjectDetail riceve:', result);
       
       if (result.success && isMounted.current) {
         // Prima aggiorna il progetto localmente
@@ -538,45 +548,40 @@ const ProjectDetail = () => {
     }
   }, [projectId, selectedTask, addUpdateProjectTask, loadProject]);
 
-/**
- * Aggiorna il ruolo di un membro del progetto
- * @param {Object} memberData - Dati del membro (projectMemberId, userId, role)
- * @returns {Promise<Boolean>} - Promise che restituisce true se l'aggiornamento è andato a buon fine
- */
-const updateMemberRole = async (memberData) => {
-  try {
-    // Verifica che l'utente corrente sia un admin del progetto
-    if (!hasAdminPermission(project, currentUserId)) {
-      swal.fire('Attenzione', 'Non hai i permessi per modificare i ruoli', 'warning');
+  const updateMemberRole = async (memberData) => {
+    try {
+      // Verifica che l'utente corrente sia un admin del progetto
+      if (!hasAdminPermission(project, currentUserId)) {
+        swal.fire('Attenzione', 'Non hai i permessi per modificare i ruoli', 'warning');
+        return false;
+      }
+      
+      // Verifica che l'utente non stia modificando il proprio ruolo
+      if (memberData.userId === parseInt(currentUserId)) {
+        swal.fire('Attenzione', 'Non puoi modificare il tuo ruolo', 'warning');
+        return false;
+      }
+      
+      // Ensure updateProjectMemberRole is properly destructured from the hook
+      const result = await updateProjectMemberRole(
+        project.ProjectID, 
+        memberData.projectMemberId, 
+        memberData.role
+      );
+      
+      if (result && result.success) {
+        // Aggiorna i membri del progetto
+        await loadProject();
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error updating member role:', error);
+      swal.fire('Errore', 'Errore nella modifica del ruolo', 'error');
       return false;
     }
-    
-    // Verifica che l'utente non stia modificando il proprio ruolo
-    if (memberData.userId === parseInt(currentUserId)) {
-      swal.fire('Attenzione', 'Non puoi modificare il tuo ruolo', 'warning');
-      return false;
-    }
-    
-    // Ensure updateProjectMemberRole is properly destructured from the hook
-    const result = await updateProjectMemberRole(
-      project.ProjectID, 
-      memberData.projectMemberId, 
-      memberData.role
-    );
-    
-    if (result && result.success) {
-      // Aggiorna i membri del progetto
-      await loadProject();
-      return true;
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('Error updating member role:', error);
-    swal.fire('Errore', 'Errore nella modifica del ruolo', 'error');
-    return false;
-  }
-};
+  };
 
   const handleTaskClick = (task) => {
     // Usa preventDialogOpen per evitare l'apertura non voluta durante le modifiche inline
@@ -714,7 +719,7 @@ const updateMemberRole = async (memberData) => {
 
   if (loading || !project) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-full">
         <span className="text-gray-500">Caricamento...</span>
       </div>
     );
@@ -724,23 +729,13 @@ const updateMemberRole = async (memberData) => {
     <div className="h-screen flex flex-col p-4 gap-4">
       {/* Header minimalista con dashboard, titolo e modifica */}
       <div className="flex items-center justify-between py-2 px-4 bg-[var(--primary)] text-white border rounded-md shadow-sm"> 
-        <Button 
-          variant=""
-          size="sm"
-          onClick={() => navigate('/progetti/dashboard')}
-          className="flex items-center gap-1 bg-white text-[var(--primary)]"
-        >
-          <ArrowLeft className="h-4 w-4" id = "backToDashboard"/>
-          <span>Dashboard</span>
-        </Button>
-        
         <h1 className="text-lg font-medium truncate max-w-md mx-2">
           {project.Name}
         </h1>
         
         {(
           <Button 
-            id = "editProjectButton"
+            id="editProjectButton"
             variant=""
             size="sm"
             onClick={() => setIsEditModalOpen(true)}
@@ -795,7 +790,7 @@ const updateMemberRole = async (memberData) => {
                 Articoli
               </TabsTrigger>
               <TabsTrigger value="analytics" id="project-analytics-tab">
-                <PieChartIcon className="h-4 w-4 mr-2" />
+                <PieChart className="h-4 w-4 mr-2" />
                 Statistiche
               </TabsTrigger>
             </TabsList>
@@ -834,8 +829,6 @@ const updateMemberRole = async (memberData) => {
                 </Dialog>
               )}
             </div>
-
-
 
             <div className="flex-1 overflow-y-auto min-h-0">
               {/* Visualizzazione condizionale in base al viewMode */}
@@ -988,7 +981,7 @@ const updateMemberRole = async (memberData) => {
               </CardContent>
             </Card>
           </TabsContent>
-          {/* Tab Articoli temporanei */}
+          {/* Tab Articoli */}
           <TabsContent value="articles" className="flex-1 mt-2">
             <ProjectArticlesTab 
               project={project}
@@ -1014,12 +1007,12 @@ const updateMemberRole = async (memberData) => {
         onClose={() => {
           setIsTaskDialogOpen(false);
           setSelectedTask(null);
-          loadProject(); // Aggiungi questa chiamata
+          loadProject();
         }}
         onAddComment={handleAddComment}
         onUpdate={handleTaskUpdate}
         assignableUsers={users}
-        refreshProject={loadProject}  // Aggiungi questa prop
+        refreshProject={loadProject}
       />
 
       <ProjectEditModalWithTemplate
@@ -1034,4 +1027,630 @@ const updateMemberRole = async (memberData) => {
   );
 };
 
-export default ProjectDetail;
+// Componente principale
+const ProjectManagementSplitView = () => {
+  const navigate = useNavigate();
+  const { projectId } = useParams();
+  const { fetchUsers } = useNotifications();
+  const { 
+    projects, 
+    loading: projectsLoading, 
+    fetchProjects, 
+    addUpdateProject, 
+    getUserProjectStatistics,
+    getProjectById,
+    categories,
+    fetchCategories,
+    projectStatuses,
+    fetchProjectStatuses
+  } = useProjectActions();
+
+  const { projectCustomers, loading: loadingCustomers, fetchProjectCustomers } = useProjectCustomersActions();
+
+  const [loading, setLoading] = useState(true);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    projectId && !isNaN(parseInt(projectId)) ? parseInt(projectId) : null
+  );
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [loadingProjectDetail, setLoadingProjectDetail] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const [filters, setFilters] = useState({
+    status: 'all',
+    searchText: '',
+    categoryId: '',
+    custSupp: null,
+    projectErpId: '',
+    taskAssignedTo: null
+  });
+  const [statistics, setStatistics] = useState({
+    activeProjects: 0,
+    activeTasks: 0,
+    delayedProjects: 0,
+    delayedTasks: 0,
+  });
+  const [isNewProjectDialogOpen, setIsNewProjectDialogOpen] = useState(false);
+  const [newProject, setNewProject] = useState({
+    Name: '',
+    Description: '',
+    StartDate: new Date().toISOString().split('T')[0],
+    EndDate: '',
+    Status: '1A',
+    ProjectCategoryId: 0,
+    ProjectCategoryDetailLine: 0,
+    CustSupp: 0,
+    ProjectErpID: ''
+  });
+  const [users, setUsers] = useState([]);
+  const [sortConfig, setSortConfig] = useState({
+    key: 'Name',
+    direction: 'ascending'
+  });
+
+  // Caricamento iniziale
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        setLoading(true);
+        
+        // Carica tutte le informazioni necessarie
+        const [usersResponse, customersResponse, categoriesResponse, statusesResponse] = await Promise.all([
+          fetchUsers(),
+          fetchProjectCustomers(),
+          fetchCategories(),
+          fetchProjectStatuses()
+        ]);
+        
+        // Aggiorna lo stato degli utenti
+        if (Array.isArray(usersResponse)) {
+          setUsers(usersResponse);
+        }
+        
+        // Aggiorna le statistiche
+        await getUserProjectStatistics().then(setStatistics);
+        
+        // Carica i progetti con i filtri attuali
+        await fetchProjects(0, 100, filters);
+        
+        // Carica il progetto selezionato se esiste un ID nell'URL
+        if (projectId && !isNaN(parseInt(projectId))) {
+          selectProject(parseInt(projectId));
+        }
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+        swal.fire('Errore', 'Errore nel caricamento dei dati', 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadInitialData();
+  }, []);
+
+  // Seleziona un progetto
+  const selectProject = (id) => {
+    if (!id || isNaN(id)) {
+      console.warn('Invalid project ID:', id);
+      return;
+    }
+    
+    // Aggiorniamo solo lo stato del progetto selezionato
+    setSelectedProjectId(id);
+  };
+
+  // Filtra e ordina i progetti
+  const getFilteredAndSortedProjects = useCallback(() => {
+    // Filtra i progetti
+    let filteredProjects = [...projects];
+    
+    // Applica filtri
+    if (filters.status && filters.status !== 'all') {
+      filteredProjects = filteredProjects.filter(p => p.Status === filters.status);
+    }
+    
+    if (filters.searchText) {
+      const search = filters.searchText.toLowerCase();
+      filteredProjects = filteredProjects.filter(p => 
+        p.Name?.toLowerCase().includes(search) || 
+        p.Description?.toLowerCase().includes(search)
+      );
+    }
+    
+    if (filters.categoryId && filters.categoryId !== '0') {
+      filteredProjects = filteredProjects.filter(p => 
+        p.ProjectCategoryId === parseInt(filters.categoryId)
+      );
+    }
+    
+    if (filters.custSupp) {
+      filteredProjects = filteredProjects.filter(p => p.CustSupp === filters.custSupp);
+    }
+    
+    if (filters.projectErpId) {
+      filteredProjects = filteredProjects.filter(p => 
+        p.ProjectErpID?.includes(filters.projectErpId)
+      );
+    }
+    
+    if (filters.taskAssignedTo) {
+      filteredProjects = filteredProjects.filter(p => 
+        p.tasks?.some(task => task.AssignedTo === filters.taskAssignedTo)
+      );
+    }
+    
+    // Ordina i progetti
+    if (sortConfig.key) {
+      filteredProjects.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    
+    return filteredProjects;
+  }, [projects, filters, sortConfig]);
+
+  // Gestisce il clic sull'intestazione per l'ordinamento
+  const handleSort = (key) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // Effetto per i filtri
+  useEffect(() => {
+    const applyFilters = async () => {
+      try {
+        setLoading(true);
+        const cleanedFilters = Object.entries(filters).reduce((acc, [key, value]) => {
+          if (value !== undefined && value !== null && value !== 'all' && value !== '') {
+            acc[key] = value;
+          }
+          return acc;
+        }, {});
+        
+        await fetchProjects(0, 100, cleanedFilters);
+        await getUserProjectStatistics().then(setStatistics);
+      } catch (error) {
+        console.error('Error applying filters:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    const timeoutId = setTimeout(applyFilters, 300);
+    return () => clearTimeout(timeoutId);
+  }, [filters]);
+
+  // Creazione nuovo progetto
+  const handleCreateProject = async () => {
+    // Validazione
+    const validationErrors = {};
+    if (!newProject.Name?.trim()) validationErrors.Name = "Campo obbligatorio";
+    if (!newProject.StartDate) validationErrors.StartDate = "Campo obbligatorio";
+    if (!newProject.EndDate) validationErrors.EndDate = "Campo obbligatorio";
+    
+    if (Object.keys(validationErrors).length > 0) {
+      setFormErrors(validationErrors);
+      return;
+    }
+
+    try {
+      const projectData = {
+        ...newProject,
+        CustSupp: newProject.CustSupp || 0,
+        ProjectErpID: newProject.ProjectErpID?.trim() || ''
+      };
+
+      const result = await addUpdateProject(projectData);
+      if (result.success) {
+        setIsNewProjectDialogOpen(false);
+        await fetchProjects(0, 100, filters);
+        setNewProject({
+          Name: '',
+          Description: '',
+          StartDate: new Date().toISOString().split('T')[0],
+          EndDate: '',
+          Status: projectStatuses?.length > 0 ? projectStatuses.find(s => s.IsActive === 1 && s.Sequence < 15)?.Id || '1A' : '1A',
+          ProjectCategoryId: 0,
+          ProjectCategoryDetailLine: 0,
+          CustSupp: 0,
+          ProjectErpID: '',
+        });
+        setFormErrors({});
+        swal.fire('Successo', 'Progetto creato con successo', 'success');
+        
+        // Seleziona il nuovo progetto
+        if (result.projectId) {
+          selectProject(result.projectId);
+        }
+      }
+    } catch (error) {
+      console.error('Error creating project:', error);
+      swal.fire('Errore', 'Errore nella creazione del progetto', 'error');
+    }
+  };
+
+  // Reset dei filtri
+  const resetFilters = () => {
+    setFilters({
+      status: 'all',
+      searchText: '',
+      categoryId: '',
+      custSupp: null,
+      projectErpId: '',
+      taskAssignedTo: null
+    });
+  };
+
+  // Rendering
+  return (
+    <div className="flex h-screen">
+      {/* Sezione sinistra (1/3) - Dashboard */}
+      <div className="w-1/3 border-r h-full flex flex-col p-4 overflow-hidden">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Progetti</h2>
+          <Dialog open={isNewProjectDialogOpen} onOpenChange={setIsNewProjectDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="flex items-center gap-1">
+                <Plus className="h-4 w-4" />
+                Nuovo
+              </Button>
+            </DialogTrigger>
+            <ProjectEditModalWithTemplate
+              project={newProject}
+              isOpen={isNewProjectDialogOpen}
+              onClose={() => setIsNewProjectDialogOpen(false)}
+              onChange={setNewProject}
+              onSave={handleCreateProject}
+              formErrors={formErrors}
+            />
+          </Dialog>
+        </div>
+        
+        {/* Filtri collassabili */}
+        <Collapsible 
+          open={filtersExpanded}
+          onOpenChange={setFiltersExpanded}
+          className="mb-4 border rounded-md"
+        >
+          <CollapsibleTrigger asChild>
+            <Button 
+              variant="ghost" 
+              className="w-full flex justify-between items-center p-2 border-b"
+            >
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                <span>Filtri</span>
+                {Object.values(filters).some(v => v && v !== 'all') && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
+                    Attivi
+                  </Badge>
+                )}
+              </div>
+              {filtersExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="p-3 space-y-3">
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Select 
+                    value={filters.status}
+                    onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Stato" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tutti gli stati</SelectItem>
+                      {projectStatuses?.map(status => (
+                        <SelectItem key={status.Id} value={status.Id}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: status.HexColor }}
+                            />
+                            {status.StatusDescription}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Select 
+                    value={filters.categoryId?.toString() || "0"}
+                    onValueChange={(value) => setFilters(prev => ({ ...prev, categoryId: value }))}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Tutte le categorie</SelectItem>
+                      {categories.map(category => (
+                        <SelectItem 
+                          key={category.ProjectCategoryId} 
+                          value={category.ProjectCategoryId.toString()}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: category.HexColor }}
+                            />
+                            {category.Description}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <CustomerSearchSelect
+                    value={filters.custSupp}
+                    onChange={(value) => setFilters(prev => ({ ...prev, custSupp: value }))}
+                    projectCustomers={projectCustomers}
+                    loading={loadingCustomers}
+                  />
+                </div>
+                <div>
+                  <Select 
+                    value={filters.taskAssignedTo?.toString() || "0"}
+                    onValueChange={(value) => setFilters(prev => ({ 
+                      ...prev, 
+                      taskAssignedTo: value === "0" ? null : parseInt(value) 
+                    }))}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Assegnato a" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Tutti gli utenti</SelectItem>
+                      {users
+                        .filter(user => user && user.userId !== 0)
+                        .map(user => (
+                          <SelectItem 
+                            key={user.userId} 
+                            value={user.userId.toString()}
+                          >
+                            {`${user.firstName} ${user.lastName}`}
+                          </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                  <Input 
+                    placeholder="Cerca..." 
+                    className="pl-8 h-8"
+                    value={filters.searchText}
+                    onChange={(e) => setFilters(prev => ({ ...prev, searchText: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Input 
+                    placeholder="ID ERP" 
+                    className="h-8"
+                    value={filters.projectErpId}
+                    onChange={(e) => setFilters(prev => ({ ...prev, projectErpId: e.target.value }))}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={resetFilters}
+                  className="flex items-center gap-1"
+                >
+                  <X className="h-3 w-3" />
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+        
+        {/* Statistiche */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <StatisticCard 
+            title="Progetti Attivi" 
+            value={statistics.activeProjects} 
+            icon={Users}
+          />
+          <StatisticCard 
+            title="Progetti in Ritardo" 
+            value={statistics.delayedProjects} 
+            color="text-red-600" 
+            icon={AlertCircle}
+          />
+          <StatisticCard 
+            title="Attività in Corso" 
+            value={statistics.activeTasks} 
+            icon={Calendar}
+          />
+          <StatisticCard 
+            title="Attività in Ritardo" 
+            value={statistics.delayedTasks} 
+            color="text-red-600" 
+            icon={AlertCircle}
+          />
+        </div>
+        
+        {/* Tabella stile Excel */}
+        <Card className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full">
+            {loading ? (
+              <div className="flex items-center justify-center h-32">
+                <span className="text-gray-500">Caricamento...</span>
+              </div>
+            ) : getFilteredAndSortedProjects().length === 0 ? (
+              <Alert className="m-4">
+                <AlertDescription>
+                  Nessun progetto trovato con i filtri selezionati.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Table>
+                <TableHeader className="sticky top-0 bg-gray-100">
+                  <TableRow>
+                    <TableHead 
+                      className="w-10 text-center"
+                    ></TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('Name')}
+                    >
+                      Nome
+                      {sortConfig.key === 'Name' && (
+                        <span className="ml-1">
+                          {sortConfig.direction === 'ascending' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-gray-200"
+                      onClick={() => handleSort('CompanyName')}
+                    >
+                      Cliente
+                      {sortConfig.key === 'CompanyName' && (
+                        <span className="ml-1">
+                          {sortConfig.direction === 'ascending' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </TableHead>
+                    <TableHead className="w-24">Stato</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-gray-200 w-28"
+                      onClick={() => handleSort('EndDate')}
+                    >
+                      Scadenza
+                      {sortConfig.key === 'EndDate' && (
+                        <span className="ml-1">
+                          {sortConfig.direction === 'ascending' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </TableHead>
+                    <TableHead className="w-20 text-right">Attività</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {getFilteredAndSortedProjects().map((project) => (
+                    <TableRow 
+                      key={project.ProjectID}
+                      className={
+                        selectedProjectId === project.ProjectID 
+                          ? "bg-blue-50 hover:bg-blue-100" 
+                          : "hover:bg-gray-50"
+                      }
+                      onClick={() => selectProject(project.ProjectID)}
+                    >
+                      <TableCell className="p-1 text-center">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            selectProject(project.ProjectID);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                      <TableCell className="font-medium py-1">
+                        <div className="flex items-start gap-1">
+                          <span className="truncate max-w-[120px]">{project.Name}</span>
+                          {project.ProjectErpID && (
+                            <Badge 
+                              variant="outline" 
+                              className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
+                            >
+                              {project.ProjectErpID}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px]">
+                        {project.CompanyName || '-'}
+                      </TableCell>
+                      <TableCell className="py-1">
+                        <div className="flex items-center gap-1">
+                          <div 
+                            className="w-2 h-2 rounded-full" 
+                            style={{ 
+                              backgroundColor: project.StatusColor || '#CCCCCC' 
+                            }}
+                          />
+                          <span className="text-xs truncate max-w-[80px]">
+                            {project.StatusDescription}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-1 text-xs">
+                        {new Date(project.EndDate).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="py-1 text-right">
+                        <div className="flex justify-end gap-1 items-center">
+                          <div className="flex items-center px-1.5 py-0.5 rounded-md bg-green-100 text-green-700">
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            <span className="text-xs font-medium">
+                              {project.TaskCompletate || 0}
+                            </span>
+                          </div>
+                          <div className="flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700">
+                            <ListTodo className="w-3 h-3 mr-1" />
+                            <span className="text-xs font-medium">
+                              {project.TaskAperteNonRitardo || 0}
+                            </span>
+                          </div>
+                          <div className="flex items-center px-1.5 py-0.5 rounded-md bg-red-100 text-red-700">
+                            <TriangleAlert className="w-3 h-3 mr-1" />
+                            <span className="text-xs font-medium">
+                              {project.TaskAperteInRitardo || 0}
+                            </span>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </ScrollArea>
+        </Card>
+      </div>
+      
+      {/* Sezione destra (2/3) - Dettaglio progetto */}
+      <div className="w-2/3 h-full overflow-hidden">
+        {selectedProjectId ? (
+          <ProjectDetailContainer projectId={selectedProjectId} />
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-gray-500">
+            <PieChart className="h-16 w-16 mb-4 text-gray-300" />
+            <h3 className="text-xl font-medium mb-2">Nessun progetto selezionato</h3>
+            <p className="text-sm max-w-md text-center">
+              Seleziona un progetto dalla lista a sinistra per visualizzarne i dettagli.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ProjectManagementSplitView;

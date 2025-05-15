@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import ProtectedRoute from '../ProtectedRoute';
 import AdminDashboard from '../../pages/admin/AdminDashboard';
-import ProjectsDashboard from '../../pages/progetti/progetti/ProjectsDashboard';
+import ProjectManagementSplitView from '../../pages/progetti/progetti/ProjectManagementSplitView';
 import CategoriesPage from '../../pages/progetti/categorie/ProjectCategories';
 import TemplatesPage from '../../pages/progetti/templates/projectTemplates';
 import ProjectDetail from '../../pages/progetti/progetti/ProjectDetail';
@@ -121,7 +121,7 @@ const MainContainer = ({
                   path="/progetti/dashboard"
                   element={
                     <ProtectedRoute>
-                      <ProjectsDashboard onExit={navigateToPreviousLevel} />
+                      <ProjectManagementSplitView onExit={navigateToPreviousLevel} />
                     </ProtectedRoute>
                   }
                 />
