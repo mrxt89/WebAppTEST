@@ -17,11 +17,14 @@ import Header from './Header';
 import NotificationConsentModal from '../NotificationConsentModal';
 import DoNotDisturbIndicator from '../chat/DoNotDisturbIndicator';
 import useWindowManager from '../../hooks/useWindowManager';
+import { useDispatch } from 'react-redux';
+import { fetchNotificationAttachments } from '@/redux/features/notifications/notificationsActions';
 
 // Import dei componenti Wiki
 import { WikiProvider, WikiHelper } from '../wiki';
 
 const MainPage = () => {
+  const dispatch = useDispatch();
   const { user, logout, isDBNotificationsViewExecuted, setIsDBNotificationsViewExecuted } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -187,6 +190,18 @@ const MainPage = () => {
       const notification = await fetchNotificationById(notificationId);
       
       if (notification) {
+        // Carica gli allegati della notifica
+        try {
+          await dispatch(fetchNotificationAttachments(notificationId)).unwrap();
+        } catch (error) {
+          console.error('Errore nel caricamento degli allegati:', error);
+          toast({
+            variant: "destructive",
+            title: "Errore nel caricamento degli allegati",
+            description: "Non è stato possibile caricare gli allegati della chat. Riprova più tardi.",
+          });
+        }
+        
         // Mark as read immediately
         toggleReadUnread(notificationId, true);
         
@@ -251,61 +266,61 @@ const MainPage = () => {
     }
   };
 
-// Gestisci l'evento di nuovo messaggio
-useEffect(() => {
-  const handleNewMessage = (event) => {
-    const { notificationId, newMessageCount } = event.detail || {};
-    
-    if (notificationId && newMessageCount) {
-      // Trova la notifica corrispondente
-      const notification = notifications.find(n => n.notificationId === parseInt(notificationId));
+  // Gestisci l'evento di nuovo messaggio
+  useEffect(() => {
+    const handleNewMessage = (event) => {
+      const { notificationId, newMessageCount } = event.detail || {};
       
-      // Bypass NotificationService per garantire la notifica
-      if ('Notification' in window && Notification.permission === 'granted') {
-        try {
-          const title = notification?.title || 'Nuovo messaggio';
-          const message = `Hai ricevuto nuovi messaggi`;
-          
-          const webNotification = new Notification(title, {
-            body: message,
-            icon: '/icons/app-icon.png'
-          });
-          
-          webNotification.onclick = () => {
-            window.focus();
-            openChatModal(notificationId);
-            webNotification.close();
-          };
-          
-          // Auto-chiusura dopo 8 secondi
-          setTimeout(() => webNotification.close(), 120000);
-        } catch (e) {
-          console.error('Error showing direct notification:', e);
+      if (notificationId && newMessageCount) {
+        // Trova la notifica corrispondente
+        const notification = notifications.find(n => n.notificationId === parseInt(notificationId));
+        
+        // Bypass NotificationService per garantire la notifica
+        if ('Notification' in window && Notification.permission === 'granted') {
+          try {
+            const title = notification?.title || 'Nuovo messaggio';
+            const message = `Hai ricevuto nuovi messaggi`;
+            
+            const webNotification = new Notification(title, {
+              body: message,
+              icon: '/icons/app-icon.png'
+            });
+            
+            webNotification.onclick = () => {
+              window.focus();
+              openChatModal(notificationId);
+              webNotification.close();
+            };
+            
+            // Auto-chiusura dopo 8 secondi
+            setTimeout(() => webNotification.close(), 120000);
+          } catch (e) {
+            console.error('Error showing direct notification:', e);
+          }
         }
+        
+        // Comunque tenta anche l'aggiornamento normale
+        fetchNotificationById(notificationId);
       }
-      
-      // Comunque tenta anche l'aggiornamento normale
-      fetchNotificationById(notificationId);
-    }
-  };
-  
-  document.addEventListener('new-message-received', handleNewMessage);
-  
-  return () => {
-    document.removeEventListener('new-message-received', handleNewMessage);
-  };
-}, [notifications, fetchNotificationById, openChatModal]);
+    };
+    
+    document.addEventListener('new-message-received', handleNewMessage);
+    
+    return () => {
+      document.removeEventListener('new-message-received', handleNewMessage);
+    };
+  }, [notifications, fetchNotificationById, openChatModal]);
 
-// Esponi openChatModal globalmente per le notifiche
-useEffect(() => {
-  // Rendi la funzione disponibile globalmente
-  window.openChatModal = openChatModal;
-  
-  return () => {
-    // Pulizia quando il componente viene smontato
-    delete window.openChatModal;
-  };
-}, [openChatModal]);
+  // Esponi openChatModal globalmente per le notifiche
+  useEffect(() => {
+    // Rendi la funzione disponibile globalmente
+    window.openChatModal = openChatModal;
+    
+    return () => {
+      // Pulizia quando il componente viene smontato
+      delete window.openChatModal;
+    };
+  }, [openChatModal]);
 
   // Ascolta specificamente eventuali errori di notifica per debug
   useEffect(() => {
@@ -758,7 +773,6 @@ useEffect(() => {
   };
 
   const handleToastClick = (notificationId, messageId) => {
-    const notification = notifications.find((n) => n.notificationId === notificationId);
     toggleReadUnread(notificationId, true);
     openChatModal(notificationId);
     markMessageAsReceived(notificationId, messageId);
