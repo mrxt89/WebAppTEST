@@ -1264,20 +1264,6 @@ const ChatWindow = ({
     prevMessagesRef.current = [...parsedMessages];
   }, [parsedMessages, initialScrollDone]);
   
-  // Aggiungi un effetto per gestire lo scroll verso il basso quando l'utente clicca sull'icona
-  const handleScrollToBottom = useCallback(() => {
-    if (chatListRef.current) {
-      scrollingToBottomRef.current = true;
-      chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
-      setHasNewMessages(false);
-      userHasScrolledRef.current = false;
-      
-      setTimeout(() => {
-        scrollingToBottomRef.current = false;
-      }, 500);
-    }
-  }, []);
-
   // Modifica l'effetto dello scroll per gestire lo stato dei nuovi messaggi
   useEffect(() => {
     if (chatListRef.current) {
@@ -1534,7 +1520,7 @@ const ChatWindow = ({
     };
   }, [notification, fetchNotificationById]);
 
-  // Nel componente ChatWindow, aggiungo la funzione handleScrollToBottom
+  // Nel componente ChatWindow, aggiungo la funzione handleChatScrollToBottom
   const handleChatScrollToBottom = useCallback(() => {
     setHasNewMessages(false);
   }, []);
