@@ -43,7 +43,7 @@ const AttachmentUploader = ({ notificationId, onAttachmentUploaded }) => {
 
     try {
       setUploading(true);
-      
+      console.log('Selected file:', file);
       const result = await uploadFile(file);
       
       // Reset esplicito
@@ -60,38 +60,46 @@ const AttachmentUploader = ({ notificationId, onAttachmentUploaded }) => {
     }
   };
 
-  const uploadFile = async (file) => {
-    try {
-      setUploading(true);
-      
-      const result = await uploadNotificationAttachment(notificationId, file);
-      
-      if (result.success) {
-        onAttachmentUploaded && onAttachmentUploaded();
-        swal.fire({
-          title: 'Successo',
-          text: 'Allegato caricato con successo',
-          icon: 'success',
-          timer: 1500,
-          showProgressBar: true,
-          showConfirmButton: false
-        });
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
+const uploadFile = async (file) => {
+  try {
+    setUploading(true);
+    console.log('Uploading file:', file);
+    // Verifica prima come la funzione si aspetta i parametri
+    // Probabilmente dovrebbe essere così:
+    const result = await uploadNotificationAttachment({
+      notificationId,
+      file
+    });
+    
+    // Oppure potrebbe aspettarsi i parametri separati:
+    // const result = await uploadNotificationAttachment(notificationId, file);
+    
+    if (result && result.success) {
+      onAttachmentUploaded && onAttachmentUploaded();
       swal.fire({
-        title: 'Errore',
-        text: 'Errore nel caricamento dell\'allegato',
-        icon: 'error',
+        title: 'Successo',
+        text: 'Allegato caricato con successo',
+        icon: 'success',
         timer: 1500,
+        showProgressBar: true,
+        showConfirmButton: false
       });
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     }
-  };
+  } catch (error) {
+    console.error('Upload error:', error);
+    swal.fire({
+      title: 'Errore',
+      text: 'Errore nel caricamento dell\'allegato',
+      icon: 'error',
+      timer: 1500,
+    });
+  } finally {
+    setUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }
+};
 
   const startCamera = async () => {
     try {

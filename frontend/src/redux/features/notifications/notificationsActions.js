@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { config } from '../../../config';
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { setAttachmentsLoading, setNotificationAttachments, fetchNotificationById } from './notificationsSlice';
+import { setAttachmentsLoading, setNotificationAttachments, fetchNotificationById, sendNotification  } from './notificationsSlice';
 
 // ActionCreator per inizializzare il worker
 export const initializeNotificationsWorker = () => ({
@@ -78,6 +78,7 @@ export const fetchNotificationAttachments = createAsyncThunk(
 export const uploadNotificationAttachment = createAsyncThunk(
   'notifications/uploadAttachment',
   async ({ notificationId, file, messageId = null }, { dispatch }) => {
+    console.log('uploadNotificationAttachment called', { notificationId, file }); // Sposta qui
     try {
       dispatch(setAttachmentsLoading(true));
       

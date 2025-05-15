@@ -493,6 +493,8 @@ const ChatModal = ({
     }
   }, [isOpen]);
 
+  
+
   // Load attachments when chat opens
   useEffect(() => {
     if (isOpen && notificationId && !attachmentsLoaded && !hasLeftChat) {

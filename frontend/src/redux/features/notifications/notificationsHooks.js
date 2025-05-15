@@ -502,6 +502,7 @@ const forceLoadNotifications = useCallback(() => {
   }, [dispatch]);
 
   const handleSendNotificationWithAttachments = useCallback((notificationData, attachments = []) => {
+    console.log('Invio notifica con allegati:', notificationData, attachments);
     return dispatch(sendNotificationWithAttachments({ notificationData, attachments })).unwrap();
   }, [dispatch]);
 
