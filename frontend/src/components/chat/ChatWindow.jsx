@@ -266,9 +266,10 @@ const ChatWindow = ({
         // Segnala che stiamo scrollando programmaticamente
         scrollingToBottomRef.current = true;
         
-        // Usa setTimeout per assicurarsi che il DOM sia aggiornato
-        setTimeout(() => {
+        // Usa requestAnimationFrame per assicurarsi che il DOM sia aggiornato
+        requestAnimationFrame(() => {
           if (chatListRef.current && isMountedRef.current) {
+            // Forza lo scroll al fondo
             chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
             
             // Riattiva la rilevazione dello scroll dopo un breve ritardo
@@ -278,7 +279,7 @@ const ChatWindow = ({
               }
             }, 500);
           }
-        }, 100);
+        });
       }
     } catch (err) {
       console.error("Errore nell'aggiornamento dei messaggi da Redux:", err);
@@ -316,7 +317,7 @@ const ChatWindow = ({
     } finally {
       setIsUpdating(false);
     }
-  }, [notification, fetchNotificationById, isUpdating, updateMessagesFromNotification]);
+  }, [notification, fetchNotificationById, isUpdating]);
 
   // Funzione per inviare un messaggio
   const handleSendMessage = useCallback(async (notificationData) => {
@@ -417,7 +418,7 @@ const ChatWindow = ({
       // Sempre resetta lo stato di invio
       setSending(false);
     }
-  }, [notification, sendNotification, replyToMessage, users, forceUpdateFromServer]);
+  }, [notification, sendNotification, replyToMessage, users]);
 
   // Unifico tutti gli event listener in un unico useEffect
   useEffect(() => {
@@ -596,10 +597,6 @@ const ChatWindow = ({
       
       // Verifica che questo evento sia per la chat corrente
       if (notificationId && notification && notificationId === notification.notificationId) {
-       
-        // Ricarica i dati aggiornati
-        await fetchNotificationById(notificationId);
-        
         // Aggiorna gli stati locali in base all'azione
         if (action === 'left') {
           setHasLeftChat(true);
@@ -862,15 +859,10 @@ const ChatWindow = ({
         // Chiama la funzione originale
         const result = await originalSendNotification(...args);
         
-        // Se l'invio è andato a buon fine, forza un aggiornamento
+        // Se l'invio è andato a buon fine, imposta solo il timestamp
         if (result && (!result.notificationId || result.notificationId === notification.notificationId)) {
           // Imposta il timestamp dell'ultimo messaggio inviato
           setLastMessageSentTime(Date.now());
-          
-          // Forza un aggiornamento
-          setTimeout(() => {
-            forceUpdateFromServer();
-          }, 300);
         }
         
         return result;
@@ -896,97 +888,8 @@ const ChatWindow = ({
         delete window.notificationContext.originalSendNotification;
       }
     };
-  }, [notification?.notificationId, sendNotification, forceUpdateFromServer]);
+  }, [notification?.notificationId, sendNotification]);
 
-  // Effetto per inizializzare e aggiornare i messaggi quando cambia notificationId
-  useEffect(() => {
-    // Use a local flag to track if we've already marked this notification as read
-    let hasMarkedAsReadLocally = false;
-    
-    // Controlla solo se l'ID della notifica è cambiato
-    if (notification?.notificationId && 
-        (!lastNotificationRef.current || 
-        lastNotificationRef.current.notificationId !== notification.notificationId)) {
-      
-      // Aggiorna i messaggi quando cambia la notifica
-      updateMessagesFromNotification();
-      
-      // Mark messages as read - but only once and only if needed
-      if (!notification.isReadByUser && markMessageAsRead && !hasMarkedAsReadLocally) {
-       
-        markMessageAsRead(notification.notificationId);
-        hasMarkedAsReadLocally = true; // Set local flag to prevent multiple calls
-      }
-      
-      // Aggiorna il riferimento all'ID
-      lastNotificationRef.current = {
-        notificationId: notification.notificationId,
-        isReadByUser: notification.isReadByUser || hasMarkedAsReadLocally
-      };
-    } else if (notification?.notificationId && lastNotificationRef.current?.notificationId === notification.notificationId) {
-      // Update the messages only if there are actual changes
-      
-      // Controlla se i messaggi sono cambiati
-      const currentMessages = Array.isArray(notification.messages) 
-        ? notification.messages 
-        : (typeof notification.messages === 'string' 
-          ? JSON.parse(notification.messages || '[]') 
-          : []);
-      
-      // Usa updatedAt o un'altra proprietà per verificare se la notifica è stata effettivamente aggiornata
-      const hasNewMessage = notification.lastUpdated !== lastNotificationRef.current.lastUpdated;
-      
-      // Se c'è una differenza significativa o è un nuovo messaggio, aggiorna
-      if (hasNewMessage || (currentMessages.length !== parsedMessages.length)) {
-        updateMessagesFromNotification();
-        
-        // Aggiorna anche il timestamp di lastUpdated per il prossimo confronto
-        lastNotificationRef.current = {
-          notificationId: notification.notificationId,
-          lastUpdated: notification.lastUpdated || Date.now(),
-          isReadByUser: notification.isReadByUser || hasMarkedAsReadLocally
-        };
-      }
-    }
-    
-    // Note: We're not returning anything from this effect since we don't need cleanup
-  }, [notification, updateMessagesFromNotification, markMessageAsRead, parsedMessages.length]);
-  
-  // Effetto per aggiornare dopo l'invio di un messaggio
-  useEffect(() => {
-    if (lastMessageSentTime && notification?.notificationId) {
-      // Aggiorna i messaggi dal server dopo un breve ritardo (solo una volta)
-      if (messageUpdateTimeoutRef.current) {
-        clearTimeout(messageUpdateTimeoutRef.current);
-      }
-      
-      messageUpdateTimeoutRef.current = setTimeout(() => {
-        forceUpdateFromServer();
-        setLastMessageSentTime(null);
-        messageUpdateTimeoutRef.current = null;
-      }, 800); // Aumentato per dare più tempo al server
-      
-      return () => {
-        if (messageUpdateTimeoutRef.current) {
-          clearTimeout(messageUpdateTimeoutRef.current);
-          messageUpdateTimeoutRef.current = null;
-        }
-      };
-    }
-  }, [lastMessageSentTime, notification?.notificationId, forceUpdateFromServer]);
-  
-  // Forza l'aggiornamento quando cambia il contatore (una sola volta)
-  useEffect(() => {
-    if (forceUpdateCounter > 0 && notification?.notificationId && !isUpdating) {
-      // Usa setTimeout per evitare loop e dare tempo al server di elaborare
-      const timerId = setTimeout(() => {
-        forceUpdateFromServer();
-      }, 800);
-      
-      return () => clearTimeout(timerId);
-    }
-  }, [forceUpdateCounter, notification?.notificationId, isUpdating, forceUpdateFromServer]);
-  
   // Separate effect for initial position/size loading
   useEffect(() => {
     if (windowManager && notification && !initialLoaded) {
