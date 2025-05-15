@@ -152,23 +152,14 @@ const MessageAttachments = ({ attachments, onClick, onDownload }) => {
 };
 
 const ModernChatList = ({ 
-  sending,
   notificationId, 
-  isReadByUser, 
-  markMessageAsRead, 
   chatListRef, 
   onReply,
-  onMessageSelect, 
-  categoryColor,
   hasLeftChat = false,
   selectedMessageId, 
   currentUser,
   users = [],
-  onEditMessage,
-  onViewVersionHistory,
-  onReactionSelect,
   animatedEditId,
-  searchHighlightedId,
   newMessage
 }) => {
   // Ottieni direttamente l'accesso al context

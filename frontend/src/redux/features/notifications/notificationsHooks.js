@@ -892,7 +892,6 @@ const forceLoadNotifications = useCallback(() => {
   }
 }, [dispatch]);
 
-
   return {
     // State
     notifications,

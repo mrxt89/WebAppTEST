@@ -234,6 +234,11 @@ const ChatWindow = ({
         messages.length > lastReduxMessageCountRef.current || // Nuovo messaggio aggiunto (dal Redux)
         (lastMessage && (!lastMessageIdRef.current || lastMessage.messageId !== lastMessageIdRef.current)); // ID diverso
       
+      // Se ci sono nuovi messaggi e l'utente è in fondo alla chat, segna come letto
+      if (hasNewMessagesReceived && !userHasScrolledRef.current && markMessageAsRead && !updatedNotification.isReadByUser) {
+        markMessageAsRead(notification.notificationId);
+      }
+      
       // Aggiorna i riferimenti
       if (lastMessage) {
         lastMessageIdRef.current = lastMessage.messageId;
@@ -285,7 +290,7 @@ const ChatWindow = ({
     } catch (err) {
       console.error("Errore nell'aggiornamento dei messaggi da Redux:", err);
     }
-  }, [notification, notifications]); // Aggiungo notifications come dipendenza
+  }, [notification, notifications, markMessageAsRead]);
   
   // Funzione per aggiornare la lista dei destinatari
   const handleReceiversUpdate = useCallback((updatedList) => {
@@ -1652,7 +1657,6 @@ useEffect(() => {
           responseOptions={responseOptions || []}
           uploadNotificationAttachment={uploadNotificationAttachment}
           captureAndUploadPhoto={captureAndUploadPhoto}
-          isNewMessage={false}
         />
       </div>
     </div>
