@@ -140,13 +140,7 @@ export const useNotifications = () => {
   const notificationAttachments = useSelector(selectNotificationAttachments);
   const standaloneChats = useSelector(selectStandaloneChats);
   
-  // Selectors from new slices
-  const reactionsLoading = useSelector(selectReactionsLoading);
-  const messageManagementLoading = useSelector(selectMessageManagementLoading);
-  const pollsLoading = useSelector(selectPollsLoading);
-  const highlightsDataLoading = useSelector(selectHighlightsDataLoading);
-  const documentLinksLoading = useSelector(selectDocumentLinksLoading);
-  
+
   // Stato locale per tracciare l'ultima volta che è stato eseguito un aggiornamento
   const [lastUpdateTime, setLastUpdateTime] = useState(0);
   // Ref per tenere traccia delle operazioni in corso

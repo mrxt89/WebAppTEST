@@ -536,16 +536,7 @@ const ChatWindow = ({
         console.error('Error updating notification:', error);
       } finally {
         updateInProgressRef.current = false;
-        
-        // Se ci sono aggiornamenti in coda, pianificali
-        if (updateQueuedRef.current) {
-          updateQueuedRef.current = false;
-          setTimeout(() => {
-            if (isMountedRef.current) {
-              handleNotificationUpdate(event);
-            }
-          }, 100);
-        }
+
       }
     };
 
@@ -917,30 +908,6 @@ const ChatWindow = ({
       
       updateInProgressRef.current = true;
       
-      // Usa requestAnimationFrame per assicurarsi che il reducer sia completato
-      requestAnimationFrame(() => {
-        // Usa setTimeout per un ulteriore livello di sicurezza
-        setTimeout(() => {
-          forceUpdateFromServer()
-            .finally(() => {
-              if (!isMountedRef.current) return;
-              
-              updateInProgressRef.current = false;
-              
-              // Se ci sono aggiornamenti in coda, eseguili
-              if (updateQueuedRef.current) {
-                updateQueuedRef.current = false;
-                requestAnimationFrame(() => {
-                  setTimeout(() => {
-                    if (isMountedRef.current) {
-                      forceUpdateFromServer();
-                    }
-                  }, 0);
-                });
-              }
-            });
-        }, 0);
-      });
     };
     
     // Aggiungi il listener per l'evento
@@ -1114,18 +1081,7 @@ const ChatWindow = ({
     }
   }, [lastMessageSentTime, notification?.notificationId, forceUpdateFromServer]);
   
-  // Forza l'aggiornamento quando cambia il contatore (una sola volta)
-  useEffect(() => {
-    if (forceUpdateCounter > 0 && notification?.notificationId && !isUpdating) {
-      // Usa setTimeout per evitare loop e dare tempo al server di elaborare
-      const timerId = setTimeout(() => {
-        forceUpdateFromServer();
-      }, 800);
-      
-      return () => clearTimeout(timerId);
-    }
-  }, [forceUpdateCounter, notification?.notificationId, isUpdating, forceUpdateFromServer]);
-  
+
   // Separate effect for initial position/size loading
   useEffect(() => {
     if (windowManager && notification && !initialLoaded) {

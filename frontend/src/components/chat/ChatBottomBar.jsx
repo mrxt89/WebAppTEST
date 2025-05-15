@@ -919,17 +919,6 @@ const handleSend = async (msg = message) => {
        if (inputRef.current) {
          inputRef.current.focus();
        }
-       
-       // Emetti un evento per forzare l'aggiornamento con più dettagli
-       // IMPORTANTE: includiamo highPriority = true per un aggiornamento più rapido
-       document.dispatchEvent(new CustomEvent('chat-message-sent', { 
-         detail: { 
-           notificationId: notificationData.notificationId,
-           message: msg,
-           timestamp: new Date().toISOString(),
-           highPriority: true
-         } 
-       }));
 
        // Forza un aggiornamento diretto delle notifiche con priorità alta
        if (contextFunctions.fetchNotificationById) {

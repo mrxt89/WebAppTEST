@@ -788,13 +788,7 @@ const MainPage = () => {
     // Piccolo timeout per assicurarsi che il modale del nuovo messaggio sia chiuso
     setTimeout(async () => {
       try {
-        const notification = await fetchNotificationById(notificationId);
-        
-        if (notification) {
-          openChatModal(notification.notificationId);
-        } else {
-          console.error('Notifica non trovata:', notificationId);
-        }
+        openChatModal(notificationId);
       } catch (error) {
         console.error('Errore apertura chat:', error);
       }
