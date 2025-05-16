@@ -188,14 +188,8 @@ export const useNotifications = () => {
     try {
       pendingUpdatesRef.current.add(notificationId);
       
-      // Usa requestAnimationFrame per assicurarsi che il reducer sia completato
-      await new Promise(resolve => requestAnimationFrame(resolve));
-      
-      // Aggiungi un piccolo delay per assicurarsi che il reducer sia completato
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
       // Ora è sicuro chiamare fetchNotificationById
-      await dispatch(fetchNotificationById(notificationId, highPriority)).unwrap();
+      await fetchNotificationById(notificationId, highPriority);
       
     } catch (error) {
       console.error('Error updating notification:', error);

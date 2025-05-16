@@ -26,9 +26,9 @@ const ChatBottomBar = ({
  notificationId,
  title,
  notificationCategoryId,
- isClosed,
  reopenChat,
  closeChat,
+ isClosed,
  closingUser_Name,
  closingDate,
  users,
@@ -1511,7 +1511,7 @@ return (
            {!disabled && (
              <button
                className="p-2 rounded-full text-gray-500 hover:bg-gray-100"
-               onClick={closeChat}
+               onClick={() => closeChat(notificationId)}
                title="Chiudi conversazione"
              >
                <SquareCheck className="h-5 w-5" />

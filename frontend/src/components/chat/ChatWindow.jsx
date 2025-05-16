@@ -71,6 +71,8 @@ const ChatWindow = ({
     unarchiveChat,
     uploadNotificationAttachment,
     captureAndUploadPhoto,
+    reopenChat,
+    closeChat,
     notifications // Aggiungo questo per accedere direttamente alle notifiche dal Redux
   } = useNotifications();
   
@@ -1463,7 +1465,7 @@ useEffect(() => {
         }
       }
     };
-    
+
     // Aggiungi listener per l'evento
     document.addEventListener('chat-status-changed', handleChatStatusChange);
     
@@ -1552,6 +1554,9 @@ useEffect(() => {
     };
   }, [notification, windowManager]);
 
+  // Aggiungo uno stato per isClosed e lo aggiorno quando la chat viene riaperta
+  const [isClosed, setIsClosed] = useState(notification?.isClosed || false);
+
   // Don't render anything if component is unmounted or window is minimized
   if (!notification || isMinimized) {
     return null;
@@ -1622,6 +1627,53 @@ useEffect(() => {
           responseOptions={responseOptions || []}
           uploadNotificationAttachment={uploadNotificationAttachment}
           captureAndUploadPhoto={captureAndUploadPhoto}
+          isClosed={isClosed}
+          closingUser_Name={notification.closingUser_Name}
+          closingDate={notification.closingDate}
+          reopenChat={async () => {
+            const res = await reopenChat(notification.notificationId);
+            if (res) {
+              // Forza un aggiornamento della notifica
+              const updatedNotification = await fetchNotificationById(notification.notificationId, true);
+              await new Promise(resolve => setTimeout(resolve, 500));
+              // Aggiorna isClosed basandosi sulla notifica aggiornata
+              setIsClosed(updatedNotification?.isClosed || false);
+              
+              // Emetti un evento per aggiornare la bottombar
+              document.dispatchEvent(new CustomEvent('chat-status-changed', {
+                detail: { 
+                  notificationId: notification.notificationId,
+                  action: 'reopened',
+                  timestamp: new Date().getTime()
+                }
+              }));
+
+              swal.fire({
+                text: 'Chat riaperta con successo',
+                icon: 'success',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 1500,
+                timerProgressBar: true
+              });
+            }
+          }}
+          closeChat={async () => {
+            const res = await closeChat(notification.notificationId);
+            if (res) {
+              handleClose();
+              swal.fire({
+                text: 'Chat chiusa con successo',
+                icon: 'success',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 1500,
+                timerProgressBar: true
+              });
+            }
+          }}
         />
       </div>
     </div>

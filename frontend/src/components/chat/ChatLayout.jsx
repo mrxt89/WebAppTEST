@@ -16,13 +16,13 @@ const ChatLayout = ({
   membersInfo,
   updateReceiversList,
   users,
-  currentUser,
   receivers,
   onReply,
+  isClosed,
+  closingUser_Name,
+  closingDate,
   title,
-  createdAt,
   notificationCategoryId,
-  notificationCategoryName,
   hexColor,
   hasLeftChat,
   initialSidebarOpen = true, // Nuovo parametro per decidere se aprire inizialmente la sidebar
@@ -37,7 +37,9 @@ const ChatLayout = ({
   responseOptions,     // Aggiungi per ricevere responseOptions
   uploadNotificationAttachment, // Aggiungi per l'upload di allegati
   captureAndUploadPhoto, // Aggiungi per la cattura foto
-  hasNewMessages
+  hasNewMessages,
+  reopenChat,
+  closeChat
 }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
@@ -212,6 +214,11 @@ const ChatLayout = ({
               updateReceiversList={updateReceiversList}
               uploadNotificationAttachment={uploadNotificationAttachment}
               captureAndUploadPhoto={captureAndUploadPhoto}
+              reopenChat={reopenChat}
+              closeChat={closeChat}
+              isClosed={isClosed}
+              closingUser_Name={closingUser_Name}
+              closingDate={closingDate}
             />
           )}
         </div>

@@ -13,7 +13,7 @@ import ChangePassword from '../../pages/user/ChangePassword';
 import UserProfile from '../../pages/user/UserProfile';
 import HomePage from '../../pages/HomePage';
 import MainMenu from '../MainMenu';
-import ChatPage from '../chat/ChatModal';
+
 import { swal } from '../../lib/common'; 
 import NotificationSidebar from '../NotificationSidebar';
 
@@ -165,14 +165,7 @@ const MainContainer = ({
                     </ProtectedRoute>
                   }
                 />
-                <Route
-                  path="/chat/:id"
-                  element={
-                    <ProtectedRoute>
-                      <ChatPage />
-                    </ProtectedRoute>
-                  }
-                />
+
               </>
             )}
           </Routes>
