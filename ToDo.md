@@ -1,1 +1,3 @@
-- (Da vedere assieme) Non va la gestione allegati
+- reazioni
+- completamento chat
+- disancoramento chat : riprova
