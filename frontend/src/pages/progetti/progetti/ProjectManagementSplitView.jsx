@@ -29,7 +29,6 @@ import useProjectCustomersActions from "../../../hooks/useProjectCustomersAction
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
 import NewTaskForm from './NewTaskForm';
 import TaskDetailsDialog from './TaskDetailsDialog';
-import ProjectEditModal from './ProjectEditModal';
 import ProjectArticlesTab from './articoli/ProjectArticlesTab';
 import ProjectAttachmentsTab from './ProjectAttachmentsTab';
 import ProjectTeamSection from './ProjectTeamSection';
@@ -228,6 +227,7 @@ const ProjectDetailContainer = ({ projectId }) => {
   const isMounted = useRef(true);
   const refreshInProgress = useRef(false);
   const preventDialogOpen = useRef(false); // Per evitare l'apertura del dialog durante modifiche in-line
+  const lastLoadedProjectId = useRef(null); // Per evitare caricamenti ripetuti dello stesso progetto
 
   const {
     loading,
@@ -261,8 +261,12 @@ const ProjectDetailContainer = ({ projectId }) => {
   const loadProject = useCallback(async (callback) => {
     if (!isMounted.current || refreshInProgress.current) return;
     
+    // Evita di ricaricare lo stesso progetto se è già in corso
+    if (lastLoadedProjectId.current === projectId && project) return;
+    
     try {
       refreshInProgress.current = true;
+      lastLoadedProjectId.current = projectId;
       
       // Salva lo stato attuale dei task prima di aggiornare
       const currentTaskStates = {};
@@ -1559,19 +1563,6 @@ const ProjectManagementSplitView = () => {
                       }
                       onClick={() => selectProject(project.ProjectID)}
                     >
-                      <TableCell className="p-1 text-center">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            selectProject(project.ProjectID);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
                       <TableCell className="font-medium py-1">
                         <div className="flex items-start gap-1">
                           <span className="truncate max-w-[120px]">{project.Name}</span>
