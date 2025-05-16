@@ -268,6 +268,62 @@ const ModernChatList = ({
     }
   }, [notificationId, registerOpenChat, unregisterOpenChat]);
 
+
+// Aggiornamento periodico delle reazioni per i messaggi visibili
+useEffect(() => {
+  if (!notificationId || hasLeftChat) return;
+  
+  // Funzione per aggiornare le reazioni dei messaggi visibili
+  const refreshVisibleReactions = async () => {
+    // Ottieni i messaggi attualmente visibili
+    const visibleIds = Array.from(visibleMessagesRef.current);
+    if (visibleIds.length === 0) return;
+    
+    // Svuota la cache delle reazioni per i messaggi visibili
+    visibleIds.forEach(id => {
+      fetchedReactionsRef.current.delete(id);
+      delete pendingReactionsRequestsRef.current[id];
+    });
+    
+    // Ricarica le reazioni per i messaggi visibili
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      // Usa l'endpoint batch già presente
+      const response = await axios.post(
+        `${config.API_BASE_URL}/messages/batch-reactions`,
+        { 
+          messageIds: visibleIds,
+          userId: currentUser?.userId 
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data && response.data.success) {
+        const freshReactions = response.data.reactions || {};
+        
+        // Aggiorna la cache con i dati freschi
+        setMessageReactionsCache(prev => ({
+          ...prev,
+          ...freshReactions
+        }));
+      }
+    } catch (error) {
+      console.error('Error refreshing reactions:', error);
+    }
+  };
+  
+  // Esegui subito un refresh iniziale
+  refreshVisibleReactions();
+  
+  // Imposta l'intervallo per gli aggiornamenti periodici (ogni 5 secondi)
+  const intervalId = setInterval(refreshVisibleReactions, 5000);
+  
+  // Cleanup al dismount
+  return () => clearInterval(intervalId);
+}, [notificationId, hasLeftChat, currentUser]);
+
   // NUOVO: Verifica direttamente dal context globale per i nuovi messaggi
   // useEffect(() => {
   //   // Solo se notificationId è valido
@@ -1001,6 +1057,9 @@ const handleReactionSelect = async (messageId, emoji) => {
   if (hasLeftChat) return Promise.resolve(); // No reactions if user left chat
 
   try {
+    // Salva la posizione di scroll corrente
+    const currentScrollPosition = chatListRef.current ? chatListRef.current.scrollTop : 0;
+    
     setLoading(true); // Show loading indicator while processing
     
     // Check if toggleMessageReaction exists before calling it
@@ -1045,13 +1104,6 @@ const handleReactionSelect = async (messageId, emoji) => {
     // Toggle the reaction
     await toggleMessageReaction(messageId, emoji);
     
-    if (notificationId) {
-      // Fetch updated notification if needed
-      if (fetchNotificationById) {
-        await fetchNotificationById(notificationId);
-      }
-    }
-    
     // Trigger update event
     const event = new CustomEvent('message-reaction-updated', { 
       detail: { 
@@ -1061,10 +1113,16 @@ const handleReactionSelect = async (messageId, emoji) => {
     });
     document.dispatchEvent(event);
     
+    // Ripristina la posizione di scroll dopo un breve ritardo
+    setTimeout(() => {
+      if (chatListRef.current) {
+        chatListRef.current.scrollTop = currentScrollPosition;
+      }
+    }, 50);
+    
     return Promise.resolve();
   } catch (error) {
     console.error('Error toggling reaction:', error);
-    // Don't show swal here to avoid UI interruption
     return Promise.reject(error);
   } finally {
     setLoading(false);

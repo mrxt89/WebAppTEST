@@ -189,7 +189,7 @@ export const useNotifications = () => {
       pendingUpdatesRef.current.add(notificationId);
       
       // Ora è sicuro chiamare fetchNotificationById
-      await fetchNotificationById(notificationId, highPriority);
+      await dispatch(fetchNotificationById(notificationId, highPriority)).unwrap();
       
     } catch (error) {
       console.error('Error updating notification:', error);

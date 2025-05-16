@@ -1150,7 +1150,7 @@ async function addMessageReaction(messageId, userId, reactionType) {
       
       // Aggiorna la vista delle notifiche
       await pool.request()
-        .input('userId', sql.Int, userId)
+        .input('userId', sql.Int, -1) // -1 indica "tutti gli utenti"
         .input('notificationId', sql.Int, notificationId)
         .input('allNotificationsByUser', sql.Int, 0)
         .execute('CreateNotificationsView');
@@ -1373,7 +1373,7 @@ async function deleteMessage(messageId, userId) {
  * @param {Array<number>} messageIds - Array di ID dei messaggi
  * @returns {Promise<Object>} - Mappa delle reazioni per messageId
  */
-async function getBatchReactions(messageIds) {
+async function getBatchReactions(messageIds, userId) {
   try {
     // Verifica che messageIds sia un array valido
     if (!Array.isArray(messageIds) || messageIds.length === 0) {
@@ -1394,12 +1394,47 @@ async function getBatchReactions(messageIds) {
     const messageIdsString = messageIdsToProcess.join(',');
     
     const query = `
-      SELECT mr.ReactionID, mr.MessageID, mr.UserID, mr.ReactionType, mr.CreatedDate,
-             u.firstName + ' ' + u.lastName AS UserName, u.email
-      FROM AR_MessageReactions mr
-      JOIN AR_Users u ON u.userId = mr.UserID
-      WHERE mr.MessageID IN (${messageIdsString})
-      ORDER BY mr.CreatedDate ASC
+DECLARE @userId INT = ${userId};
+
+WITH MessaggiConRowNo AS (
+    SELECT  
+        messageId,
+        message,
+        tbCreated,
+        ROW_NUMBER() OVER(PARTITION BY message, tbCreated ORDER BY (CASE WHEN receiverId = @userId THEN 1 ELSE 0 END) DESC) AS RowNo
+    FROM AR_NotificationDetails
+    WHERE tbCreated IN (
+        SELECT tbCreated
+        FROM AR_NotificationDetails
+		WHERE messageId IN (${messageIdsString})
+    )
+),
+MessaggiChiave AS (
+    SELECT 
+        tbCreated,
+        message,
+        messageId AS chiaveMessageId
+    FROM MessaggiConRowNo
+    WHERE RowNo = 1
+)
+
+SELECT mr.ReactionID
+		, groupedMessageId AS MessageID
+		, mr.UserID
+		, mr.ReactionType
+		, mr.CreatedDate
+		, u.firstName + ' ' + u.lastName AS UserName
+		, u.email
+FROM	AR_MessageReactions mr
+JOIN	AR_Users u ON u.userId = mr.UserID
+JOIN	(SELECT	m.messageId,
+					m.message,
+					m.tbCreated,
+					m.RowNo,
+					k.chiaveMessageId AS groupedMessageId
+			FROM MessaggiConRowNo m
+			JOIN MessaggiChiave k
+			ON m.tbCreated = k.tbCreated AND m.message = k.message ) tmp ON tmp.messageId = mr.MessageID
     `;
     
     const result = await pool.request().query(query);
