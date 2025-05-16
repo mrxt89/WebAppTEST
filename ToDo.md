@@ -1,3 +1,2 @@
 - reazioni
 - completamento chat
-- disancoramento chat : riprova

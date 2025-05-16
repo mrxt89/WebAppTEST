@@ -8,6 +8,8 @@ import { CircleX } from 'lucide-react';
 import { swal } from '../lib/common';
 import axios from 'axios';
 import { config } from '../config';
+import { useSelector } from 'react-redux';
+import { selectNotifications } from '../redux/features/notifications/notificationsSlice';
 
 // Aggiungi un identificatore univoco per la finestra
 if (!window.WINDOW_ID) {
@@ -74,11 +76,26 @@ const StandaloneChat = () => {
     registerOpenChat,
     toggleReadUnread,
     registerStandaloneChat,
-    forceLoadNotifications,
     DBNotificationsView,
     reloadNotifications,
     restartNotificationWorker
   } = useNotifications();
+
+  // Aggiungi selettore per le notifiche
+  const notifications = useSelector(selectNotifications);
+  
+  // Effect per monitorare le notifiche nello store
+  useEffect(() => {
+    if (notificationId && notifications.length > 0) {
+      const foundNotification = notifications.find(n => n.notificationId === notificationId);
+      if (foundNotification && !loaded) {
+        console.log("Notifica trovata nello store:", foundNotification);
+        setNotification(foundNotification);
+        setLoaded(true);
+        document.title = `Chat: ${foundNotification.title || 'Conversazione'}`;
+      }
+    }
+  }, [notificationId, notifications, loaded]);
 
   // Miglioramento: funzione per recuperare il token e l'URL API in modo sicuro
   const getApiConfig = () => {
@@ -201,35 +218,23 @@ const StandaloneChat = () => {
       
       // Initialize redux worker with forceInit flag
       console.log("Inizializzazione worker con forceInit");
-      await initializeWorker(true);
+      initializeWorker(true);
       
       // Ensure DB view is created
       console.log("Creazione vista DB");
       await DBNotificationsView();
       
-      // Force notification reload with high priority
-      console.log("Caricamento notifiche forzato");
-      await reloadNotifications(true);
+      // Aspetta che il worker sia pronto
+      console.log("Attesa worker...");
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Load user data and response options in parallel
-      console.log("Caricamento utenti e opzioni di risposta");
-      const [usersData, optionsData] = await Promise.all([
-        fetchUsers(),
-        fetchResponseOptions()
-      ]);
+      // Carica la notifica con priorità alta
+      console.log("Chiamata fetchNotificationById...");
+      await fetchNotificationById(notificationId, true);
       
-      // Wait a short delay to ensure synchronization
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Load the specific chat with retry
-      console.log(`Caricamento notifica: ${notificationId}`);
-      const fetchedNotification = await fetchNotificationById(notificationId);
-      
-      if (!fetchedNotification) {
-        throw new Error(`Chat non trovata con ID: ${notificationId}`);
-      }
-      
-      console.log("Notifica caricata con successo:", fetchedNotification.title);
+      // Aspetta che lo store sia aggiornato
+      console.log("Attesa aggiornamento store...");
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Register this chat as open in redux store
       if (!chatRegisteredRef.current) {
@@ -242,19 +247,12 @@ const StandaloneChat = () => {
         await toggleReadUnread(notificationId, true);
       }
       
-      // Update state with fetched data
-      setNotification(fetchedNotification);
-      setLoaded(true);
-      
-      // Update the window title
-      document.title = `Chat: ${fetchedNotification.title || 'Conversazione'}`;
-      
       console.log("Inizializzazione completata con successo");
       
-      return fetchedNotification;
     } catch (error) {
       console.error("Errore inizializzazione:", error);
       setError(error.message || "Errore di caricamento");
+      initializationAttempted.current = false;
       return null;
     }
   }, [
@@ -262,11 +260,11 @@ const StandaloneChat = () => {
     fetchNotificationById, 
     initializeWorker, 
     DBNotificationsView, 
-    forceLoadNotifications,
     reloadNotifications, 
     registerStandaloneChat, 
     registerOpenChat, 
-    toggleReadUnread
+    toggleReadUnread,
+    notifications
   ]);
   
   // Initialization effect

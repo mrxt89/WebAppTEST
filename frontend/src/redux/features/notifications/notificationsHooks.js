@@ -152,8 +152,10 @@ export const useNotifications = () => {
   }, [dispatch]);
 
   // Worker management
-  const initializeWorker = useCallback((forceInit = false) => {
-    dispatch(initializeNotificationsWorker(forceInit ? { forceWorkerInit: true } : undefined));
+  const initializeWorker = useCallback(() => {
+    dispatch(stopNotificationsWorker());
+    dispatch(initializeNotificationsWorker());
+    dispatch(reloadNotifications(true));
   }, [dispatch]);
 
   const restartNotificationWorker = useCallback((highPriority = false) => {
