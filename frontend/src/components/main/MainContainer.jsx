@@ -6,12 +6,10 @@ import AdminDashboard from '../../pages/admin/AdminDashboard';
 import ProjectManagementSplitView from '../../pages/progetti/progetti/ProjectManagementSplitView';
 import CategoriesPage from '../../pages/progetti/categorie/ProjectCategories';
 import TemplatesPage from '../../pages/progetti/templates/projectTemplates';
-import ProjectDetail from '../../pages/progetti/progetti/ProjectDetail';
 import ProjectCustomers from '../../pages/progetti/clienti/ProjectCustomers';
 import MyTasksPage from '../../pages/progetti/attivita/MyTasksPage';
 import ChangePassword from '../../pages/user/ChangePassword';
 import UserProfile from '../../pages/user/UserProfile';
-import HomePage from '../../pages/HomePage';
 import MainMenu from '../MainMenu';
 
 import { swal } from '../../lib/common'; 
@@ -146,14 +144,6 @@ const MainContainer = ({
                   element={
                     <ProtectedRoute>
                       <CategoriesPage onExit={navigateToPreviousLevel} />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/progetti/detail/:projectId"
-                  element={
-                    <ProtectedRoute>
-                      <ProjectDetail onExit={() => navigate('/progetti/dashboard')} />
                     </ProtectedRoute>
                   }
                 />
