@@ -12,8 +12,6 @@ import ChangePassword from '../../pages/user/ChangePassword';
 import UserProfile from '../../pages/user/UserProfile';
 import MainMenu from '../MainMenu';
 
-import { swal } from '../../lib/common'; 
-import NotificationSidebar from '../NotificationSidebar';
 
 // Import the NotificationProvider (which is now a placeholder function)
 import { NotificationProvider } from '@/redux/features/notifications/NotificationProvider';
@@ -42,7 +40,7 @@ const MainContainer = ({
         {/* Mostra il menu principale solo quando NON siamo su una pagina componente */}
         {!isPageComponent && <MainMenu menuItems={currentLevelItems} onNavigate={handleNavigate} />}
         
-        <NotificationSidebar />
+
         
         {/* Mostra la navigazione appropriata a seconda del tipo di pagina */}
         {isPageComponent ? (

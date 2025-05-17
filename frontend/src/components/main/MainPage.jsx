@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios'; 
 import { useAuth } from '../../context/AuthContext';
-import NotificationSidebar from '../NotificationSidebar';
+import NotificationSidebar from '../notifications/NotificationSidebar';
 import MainContainer from './MainContainer';
 import ChatWindow from '../chat/ChatWindow';
 import MinimizedChatsDock from '../chat/MinimizedChatsDock';
@@ -14,7 +14,7 @@ import { useNotifications } from '@/redux/features/notifications/notificationsHo
 import NewMessageModal from '../chat/NewMessageModal';
 import { config } from '../../config';
 import Header from './Header';
-import NotificationConsentModal from '../NotificationConsentModal';
+import NotificationConsentModal from '../notifications/NotificationConsentModal';
 import DoNotDisturbIndicator from '../chat/DoNotDisturbIndicator';
 import useWindowManager from '../../hooks/useWindowManager';
 import { useDispatch } from 'react-redux';

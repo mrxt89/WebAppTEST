@@ -116,17 +116,25 @@ router.delete('/notifications/:notificationId/documents/:linkId', authenticateTo
     const linkId = parseInt(req.params.linkId);
     const companyId = req.user.CompanyId;
     
-    if (!notificationId || !linkId) {
+    console.log('Parametri ricevuti:', { notificationId, linkId, companyId });
+    
+    if (!notificationId || isNaN(notificationId)) {
       return res.status(400).json({ 
         success: false, 
-        message: 'ID notifica e ID collegamento sono campi obbligatori' 
+        message: 'ID notifica mancante o non valido' 
+      });
+    }
+    
+    if (!linkId || isNaN(linkId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'ID collegamento mancante o non valido' 
       });
     }
     
     const result = await unlinkDocumentFromNotification({
       notificationId,
       companyId,
-      documentType: null, // Non necessario con linkId
       linkId
     });
     

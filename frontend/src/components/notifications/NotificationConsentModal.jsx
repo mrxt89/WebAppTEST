@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Bell, Volume2, X } from 'lucide-react';
-import notificationService from '../services/notifications/NotificationService';
+import notificationService from '@/services/notifications/NotificationService';
 
 const NotificationConsentModal = () => {
   const [showModal, setShowModal] = useState(false);

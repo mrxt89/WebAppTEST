@@ -85,7 +85,7 @@ const ChatTopBar = ({
   // Controlla se siamo su un dispositivo mobile
   useEffect(() => {
     const checkIsMobile = () => {
-      setIsMobile(window.innerWidth <= 1250);
+      setIsMobile(window.innerWidth <= 768);
     };
     
     checkIsMobile();
