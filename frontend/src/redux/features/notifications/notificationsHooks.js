@@ -820,12 +820,12 @@ const forceLoadNotifications = useCallback(() => {
     return dispatch(searchDocuments(searchQuery)).unwrap();
   }, [dispatch]);
   
-  const handleLinkDocument = useCallback((notificationId, documentId) => {
-    return dispatch(linkDocument({ notificationId, documentId })).unwrap();
+  const handleLinkDocument = useCallback((notificationId, documentId, documentType) => {
+    return dispatch(linkDocument({ notificationId, documentId, documentType })).unwrap();
   }, [dispatch]);
   
-  const handleUnlinkDocument = useCallback((notificationId, documentId) => {
-    return dispatch(unlinkDocument({ notificationId, documentId })).unwrap();
+  const handleUnlinkDocument = useCallback((notificationId, linkId) => {
+    return dispatch(unlinkDocument({ notificationId, linkId })).unwrap();
   }, [dispatch]);
   
   const handleSearchChatsByDocument = useCallback((searchType, searchValue) => {

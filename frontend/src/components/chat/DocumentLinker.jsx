@@ -38,10 +38,12 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
     
     setIsSearching(true);
     try {
-      const results = await searchDocuments(documentType, searchTerm);
-      setSearchResults(results || []);
+      const response = await searchDocuments({ documentType, searchTerm });
+      console.log('Risultati ricerca:', response);
+      setSearchResults(response.results || []);
     } catch (error) {
       console.error('Search error:', error);
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
@@ -49,39 +51,9 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
 
   // Collega un documento
   const handleLinkDocument = async (document) => {
-    // Crea i parametri corretti in base al tipo di documento
-    const params = { documentType };
-    
-    switch (documentType) {
-      case 'MO':
-        params.moId = document.DocumentId;
-        break;
-      case 'SaleOrd':
-        params.saleOrdId = document.DocumentId;
-        break;
-      case 'PurchaseOrd':
-        params.purchaseOrdId = document.DocumentId;
-        break;
-      case 'SaleDoc':
-        params.saleDocId = document.DocumentId;
-        break;
-      case 'PurchaseDoc':
-        params.purchaseDocId = document.DocumentId;
-        break;
-      case 'Item':
-        params.itemCode = document.DocumentId;
-        break;
-      case 'CustSupp':
-        params.custSuppCode = document.DocumentId;
-        params.custSuppType = document.Status === 'Fornitore' ? 3211264 : 3211265;
-        break;
-      case 'BillOfMaterials':
-        params.bom = document.DocumentId;
-        break;
-    }
-    
     try {
-      await linkDocument(notificationId, params);
+      console.log('Collega documento:', document);
+      await linkDocument(notificationId, document.DocumentId, document.DocumentType);
       onClose();
     } catch (error) {
       console.error('Error linking document:', error);
@@ -179,7 +151,7 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
                     <div className="divide-y divide-gray-200">
                       {searchResults.map((doc, index) => (
                         <div 
-                          key={`${doc.DocumentId}-${index}`}
+                          key={`${doc.DocumentId || doc.MOId}-${index}`}
                           className="p-3 flex items-center hover:bg-gray-50 transition-colors cursor-pointer"
                           onClick={() => handleLinkDocument(doc)}
                         >
@@ -188,7 +160,7 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-sm">{doc.DocumentNumber}</div>
-                            <div className="text-xs text-gray-500 truncate">{doc.DocumentReference}</div>
+                            <div className="text-xs text-gray-500 truncate">{doc.DocumentDescription || doc.DocumentReference}</div>
                             {doc.DocumentDate && (
                               <div className="text-xs text-gray-400">
                                 {new Date(doc.DocumentDate).toLocaleDateString()}
@@ -197,7 +169,7 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
                           </div>
                           <div className="ml-2">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                              {doc.Status}
+                              {doc.Status || doc.DocumentType}
                             </span>
                           </div>
                         </div>

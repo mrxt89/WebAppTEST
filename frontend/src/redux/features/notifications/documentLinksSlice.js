@@ -27,7 +27,7 @@ export const getLinkedDocuments = createAsyncThunk(
       if (response.data && response.data.success) {
         return {
           notificationId,
-          documents: response.data.documents || []
+          documents: response.data.data || []
         };
       } else {
         return rejectWithValue(response.data?.message || 'Failed to get linked documents');
@@ -42,10 +42,10 @@ export const getLinkedDocuments = createAsyncThunk(
 // Async thunk for searching documents
 export const searchDocuments = createAsyncThunk(
   'documentLinks/searchDocuments',
-  async (searchQuery, { rejectWithValue }) => {
+  async ({ documentType, searchTerm }, { rejectWithValue }) => {
     try {
-      if (!searchQuery) {
-        return rejectWithValue('Invalid search query');
+      if (!documentType || !searchTerm) {
+        return rejectWithValue('Tipo documento e termine di ricerca sono campi obbligatori');
       }
       
       const token = localStorage.getItem('token');
@@ -54,7 +54,7 @@ export const searchDocuments = createAsyncThunk(
       }
       
       const response = await axios.get(
-        `${config.API_BASE_URL}/documents/search?q=${encodeURIComponent(searchQuery)}`,
+        `${config.API_BASE_URL}/documents/search?documentType=${encodeURIComponent(documentType)}&searchTerm=${encodeURIComponent(searchTerm)}`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -62,8 +62,9 @@ export const searchDocuments = createAsyncThunk(
       
       if (response.data && response.data.success) {
         return {
-          searchQuery,
-          results: response.data.documents || []
+          documentType,
+          searchTerm,
+          results: response.data.data || []
         };
       } else {
         return rejectWithValue(response.data?.message || 'Failed to search documents');
@@ -78,9 +79,9 @@ export const searchDocuments = createAsyncThunk(
 // Async thunk for linking a document to a notification
 export const linkDocument = createAsyncThunk(
   'documentLinks/linkDocument',
-  async ({ notificationId, documentId }, { rejectWithValue, dispatch }) => {
+  async ({ notificationId, documentId, documentType }, { rejectWithValue, dispatch }) => {
     try {
-      if (!notificationId || !documentId) {
+      if (!notificationId || !documentId || !documentType) {
         return rejectWithValue('Missing required parameters');
       }
       
@@ -90,8 +91,19 @@ export const linkDocument = createAsyncThunk(
       }
       
       const response = await axios.post(
-        `${config.API_BASE_URL}/notifications/${notificationId}/documents/${documentId}`,
-        {},
+        `${config.API_BASE_URL}/notifications/${notificationId}/documents`,
+        {
+          documentType,
+          moId: documentType === 'MO' ? documentId : undefined,
+          saleOrdId: documentType === 'SaleOrd' ? documentId : undefined,
+          purchaseOrdId: documentType === 'PurchaseOrd' ? documentId : undefined,
+          saleDocId: documentType === 'SaleDoc' ? documentId : undefined,
+          purchaseDocId: documentType === 'PurchaseDoc' ? documentId : undefined,
+          itemCode: documentType === 'Item' ? documentId : undefined,
+          custSuppCode: documentType === 'CustSupp' ? documentId : undefined,
+          custSuppType: documentType === 'CustSupp' ? 3211264 : undefined,
+          bom: documentType === 'BillOfMaterials' ? documentId : undefined
+        },
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -130,9 +142,9 @@ export const linkDocument = createAsyncThunk(
 // Async thunk for unlinking a document from a notification
 export const unlinkDocument = createAsyncThunk(
   'documentLinks/unlinkDocument',
-  async ({ notificationId, documentId }, { rejectWithValue, dispatch }) => {
+  async ({ notificationId, linkId }, { rejectWithValue, dispatch }) => {
     try {
-      if (!notificationId || !documentId) {
+      if (!notificationId || !linkId) {
         return rejectWithValue('Missing required parameters');
       }
       
@@ -142,7 +154,7 @@ export const unlinkDocument = createAsyncThunk(
       }
       
       const response = await axios.delete(
-        `${config.API_BASE_URL}/notifications/${notificationId}/documents/${documentId}`,
+        `${config.API_BASE_URL}/notifications/${notificationId}/documents/${linkId}`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -156,7 +168,7 @@ export const unlinkDocument = createAsyncThunk(
         const event = new CustomEvent('document-unlinked', {
           detail: {
             notificationId,
-            documentId
+            linkId
           }
         });
         document.dispatchEvent(event);
@@ -164,14 +176,14 @@ export const unlinkDocument = createAsyncThunk(
         return {
           success: true,
           notificationId,
-          documentId
+          linkId
         };
       } else {
         return rejectWithValue(response.data?.message || 'Failed to unlink document');
       }
     } catch (error) {
       console.error('Error unlinking document:', error);
-      return rejectWithValue(error.message || 'Failed to unlink document');
+      return rejectWithValue(error.response?.data?.message || error.message || 'Failed to unlink document');
     }
   }
 );
@@ -302,8 +314,9 @@ const documentLinksSlice = createSlice({
       })
       .addCase(searchDocuments.fulfilled, (state, action) => {
         state.loading = false;
-        const { searchQuery, results } = action.payload;
-        state.searchResults[searchQuery] = results;
+        const { documentType, searchTerm, results } = action.payload;
+        const key = `${documentType}_${searchTerm}`;
+        state.searchResults[key] = results;
       })
       .addCase(searchDocuments.rejected, (state, action) => {
         state.loading = false;
@@ -376,8 +389,10 @@ export const {
 // Export selectors
 export const selectLinkedDocuments = (state, notificationId) => 
   state.documentLinks.linkedDocuments[notificationId] || [];
-export const selectDocumentSearchResults = (state, searchQuery) => 
-  state.documentLinks.searchResults[searchQuery] || [];
+export const selectDocumentSearchResults = (state, documentType, searchTerm) => {
+  const key = `${documentType}_${searchTerm}`;
+  return state.documentLinks.searchResults[key] || [];
+};
 export const selectChatsByDocument = (state, searchType, searchValue) => {
   const key = `${searchType}_${searchValue || 'all'}`;
   return state.documentLinks.chatsByDocument[key] || [];

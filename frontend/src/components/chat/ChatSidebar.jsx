@@ -51,8 +51,6 @@ const ChatSidebar = forwardRef((props, ref) => {
     // Funzioni per i documenti
     getLinkedDocuments,
     unlinkDocument,
-    documents,
-    documentsLoading,
     removeUserFromChat 
   } = useNotifications();
 
@@ -62,6 +60,7 @@ const ChatSidebar = forwardRef((props, ref) => {
   } = useAIActions();
   
   const [attachments, setAttachments] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   
   // Reference per gestire l'overflow e gli input
@@ -74,10 +73,8 @@ const ChatSidebar = forwardRef((props, ref) => {
   // Carica gli allegati all'inizio e quando cambia la tab o la notifica
   useEffect(() => {
     const handleAttachmentsUpdate = (event) => {
-      console.log('handleAttachmentsUpdate', event);
       if (activeTab === 'attachments' && notificationId) {
         setLoading(true);
-        console.log('getNotificationAttachments', notificationId);
         getNotificationAttachments(notificationId)
         .then(data => {
           console.log('data', data);
@@ -90,6 +87,20 @@ const ChatSidebar = forwardRef((props, ref) => {
         .catch(err => {
           console.error('Error loading attachments:', err);
           setAttachments([]);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+      }
+      if (activeTab === 'documents' && notificationId) {
+        setLoading(true);
+        getLinkedDocuments(notificationId)
+        .then(data => {
+          setDocuments(Array.isArray(data) ? data : []);
+        })
+        .catch(err => {
+          console.error('Error loading documents:', err);
+          setDocuments([]);
         })
         .finally(() => {
           setLoading(false);
@@ -109,41 +120,37 @@ const ChatSidebar = forwardRef((props, ref) => {
 
   // useEffect per caricare i documenti quando si apre la tab
   useEffect(() => {
-    let isMounted = true;
-    
-    // Solo quando la tab è attiva e c'è un notificationId
-    if (activeTab === 'documents' && notificationId) {
-      // Imposta lo stato loading
-      setLoading(true);
-      
-      // Chiamata API
-      getLinkedDocuments(notificationId)
-        .then(data => {
-          // Controlla che il componente sia ancora montato
-          if (isMounted) {
-            // Aggiorna lo stato solo se ci sono dati
-            if (data) {
-              // Niente setDocuments qui, usiamo lo stato dal context
+    // Funzione per aggiornare i documenti quando vengono modificati
+    const handleDocumentChange = () => {
+      if (activeTab === 'documents' && notificationId) {
+        setLoading(true);
+        getLinkedDocuments(notificationId)
+          .then(response => {
+            if (response && response.documents) {
+              setDocuments(response.documents);
+            } else {
+              setDocuments([]);
             }
-          }
-        })
-        .catch(error => {
-          if (isMounted) {
-            console.error('Error loading documents:', error);
-          }
-        })
-        .finally(() => {
-          if (isMounted) {
+          })
+          .catch(error => {
+            console.error('Error refreshing documents:', error);
+          })
+          .finally(() => {
             setLoading(false);
-          }
-        });
-    }
-    
-    // Cleanup function
-    return () => {
-      isMounted = false;
+          });
+      }
     };
-  }, [activeTab, notificationId, getLinkedDocuments]); // Dipendenze minimali
+  
+    // Aggiungi listener per gli eventi di collegamento/scollegamento
+    document.addEventListener('document-linked', handleDocumentChange);
+    document.addEventListener('document-unlinked', handleDocumentChange);
+    
+    // Rimuovi i listener quando il componente viene smontato
+    return () => {
+      document.removeEventListener('document-linked', handleDocumentChange);
+      document.removeEventListener('document-unlinked', handleDocumentChange);
+    };
+  }, [activeTab, notificationId, getLinkedDocuments]);
   
   
   // Carica i punti importanti quando si accede alla tab o cambia la notifica
@@ -415,14 +422,14 @@ const ChatSidebar = forwardRef((props, ref) => {
                 <h3 className="text-sm font-medium">Documenti collegati ({documents.length})</h3>
                 <button 
                   className="p-1 rounded-full transition-colors hover:bg-gray-100"
-                  onClick={() => setDocumentLinkerOpen(true)}  // Corretto
+                  onClick={() => setDocumentLinkerOpen(true)}
                   title="Collega un documento"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
               
-              {documentsLoading ? (
+              {loading ? (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                 </div>
@@ -470,17 +477,78 @@ const ChatSidebar = forwardRef((props, ref) => {
                       </div>
                       
                       <div className="flex text-xs border-t border-gray-50">
-                        
-                        <button 
-                          className="d-none flex-1 py-1.5 text-blue-600 hover:bg-blue-50 transition-colors rounded-bl-lg flex items-center justify-center"
-                          onClick={() => window.open(`/document-viewer/${doc.DocumentType}/${doc.DocumentId}`, '_blank')}
-                        >
-                          <ExternalLink className="h-3 w-3 mr-1" />
-                          Apri
-                        </button>
                         <button 
                           className="flex-1 py-1.5 text-red-600 hover:bg-red-50 transition-colors rounded-br-lg flex items-center justify-center"
-                          onClick={() => unlinkDocument(notificationId, doc.LinkId)}
+                          onClick={async () => {
+                            try {
+                              console.log('Documento da scollegare:', doc);
+                              console.log('NotificationId:', notificationId);
+                              
+                              if (!notificationId) {
+                                console.error('NotificationId mancante');
+                                swal.fire({
+                                  title: 'Errore',
+                                  text: 'ID notifica non valido',
+                                  icon: 'error'
+                                });
+                                return;
+                              }
+                              
+                              if (!doc || !doc.LinkId) {
+                                console.error('LinkId mancante nel documento:', doc);
+                                swal.fire({
+                                  title: 'Errore',
+                                  text: 'ID documento non valido',
+                                  icon: 'error'
+                                });
+                                return;
+                              }
+                              
+                              const params = {
+                                notificationId: parseInt(notificationId),
+                                linkId: parseInt(doc.LinkId)
+                              };
+                              
+                              console.log('Tentativo di scollegamento con parametri:', params);
+                              
+                              try {
+                                const result = await unlinkDocument(params.notificationId, params.linkId);
+                                console.log('Risultato scollegamento:', result);
+                                
+                                // Dopo lo scollegamento di un documento, si aggiorna la lista dei documenti
+                                if (result) {
+                                  // Aggiorna la lista dei documenti
+                                  const updatedDocs = await getLinkedDocuments(notificationId);
+                                  // Aggiorna lo stato locale con i documenti aggiornati
+                                  if (updatedDocs && updatedDocs.documents) {
+                                    setDocuments(updatedDocs.documents);
+                                  }
+                                  
+                                  swal.fire({
+                                    title: 'Successo',
+                                    text: 'Documento scollegato con successo',
+                                    icon: 'success',
+                                    timer: 2000,
+                                    showConfirmButton: false
+                                  });
+                                }
+                              } catch (error) {
+                                console.error('Errore durante lo scollegamento:', error);
+                                swal.fire({
+                                  title: 'Errore',
+                                  text: error.message || 'Impossibile scollegare il documento',
+                                  icon: 'error'
+                                });
+                              }
+                            } catch (error) {
+                              console.error('Errore durante lo scollegamento:', error);
+                              swal.fire({
+                                title: 'Errore',
+                                text: error.message || 'Impossibile scollegare il documento',
+                                icon: 'error'
+                              });
+                            }
+                          }}
                         >
                           <Unlink className="h-3 w-3 mr-1" />
                           Scollega

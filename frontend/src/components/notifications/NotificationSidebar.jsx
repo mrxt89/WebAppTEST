@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
-import { Switch } from './ui/switch';
-import { swal } from '../lib/common';
+import { swal } from '@/lib/common';
 import { 
   Plus, 
   Filter, 
@@ -34,12 +33,12 @@ import {
   Calendar,
   ExternalLink
 } from 'lucide-react';
-import { useWikiContext } from './wiki/WikiContext';
+import { useWikiContext } from '../wiki/WikiContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import './ui/ui.css';
-import DoNotDisturbToggle from './chat/DoNotDisturbToggle';
+import '@/components/ui/ui.css';
+import DoNotDisturbToggle from '../chat/DoNotDisturbToggle';
 import axios from 'axios';
-import { config } from '../config';
+import { config } from '@/config';
 
 const NotificationSidebar = ({
   closeSidebar,
