@@ -192,7 +192,7 @@ const ChatLayout = ({
         </div>
         
         {/* Aggiungiamo ChatBottomBar qui, passando tutte le props necessarie */}
-        <div style={{ height: hasLeftChat ? 'auto' : '130px' }}>
+        <div style={{ height: 'auto' }}>
           {hasLeftChat ? (
             <div className="p-4 bg-gray-50 border-t border-gray-200 text-center text-gray-500">
               <p>Hai abbandonato questa chat il {new Date().toLocaleDateString()} e non puoi più inviare messaggi.</p>
