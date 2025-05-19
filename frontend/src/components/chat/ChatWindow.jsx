@@ -103,10 +103,15 @@ const ChatWindow = ({
   const initialY = Math.max(0, Math.floor(20)); // Posizione più in alto, appena sotto l'header
   
   // Local state for window position and size tracking during drag/resize
-  const [position, setPosition] = useState(() => ({
-    x: Number(initialX) || 0,
-    y: Number(initialY) || 0
-  }));
+  const [position, setPosition] = useState(() => {
+    // Assicuriamoci che i valori iniziali siano sempre numeri validi
+    const x = Number(initialX);
+    const y = Number(initialY);
+    return {
+      x: isNaN(x) ? 0 : x,
+      y: isNaN(y) ? 0 : y
+    };
+  });
   const [size, setSize] = useState({ width: 900, height: 700 });
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -643,8 +648,8 @@ const ChatWindow = ({
     if (isNaN(startWindowX) || isNaN(startWindowY)) {
       const computedStyle = window.getComputedStyle(nodeRef.current);
       // Usiamo parseFloat per estrarre il valore numerico e rimuovere 'px'
-      startWindowX = parseFloat(computedStyle.left);
-      startWindowY = parseFloat(computedStyle.top);
+      startWindowX = parseFloat(computedStyle.left) || 0;
+      startWindowY = parseFloat(computedStyle.top) || 0;
       
       // Aggiorna lo stato con i valori corretti
       setPosition({
@@ -1091,9 +1096,12 @@ const ChatWindow = ({
       
       if (windowState) {
         // Initialize position and size from window manager
+        const x = windowState.x !== undefined ? Number(windowState.x) : initialX;
+        const y = windowState.y !== undefined ? Number(windowState.y) : initialY;
+        
         setPosition({ 
-          x: windowState.x !== undefined ? windowState.x : initialX, 
-          y: windowState.y !== undefined ? windowState.y : initialY
+          x: isNaN(x) ? 0 : x,
+          y: isNaN(y) ? 0 : y
         });
         
         setSize({ 
@@ -1722,8 +1730,8 @@ useEffect(() => {
       className="chat-window"
       style={{
         position: 'absolute',
-        top: position.y,
-        left: position.x,
+        top: isNaN(position.y) ? 0 : position.y,
+        left: isNaN(position.x) ? 0 : position.x,
         width: size.width,
         height: size.height,
         zIndex: zIndex,

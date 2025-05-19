@@ -43,7 +43,6 @@ export const AuthProvider = ({ children }) => {
       axiosInstance.get('/currentUser')
         .then(response => {
           const userData = response.data.user;
-          console.log('Current user:', userData);
           setUser(userData);
           setLoading(false);
           setSessionTimeout(userData.sessionDurationMinutes);

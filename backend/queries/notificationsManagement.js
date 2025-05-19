@@ -267,11 +267,9 @@ async function sendNotification(data) {
     if (receiversList) request.input('receiversList', sql.VarChar, receiversList);
     if (pollId) request.input('pollId', sql.Int, pollId); // Nuovo parametro per messaggi con sondaggio
     
-    console.log('Executing SendNotification procedure with message:', cleanMessage.substring(0, 50) + '...');
     let result = await request.execute('SendNotification');
 
     const record = result.recordset[0];
-    console.log('SendNotification result received');
     
     // Gestione sicura del parsing dei messaggi
     let parsedMessages;

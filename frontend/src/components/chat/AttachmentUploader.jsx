@@ -43,7 +43,6 @@ const AttachmentUploader = ({ notificationId, onAttachmentUploaded }) => {
 
     try {
       setUploading(true);
-      console.log('Selected file:', file);
       const result = await uploadFile(file);
       
       // Reset esplicito
@@ -63,7 +62,6 @@ const AttachmentUploader = ({ notificationId, onAttachmentUploaded }) => {
 const uploadFile = async (file) => {
   try {
     setUploading(true);
-    console.log('Uploading file:', file);
     // Verifica prima come la funzione si aspetta i parametri
     // Probabilmente dovrebbe essere così:
     const result = await uploadNotificationAttachment({

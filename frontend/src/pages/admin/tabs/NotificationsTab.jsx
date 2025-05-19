@@ -39,13 +39,9 @@ const NotificationsTab = ({
   };
 
   const handleUserCheckbox = (userId) => {
-    console.log("Checkbox clicked for userId:", userId);
-    console.log("Current selectedUsers:", selectedUsers);
-    
     // Toggle selection: if included, remove it; if not included, add it
     setSelectedUsers(prevSelected => {
       const isAlreadySelected = prevSelected.includes(userId);
-      console.log("Is already selected:", isAlreadySelected);
       
       if (isAlreadySelected) {
         return prevSelected.filter(id => id !== userId);
@@ -316,7 +312,6 @@ const NotificationsTab = ({
                           checked={selectedUsers.includes(userId)}
                           className={`${selectedUsers.includes(userId) ? 'bg-primary' : ''}`}
                           onCheckedChange={() => {
-                            console.log("Checkbox clicked for channel user:", userId);
                             handleUserCheckbox(userId);
                           }}
                         />
@@ -362,7 +357,6 @@ const NotificationsTab = ({
                         checked={selectedUsers.includes(user.userId)}
                         className={`${selectedUsers.includes(user.userId) ? 'bg-primary' : ''}`}
                         onCheckedChange={() => {
-                          console.log("Checkbox clicked for available channel user:", user.userId);
                           handleUserCheckbox(user.userId);
                         }}
                       />

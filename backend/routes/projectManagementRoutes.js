@@ -302,15 +302,7 @@ router.patch('/projects/tasks/:taskId/sequence', authenticateToken, async (req, 
     try {
         const taskId = parseInt(req.params.taskId);
         const { projectId, newSequence } = req.body;
-        
-        // Log dettagliato per debug
-        console.log('Route updateTaskSequence: Parametri ricevuti:', {
-            taskId,
-            projectId,
-            newSequence,
-            userId: req.user.UserId
-        });
-        
+
         if (!taskId || !projectId || newSequence === undefined) {
             return res.status(400).json({ 
                 success: 0,
@@ -320,13 +312,6 @@ router.patch('/projects/tasks/:taskId/sequence', authenticateToken, async (req, 
         
         // Chiamata alla funzione di query
         const result = await updateTaskSequence(taskId, projectId, newSequence);
-        
-        // Log della risposta
-        console.log('Route updateTaskSequence: Risposta dalla query:', {
-            success: result ? 1 : 0,
-            taskId,
-            projectId
-        });
         
         // Risposta completa che include anche i task aggiornati
         res.json({

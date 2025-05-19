@@ -22,8 +22,6 @@ const useItemAttachmentsActions = () => {
         // Usa swal per mostrare successo
         if (swal && swal.fire) {
             swal.fire('Successo', message, 'success');
-        } else {
-            console.log('Successo:', message);
         }
     };
 
@@ -127,8 +125,6 @@ const useItemAttachmentsActions = () => {
             if (metadata.categoryIds) formData.append('categoryIds', metadata.categoryIds);
             if (metadata.tags) formData.append('tags', metadata.tags);
 
-            console.log("Sending form data:", Object.fromEntries(formData.entries()));
-
             const data = await makeRequest(`${config.API_BASE_URL}/item-attachments/item-code/${itemCode}/upload`, {
                 method: 'POST',
                 body: formData
@@ -171,8 +167,6 @@ const useItemAttachmentsActions = () => {
             if (metadata.categoryIds) formData.append('categoryIds', metadata.categoryIds);
             if (metadata.tags) formData.append('tags', metadata.tags);
 
-            console.log("Sending form data:", Object.fromEntries(formData.entries()));
-            
             const data = await makeRequest(`${config.API_BASE_URL}/item-attachments/project-item/${projectItemId}/upload`, {
                 method: 'POST',
                 body: formData
@@ -616,8 +610,6 @@ const useItemAttachmentsActions = () => {
     const updateAttachment = useCallback(async (attachmentId, metadata) => {
         try {
             setLoading(true);
-            
-            console.log('Updating attachment:', attachmentId, 'with metadata:', metadata);
             
             const data = await makeRequest(`${config.API_BASE_URL}/item-attachments/${attachmentId}`, {
                 method: 'PUT',

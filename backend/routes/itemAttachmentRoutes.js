@@ -242,9 +242,6 @@ router.post('/item-attachments/item-code/:itemCode/upload', authenticateToken, u
 
 // Carica un nuovo allegato per articolo progetto
 router.post('/item-attachments/project-item/:projectItemId/upload', authenticateToken, (req, res, next) => {
-    // Debug dei dati in arrivo prima che multer li gestisca
-    console.log("Headers:", req.headers);
-    console.log("Content-Type:", req.headers['content-type']);
     next();
 }, upload.single('file'), async (req, res) => {
     try {
@@ -252,9 +249,6 @@ router.post('/item-attachments/project-item/:projectItemId/upload', authenticate
         const companyId = req.user.CompanyId;
         const userId = req.user.UserId;
         
-        console.log("Request body:", req.body);
-        console.log("File:", req.file);
-
         // Controllo di sicurezza
         const isPublic = req.body && req.body.isPublic === 'true' ? true : false;
         const description = req.body ? req.body.description : null;
@@ -588,9 +582,6 @@ router.put('/item-attachments/:attachmentId', authenticateToken, async (req, res
         const attachmentId = parseInt(req.params.attachmentId);
         const userId = req.user.UserId;
         const companyId = req.user.CompanyId;
-        
-        // Aggiungi un log per debug
-        console.log('Request body:', req.body);
         
         // Controllo di sicurezza sul body
         if (!req.body) {

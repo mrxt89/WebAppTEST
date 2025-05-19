@@ -69,11 +69,6 @@ router.post('/notifications/:notificationId/documents', authenticateToken, async
         message: 'ID notifica e tipo documento sono campi obbligatori' 
       });
     }
-    
-    console.log('Parametri elaborati:', {
-      documentType, bom, projectId, taskId, moId, saleOrdId, serialNo,
-      purchaseOrdId, saleDocId, purchaseDocId, itemCode, custSuppType, custSuppCode
-    });
 
     // Verifica che almeno un identificatore di documento sia specificato
     const hasDocumentId = bom || moId || saleOrdId || purchaseOrdId || 
@@ -115,8 +110,6 @@ router.delete('/notifications/:notificationId/documents/:linkId', authenticateTo
     const notificationId = parseInt(req.params.notificationId);
     const linkId = parseInt(req.params.linkId);
     const companyId = req.user.CompanyId;
-    
-    console.log('Parametri ricevuti:', { notificationId, linkId, companyId });
     
     if (!notificationId || isNaN(notificationId)) {
       return res.status(400).json({ 

@@ -39,7 +39,6 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
     setIsSearching(true);
     try {
       const response = await searchDocuments({ documentType, searchTerm });
-      console.log('Risultati ricerca:', response);
       setSearchResults(response.results || []);
     } catch (error) {
       console.error('Search error:', error);
@@ -52,7 +51,6 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
   // Collega un documento
   const handleLinkDocument = async (document) => {
     try {
-      console.log('Collega documento:', document);
       await linkDocument(notificationId, document.DocumentId, document.DocumentType);
       onClose();
     } catch (error) {

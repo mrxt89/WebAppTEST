@@ -77,7 +77,6 @@ const ChatSidebar = forwardRef((props, ref) => {
         setLoading(true);
         getNotificationAttachments(notificationId)
         .then(data => {
-          console.log('data', data);
           if (Array.isArray(data)) {
             setAttachments(data);
           } else {
@@ -213,7 +212,6 @@ const ChatSidebar = forwardRef((props, ref) => {
         // Aggiorna gli allegati
         getNotificationAttachments(notificationId)
         .then(data => {
-          console.log('data', data);
           if (Array.isArray(data)) {
             setAttachments(data);
           } else {
@@ -481,9 +479,6 @@ const ChatSidebar = forwardRef((props, ref) => {
                           className="flex-1 py-1.5 text-red-600 hover:bg-red-50 transition-colors rounded-br-lg flex items-center justify-center"
                           onClick={async () => {
                             try {
-                              console.log('Documento da scollegare:', doc);
-                              console.log('NotificationId:', notificationId);
-                              
                               if (!notificationId) {
                                 console.error('NotificationId mancante');
                                 swal.fire({
@@ -509,11 +504,8 @@ const ChatSidebar = forwardRef((props, ref) => {
                                 linkId: parseInt(doc.LinkId)
                               };
                               
-                              console.log('Tentativo di scollegamento con parametri:', params);
-                              
                               try {
                                 const result = await unlinkDocument(params.notificationId, params.linkId);
-                                console.log('Risultato scollegamento:', result);
                                 
                                 // Dopo lo scollegamento di un documento, si aggiorna la lista dei documenti
                                 if (result) {

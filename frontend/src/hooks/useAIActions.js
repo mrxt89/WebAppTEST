@@ -68,7 +68,6 @@ const useAIActions = () => {
           }
         }
       );
-      console.log('generateConversationSummary response:', response.data);
       
       if (!response.data.success) {
         throw new Error(response.data.error || 'Errore nella generazione del riepilogo');

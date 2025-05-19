@@ -98,8 +98,6 @@ const useDocumentLinks = () => {
        ...documentParams
      };
      
-     console.log('Sending document link request with data:', requestData);
-     
      const response = await axios.post(
        `${config.API_BASE_URL}/notifications/${notificationId}/documents`,
        requestData,

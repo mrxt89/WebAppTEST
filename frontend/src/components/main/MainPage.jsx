@@ -269,7 +269,6 @@ const MainPage = () => {
   // Gestisci l'evento di nuovo messaggio
   useEffect(() => {
     const handleNewMessage = (event) => {
-      console.log('handleNewMessage', event); 
       const { notificationId, newMessageCount } = event.detail || {};
       
       if (notificationId && newMessageCount) {

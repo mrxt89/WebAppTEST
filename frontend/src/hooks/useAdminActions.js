@@ -138,7 +138,6 @@ const useAdminActions = () => {
           groups: groupsArray
         };
       });
-      console.log('usersData:', usersData);
       setUsers(usersData);
       setLoading(false);
     } catch (error) {
@@ -405,7 +404,6 @@ const useAdminActions = () => {
   const addNotificationChannel = async (channelData) => {
     try {
       const token = localStorage.getItem('token');
-      console.log('channelData:', channelData);
       const response = await axios.post(`${config.API_BASE_URL}/notifications-channels`, channelData, {
         headers: { Authorization: `Bearer ${token}` },
       });

@@ -35,12 +35,8 @@ const PagesTab = ({
   };
 
   const handleGroupCheckbox = (groupId) => {
-    console.log("Checkbox clicked for groupId:", groupId);
-    console.log("Current selectedGroups:", selectedGroups);
-    
     setSelectedGroups(prevSelected => {
       const isAlreadySelected = prevSelected.includes(groupId);
-      console.log("Is already selected:", isAlreadySelected);
       
       if (isAlreadySelected) {
         return prevSelected.filter(id => id !== groupId);
@@ -114,7 +110,6 @@ const PagesTab = ({
     setPageDisabled(newDisabledState);
     
     // Chiamata all'API con il nuovo stato disabled
-    console.log("Chiamata API enableDisablePage con:", selectedPage.pageId, newDisabledState);
     enableDisablePage(selectedPage.pageId, newDisabledState)
       .then(() => {
         // Messaggio di successo con informazioni su cosa è stato modificato
@@ -159,7 +154,6 @@ const PagesTab = ({
       
       // Call the API with the correct parameter (1 = inherit, 0 = don't inherit)
       const inheritValue = checked ? 1 : 0;
-      console.log("Calling API toggleInheritPermissions with:", selectedPage.pageId, inheritValue);
       
       toggleInheritPermissions(selectedPage.pageId, inheritValue)
         .then(() => {
@@ -321,7 +315,6 @@ const PagesTab = ({
                 checked={applyToChildren}
                 className={`${applyToChildren ? 'bg-primary' : ''}`}
                 onCheckedChange={(checked) => {
-                  console.log("Apply to children checked:", checked);
                   setApplyToChildren(Boolean(checked));
                 }}
               />
@@ -356,7 +349,6 @@ const PagesTab = ({
                         checked={selectedGroups.includes(group.groupId)}
                         className={`${selectedGroups.includes(group.groupId) ? 'bg-primary' : ''}`}
                         onCheckedChange={() => {
-                          console.log("Checkbox clicked for page group:", group.groupId);
                           handleGroupCheckbox(group.groupId);
                         }}
                       />
@@ -395,7 +387,6 @@ const PagesTab = ({
                         checked={selectedGroups.includes(group.groupId)}
                         className={`${selectedGroups.includes(group.groupId) ? 'bg-primary' : ''}`}
                         onCheckedChange={() => {
-                          console.log("Checkbox clicked for available group:", group.groupId);
                           handleGroupCheckbox(group.groupId);
                         }}
                       />

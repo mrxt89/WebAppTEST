@@ -176,8 +176,6 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
       const selectedTask = weekData.dailyEntries.find(entry => entry.TaskID === taskId) ||
                          weekData.weeklyTotals.find(task => task.TaskID === taskId);
       
-      console.log("Selected task:", selectedTask);
-      
       if (selectedTask) {
         preselectedTaskId = selectedTask.TaskID.toString();
       }

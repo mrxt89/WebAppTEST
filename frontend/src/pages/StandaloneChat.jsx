@@ -89,7 +89,6 @@ const StandaloneChat = () => {
     if (notificationId && notifications.length > 0) {
       const foundNotification = notifications.find(n => n.notificationId === notificationId);
       if (foundNotification && !loaded) {
-        console.log("Notifica trovata nello store:", foundNotification);
         setNotification(foundNotification);
         setLoaded(true);
         document.title = `Chat: ${foundNotification.title || 'Conversazione'}`;
@@ -111,8 +110,6 @@ const StandaloneChat = () => {
     try {
       const { token, apiBaseUrl } = getApiConfig();
       
-      console.log("Caricamento utenti...");
-      
       const response = await axios.get(`${apiBaseUrl}/users`, {
         headers: { 
           Authorization: `Bearer ${token}`,
@@ -122,7 +119,6 @@ const StandaloneChat = () => {
       });
       
       if (response.data) {
-        console.log(`Caricati ${response.data.length} utenti`);
         setUsers(response.data);
         return response.data;
       }
@@ -150,8 +146,6 @@ const StandaloneChat = () => {
     try {
       const { token, apiBaseUrl } = getApiConfig();
       
-      console.log("Caricamento opzioni di risposta...");
-      
       const response = await axios.get(`${apiBaseUrl}/response-options`, {
         headers: { 
           Authorization: `Bearer ${token}`,
@@ -161,7 +155,6 @@ const StandaloneChat = () => {
       });
       
       if (response.data) {
-        console.log("Opzioni di risposta caricate con successo");
         setResponseOptions(response.data);
         return response.data;
       }
@@ -203,7 +196,6 @@ const StandaloneChat = () => {
     initializationAttempted.current = true;
     
     try {
-      console.log(`Inizializzazione della chat standalone per ID: ${notificationId}`);
       document.title = "Caricamento chat...";
       
       // Verify token
@@ -217,28 +209,22 @@ const StandaloneChat = () => {
       }
       
       // Initialize redux worker with forceInit flag
-      console.log("Inizializzazione worker con forceInit");
       initializeWorker(true);
       
       // Ensure DB view is created
-      console.log("Creazione vista DB");
       await DBNotificationsView();
       
       // Aspetta che il worker sia pronto
-      console.log("Attesa worker...");
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Carica la notifica con priorità alta
-      console.log("Chiamata fetchNotificationById...");
       await fetchNotificationById(notificationId, true);
       
       // Aspetta che lo store sia aggiornato
-      console.log("Attesa aggiornamento store...");
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Register this chat as open in redux store
       if (!chatRegisteredRef.current) {
-        console.log("Registrazione della chat come standalone");
         registerStandaloneChat(notificationId);
         registerOpenChat(notificationId);
         chatRegisteredRef.current = true;
@@ -246,8 +232,6 @@ const StandaloneChat = () => {
         // Mark the notification as read
         await toggleReadUnread(notificationId, true);
       }
-      
-      console.log("Inizializzazione completata con successo");
       
     } catch (error) {
       console.error("Errore inizializzazione:", error);
@@ -297,8 +281,6 @@ const StandaloneChat = () => {
       
       // Only update if it matches our notification
       if (updatedId && updatedId === notificationId && loaded) {
-        console.log(`Aggiornamento ricevuto per notifica ${updatedId}`);
-        
         fetchNotificationById(notificationId)
           .then(updatedNotification => {
             if (updatedNotification) {

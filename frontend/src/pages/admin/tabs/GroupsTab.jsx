@@ -18,13 +18,9 @@ const GroupsTab = ({ groups, users, updateGroup, assignUserToGroup, removeUserFr
       };
 
       const handleUserCheckbox = (userId) => {
-        console.log("Checkbox clicked for userId:", userId);
-        console.log("Current selectedUsers:", selectedUsers);
-        
         // Toggle selection with setState callback to ensure we're working with the latest state
         setSelectedUsers(prevSelected => {
           const isAlreadySelected = prevSelected.includes(userId);
-          console.log("Is already selected:", isAlreadySelected);
           
           if (isAlreadySelected) {
             return prevSelected.filter(id => id !== userId);

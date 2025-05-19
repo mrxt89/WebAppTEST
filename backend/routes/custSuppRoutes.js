@@ -55,7 +55,6 @@ router.get('/custSupp/:id', authenticateToken, async (req, res) => {
 router.put('/custSupp/:CustSupp', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.UserId;
-    console.log('userId:', userId);
     
     // Convert IsCustomer/IsSupplier to CustSuppType if needed
     const updatedData = { ...req.body };
@@ -246,10 +245,6 @@ router.post('/custSupp/import', authenticateToken, async (req, res) => {
           `Riga ${item.index} (CustSupp: ${item.custsuppId}): ${item.errors.join(', ')}`
         )
       });
-    }
-
-    if (errorDetails.length > 0) {
-      console.log('Warning: alcuni record non sono validi:', errorDetails);
     }
 
     const userId = req.user.UserId;

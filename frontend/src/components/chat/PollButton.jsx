@@ -20,12 +20,10 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
   
   // Usa useCallback per memorizzare le funzioni tra i render
   const handleShowPollModal = useCallback(() => {
-    console.log("Event 'show-poll-modal' received - Opening poll creation modal");
     setIsCreateModalOpen(true);
   }, []);
   
   const handleShowPollsList = useCallback(() => {
-    console.log("Event 'show-polls-list' received - Opening polls list");
     setIsListModalOpen(true);
   }, []);
   
@@ -34,20 +32,16 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
     // Aggiungi gli event listener
     document.addEventListener('show-poll-modal', handleShowPollModal);
     document.addEventListener('show-polls-list', handleShowPollsList);
-    
-    console.log("PollButton: Event listeners registered for 'show-poll-modal' and 'show-polls-list'");
-    
+
     // Cleanup: rimuovi gli event listener quando il componente viene smontato
     return () => {
       document.removeEventListener('show-poll-modal', handleShowPollModal);
       document.removeEventListener('show-polls-list', handleShowPollsList);
-      console.log("PollButton: Event listeners removed");
     };
   }, [handleShowPollModal, handleShowPollsList]);
   
   // Aggiungi un handler diretto per il click sul pulsante
   const handlePollButtonClick = () => {
-    console.log("Poll button clicked directly");
     setIsCreateModalOpen(true);
   };
   
@@ -78,8 +72,6 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
     setIsCreateModalOpen(false);
     
     try {
-      console.log('Creating poll with data:', pollData);
-      
       // FASE 1: Prima invio un messaggio nella chat per indicare che sto creando un sondaggio
       const messageData = {
         notificationId: notificationId,
@@ -131,7 +123,6 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
       
       return true;
     } catch (error) {
-      console.error('Error in poll creation flow:', error);
       swal.fire('Errore', 'Si è verificato un errore durante la creazione del sondaggio: ' + error.message, 'error');
       return false;
     }
