@@ -73,6 +73,7 @@ function haveNotificationsChanged(newNotifications) {
 
     // Se la data dell'ultimo messaggio è più recente di quella in cache, allora ho un nuovo messaggio
     if (newLastMessageDate > cachedLastMessageDate) {
+      console.log('Nuova notifica con un messaggio più recente');
       hasChanges = true;
     }
 
@@ -275,7 +276,7 @@ async function fetchNotifications(notificationIdToFetch = null) {
         // Invia un solo evento con tutte le informazioni sui nuovi messaggi
         if (newMessagesInfo.length > 0) {
           self.postMessage({
-            type: 'batch_new_messages',
+            type: 'new_message',
             newMessagesInfo,
             timestamp: Date.now()
           });

@@ -1497,7 +1497,7 @@ useEffect(() => {
 
             return (
               <div
-                key={`notification-${notification.notificationId}-${lastMessage ? lastMessage.messageId : ''}`}
+                key={`notification-${notification.notificationId}-${lastMessage ? lastMessage.messageId : Date.now()}`}
                 className={`notification-item ${notification.isReadByUser ? 'read' : 'unread'} ${notification.isClosed ? 'isClosed' : ''} ${hasLeftChat ? 'chat-left' : ''} ${isArchived ? 'archived' : ''}
                           ${animatingItemId === notification.notificationId && animationPhase === 'exit' ? 'pin-exit-active' : ''}
                           ${animatingItemId === notification.notificationId && animationPhase === 'enter' ? 'pin-enter-active' : ''}`}
