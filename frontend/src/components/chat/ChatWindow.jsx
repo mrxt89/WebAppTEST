@@ -117,7 +117,7 @@ const ChatWindow = ({
     const y = Number(initialY);
     return {
       x: isNaN(x) ? 0 : x,
-      y: isNaN(y) ? 0 : y,
+      y: isNaN(y) ? 0 : y
     };
   });
   const [size, setSize] = useState({ width: 900, height: 700 });
@@ -744,8 +744,8 @@ const ChatWindow = ({
       if (isNaN(startWindowX) || isNaN(startWindowY)) {
         const computedStyle = window.getComputedStyle(nodeRef.current);
         // Usiamo parseFloat per estrarre il valore numerico e rimuovere 'px'
-        startWindowX = parseFloat(computedStyle.left) || 0;
-        startWindowY = parseFloat(computedStyle.top) || 0;
+        startWindowX = parseFloat(computedStyle.left);
+        startWindowY = parseFloat(computedStyle.top);
 
         // Aggiorna lo stato con i valori corretti
         setPosition({
@@ -1265,14 +1265,9 @@ const ChatWindow = ({
 
       if (windowState) {
         // Initialize position and size from window manager
-        const x =
-          windowState.x !== undefined ? Number(windowState.x) : initialX;
-        const y =
-          windowState.y !== undefined ? Number(windowState.y) : initialY;
-
-        setPosition({
-          x: isNaN(x) ? 0 : x,
-          y: isNaN(y) ? 0 : y,
+        setPosition({ 
+          x: windowState.x !== undefined ? windowState.x : initialX, 
+          y: windowState.y !== undefined ? windowState.y : initialY
         });
 
         setSize({
@@ -1945,8 +1940,8 @@ const ChatWindow = ({
       className="chat-window"
       style={{
         position: "absolute",
-        top: isNaN(position.y) ? 0 : position.y,
-        left: isNaN(position.x) ? 0 : position.x,
+        top: position.y,
+        left: position.x,
         width: size.width,
         height: size.height,
         zIndex: zIndex,
