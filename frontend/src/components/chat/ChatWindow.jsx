@@ -17,7 +17,6 @@ const useMemoizedUsers = (initialUsers = []) => {
   const [users, setUsers] = useState(initialUsers);
   const lastValidUsersRef = useRef(initialUsers);
   const usersLoadedRef = useRef(false);
-  const [attachmentsLoaded, setAttachmentsLoaded] = useState(false);
   const lastUsersFetchTimeRef = useRef(0);
   const MIN_FETCH_INTERVAL = 30000; // 30 secondi
 
