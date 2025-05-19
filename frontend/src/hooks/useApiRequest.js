@@ -64,7 +64,7 @@ const useApiRequest = () => {
       controllersMap.current.delete(requestKey);
       
       if (error.name === 'AbortError') {
-        console.log(`Request was aborted: ${requestKey}`);
+        console.error(`Request was aborted: ${requestKey}`);
         return null;
       }
       throw error;

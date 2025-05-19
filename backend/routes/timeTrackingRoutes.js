@@ -37,29 +37,19 @@ const checkUserViewPermission = (req, res, next) => {
   const targetUserId = parseInt(req.params.userId);
   const currentUserId = req.user.UserId;
   
-  console.log('Verifica permessi visualizzazione:', {
-    targetUserId,
-    currentUserId,
-    isAdmin: req.isAdmin,
-    userRole: req.user.role
-  });
-  
   // Se l'utente sta cercando di vedere i propri dati, procedi
   if (targetUserId === currentUserId) {
-    console.log('Utente sta visualizzando i propri dati, permesso accordato');
     next();
     return;
   }
   
   // Se l'utente è admin basato sul controllo precedente, procedi
   if (req.isAdmin === true) {
-    console.log('Utente è admin, permesso accordato');
     next();
     return;
   }
   
   // Se siamo qui, l'utente non ha i permessi necessari
-  console.log('Permesso negato: utente non può visualizzare dati di altri utenti');
   return res.status(403).json({ 
     success: 0, 
     msg: 'Non hai i permessi per visualizzare i dati di questo utente'

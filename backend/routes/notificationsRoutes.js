@@ -1002,8 +1002,6 @@ router.get('/messages/:messageId/reactions', authenticateToken, async (req, res)
       });
     }
     
-    console.log(`Recupero reazioni per il messaggio: ${messageId}`);
-    
     // Chiama la funzione dal file delle query
     const reactions = await getMessageReactions(parseInt(messageId));
     
@@ -1043,8 +1041,6 @@ router.post('/messages/:messageId/reactions', authenticateToken, async (req, res
         message: 'Tipo reazione è obbligatorio e deve essere una stringa' 
       });
     }
-    
-    console.log(`Utente ${userId} sta aggiungendo/rimuovendo reazione ${reactionType} al messaggio ${messageId}`);
     
     // Chiama la funzione dal file delle query
     const result = await addMessageReaction(parseInt(messageId), userId, reactionType);
@@ -1189,8 +1185,6 @@ router.delete('/messages/:messageId', authenticateToken, async (req, res) => {
         message: 'ID messaggio non valido' 
       });
     }
-    
-    console.log(`Utente ${userId} sta tentando di eliminare il messaggio ${messageId}`);
     
     // Chiama la funzione dal file delle query
     const result = await deleteMessage(parseInt(messageId), userId);

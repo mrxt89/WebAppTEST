@@ -10,7 +10,6 @@ const useCategoryActions = () => {
     const fetchCategories = useCallback(async () => {
         try {
             setLoading(true);
-            console.log('Fetching categories...');
             const token = localStorage.getItem('token');
             const response = await fetch(`${config.API_BASE_URL}/projectsCategories/categories`, {
                 headers: {
@@ -24,7 +23,6 @@ const useCategoryActions = () => {
             }
 
             const data = await response.json();
-            console.log('Categories:', data);
             setCategories(data);
             return data;
         } catch (error) {

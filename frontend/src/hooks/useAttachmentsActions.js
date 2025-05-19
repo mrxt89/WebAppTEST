@@ -61,7 +61,6 @@ const useAttachmentsActions = () => {
     // Upload per progetto/task o per itemCode, con l'utente che passa un parametro che indica il tipo
     const uploadAttachment = async (file, options = {}) => {
         const { projectId, taskId, itemCode } = options;
-        console.log('uploadAttachment options:', options);
         if (!file) {
             throw new Error('No file provided');
         }
@@ -76,13 +75,6 @@ const useAttachmentsActions = () => {
             const formData = new FormData();
             formData.append('file', file);
             
-            console.log('Uploading attachment with params:', {
-                projectId,
-                taskId,
-                hasFile: !!file,
-                itemCode
-            });
-            
             // Costruisci l'URL in base al tipo di allegato
             let url;
             if (itemCode) {
@@ -90,8 +82,6 @@ const useAttachmentsActions = () => {
             } else {
                 url = `${config.API_BASE_URL}/attachments/${projectId}${taskId ? `/${taskId}` : ''}`;
             }
-            
-            console.log('Upload URL:', url);
             
             const response = await axios.post(
                 url,

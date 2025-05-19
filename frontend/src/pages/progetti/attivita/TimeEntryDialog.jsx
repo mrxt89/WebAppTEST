@@ -124,7 +124,6 @@ const TimeEntryDialog = ({
       
       // Se c'è un taskId preselezionato nella configurazione del dialog, usalo
       if (dialogConfig && dialogConfig.preselectedTaskId) {
-        console.log('Preselected task ID:', dialogConfig.preselectedTaskId);
         initialData.taskId = dialogConfig.preselectedTaskId;
       }
       

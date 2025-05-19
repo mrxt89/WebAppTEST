@@ -30,7 +30,6 @@ const CategoriesPage = () => {
   const [currentSubcategory, setCurrentSubcategory] = useState(null);
 
   useEffect(() => {
-    console.log('Fetching categories from jsx...');
     fetchCategories();
   }, [fetchCategories]);
 

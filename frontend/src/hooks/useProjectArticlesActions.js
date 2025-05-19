@@ -171,7 +171,6 @@ const getItemById = useCallback(async (itemId) => {
     // Visualizzazione distinte base
     const getBOMData = async (action, id, itemId = null, version = null, options = {}) => {
         try {
-            console.log('Fetching BOM data with action:', action, 'id:', id, 'itemId:', itemId, 'version:', version, 'options:', options);
             let url;
             
             // If we have a BOM ID, use the /boms/:id endpoint
@@ -572,7 +571,6 @@ const getItemById = useCallback(async (itemId) => {
 // Aggiungi componente a una distinta
 const addComponent = useCallback(async (bomId, componentData = null) => {
     try {
-        console.log('Adding component to BOM ID:', bomId, 'with data:', componentData);
         // Se componentData è null, bomId contiene tutti i dati
         // Se componentData è definito, bomId è l'ID della distinta
         let data;
@@ -588,8 +586,6 @@ const addComponent = useCallback(async (bomId, componentData = null) => {
             // Formato nuovo: addComponent(bomId, componentData)
             data = { ...componentData, Id: bomId };
         }
-        
-        console.log('Adding component with data:', data);
         
         // Ora controlliamo se è richiesta la creazione di un componente temporaneo
         if (data.createTempComponent) {
@@ -615,7 +611,6 @@ const addComponent = useCallback(async (bomId, componentData = null) => {
                 SourceItemCode: data.sourceItemCode || null,
             };
             
-            console.log('Payload for ADD_COMPONENT with temp component:', payload);
             return await addUpdateBOM('ADD_COMPONENT', payload);
         } else {
             // Comportamento originale per l'aggiunta di componenti esistenti
@@ -629,7 +624,6 @@ const addComponent = useCallback(async (bomId, componentData = null) => {
                 ...data
             };
             
-            console.log('Payload for ADD_COMPONENT with existing component:', payload);
             return await addUpdateBOM('ADD_COMPONENT', payload);
         }
     } catch (error) {
@@ -649,7 +643,6 @@ const addComponent = useCallback(async (bomId, componentData = null) => {
 
     // Elimina componente da una distinta
     const deleteComponent = useCallback(async (bomId, line) => {
-        console.log('Deleting component from BOM ID:', bomId, 'at line:', line);
         return addUpdateBOM('DELETE_COMPONENT', {
             Id: bomId,
             Line: line
@@ -677,7 +670,6 @@ const addRouting = useCallback(async (bomId, routingData) => {
     // Aggiorna fase di ciclo di una distinta
     const updateRouting = useCallback(async (bomId, rtgStep, routingData) => {
         try {
-            console.log('Updating routing for BOM ID:', bomId, 'with step:', rtgStep, 'and data:', routingData);
           setLoading(true);
           const data = await addUpdateBOM('UPDATE_ROUTING', {
             Id: bomId,
