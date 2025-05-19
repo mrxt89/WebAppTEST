@@ -1355,7 +1355,10 @@ return (
          )}
 
          {/* Main Input Area */}
-         <div className="flex-1 bg-gray-100 rounded-xl">
+         <div 
+          className="flex-1 bg-gray-100 rounded-xl"
+          style={{height: '80px'}}
+         >
            {allowedResponses.length > 0 ? (
              <div className="flex flex-wrap gap-2 justify-center p-2">
                {allowedResponses.map((option, index) => (
@@ -1373,29 +1376,34 @@ return (
              </div>
            ) : allowReply ? (
              <div className="relative">
-               <div
-                 contentEditable
-                 ref={inputRef}
-                 onInput={handleInputChange}
-                 onKeyDown={handleKeyPress}
-                 onFocus={() => { 
-                   setIsFocused(true);
-                   setPlaceholderVisible(false);
-                 }}
-                 onBlur={() => { 
-                   setIsFocused(false);
-                   setPlaceholderVisible(!message);
-                 }}
-                 className={`py-2 px-3 w-full outline-none rounded-xl ${disabled ? 'bg-gray-200 cursor-not-allowed' : ''}`}
-                 style={{
-                   whiteSpace: "pre-wrap",
-                   minHeight: "36px",
-                   maxHeight: "80px",
-                   overflowY: "auto"
-                 }}
-                 suppressContentEditableWarning={true}
-                 aria-disabled={disabled}
-               ></div>
+                <div
+                  contentEditable
+                  ref={inputRef}
+                  onInput={handleInputChange}
+                  onKeyDown={handleKeyPress}
+                  onFocus={() => { 
+                    setIsFocused(true);
+                    setPlaceholderVisible(false);
+                  }}
+                  onBlur={() => { 
+                    setIsFocused(false);
+                    setPlaceholderVisible(!message);
+                  }}
+                  className={`py-2 px-3 w-full outline-none rounded-xl ${disabled ? 'bg-gray-200 cursor-not-allowed' : ''}`}
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    wordWrap: "break-word",  // Forza il testo a spezzarsi e andare a capo
+                    wordBreak: "break-word", // Permette alle parole di andare a capo anche a metà
+                    minHeight: "36px",
+                    maxHeight: "80px",
+                    overflowY: "auto",
+                    overflowX: "hidden",     // Impedisce lo scroll orizzontale
+                    width: "100%",           // Assicura che l'elemento mantenga la larghezza
+                    display: "block"         // Permette all'elemento di espandersi verticalmente
+                  }}
+                  suppressContentEditableWarning={true}
+                  aria-disabled={disabled}
+                ></div>
                
                {/* Placeholder separato dal contenuto editabile */}
                {placeholderVisible && (
