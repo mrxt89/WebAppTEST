@@ -1,28 +1,38 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Download, Trash2, Upload, File } from 'lucide-react';
-import { swal } from '../../../lib/common';
-import useAttachmentsActions from '../../../hooks/useAttachmentsActions';
-import DeleteConfirmationModal from './DeleteConfirmationModal';
-import FileViewer from '../../../components/ui/fileViewer';
-import FileDropZone from '@/components/ui/FileDropZone';
+import { Download, Trash2, Upload, File } from "lucide-react";
+import { swal } from "../../../lib/common";
+import useAttachmentsActions from "../../../hooks/useAttachmentsActions";
+import DeleteConfirmationModal from "./DeleteConfirmationModal";
+import FileViewer from "../../../components/ui/fileViewer";
+import FileDropZone from "@/components/ui/FileDropZone";
 
 const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
-  const [deleteModal, setDeleteModal] = useState({ open: false, attachmentId: null });
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    attachmentId: null,
+  });
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
-  
-  const { 
-    loading, 
+
+  const {
+    loading,
     getAttachments,
-    uploadAttachment, 
-    deleteAttachment, 
+    uploadAttachment,
+    deleteAttachment,
     downloadAttachment,
-    downloadAllAttachments
+    downloadAllAttachments,
   } = useAttachmentsActions();
 
   const loadAttachments = async () => {
@@ -32,9 +42,9 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
       setAttachments(data);
     } catch (error) {
       swal.fire({
-        title: 'Errore',
-        text: 'Errore nel caricamento degli allegati',
-        icon: 'error',
+        title: "Errore",
+        text: "Errore nel caricamento degli allegati",
+        icon: "error",
         timer: 1500,
       });
     }
@@ -48,7 +58,7 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
 
   const handleFileSelect = async (input) => {
     let file;
-    
+
     // Se viene da input file standard
     if (input?.target?.files) {
       file = input.target.files[0];
@@ -56,48 +66,47 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
       // Se viene da drag & drop
       file = input;
     }
-    
+
     if (!file) {
-      console.log('No file selected');
+      console.log("No file selected");
       return;
     }
-  
+
     try {
       setUploading(true);
-      
+
       const formData = new FormData();
-      formData.append('file', file);
-      
+      formData.append("file", file);
+
       const result = await uploadAttachment(task.ProjectID, task.TaskID, file);
-      
+
       if (result.success) {
         await loadAttachments();
         onAttachmentChange && onAttachmentChange();
         swal.fire({
-          title: 'Successo',
-          text: 'Allegato caricato con successo',
-          icon: 'success',
+          title: "Successo",
+          text: "Allegato caricato con successo",
+          icon: "success",
           timer: 1500,
           showProgressBar: true,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
       }
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error("Upload error:", error);
       swal.fire({
-        title: 'Errore',
-        text: 'Errore nel caricamento dell\'allegato',
-        icon: 'error',
+        title: "Errore",
+        text: "Errore nel caricamento dell'allegato",
+        icon: "error",
         timer: 1500,
       });
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
-
 
   const handleConfirmDelete = async () => {
     try {
@@ -105,18 +114,18 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
       await loadAttachments();
       onAttachmentChange && onAttachmentChange();
       swal.fire({
-        title: 'Successo',
-        text: 'Allegato eliminato con successo',
-        icon: 'success',
+        title: "Successo",
+        text: "Allegato eliminato con successo",
+        icon: "success",
         timer: 1500,
         showProgressBar: true,
-        showConfirmButton: false
+        showConfirmButton: false,
       });
     } catch (error) {
       swal.fire({
-        title: 'Errore',
-        text: 'Errore nell\'eliminazione dell\'allegato',
-        icon: 'error',
+        title: "Errore",
+        text: "Errore nell'eliminazione dell'allegato",
+        icon: "error",
         timer: 1500,
       });
     } finally {
@@ -129,17 +138,17 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
       await downloadAttachment(attachment.AttachmentID, attachment.FileName);
     } catch (error) {
       swal.fire({
-        title: 'Errore',
-        text: 'Errore nel download dell\'allegato',
-        icon: 'error',
+        title: "Errore",
+        text: "Errore nel download dell'allegato",
+        icon: "error",
         timer: 1500,
       });
     }
   };
 
   return (
-    <FileDropZone 
-      onFileSelect={handleFileSelect} 
+    <FileDropZone
+      onFileSelect={handleFileSelect}
       disabled={!canEdit || uploading}
     >
       <div className="space-y-4">
@@ -170,11 +179,13 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
               </Button>
             </div>
           )}
-          
+
           {attachments.length > 0 && (
             <Button
               variant="outline"
-              onClick={() => downloadAllAttachments(task.ProjectID, task.TaskID)}
+              onClick={() =>
+                downloadAllAttachments(task.ProjectID, task.TaskID)
+              }
               disabled={loading}
             >
               {loading ? (
@@ -214,7 +225,7 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
                 attachments.map((attachment) => (
                   <TableRow key={attachment.AttachmentID}>
                     <TableCell className="font-medium">
-                      <div 
+                      <div
                         className="flex items-center gap-2 cursor-pointer hover:text-blue-500"
                         onClick={() => setSelectedFile(attachment)}
                       >
@@ -223,7 +234,8 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {Math.round(attachment.FileSizeKB / 1024 * 100) / 100} MB
+                      {Math.round((attachment.FileSizeKB / 1024) * 100) / 100}{" "}
+                      MB
                     </TableCell>
                     <TableCell>{attachment.UploadedByName}</TableCell>
                     <TableCell>
@@ -242,10 +254,12 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setDeleteModal({ 
-                              open: true, 
-                              attachmentId: attachment.AttachmentID 
-                            })}
+                            onClick={() =>
+                              setDeleteModal({
+                                open: true,
+                                attachmentId: attachment.AttachmentID,
+                              })
+                            }
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -260,14 +274,14 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
         </ScrollArea>
       </div>
 
-      <DeleteConfirmationModal 
+      <DeleteConfirmationModal
         isOpen={deleteModal.open}
         onClose={() => setDeleteModal({ open: false, attachmentId: null })}
         onConfirm={handleConfirmDelete}
         title="Elimina allegato"
         message="Sei sicuro di voler eliminare questo allegato? L'operazione non può essere annullata."
       />
-      <FileViewer 
+      <FileViewer
         file={selectedFile}
         isOpen={!!selectedFile}
         onClose={() => setSelectedFile(null)}

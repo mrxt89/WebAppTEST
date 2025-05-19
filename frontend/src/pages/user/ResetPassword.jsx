@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import axios from "axios";
 import { Input, Button, Card, Alert } from "@/components/ui";
 import { useParams } from "react-router-dom";
-import { config } from  '../../config';
-import { swal } from '../../lib/common'; 
+import { config } from "../../config";
+import { swal } from "../../lib/common";
 
 const ResetPassword = () => {
   const { token } = useParams();
@@ -18,10 +18,13 @@ const ResetPassword = () => {
       return;
     }
     try {
-      const response = await axios.post(`${config.API_BASE_URL}/reset-password`, {
-        token,
-        newPassword,
-      });
+      const response = await axios.post(
+        `${config.API_BASE_URL}/reset-password`,
+        {
+          token,
+          newPassword,
+        },
+      );
       console.log("Password reset successful:", response.data);
       setMessage("Password reset successful.");
     } catch (error) {
@@ -53,7 +56,9 @@ const ResetPassword = () => {
             onChange={(e) => setConfirmPassword(e.target.value)}
           />
         </div>
-        <Button type="submit" className="w-full">Reset Password</Button>
+        <Button type="submit" className="w-full">
+          Reset Password
+        </Button>
         {message && <Alert variant="destructive">{message}</Alert>}
       </form>
     </Card>

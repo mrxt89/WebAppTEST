@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,16 +18,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { 
-  MoreVertical, 
-  Pencil, 
-  Trash2, 
-  Unlink, 
+import {
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Unlink,
   Eye,
-  ListFilter
-} from 'lucide-react';
-import { swal } from '@/lib/common';
-import useProjectArticlesActions from '@/hooks/useProjectArticlesActions';
+  ListFilter,
+} from "lucide-react";
+import { swal } from "@/lib/common";
+import useProjectArticlesActions from "@/hooks/useProjectArticlesActions";
 
 /**
  * ArticleActionsDropdown - Componente per le azioni sugli articoli
@@ -39,14 +39,14 @@ import useProjectArticlesActions from '@/hooks/useProjectArticlesActions';
  * @param {Function} onEdit - Callback per modificare l'articolo
  * @param {Function} onRefresh - Callback per aggiornare la lista degli articoli
  */
-const ArticleActionsDropdown = ({ 
-  item, 
-  project, 
-  canEdit, 
-  onViewDetails, 
+const ArticleActionsDropdown = ({
+  item,
+  project,
+  canEdit,
+  onViewDetails,
   onViewBOM,
   onEdit,
-  onRefresh 
+  onRefresh,
 }) => {
   // Stati per i dialoghi di conferma
   const [showUnlinkDialog, setShowUnlinkDialog] = useState(false);
@@ -54,40 +54,39 @@ const ArticleActionsDropdown = ({
   const [loading, setLoading] = useState(false);
 
   // Hook per le azioni API
-  const { 
-    unlinkItemFromProject, 
-    disableTemporaryItem,
-    canDisableItem
-  } = useProjectArticlesActions();
+  const { unlinkItemFromProject, disableTemporaryItem, canDisableItem } =
+    useProjectArticlesActions();
 
   // Gestione rimozione articolo dal progetto
   const handleUnlinkItem = async () => {
     setShowUnlinkDialog(false);
-    
+
     try {
       setLoading(true);
-      
+
       const result = await unlinkItemFromProject(project.ProjectID, item.Id);
-      
+
       if (result && result.success) {
         swal.fire({
-          title: 'Completato',
-          text: 'Articolo rimosso dal progetto con successo',
-          icon: 'success',
+          title: "Completato",
+          text: "Articolo rimosso dal progetto con successo",
+          icon: "success",
           timer: 1500,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
-        
+
         if (onRefresh) onRefresh();
       } else {
-        throw new Error(result.msg || 'Errore durante la rimozione');
+        throw new Error(result.msg || "Errore durante la rimozione");
       }
     } catch (error) {
-      console.error('Error unlinking item:', error);
+      console.error("Error unlinking item:", error);
       swal.fire({
-        title: 'Errore',
-        text: error.message || 'Si è verificato un errore durante la rimozione dell\'articolo dal progetto',
-        icon: 'error',
+        title: "Errore",
+        text:
+          error.message ||
+          "Si è verificato un errore durante la rimozione dell'articolo dal progetto",
+        icon: "error",
       });
     } finally {
       setLoading(false);
@@ -97,38 +96,42 @@ const ArticleActionsDropdown = ({
   // Gestione disabilitazione articolo temporaneo
   const handleDisableItem = async () => {
     setShowDisableDialog(false);
-    
+
     try {
       setLoading(true);
-      
+
       // Prima verifichiamo se l'articolo può essere disabilitato
       const checkResult = await canDisableItem(item.Id);
-      
+
       if (!checkResult.canDisable) {
-        throw new Error(checkResult.reason || 'Non è possibile disabilitare questo articolo');
+        throw new Error(
+          checkResult.reason || "Non è possibile disabilitare questo articolo",
+        );
       }
-      
+
       const result = await disableTemporaryItem(item.Id);
-      
+
       if (result && result.success) {
         swal.fire({
-          title: 'Completato',
-          text: 'Articolo disabilitato con successo',
-          icon: 'success',
+          title: "Completato",
+          text: "Articolo disabilitato con successo",
+          icon: "success",
           timer: 1500,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
-        
+
         if (onRefresh) onRefresh();
       } else {
-        throw new Error(result.msg || 'Errore durante la disabilitazione');
+        throw new Error(result.msg || "Errore durante la disabilitazione");
       }
     } catch (error) {
-      console.error('Error disabling item:', error);
+      console.error("Error disabling item:", error);
       swal.fire({
-        title: 'Errore',
-        text: error.message || 'Si è verificato un errore durante la disabilitazione dell\'articolo',
-        icon: 'error',
+        title: "Errore",
+        text:
+          error.message ||
+          "Si è verificato un errore durante la disabilitazione dell'articolo",
+        icon: "error",
       });
     } finally {
       setLoading(false);
@@ -142,9 +145,9 @@ const ArticleActionsDropdown = ({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             className="h-8 w-8"
             disabled={loading}
           >
@@ -161,7 +164,7 @@ const ArticleActionsDropdown = ({
             <ListFilter className="h-4 w-4 mr-2" />
             Visualizza Distinta Base
           </DropdownMenuItem>
-          
+
           {canEdit && (
             <>
               <DropdownMenuSeparator />
@@ -169,17 +172,17 @@ const ArticleActionsDropdown = ({
                 <Pencil className="h-4 w-4 mr-2" />
                 Modifica Articolo
               </DropdownMenuItem>
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => setShowUnlinkDialog(true)}
                 className="text-amber-600"
               >
                 <Unlink className="h-4 w-4 mr-2" />
                 Rimuovi dal Progetto
               </DropdownMenuItem>
-              
+
               {/* Disable article option - only for non-ERP articles */}
               {!isFromERP && (
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={() => setShowDisableDialog(true)}
                   className="text-red-600"
                 >
@@ -193,23 +196,31 @@ const ArticleActionsDropdown = ({
       </DropdownMenu>
 
       {/* Dialog for unlinking from project */}
-      <AlertDialog 
-            open={showUnlinkDialog} 
-            onOpenChange={setShowUnlinkDialog}
-            className="text-sm text-gray-700 bg-gray-50 p-4 rounded-md bg-white shadow-md"
-            >
+      <AlertDialog
+        open={showUnlinkDialog}
+        onOpenChange={setShowUnlinkDialog}
+        className="text-sm text-gray-700 bg-gray-50 p-4 rounded-md bg-white shadow-md"
+      >
         <AlertDialogContent className="text-sm text-gray-700 bg-gray-50 p-4 rounded-md bg-white shadow-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Rimuovere l'articolo dal progetto?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Rimuovere l'articolo dal progetto?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Stai per rimuovere l'articolo <span className="font-semibold">{item.Item}</span> dal progetto.<br/>
-              L'articolo continuerà ad esistere e potrà essere associato nuovamente in futuro.<br/><br/>
-              Questa azione rimuove solo l'associazione tra l'articolo e il progetto corrente.
+              Stai per rimuovere l'articolo{" "}
+              <span className="font-semibold">{item.Item}</span> dal progetto.
+              <br />
+              L'articolo continuerà ad esistere e potrà essere associato
+              nuovamente in futuro.
+              <br />
+              <br />
+              Questa azione rimuove solo l'associazione tra l'articolo e il
+              progetto corrente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleUnlinkItem}
               className="bg-amber-600 hover:bg-amber-700"
             >
@@ -225,15 +236,23 @@ const ArticleActionsDropdown = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Disabilitare l'articolo?</AlertDialogTitle>
             <AlertDialogDescription>
-              Stai per disabilitare l'articolo <span className="font-semibold">{item.Item}</span>.<br/>
-              L'articolo verrà contrassegnato come disabilitato e non sarà più visibile nelle liste.<br/><br/>
-              <span className="text-red-600 font-semibold">Questa azione non può essere annullata.</span><br/>
-              Non è possibile disabilitare articoli provenienti dal gestionale o utilizzati in altre distinte.
+              Stai per disabilitare l'articolo{" "}
+              <span className="font-semibold">{item.Item}</span>.<br />
+              L'articolo verrà contrassegnato come disabilitato e non sarà più
+              visibile nelle liste.
+              <br />
+              <br />
+              <span className="text-red-600 font-semibold">
+                Questa azione non può essere annullata.
+              </span>
+              <br />
+              Non è possibile disabilitare articoli provenienti dal gestionale o
+              utilizzati in altre distinte.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleDisableItem}
               className="bg-red-600 hover:bg-red-700"
             >

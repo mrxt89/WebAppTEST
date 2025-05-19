@@ -1,21 +1,23 @@
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Smile } from "lucide-react";
-import Picker from '@emoji-mart/react';
+import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 
 function EmojiPicker({ onChange, className, disabled }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <div 
-          className={className || "cursor-pointer p-2 rounded-full hover:bg-gray-100"} 
+        <div
+          className={
+            className || "cursor-pointer p-2 rounded-full hover:bg-gray-100"
+          }
           role="button"
           tabIndex={0}
           aria-label="Pick emoji"
@@ -24,7 +26,7 @@ function EmojiPicker({ onChange, className, disabled }) {
         </div>
       </PopoverTrigger>
       <PopoverContent className="w-full custom-popover-content p-0 border-none">
-        <Picker 
+        <Picker
           emojiSize={24}
           theme="light"
           data={data}

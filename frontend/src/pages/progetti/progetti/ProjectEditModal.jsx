@@ -1,22 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import React, { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2 } from 'lucide-react';
-import useCategoryActions from '../../../hooks/useCategoryActions';
-import { CustomerSearchSelect } from './ProjectComponents';
-import useProjectCustomersActions, { CUSTOMER_TYPE } from "../../../hooks/useProjectCustomersActions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Trash2 } from "lucide-react";
+import useCategoryActions from "../../../hooks/useCategoryActions";
+import { CustomerSearchSelect } from "./ProjectComponents";
+import useProjectCustomersActions, {
+  CUSTOMER_TYPE,
+} from "../../../hooks/useProjectCustomersActions";
 
-
-const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisable }) => {
-  const { projectCustomers, loading: loadingCustomers, fetchProjectCustomers } = useProjectCustomersActions();
-  const { categories, loading: loadingCategories, fetchCategories } = useCategoryActions();
-  const [localProject, setLocalProject] = useState({ ...project, Disabled: project?.Disabled || 0 });
-  const [selectedCategory, setSelectedCategory] = useState(project?.ProjectCategoryId || 0);
-  const [selectedSubcategory, setSelectedSubcategory] = useState(project?.ProjectCategoryDetailLine || 0);
+const ProjectEditModal = ({
+  project,
+  isOpen,
+  onClose,
+  onSave,
+  onChange,
+  onDisable,
+}) => {
+  const {
+    projectCustomers,
+    loading: loadingCustomers,
+    fetchProjectCustomers,
+  } = useProjectCustomersActions();
+  const {
+    categories,
+    loading: loadingCategories,
+    fetchCategories,
+  } = useCategoryActions();
+  const [localProject, setLocalProject] = useState({
+    ...project,
+    Disabled: project?.Disabled || 0,
+  });
+  const [selectedCategory, setSelectedCategory] = useState(
+    project?.ProjectCategoryId || 0,
+  );
+  const [selectedSubcategory, setSelectedSubcategory] = useState(
+    project?.ProjectCategoryDetailLine || 0,
+  );
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 
   useEffect(() => {
@@ -24,7 +58,7 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
       await Promise.all([
         fetchCategories(),
         fetchProjectCustomers(),
-        fetchProjectStatuses()
+        fetchProjectStatuses(),
       ]);
     };
     loadData();
@@ -37,7 +71,7 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
         ProjectCategoryId: project.ProjectCategoryId || 0,
         ProjectCategoryDetailLine: project.ProjectCategoryDetailLine || 0,
         Disabled: project.Disabled || 0,
-        ProjectErpID: project?.ProjectErpID || ''
+        ProjectErpID: project?.ProjectErpID || "",
       };
       setLocalProject(updatedProject);
       setSelectedCategory(updatedProject.ProjectCategoryId);
@@ -52,7 +86,7 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
         ProjectCategoryId: project.ProjectCategoryId || 0,
         ProjectCategoryDetailLine: project.ProjectCategoryDetailLine || 0,
         Disabled: project.Disabled || 0,
-        ProjectErpID: project.ProjectErpID || ''
+        ProjectErpID: project.ProjectErpID || "",
       };
       setLocalProject(updatedProject);
       setSelectedCategory(updatedProject.ProjectCategoryId);
@@ -63,7 +97,7 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
   }, [project, onChange]);
 
   const handleChange = (field, value) => {
-    if (field === 'CustSupp') {
+    if (field === "CustSupp") {
       // Assicuriamoci che CustSupp sia un valore singolo
       const custSuppValue = Array.isArray(value) ? value[0] : value;
       const updatedProject = { ...localProject, [field]: custSuppValue };
@@ -80,11 +114,11 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
     const categoryId = value === "0" ? 0 : parseInt(value);
     setSelectedCategory(categoryId);
     setSelectedSubcategory(0);
-    
+
     const updatedProject = {
       ...localProject,
       ProjectCategoryId: categoryId,
-      ProjectCategoryDetailLine: 0
+      ProjectCategoryDetailLine: 0,
     };
     setLocalProject(updatedProject);
     onChange && onChange(updatedProject);
@@ -93,10 +127,10 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
   const handleSubcategoryChange = (value) => {
     const line = value === "0" ? 0 : parseInt(value);
     setSelectedSubcategory(line);
-    
+
     const updatedProject = {
       ...localProject,
-      ProjectCategoryDetailLine: line
+      ProjectCategoryDetailLine: line,
     };
     setLocalProject(updatedProject);
     onChange && onChange(updatedProject);
@@ -109,7 +143,6 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
     onClose();
   };
 
-  
   if (!localProject) return null;
 
   return (
@@ -118,8 +151,8 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>Modifica Progetto</DialogTitle>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               className="text-red-500 hover:text-red-700 hover:bg-red-100"
               onClick={handleDisable}
@@ -134,7 +167,7 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
               <Input
                 id="name"
                 value={localProject.Name}
-                onChange={(e) => handleChange('Name', e.target.value)}
+                onChange={(e) => handleChange("Name", e.target.value)}
               />
             </div>
             <div>
@@ -142,7 +175,7 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
               <Input
                 id="projectErpId"
                 value={localProject.ProjectErpID}
-                onChange={(e) => handleChange('ProjectErpID', e.target.value)}
+                onChange={(e) => handleChange("ProjectErpID", e.target.value)}
                 placeholder="Inserisci ID ERP"
               />
             </div>
@@ -151,7 +184,7 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
               <Textarea
                 id="description"
                 value={localProject.Description}
-                onChange={(e) => handleChange('Description', e.target.value)}
+                onChange={(e) => handleChange("Description", e.target.value)}
                 rows={4}
               />
             </div>
@@ -159,7 +192,7 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
               <Label htmlFor="customer">Cliente</Label>
               <CustomerSearchSelect
                 value={localProject.CustSupp}
-                onChange={(value) => handleChange('CustSupp', value)}
+                onChange={(value) => handleChange("CustSupp", value)}
                 projectCustomers={projectCustomers}
                 loading={loadingCustomers}
               />
@@ -168,19 +201,16 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
               <Label htmlFor="status">Stato</Label>
               <Select
                 value={localProject.Status}
-                onValueChange={(value) => handleChange('Status', value)}
+                onValueChange={(value) => handleChange("Status", value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleziona stato" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statuses.map(status => (
-                    <SelectItem 
-                      key={status.Id} 
-                      value={status.Id}
-                    >
+                  {statuses.map((status) => (
+                    <SelectItem key={status.Id} value={status.Id}>
                       <div className="flex items-center gap-2">
-                        <div 
+                        <div
                           className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: status.HexColor }}
                         />
@@ -203,13 +233,13 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="0">Nessuna categoria</SelectItem>
-                  {categories.map(category => (
-                    <SelectItem 
-                      key={category.ProjectCategoryId} 
+                  {categories.map((category) => (
+                    <SelectItem
+                      key={category.ProjectCategoryId}
                       value={category.ProjectCategoryId.toString()}
                     >
                       <div className="flex items-center gap-2">
-                        <div 
+                        <div
                           className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: category.HexColor }}
                         />
@@ -221,35 +251,35 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
               </Select>
             </div>
 
-            {selectedCategory > 0 && categories.find(c => c.ProjectCategoryId === selectedCategory)?.details?.length > 0 && (
-              <div>
-                <Label htmlFor="subcategory">Sottocategoria</Label>
-                <Select
-                  value={selectedSubcategory?.toString() || "0"}
-                  onValueChange={handleSubcategoryChange}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleziona sottocategoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">Nessuna sottocategoria</SelectItem>
-                    {categories
-                      .find(c => c.ProjectCategoryId === selectedCategory)
-                      ?.details
-                      ?.filter(d => !d.Disabled)
-                      ?.map(subcategory => (
-                        <SelectItem 
-                          key={subcategory.Line} 
-                          value={subcategory.Line.toString()}
-                        >
-                          {subcategory.Description}
-                        </SelectItem>
-                      ))
-                    }
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            {selectedCategory > 0 &&
+              categories.find((c) => c.ProjectCategoryId === selectedCategory)
+                ?.details?.length > 0 && (
+                <div>
+                  <Label htmlFor="subcategory">Sottocategoria</Label>
+                  <Select
+                    value={selectedSubcategory?.toString() || "0"}
+                    onValueChange={handleSubcategoryChange}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Seleziona sottocategoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Nessuna sottocategoria</SelectItem>
+                      {categories
+                        .find((c) => c.ProjectCategoryId === selectedCategory)
+                        ?.details?.filter((d) => !d.Disabled)
+                        ?.map((subcategory) => (
+                          <SelectItem
+                            key={subcategory.Line}
+                            value={subcategory.Line.toString()}
+                          >
+                            {subcategory.Description}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
             <div className="flex gap-4">
               <div className="flex-1">
@@ -257,8 +287,8 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
                 <Input
                   id="startDate"
                   type="date"
-                  value={localProject.StartDate?.split('T')[0]}
-                  onChange={(e) => handleChange('StartDate', e.target.value)}
+                  value={localProject.StartDate?.split("T")[0]}
+                  onChange={(e) => handleChange("StartDate", e.target.value)}
                 />
               </div>
               <div className="flex-1">
@@ -266,9 +296,9 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
                 <Input
                   id="endDate"
                   type="date"
-                  value={localProject.EndDate?.split('T')[0]}
-                  min={localProject.StartDate?.split('T')[0]}
-                  onChange={(e) => handleChange('EndDate', e.target.value)}
+                  value={localProject.EndDate?.split("T")[0]}
+                  min={localProject.StartDate?.split("T")[0]}
+                  onChange={(e) => handleChange("EndDate", e.target.value)}
                 />
               </div>
             </div>
@@ -291,13 +321,20 @@ const ProjectEditModal = ({ project, isOpen, onClose, onSave, onChange, onDisabl
             <DialogTitle className="text-red-600">Sei sicuro?</DialogTitle>
           </DialogHeader>
           <p className="text-gray-700">
-            Il progetto verrà disabilitato. Questa azione non può essere annullata!
+            Il progetto verrà disabilitato. Questa azione non può essere
+            annullata!
           </p>
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setConfirmModalOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmModalOpen(false)}
+            >
               Annulla
             </Button>
-            <Button className="bg-red-600 text-white hover:bg-red-700" onClick={confirmDisable}>
+            <Button
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={confirmDisable}
+            >
               Sì, disabilita
             </Button>
           </div>

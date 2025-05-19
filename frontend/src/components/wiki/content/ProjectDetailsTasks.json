@@ -1,70 +1,69 @@
 {
-    "title": "Guida Attività Progetto",
-    "description": "Questa sezione permette di visualizzare e gestire tutte le attività associate al progetto.",
-    "sections": [
+  "title": "Guida Attività Progetto",
+  "description": "Questa sezione permette di visualizzare e gestire tutte le attività associate al progetto.",
+  "sections": [
+    {
+      "title": "Gestione Attività",
+      "content": "<p>La scheda <strong>Attività</strong> permette di visualizzare e gestire tutte le attività associate al progetto. Puoi:</p><ul><li>Visualizzare tutte le attività in diverse modalità (kanban, tabella, gantt)</li><li>Aggiungere nuove attività</li><li>Modificare lo stato delle attività</li><li>Assegnare attività a membri del team</li><li>Impostare priorità e scadenze</li></ul><p>Una gestione efficace delle attività è fondamentale per il successo del progetto.</p>",
+      "tourId": "attivita_gestione"
+    },
+    {
+      "title": "Modalità di Visualizzazione",
+      "content": "<p>Le attività possono essere visualizzate in tre diverse modalità:</p><ul><li><strong>Schede (Kanban)</strong>: visualizzazione a colonne per stato (Da Fare, In Corso, ecc.)</li><li><strong>Tabella</strong>: visualizzazione in formato tabellare con tutte le informazioni</li><li><strong>Gantt</strong>: visualizzazione cronologica con dipendenze tra attività</li></ul><p>Seleziona la modalità che meglio si adatta alle tue esigenze di gestione.</p>",
+      "tourId": "attivita_modalita",
+      "selector": "#project-tasks-view"
+    },
+    {
+      "title": "Creazione Nuova Attività",
+      "content": "<p>Per creare una nuova attività:</p><ol><li>Fai clic sul pulsante <strong>Aggiungi Attività</strong></li><li>Inserisci le informazioni richieste nel modulo:</li><ul><li>Titolo (obbligatorio)</li><li>Descrizione</li><li>Responsabile (obbligatorio)</li><li>Partecipanti aggiuntivi</li><li>Priorità</li><li>Date di inizio e scadenza (obbligatorie)</li><li>Attività precedente (opzionale)</li></ul><li>Fai clic su <strong>Aggiungi</strong> per creare l'attività</li></ol><p>La nuova attività apparirà nella visualizzazione corrente.</p>",
+      "tourId": "attivita_creazione"
+    },
+    {
+      "title": "Dettagli Attività",
+      "content": "<p>Per visualizzare e modificare i dettagli di un'attività:</p><ol><li>Fai clic su un'attività nella visualizzazione corrente</li><li>Si aprirà una finestra di dialogo con tutte le informazioni sull'attività</li><li>Puoi navigare tra le diverse schede per gestire:</li><ul><li>Informazioni generali</li><li>Commenti</li><li>Costi</li><li>Allegati</li><li>Storico modifiche</li><li>Eventi calendario</li></ul><li>Fai clic su <strong>Modifica</strong> per modificare le informazioni</li></ol><p>Questa finestra di dialogo fornisce un accesso completo a tutti gli aspetti dell'attività.</p>",
+      "tourId": "attivita_dettagli"
+    }
+  ],
+  "tours": {
+    "attivita_gestione": [
       {
         "title": "Gestione Attività",
-        "content": "<p>La scheda <strong>Attività</strong> permette di visualizzare e gestire tutte le attività associate al progetto. Puoi:</p><ul><li>Visualizzare tutte le attività in diverse modalità (kanban, tabella, gantt)</li><li>Aggiungere nuove attività</li><li>Modificare lo stato delle attività</li><li>Assegnare attività a membri del team</li><li>Impostare priorità e scadenze</li></ul><p>Una gestione efficace delle attività è fondamentale per il successo del progetto.</p>",
-        "tourId": "attivita_gestione"
+        "description": "Questa sezione ti permette di gestire tutte le attività del progetto.",
+        "selector": "#project-tasks-tab",
+        "position": "bottom"
       },
       {
-        "title": "Modalità di Visualizzazione",
-        "content": "<p>Le attività possono essere visualizzate in tre diverse modalità:</p><ul><li><strong>Schede (Kanban)</strong>: visualizzazione a colonne per stato (Da Fare, In Corso, ecc.)</li><li><strong>Tabella</strong>: visualizzazione in formato tabellare con tutte le informazioni</li><li><strong>Gantt</strong>: visualizzazione cronologica con dipendenze tra attività</li></ul><p>Seleziona la modalità che meglio si adatta alle tue esigenze di gestione.</p>",
-        "tourId": "attivita_modalita",
-        "selector": "#project-tasks-view"
-      },
-      {
-        "title": "Creazione Nuova Attività",
-        "content": "<p>Per creare una nuova attività:</p><ol><li>Fai clic sul pulsante <strong>Aggiungi Attività</strong></li><li>Inserisci le informazioni richieste nel modulo:</li><ul><li>Titolo (obbligatorio)</li><li>Descrizione</li><li>Responsabile (obbligatorio)</li><li>Partecipanti aggiuntivi</li><li>Priorità</li><li>Date di inizio e scadenza (obbligatorie)</li><li>Attività precedente (opzionale)</li></ul><li>Fai clic su <strong>Aggiungi</strong> per creare l'attività</li></ol><p>La nuova attività apparirà nella visualizzazione corrente.</p>",
-        "tourId": "attivita_creazione"
-      },
-      {
-        "title": "Dettagli Attività",
-        "content": "<p>Per visualizzare e modificare i dettagli di un'attività:</p><ol><li>Fai clic su un'attività nella visualizzazione corrente</li><li>Si aprirà una finestra di dialogo con tutte le informazioni sull'attività</li><li>Puoi navigare tra le diverse schede per gestire:</li><ul><li>Informazioni generali</li><li>Commenti</li><li>Costi</li><li>Allegati</li><li>Storico modifiche</li><li>Eventi calendario</li></ul><li>Fai clic su <strong>Modifica</strong> per modificare le informazioni</li></ol><p>Questa finestra di dialogo fornisce un accesso completo a tutti gli aspetti dell'attività.</p>",
-        "tourId": "attivita_dettagli"
+        "title": "Aggiungi Attività",
+        "description": "Fai clic qui per creare una nuova attività nel progetto.",
+        "selector": "button:contains('Aggiungi Attività')",
+        "position": "bottom"
       }
     ],
-    "tours": {
-      "attivita_gestione": [
-        {
-          "title": "Gestione Attività",
-          "description": "Questa sezione ti permette di gestire tutte le attività del progetto.",
-          "selector": "#project-tasks-tab",
-          "position": "bottom"
-        },
-        {
-          "title": "Aggiungi Attività",
-          "description": "Fai clic qui per creare una nuova attività nel progetto.",
-          "selector": "button:contains('Aggiungi Attività')",
-          "position": "bottom"
-        }
-      ],
-      "attivita_modalita": [
-        {
-          "title": "Modalità di Visualizzazione",
-          "description": "Puoi scegliere tra diverse modalità per visualizzare le attività.",
-          "selector": "#project-tasks-view",
-          "position": "bottom"
-        },
-        {
-          "title": "Vista Kanban",
-          "description": "Visualizza le attività in colonne per stato.",
-          "selector": "label[for='kanban']",
-          "position": "bottom"
-        },
-        {
-          "title": "Vista Tabella",
-          "description": "Visualizza le attività in formato tabellare.",
-          "selector": "label[for='table']",
-          "position": "bottom"
-        },
-        {
-          "title": "Vista Gantt",
-          "description": "Visualizza le attività in un diagramma cronologico.",
-          "selector": "label[for='gantt']",
-          "position": "bottom"
-        }
-      ]
-    }
+    "attivita_modalita": [
+      {
+        "title": "Modalità di Visualizzazione",
+        "description": "Puoi scegliere tra diverse modalità per visualizzare le attività.",
+        "selector": "#project-tasks-view",
+        "position": "bottom"
+      },
+      {
+        "title": "Vista Kanban",
+        "description": "Visualizza le attività in colonne per stato.",
+        "selector": "label[for='kanban']",
+        "position": "bottom"
+      },
+      {
+        "title": "Vista Tabella",
+        "description": "Visualizza le attività in formato tabellare.",
+        "selector": "label[for='table']",
+        "position": "bottom"
+      },
+      {
+        "title": "Vista Gantt",
+        "description": "Visualizza le attività in un diagramma cronologico.",
+        "selector": "label[for='gantt']",
+        "position": "bottom"
+      }
+    ]
   }
-  
+}

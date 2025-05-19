@@ -11,16 +11,16 @@ import {
   FileIcon,
   Users,
   AlertOctagon,
-  Image
+  Image,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import EmojiPicker from "./Emoji-picker";
-import { swal } from '../../lib/common';
-import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
-import FileDropZone from '@/components/ui/FileDropZone';
-import { debounce } from 'lodash';
+import { swal } from "../../lib/common";
+import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
+import FileDropZone from "@/components/ui/FileDropZone";
+import { debounce } from "lodash";
 import { Margin } from "@mui/icons-material";
-import '@/styles/chat-components.css';
+import "@/styles/chat-components.css";
 
 const ChatBottomBar = ({
   notificationId,
@@ -45,7 +45,7 @@ const ChatBottomBar = ({
   openChatModal,
   disabled = false, // Prop per disabilitare il componente (quando chatLeft = 1)
   uploadNotificationAttachment,
-  captureAndUploadPhoto
+  captureAndUploadPhoto,
 }) => {
   const [message, setMessage] = useState("");
   const [mentionSuggestions, setMentionSuggestions] = useState([]);
@@ -57,7 +57,8 @@ const ChatBottomBar = ({
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [clipboardImage, setClipboardImage] = useState(null);
-  const [isUpdatingContentEditable, setIsUpdatingContentEditable] = useState(false);
+  const [isUpdatingContentEditable, setIsUpdatingContentEditable] =
+    useState(false);
   const [placeholderVisible, setPlaceholderVisible] = useState(true); // New state to control placeholder visibility
 
   const inputRef = useRef(null);
@@ -68,26 +69,36 @@ const ChatBottomBar = ({
   const lastSelectionRef = useRef(null);
 
   // Use functions from context
-  const { getNotificationAttachments, ...contextFunctions } = useNotifications();
+  const { getNotificationAttachments, ...contextFunctions } =
+    useNotifications();
   // Ottieni riferimenti diretti alle funzioni
-  const sendNotificationWithAttachments = contextFunctions.sendNotificationWithAttachments;
+  const sendNotificationWithAttachments =
+    contextFunctions.sendNotificationWithAttachments;
   const sendNotification = contextFunctions.sendNotification;
 
   // Ensure we have upload functions either from props or context
-  const uploadAttachment = uploadNotificationAttachment || contextFunctions.uploadNotificationAttachment;
-  const capture = captureAndUploadPhoto || contextFunctions.captureAndUploadPhoto;
+  const uploadAttachment =
+    uploadNotificationAttachment ||
+    contextFunctions.uploadNotificationAttachment;
+  const capture =
+    captureAndUploadPhoto || contextFunctions.captureAndUploadPhoto;
 
-  const debouncedCursorUpdate = useRef(debounce((position) => {
-    setCursorPosition(position);
-  }, 10)).current;
+  const debouncedCursorUpdate = useRef(
+    debounce((position) => {
+      setCursorPosition(position);
+    }, 10),
+  ).current;
 
   // Ottieni il colore della categoria o usa un valore predefinito
-  const categoryColor = hexColor || '#3b82f6';
+  const categoryColor = hexColor || "#3b82f6";
 
   // Gestione del clic all'esterno del menu allegati per chiuderlo
   useEffect(() => {
     function handleClickOutside(event) {
-      if (attachMenuRef.current && !attachMenuRef.current.contains(event.target)) {
+      if (
+        attachMenuRef.current &&
+        !attachMenuRef.current.contains(event.target)
+      ) {
         setShowAttachMenu(false);
       }
     }
@@ -106,9 +117,12 @@ const ChatBottomBar = ({
       }
     };
 
-    document.addEventListener('clear-reply-message', handleClearReplyMessage);
+    document.addEventListener("clear-reply-message", handleClearReplyMessage);
     return () => {
-      document.removeEventListener('clear-reply-message', handleClearReplyMessage);
+      document.removeEventListener(
+        "clear-reply-message",
+        handleClearReplyMessage,
+      );
     };
   }, [replyToMessage, setReplyToMessage]);
 
@@ -170,7 +184,7 @@ const ChatBottomBar = ({
     setIsDraggingOver(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setAttachments(prev => [...prev, ...Array.from(e.dataTransfer.files)]);
+      setAttachments((prev) => [...prev, ...Array.from(e.dataTransfer.files)]);
     }
   };
 
@@ -191,20 +205,27 @@ const ChatBottomBar = ({
       const imageBlob = event.detail?.image;
       if (imageBlob) {
         // Crea un oggetto File dall'immagine rilevata
-        const clipboardFile = new File([imageBlob], `clipboard_image_${Date.now()}.png`, {
-          type: imageBlob.type || 'image/png'
-        });
+        const clipboardFile = new File(
+          [imageBlob],
+          `clipboard_image_${Date.now()}.png`,
+          {
+            type: imageBlob.type || "image/png",
+          },
+        );
 
         // Aggiungi il file all'elenco degli allegati
-        setAttachments(prev => [...prev, clipboardFile]);
+        setAttachments((prev) => [...prev, clipboardFile]);
         setClipboardImage(URL.createObjectURL(clipboardFile));
       }
     };
 
-    document.addEventListener('clipboard-image-ready', handleClipboardImage);
+    document.addEventListener("clipboard-image-ready", handleClipboardImage);
 
     return () => {
-      document.removeEventListener('clipboard-image-ready', handleClipboardImage);
+      document.removeEventListener(
+        "clipboard-image-ready",
+        handleClipboardImage,
+      );
     };
   }, [disabled]);
 
@@ -215,14 +236,14 @@ const ChatBottomBar = ({
       const imageFile = event.detail?.image;
       if (imageFile) {
         // Aggiungi il file all'elenco degli allegati
-        setAttachments(prev => [...prev, imageFile]);
+        setAttachments((prev) => [...prev, imageFile]);
       }
     };
 
-    document.addEventListener('captured-photo-ready', handleCapturedPhoto);
+    document.addEventListener("captured-photo-ready", handleCapturedPhoto);
 
     return () => {
-      document.removeEventListener('captured-photo-ready', handleCapturedPhoto);
+      document.removeEventListener("captured-photo-ready", handleCapturedPhoto);
     };
   }, [disabled]);
 
@@ -240,17 +261,21 @@ const ChatBottomBar = ({
       let hasImage = false;
 
       for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf('image') !== -1) {
+        if (items[i].type.indexOf("image") !== -1) {
           hasImage = true;
           const blob = items[i].getAsFile();
 
           // Crea un oggetto File dall'immagine rilevata
-          const clipboardFile = new File([blob], `clipboard_image_${Date.now()}.png`, {
-            type: blob.type || 'image/png'
-          });
+          const clipboardFile = new File(
+            [blob],
+            `clipboard_image_${Date.now()}.png`,
+            {
+              type: blob.type || "image/png",
+            },
+          );
 
           // Aggiungi il file all'elenco degli allegati
-          setAttachments(prev => [...prev, clipboardFile]);
+          setAttachments((prev) => [...prev, clipboardFile]);
           setClipboardImage(URL.createObjectURL(clipboardFile));
 
           // Impedisci che l'immagine venga incollata nell'input
@@ -267,11 +292,11 @@ const ChatBottomBar = ({
     };
 
     if (inputRef.current) {
-      inputRef.current.addEventListener('paste', handlePaste);
+      inputRef.current.addEventListener("paste", handlePaste);
 
       return () => {
         if (inputRef.current) {
-          inputRef.current.removeEventListener('paste', handlePaste);
+          inputRef.current.removeEventListener("paste", handlePaste);
         }
       };
     }
@@ -294,7 +319,10 @@ const ChatBottomBar = ({
       end: getCaretPosition(inputRef.current),
       container: range.startContainer,
       offset: range.startOffset,
-      textLength: range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.length : 0
+      textLength:
+        range.startContainer.nodeType === Node.TEXT_NODE
+          ? range.startContainer.length
+          : 0,
     };
   };
 
@@ -409,11 +437,11 @@ const ChatBottomBar = ({
   const handleReplyCancel = () => {
     // Add check for hasLeftChat from props rather than from global scope
     if (disabled) return; // Use disabled instead, which is already a prop
-    if (typeof setReplyToMessage === 'function') {
+    if (typeof setReplyToMessage === "function") {
       setReplyToMessage(null);
     } else {
       // Emetti un evento personalizzato se setReplyToMessage non è disponibile
-      document.dispatchEvent(new CustomEvent('clear-reply-message'));
+      document.dispatchEvent(new CustomEvent("clear-reply-message"));
     }
   };
 
@@ -453,7 +481,10 @@ const ChatBottomBar = ({
           // Aggiunta importante: scorrimento automatico alla posizione del cursore
           // Questo è importante per vedere dove si trova il cursore quando si aggiunge una nuova riga
           if (currentNode.parentNode) {
-            currentNode.parentNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            currentNode.parentNode.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
           }
         } else if (textNodes.length > 0) {
           // Se non abbiamo trovato la posizione ma ci sono nodi di testo, vai alla fine
@@ -501,36 +532,41 @@ const ChatBottomBar = ({
         e.preventDefault();
 
         // Ottieni il testo puro dagli appunti, senza formattazione
-        const text = e.clipboardData.getData('text/plain');
+        const text = e.clipboardData.getData("text/plain");
 
         // Inserisci il testo senza formattazione nella posizione corrente
-        document.execCommand('insertText', false, text);
+        document.execCommand("insertText", false, text);
       }
     };
 
     // Aggiungi il listener all'elemento di input
     if (inputRef.current) {
-      inputRef.current.addEventListener('paste', handlePaste);
+      inputRef.current.addEventListener("paste", handlePaste);
     }
 
     return () => {
       // Rimuovi il listener quando il componente viene smontato
       if (inputRef.current) {
-        inputRef.current.removeEventListener('paste', handlePaste);
+        inputRef.current.removeEventListener("paste", handlePaste);
       }
     };
   }, [disabled, inputRef.current]); // Dipendenze per rieseguire l'effect
 
   const currentResponseOptions = Array.isArray(responseOptions)
-    ? responseOptions.find(option => option.notificationCategoryId == notificationCategoryId) || {
-      type: 'text',
-      reply: true,
-    }
-    : { type: 'text', reply: true };
+    ? responseOptions.find(
+        (option) => option.notificationCategoryId == notificationCategoryId,
+      ) || {
+        type: "text",
+        reply: true,
+      }
+    : { type: "text", reply: true };
 
-  const allowedResponses = currentResponseOptions.type === 'option'
-    ? JSON.parse(currentResponseOptions.valuesJSON || '[]').map(opt => opt.defaultValue)
-    : [];
+  const allowedResponses =
+    currentResponseOptions.type === "option"
+      ? JSON.parse(currentResponseOptions.valuesJSON || "[]").map(
+          (opt) => opt.defaultValue,
+        )
+      : [];
 
   const allowReply = currentResponseOptions.reply;
 
@@ -543,26 +579,26 @@ const ChatBottomBar = ({
 
     // Ottieni il testo con i caratteri di nuova riga preservati
     // Sostituendo <br> o <div> con \n
-    const htmlContent = event.target.innerHTML || '';
-    let value = '';
+    const htmlContent = event.target.innerHTML || "";
+    let value = "";
 
     // Se utilizziamo contentEditable, dobbiamo estrarre il testo preservando i ritorno a capo
     if (htmlContent) {
       // Sostituisci <br> o <div> con nuove righe
       value = htmlContent
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<div[^>]*>(.*?)<\/div>/gi, '\n$1')
-        .replace(/<[^>]*>/g, ''); // Rimuove tutti i tag HTML, compresi quelli di stile
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<div[^>]*>(.*?)<\/div>/gi, "\n$1")
+        .replace(/<[^>]*>/g, ""); // Rimuove tutti i tag HTML, compresi quelli di stile
 
       // Decodifica qualsiasi entità HTML che potrebbe essere nel testo
-      const textarea = document.createElement('textarea');
+      const textarea = document.createElement("textarea");
       textarea.innerHTML = value;
       value = textarea.value;
 
       // Rimuovi la prima riga vuota se presente
-      value = value.replace(/^\n/, '');
+      value = value.replace(/^\n/, "");
     } else {
-      value = event.target.innerText || '';
+      value = event.target.innerText || "";
     }
 
     // Update placeholder visibility based on content
@@ -572,11 +608,13 @@ const ChatBottomBar = ({
     setMessage(value);
 
     // Resto del codice per la gestione delle menzioni...
-    const mentionTriggerIndex = value.lastIndexOf('@', value.length - 1);
+    const mentionTriggerIndex = value.lastIndexOf("@", value.length - 1);
     if (mentionTriggerIndex > -1) {
       const mentionQuery = value.slice(mentionTriggerIndex + 1).toLowerCase();
       if (mentionQuery) {
-        const filteredUsers = users.filter(user => user.username?.toLowerCase().startsWith(mentionQuery));
+        const filteredUsers = users.filter((user) =>
+          user.username?.toLowerCase().startsWith(mentionQuery),
+        );
         setMentionSuggestions(filteredUsers);
         setMentionIndex(mentionTriggerIndex);
       } else {
@@ -598,11 +636,11 @@ const ChatBottomBar = ({
       element,
       NodeFilter.SHOW_TEXT,
       null,
-      false
+      false,
     );
 
     let node;
-    while (node = walker.nextNode()) {
+    while ((node = walker.nextNode())) {
       textNodes.push(node);
     }
 
@@ -641,7 +679,7 @@ const ChatBottomBar = ({
     setCursorPosition({
       start: newPosition,
       end: newPosition,
-      isAtEnd: false
+      isAtEnd: false,
     });
 
     // Reimposta i suggerimenti di menzione
@@ -651,11 +689,11 @@ const ChatBottomBar = ({
     // Aggiorna la lista dei destinatari
     // FIX: Ensure receiversList is treated as a string, even if it's an array
     const currentReceivers = Array.isArray(receiversList)
-      ? receiversList.join('-')
-      : (receiversList || '');
+      ? receiversList.join("-")
+      : receiversList || "";
 
     // Then we can safely split it
-    const receiversArray = currentReceivers.split('-').filter(Boolean);
+    const receiversArray = currentReceivers.split("-").filter(Boolean);
 
     // Add the new user ID if not already in the list
     if (!receiversArray.includes(user.userId.toString())) {
@@ -663,8 +701,8 @@ const ChatBottomBar = ({
     }
 
     // Call updateReceiversList with the joined string
-    if (typeof updateReceiversList === 'function') {
-      updateReceiversList(receiversArray.join('-'));
+    if (typeof updateReceiversList === "function") {
+      updateReceiversList(receiversArray.join("-"));
     }
   };
 
@@ -672,43 +710,52 @@ const ChatBottomBar = ({
     if (disabled) return; // Non fare nulla se la chat è disabilitata
 
     // Verifica per nuovi messaggi
-    if (isNewMessage && (!receiversList && notificationCategoryId <= 1)) {
-      swal.fire('Errore', 'Assicurati di aver selezionato almeno un destinatario', 'error');
+    if (isNewMessage && !receiversList && notificationCategoryId <= 1) {
+      swal.fire(
+        "Errore",
+        "Assicurati di aver selezionato almeno un destinatario",
+        "error",
+      );
       return;
     }
 
     // Se manca il titolo, avvisa l'utente ed esce
     if (isNewMessage && !title) {
-      swal.fire('Errore', 'Attenzione: il titolo è obbligatorio', 'error');
+      swal.fire("Errore", "Attenzione: il titolo è obbligatorio", "error");
       return;
     }
 
     // Consenti l'invio se c'è un testo O almeno un allegato
     if (message.trim() || attachments.length > 0) {
       // Trova l'utente corrente in modo sicuro
-      const currentUser = users?.find(user => user?.isCurrentUser);
+      const currentUser = users?.find((user) => user?.isCurrentUser);
 
       // Crea una copia temporanea del messaggio per feedback immediato
       const tempMessage = {
         messageId: `temp_${Date.now()}`,
-        message: message.trim() || (attachments.length > 0 ? "Ha condiviso allegati" : ""),
+        message:
+          message.trim() ||
+          (attachments.length > 0 ? "Ha condiviso allegati" : ""),
         senderId: currentUser?.userId || 0,
-        senderName: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Tu',
-        selectedUser: '1',
+        senderName: currentUser
+          ? `${currentUser.firstName} ${currentUser.lastName}`
+          : "Tu",
+        selectedUser: "1",
         tbCreated: new Date().toISOString(),
         replyToMessageId: replyToMessage ? replyToMessage.messageId : 0,
         // Aggiungi info temporanee sugli allegati
-        tempAttachments: attachments.map(file => ({
+        tempAttachments: attachments.map((file) => ({
           name: file.name,
           size: file.size,
-          type: file.type
-        }))
+          type: file.type,
+        })),
       };
-
 
       const notificationData = {
         notificationId,
-        message: message.trim() || (attachments.length > 0 ? "Ha condiviso allegati" : ""),
+        message:
+          message.trim() ||
+          (attachments.length > 0 ? "Ha condiviso allegati" : ""),
         responseOptionId: 3,
         eventId: 0,
         title,
@@ -717,7 +764,7 @@ const ChatBottomBar = ({
         replyToMessageId: replyToMessage ? replyToMessage.messageId : 0,
       };
 
-      if (typeof setSending === 'function') {
+      if (typeof setSending === "function") {
         setSending(true);
       }
       setLoading(true);
@@ -725,11 +772,14 @@ const ChatBottomBar = ({
       try {
         let result;
 
-        result = await sendNotificationWithAttachments(notificationData, attachments);
+        result = await sendNotificationWithAttachments(
+          notificationData,
+          attachments,
+        );
 
         if (result && (result.success || result.notificationId)) {
           // Reset degli stati
-          if (typeof updateReceiversList === 'function') {
+          if (typeof updateReceiversList === "function") {
             updateReceiversList("");
           }
           setMessage("");
@@ -737,11 +787,11 @@ const ChatBottomBar = ({
           setAttachments([]);
 
           // Resetta messaggio di risposta
-          if (typeof setReplyToMessage === 'function') {
+          if (typeof setReplyToMessage === "function") {
             setReplyToMessage(null);
           } else {
             // Emetti un evento personalizzato
-            document.dispatchEvent(new CustomEvent('clear-reply-message'));
+            document.dispatchEvent(new CustomEvent("clear-reply-message"));
           }
 
           setClipboardImage(null);
@@ -762,72 +812,87 @@ const ChatBottomBar = ({
               onRequestClose();
               // Poi apri la nuova chat
               setTimeout(() => {
-                if (openChatModal) openChatModal(result.notificationId || result.id);
+                if (openChatModal)
+                  openChatModal(result.notificationId || result.id);
               }, 100);
             }
           }
 
           // Emetti un evento per forzare l'aggiornamento con alta priorità
-          document.dispatchEvent(new CustomEvent('chat-message-sent', {
-            detail: {
-              notificationId: result.notificationId || notificationData.notificationId,
-              highPriority: true
-            }
-          }));
+          document.dispatchEvent(
+            new CustomEvent("chat-message-sent", {
+              detail: {
+                notificationId:
+                  result.notificationId || notificationData.notificationId,
+                highPriority: true,
+              },
+            }),
+          );
 
           // Aggiornamento diretto tramite context
           if (contextFunctions.fetchNotificationById) {
             setTimeout(() => {
-              contextFunctions.fetchNotificationById(result.notificationId || notificationId, true);
+              contextFunctions.fetchNotificationById(
+                result.notificationId || notificationId,
+                true,
+              );
               // Aggiorna gli allegati
-              getNotificationAttachments(result.notificationId || notificationId)
-                .then(data => {
+              getNotificationAttachments(
+                result.notificationId || notificationId,
+              )
+                .then((data) => {
                   if (Array.isArray(data)) {
                     // Emetti un evento per aggiornare ChatSidebar
-                    document.dispatchEvent(new CustomEvent('attachments-updated', {
-                      detail: {
-                        notificationId: result.notificationId || notificationId,
-                        attachments: data
-                      }
-                    }));
+                    document.dispatchEvent(
+                      new CustomEvent("attachments-updated", {
+                        detail: {
+                          notificationId:
+                            result.notificationId || notificationId,
+                          attachments: data,
+                        },
+                      }),
+                    );
                   }
                 })
-                .catch(err => {
-                  console.error('Error refreshing attachments:', err);
+                .catch((err) => {
+                  console.error("Error refreshing attachments:", err);
                 });
             }, 100);
           }
         } else {
           // Rimuovi il messaggio temporaneo in caso di errore
-          document.dispatchEvent(new CustomEvent('temp-message-removed', {
-            detail: {
-              messageId: tempMessage.messageId,
-              notificationId
-            }
-          }));
+          document.dispatchEvent(
+            new CustomEvent("temp-message-removed", {
+              detail: {
+                messageId: tempMessage.messageId,
+                notificationId,
+              },
+            }),
+          );
         }
 
         return result;
       } catch (error) {
-        console.error('Error sending message with attachments:', error);
-        swal.fire('Errore', 'Impossibile inviare il messaggio', 'error');
+        console.error("Error sending message with attachments:", error);
+        swal.fire("Errore", "Impossibile inviare il messaggio", "error");
 
         // Rimuovi il messaggio temporaneo in caso di errore
-        document.dispatchEvent(new CustomEvent('temp-message-removed', {
-          detail: {
-            messageId: tempMessage.messageId,
-            notificationId
-          }
-        }));
+        document.dispatchEvent(
+          new CustomEvent("temp-message-removed", {
+            detail: {
+              messageId: tempMessage.messageId,
+              notificationId,
+            },
+          }),
+        );
       } finally {
-        if (typeof setSending === 'function') {
+        if (typeof setSending === "function") {
           setSending(false);
         }
         setLoading(false);
       }
     }
   };
-
 
   const handleSend = async (msg = message) => {
     if (disabled) return; // Non fare nulla se la chat è disabilitata
@@ -838,16 +903,20 @@ const ChatBottomBar = ({
     }
 
     // Validazioni...
-    if (isNewMessage && (!title)) {
-      swal.fire('Errore', 'Attenzione: il titolo è obbligatorio', 'error');
+    if (isNewMessage && !title) {
+      swal.fire("Errore", "Attenzione: il titolo è obbligatorio", "error");
       return;
     }
-    if (isNewMessage && (!msg)) {
-      swal.fire('Errore', 'Attenzione: il messaggio è obbligatorio', 'error');
+    if (isNewMessage && !msg) {
+      swal.fire("Errore", "Attenzione: il messaggio è obbligatorio", "error");
       return;
     }
-    if (isNewMessage && (!receiversList && notificationCategoryId <= 1)) {
-      swal.fire('Errore', 'Assicurati di aver selezionato almeno un destinatario', 'error');
+    if (isNewMessage && !receiversList && notificationCategoryId <= 1) {
+      swal.fire(
+        "Errore",
+        "Assicurati di aver selezionato almeno un destinatario",
+        "error",
+      );
       return;
     }
 
@@ -855,17 +924,19 @@ const ChatBottomBar = ({
       // Aggiungiamo un feedback immediato all'utente creando una copia locale temporanea
       // del messaggio che sarà visibile immediatamente
       // Find current user safely
-      const currentUser = users?.find(user => user?.isCurrentUser);
+      const currentUser = users?.find((user) => user?.isCurrentUser);
 
       // Crea una copia temporanea del messaggio per visualizzazione immediata
       const tempMessage = {
         messageId: `temp_${Date.now()}`,
         message: msg,
         senderId: currentUser?.userId || 0,
-        senderName: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Tu',
-        selectedUser: '1',
+        senderName: currentUser
+          ? `${currentUser.firstName} ${currentUser.lastName}`
+          : "Tu",
+        selectedUser: "1",
         tbCreated: new Date().toISOString(),
-        replyToMessageId: replyToMessage ? replyToMessage.messageId : 0
+        replyToMessageId: replyToMessage ? replyToMessage.messageId : 0,
       };
 
       // Preserva i ritorni a capo - non aggiungere manipolazioni extra al messaggio
@@ -880,7 +951,7 @@ const ChatBottomBar = ({
         replyToMessageId: replyToMessage ? replyToMessage.messageId : 0,
       };
 
-      if (typeof setSending === 'function') {
+      if (typeof setSending === "function") {
         setSending(true);
       }
       setLoading(true);
@@ -889,7 +960,7 @@ const ChatBottomBar = ({
         let result;
 
         // Usa la funzione onSend passata come prop se disponibile, altrimenti usa sendNotification dal contesto
-        if (typeof onSend === 'function') {
+        if (typeof onSend === "function") {
           result = await onSend(notificationData);
         } else {
           result = await sendNotification(notificationData);
@@ -897,18 +968,18 @@ const ChatBottomBar = ({
 
         // Resetta gli stati se l'invio è andato a buon fine
         if (result) {
-          if (typeof updateReceiversList === 'function') {
+          if (typeof updateReceiversList === "function") {
             updateReceiversList("");
           }
           setMessage("");
           setIsUpdatingContentEditable(true);
 
           // Resetta il messaggio di risposta
-          if (typeof setReplyToMessage === 'function') {
+          if (typeof setReplyToMessage === "function") {
             setReplyToMessage(null);
           } else {
             // Emetti un evento personalizzato se setReplyToMessage non è disponibile
-            document.dispatchEvent(new CustomEvent('clear-reply-message'));
+            document.dispatchEvent(new CustomEvent("clear-reply-message"));
           }
 
           setPlaceholderVisible(true);
@@ -931,25 +1002,26 @@ const ChatBottomBar = ({
 
         return result;
       } catch (error) {
-        console.error('Error sending message:', error);
-        swal.fire('Errore', 'Impossibile inviare il messaggio', 'error');
+        console.error("Error sending message:", error);
+        swal.fire("Errore", "Impossibile inviare il messaggio", "error");
 
         // Rimuovi il messaggio temporaneo in caso di errore
-        document.dispatchEvent(new CustomEvent('temp-message-removed', {
-          detail: {
-            messageId: tempMessage.messageId,
-            notificationId: notificationId
-          }
-        }));
+        document.dispatchEvent(
+          new CustomEvent("temp-message-removed", {
+            detail: {
+              messageId: tempMessage.messageId,
+              notificationId: notificationId,
+            },
+          }),
+        );
       } finally {
-        if (typeof setSending === 'function') {
+        if (typeof setSending === "function") {
           setSending(false);
         }
         setLoading(false);
       }
     }
   };
-
 
   const handleThumbsUp = async () => {
     if (disabled) return; // Non fare nulla se la chat è disabilitata
@@ -964,7 +1036,7 @@ const ChatBottomBar = ({
       receiversList,
     };
 
-    if (typeof setSending === 'function') {
+    if (typeof setSending === "function") {
       setSending(true);
     }
     setLoading(true);
@@ -973,7 +1045,7 @@ const ChatBottomBar = ({
       let result;
 
       // Usa la funzione onSend passata come prop se disponibile, altrimenti usa sendNotification dal contesto
-      if (typeof onSend === 'function') {
+      if (typeof onSend === "function") {
         result = await onSend(notificationData);
       } else {
         result = await sendNotification(notificationData);
@@ -981,7 +1053,7 @@ const ChatBottomBar = ({
 
       // Resetta gli stati se l'invio è andato a buon fine
       if (result) {
-        if (typeof updateReceiversList === 'function') {
+        if (typeof updateReceiversList === "function") {
           updateReceiversList("");
         }
         setMessage("");
@@ -989,22 +1061,24 @@ const ChatBottomBar = ({
         setPlaceholderVisible(true);
 
         // Emetti un evento per forzare l'aggiornamento
-        document.dispatchEvent(new CustomEvent('refreshNotifications'));
+        document.dispatchEvent(new CustomEvent("refreshNotifications"));
 
         // Emetti anche un evento specifico
-        document.dispatchEvent(new CustomEvent('chat-message-sent', {
-          detail: {
-            notificationId: notificationData.notificationId
-          }
-        }));
+        document.dispatchEvent(
+          new CustomEvent("chat-message-sent", {
+            detail: {
+              notificationId: notificationData.notificationId,
+            },
+          }),
+        );
       }
 
       return result;
     } catch (error) {
-      console.error('Error sending thumbs up:', error);
-      swal.fire('Errore', 'Impossibile inviare il messaggio', 'error');
+      console.error("Error sending thumbs up:", error);
+      swal.fire("Errore", "Impossibile inviare il messaggio", "error");
     } finally {
-      if (typeof setSending === 'function') {
+      if (typeof setSending === "function") {
         setSending(false);
       }
       setLoading(false);
@@ -1052,17 +1126,24 @@ const ChatBottomBar = ({
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    const options = { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' };
-    return new Intl.DateTimeFormat('it-IT', options).format(date);
+    const options = {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    };
+    return new Intl.DateTimeFormat("it-IT", options).format(date);
   };
 
   // Funzione per gestire il caricamento di un file
   const handleFileSelect = (input) => {
-    if (disabled || !input?.target?.files || input?.target?.files.length === 0) return;
+    if (disabled || !input?.target?.files || input?.target?.files.length === 0)
+      return;
 
     try {
       const newFiles = Array.from(input.target.files);
-      setAttachments(prev => [...prev, ...newFiles]);
+      setAttachments((prev) => [...prev, ...newFiles]);
       setShowAttachMenu(false); // Chiudi il menu dopo la selezione
 
       // Focus sull'area di input per una migliore esperienza utente
@@ -1072,8 +1153,8 @@ const ChatBottomBar = ({
         }, 0);
       }
     } catch (error) {
-      console.error('Error selecting files:', error);
-      swal.fire('Errore', 'Errore nella selezione dei file', 'error');
+      console.error("Error selecting files:", error);
+      swal.fire("Errore", "Errore nella selezione dei file", "error");
 
       // Reset dell'input anche in caso di errore
       if (fileInputRef.current) {
@@ -1087,7 +1168,7 @@ const ChatBottomBar = ({
     if (disabled || !file) return;
 
     try {
-      setAttachments(prev => [...prev, file]);
+      setAttachments((prev) => [...prev, file]);
 
       // Focus sull'area di input per una migliore esperienza utente
       if (inputRef.current) {
@@ -1096,15 +1177,15 @@ const ChatBottomBar = ({
         }, 0);
       }
     } catch (error) {
-      console.error('Error with dragged file:', error);
-      swal.fire('Errore', 'Errore nella gestione del file', 'error');
+      console.error("Error with dragged file:", error);
+      swal.fire("Errore", "Errore nella gestione del file", "error");
     }
   };
 
   const removeAttachment = (index) => {
     if (disabled) return; // Non fare nulla se la chat è disabilitata
 
-    setAttachments(prev => {
+    setAttachments((prev) => {
       // Crea una nuova array senza l'elemento all'indice specificato
       const updatedAttachments = prev.filter((_, i) => i !== index);
 
@@ -1131,16 +1212,16 @@ const ChatBottomBar = ({
       const result = await captureFunc(notificationId);
       if (result) {
         swal.fire({
-          icon: 'success',
-          text: 'Foto caricata con successo',
+          icon: "success",
+          text: "Foto caricata con successo",
           toast: true,
-          position: 'top-end',
+          position: "top-end",
           showConfirmButton: false,
-          timer: 3000
+          timer: 3000,
         });
       }
     } catch (error) {
-      swal.fire('Errore', 'Impossibile catturare o caricare la foto', 'error');
+      swal.fire("Errore", "Impossibile catturare o caricare la foto", "error");
     } finally {
       setLoading(false);
     }
@@ -1149,7 +1230,7 @@ const ChatBottomBar = ({
   const toggleAttachMenu = () => {
     if (disabled) return; // Non fare nulla se la chat è disabilitata
 
-    setShowAttachMenu(prev => !prev);
+    setShowAttachMenu((prev) => !prev);
   };
 
   // Se la chat è stata abbandonata, mostra un messaggio informativo invece della barra di input
@@ -1164,10 +1245,12 @@ const ChatBottomBar = ({
 
   if (isClosed) {
     return (
-      <div className='flex justify-between w-full items-center gap-2 border-t border-gray-200 px-4 py-3 bg-gray-50'>
+      <div className="flex justify-between w-full items-center gap-2 border-t border-gray-200 px-4 py-3 bg-gray-50">
         <div className="flex-1 text-center">
           <p className="text-gray-600 text-sm">
-            La chat è stata chiusa da <span className="font-medium">{closingUser_Name}</span> il {formatDate(closingDate)}
+            La chat è stata chiusa da{" "}
+            <span className="font-medium">{closingUser_Name}</span> il{" "}
+            {formatDate(closingDate)}
           </p>
         </div>
         <button
@@ -1186,9 +1269,9 @@ const ChatBottomBar = ({
       ref={containerRef}
       className="w-full bg-white border-t border-gray-200 chat-bottom-bar-container"
       style={{
-        maxHeight: isNewMessage ? '150px' : '180px',
-        overflowY: 'visible',
-        position: 'relative'
+        maxHeight: isNewMessage ? "150px" : "180px",
+        overflowY: "visible",
+        position: "relative",
       }}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -1200,7 +1283,9 @@ const ChatBottomBar = ({
         <div className="drag-overlay">
           <div className="drag-overlay-content">
             <Paperclip className="drag-overlay-icon" />
-            <p className="drag-overlay-text">Rilascia qui per allegare il file</p>
+            <p className="drag-overlay-text">
+              Rilascia qui per allegare il file
+            </p>
           </div>
         </div>
       )}
@@ -1217,7 +1302,7 @@ const ChatBottomBar = ({
                   className="flex items-center justify-between p-2 rounded-lg bg-white shadow-sm border border-gray-100 mb-1"
                   style={{
                     backgroundColor: `${categoryColor}10`,
-                    borderLeft: `3px solid ${categoryColor}`
+                    borderLeft: `3px solid ${categoryColor}`,
                   }}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -1225,9 +1310,15 @@ const ChatBottomBar = ({
                   transition={{ duration: 0.2 }}
                 >
                   <div className="flex items-start flex-1 min-w-0 gap-2">
-                    <Reply className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: categoryColor }} />
+                    <Reply
+                      className="h-4 w-4 mt-0.5 flex-shrink-0"
+                      style={{ color: categoryColor }}
+                    />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium" style={{ color: categoryColor }}>
+                      <p
+                        className="text-xs font-medium"
+                        style={{ color: categoryColor }}
+                      >
                         Risposta a: {replyToMessage.senderName}
                       </p>
                       <p className="text-xs text-gray-700 truncate">
@@ -1286,12 +1377,14 @@ const ChatBottomBar = ({
                       key={index}
                       className="flex items-center bg-gray-100 rounded-full pl-2 pr-1 py-1 text-gray-700 border border-gray-200"
                     >
-                      {file.type.startsWith('image/') ? (
+                      {file.type.startsWith("image/") ? (
                         <Image className="h-3 w-3 text-blue-500 mr-1 flex-shrink-0" />
                       ) : (
                         <FileIcon className="h-3 w-3 text-gray-500 mr-1 flex-shrink-0" />
                       )}
-                      <span className="text-xs truncate max-w-[80px]">{file.name}</span>
+                      <span className="text-xs truncate max-w-[80px]">
+                        {file.name}
+                      </span>
                       <button
                         className="ml-1 p-0.5 rounded-full hover:bg-gray-200 text-gray-500 hover:text-red-500"
                         onClick={() => removeAttachment(index)}
@@ -1310,14 +1403,14 @@ const ChatBottomBar = ({
             {/* Menu allegati e selettore destinatari - SPOSTATO A SINISTRA */}
             {allowedResponses.length === 0 && allowReply && (
               <div className="flex gap-1">
-
                 {/* Menu allegati */}
                 <div className="relative flex-shrink-0" ref={attachMenuRef}>
                   <button
-                    className={`p-2 rounded-full ${showAttachMenu
-                        ? 'bg-gray-200 text-gray-800'
-                        : 'text-gray-500 hover:bg-gray-100'
-                      }`}
+                    className={`p-2 rounded-full ${
+                      showAttachMenu
+                        ? "bg-gray-200 text-gray-800"
+                        : "text-gray-500 hover:bg-gray-100"
+                    }`}
                     onClick={toggleAttachMenu}
                     disabled={loading}
                     title="Allegati"
@@ -1334,7 +1427,7 @@ const ChatBottomBar = ({
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
-                        style={{ width: '150px' }}
+                        style={{ width: "150px" }}
                       >
                         <button
                           className="flex items-center w-full px-3 py-2 text-left hover:bg-gray-100 text-sm"
@@ -1353,7 +1446,7 @@ const ChatBottomBar = ({
             {/* Main Input Area */}
             <div
               className="flex-1 bg-gray-100 rounded-xl"
-              style={{ height: '48px' }}
+              style={{ height: "48px" }}
             >
               {allowedResponses.length > 0 ? (
                 <div className="flex flex-wrap gap-2 justify-center p-2">
@@ -1363,7 +1456,7 @@ const ChatBottomBar = ({
                       onClick={() => handleOptionClick(option)}
                       className="px-3 py-1.5 bg-white shadow-sm hover:shadow text-sm rounded-lg border border-gray-200 transition-all"
                       style={{
-                        borderLeft: `3px solid ${categoryColor}`
+                        borderLeft: `3px solid ${categoryColor}`,
                       }}
                     >
                       {option}
@@ -1385,7 +1478,7 @@ const ChatBottomBar = ({
                       setIsFocused(false);
                       setPlaceholderVisible(!message);
                     }}
-                    className={`py-1.5 px-3 w-full outline-none rounded-xl ${disabled ? 'bg-gray-200 cursor-not-allowed' : ''}`}
+                    className={`py-1.5 px-3 w-full outline-none rounded-xl ${disabled ? "bg-gray-200 cursor-not-allowed" : ""}`}
                     style={{
                       whiteSpace: "pre-wrap",
                       wordWrap: "break-word",
@@ -1395,7 +1488,7 @@ const ChatBottomBar = ({
                       overflowY: "auto",
                       overflowX: "hidden",
                       width: "100%",
-                      display: "block"
+                      display: "block",
                     }}
                     suppressContentEditableWarning={true}
                     aria-disabled={disabled}
@@ -1416,7 +1509,7 @@ const ChatBottomBar = ({
                   className="absolute bottom-full left-0 w-full bg-white rounded-lg shadow-lg z-10 mb-2"
                   style={{
                     maxHeight: "200px",
-                    overflowY: "auto"
+                    overflowY: "auto",
                   }}
                 >
                   {mentionSuggestions.map((user) => (
@@ -1455,7 +1548,8 @@ const ChatBottomBar = ({
                     lastSelectionRef.current = saveSelection();
 
                     // Calcola la posizione per l'inserimento dell'emoji
-                    const currentPosition = lastSelectionRef.current?.start || message.length;
+                    const currentPosition =
+                      lastSelectionRef.current?.start || message.length;
                     const beforeEmoji = message.substring(0, currentPosition);
                     const afterEmoji = message.substring(currentPosition);
 
@@ -1473,7 +1567,7 @@ const ChatBottomBar = ({
                     setCursorPosition({
                       start: currentPosition + value.length,
                       end: currentPosition + value.length,
-                      isAtEnd: false
+                      isAtEnd: false,
                     });
 
                     if (inputRef.current) {
@@ -1487,20 +1581,30 @@ const ChatBottomBar = ({
               {/* Send/Like Button */}
               {allowedResponses.length === 0 && allowReply && !disabled && (
                 <button
-                  className={`p-2 rounded-full ${message.trim() || attachments.length > 0
+                  className={`p-2 rounded-full ${
+                    message.trim() || attachments.length > 0
                       ? `text-white`
-                      : 'text-gray-500 hover:bg-gray-100'
-                    }`}
+                      : "text-gray-500 hover:bg-gray-100"
+                  }`}
                   style={{
-                    backgroundColor: message.trim() || attachments.length > 0 ? categoryColor : 'transparent'
+                    backgroundColor:
+                      message.trim() || attachments.length > 0
+                        ? categoryColor
+                        : "transparent",
                   }}
                   onClick={() =>
                     message.trim() || attachments.length > 0
-                      ? (attachments.length > 0 ? handleSendWithAttachments() : handleSend())
+                      ? attachments.length > 0
+                        ? handleSendWithAttachments()
+                        : handleSend()
                       : handleThumbsUp()
                   }
                   disabled={loading || disabled}
-                  title={message.trim() || attachments.length > 0 ? "Invia messaggio" : "Mi piace"}
+                  title={
+                    message.trim() || attachments.length > 0
+                      ? "Invia messaggio"
+                      : "Mi piace"
+                  }
                 >
                   {message.trim() || attachments.length > 0 ? (
                     <SendHorizontal className="h-5 w-5" />
@@ -1530,10 +1634,10 @@ const ChatBottomBar = ({
             Premi Invio per inviare, Shift+Invio per andare a capo
           </p>
 
-          {receiversList && receiversList.split('-').length > 0 && (
+          {receiversList && receiversList.split("-").length > 0 && (
             <p className="text-xs text-blue-600 flex items-center">
               <Users className="h-3 w-3 mr-1" />
-              {receiversList.split('-').length} destinatari selezionati
+              {receiversList.split("-").length} destinatari selezionati
             </p>
           )}
         </div>

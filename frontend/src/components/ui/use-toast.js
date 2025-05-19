@@ -9,7 +9,7 @@ const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
   UPDATE_TOAST: "UPDATE_TOAST",
   DISMISS_TOAST: "DISMISS_TOAST",
-  REMOVE_TOAST: "REMOVE_TOAST"
+  REMOVE_TOAST: "REMOVE_TOAST",
 };
 
 let count = 0;
@@ -49,7 +49,8 @@ export const reducer = (state, action) => {
       return {
         ...state,
         toasts: state.toasts.map((t) =>
-          t.id === action.toast.id ? { ...t, ...action.toast } : t),
+          t.id === action.toast.id ? { ...t, ...action.toast } : t,
+        ),
       };
 
     case "DISMISS_TOAST": {
@@ -71,7 +72,8 @@ export const reducer = (state, action) => {
                 ...t,
                 open: false,
               }
-            : t),
+            : t,
+        ),
       };
     }
     case "REMOVE_TOAST":
@@ -99,9 +101,7 @@ function dispatch(action) {
   });
 }
 
-function toast({
-  ...props
-}) {
+function toast({ ...props }) {
   const id = genId();
 
   const update = (props) =>

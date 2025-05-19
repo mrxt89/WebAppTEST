@@ -1,125 +1,125 @@
 {
-    "title": "Gestione Categorie",
-    "description": "Questa sezione permette di gestire le categorie e sottocategorie dei progetti.",
-    "sections": [
+  "title": "Gestione Categorie",
+  "description": "Questa sezione permette di gestire le categorie e sottocategorie dei progetti.",
+  "sections": [
+    {
+      "title": "Panoramica",
+      "content": "<p>La pagina <strong>Gestione Categorie</strong> permette di creare, modificare e gestire le categorie dei progetti con le relative sottocategorie.</p><p>Le categorie vengono utilizzate per organizzare i progetti e facilitare la ricerca e il filtraggio.</p>",
+      "tourId": "panoramica"
+    },
+    {
+      "title": "Creare una nuova categoria",
+      "content": "<p>Per creare una nuova categoria:</p><ol><li>Clicca sul pulsante <strong>Nuova Categoria</strong> in alto a destra</li><li>Inserisci il nome della categoria</li><li>Seleziona un colore per la categoria usando il selettore di colori</li><li>Clicca su <strong>Salva</strong> per confermare</li></ol>",
+      "tourId": "nuova_categoria"
+    },
+    {
+      "title": "Aggiungere sottocategorie",
+      "content": "<p>Puoi aggiungere sottocategorie a una categoria esistente:</p><ol><li>Trova la categoria a cui vuoi aggiungere una sottocategoria</li><li>Clicca sul pulsante <strong>+</strong> nella colonna Sottocategorie</li><li>Inserisci il nome della sottocategoria</li><li>Clicca su <strong>Salva</strong> per confermare</li></ol>",
+      "tourId": "sottocategorie"
+    },
+    {
+      "title": "Attivare/Disattivare categorie",
+      "content": "<p>Puoi attivare o disattivare categorie e sottocategorie:</p><ul><li>Per le categorie, usa l'icona <strong>occhio</strong> nella colonna Azioni</li><li>Per le sottocategorie, usa l'icona <strong>occhio</strong> accanto al nome della sottocategoria</li></ul><p>Le categorie disattivate non saranno visibili durante la creazione di nuovi progetti.</p>"
+    },
+    {
+      "title": "Modificare categorie esistenti",
+      "content": "<p>Per modificare una categoria:</p><ol><li>Clicca sull'icona <strong>matita</strong> nella colonna Azioni</li><li>Modifica il nome o il colore della categoria</li><li>Clicca su <strong>Salva</strong> per confermare le modifiche</li></ol>"
+    },
+    {
+      "title": "Stati delle categorie",
+      "content": "<p>Le categorie e sottocategorie possono avere i seguenti stati:</p><ul><li><strong>Attiva</strong>: la categoria è visibile e utilizzabile</li><li><strong>Disabilitata</strong>: la categoria non è disponibile per nuovi progetti</li></ul><p>Nota: disabilitare una categoria non influisce sui progetti esistenti che già utilizzano quella categoria.</p>"
+    }
+  ],
+  "tours": {
+    "panoramica": [
       {
-        "title": "Panoramica",
-        "content": "<p>La pagina <strong>Gestione Categorie</strong> permette di creare, modificare e gestire le categorie dei progetti con le relative sottocategorie.</p><p>Le categorie vengono utilizzate per organizzare i progetti e facilitare la ricerca e il filtraggio.</p>",
-        "tourId": "panoramica"
+        "title": "Benvenuto in Gestione Categorie",
+        "description": "Questo tour ti mostrerà come navigare e utilizzare la pagina di gestione delle categorie.",
+        "selector": ".card",
+        "position": "bottom"
       },
       {
-        "title": "Creare una nuova categoria",
-        "content": "<p>Per creare una nuova categoria:</p><ol><li>Clicca sul pulsante <strong>Nuova Categoria</strong> in alto a destra</li><li>Inserisci il nome della categoria</li><li>Seleziona un colore per la categoria usando il selettore di colori</li><li>Clicca su <strong>Salva</strong> per confermare</li></ol>",
-        "tourId": "nuova_categoria"
+        "title": "Tabella delle categorie",
+        "description": "Qui puoi visualizzare tutte le categorie create e gestirle.",
+        "selector": "table",
+        "position": "top"
       },
       {
-        "title": "Aggiungere sottocategorie",
-        "content": "<p>Puoi aggiungere sottocategorie a una categoria esistente:</p><ol><li>Trova la categoria a cui vuoi aggiungere una sottocategoria</li><li>Clicca sul pulsante <strong>+</strong> nella colonna Sottocategorie</li><li>Inserisci il nome della sottocategoria</li><li>Clicca su <strong>Salva</strong> per confermare</li></ol>",
-        "tourId": "sottocategorie"
+        "title": "Colonna delle sottocategorie",
+        "description": "In questa colonna puoi vedere tutte le sottocategorie associate a una categoria e aggiungerne di nuove.",
+        "selector": "th:nth-child(3)",
+        "position": "bottom"
       },
       {
-        "title": "Attivare/Disattivare categorie",
-        "content": "<p>Puoi attivare o disattivare categorie e sottocategorie:</p><ul><li>Per le categorie, usa l'icona <strong>occhio</strong> nella colonna Azioni</li><li>Per le sottocategorie, usa l'icona <strong>occhio</strong> accanto al nome della sottocategoria</li></ul><p>Le categorie disattivate non saranno visibili durante la creazione di nuovi progetti.</p>"
+        "title": "Stato delle categorie",
+        "description": "Qui puoi vedere se una categoria è attiva o disabilitata.",
+        "selector": "th:nth-child(4)",
+        "position": "bottom"
       },
       {
-        "title": "Modificare categorie esistenti",
-        "content": "<p>Per modificare una categoria:</p><ol><li>Clicca sull'icona <strong>matita</strong> nella colonna Azioni</li><li>Modifica il nome o il colore della categoria</li><li>Clicca su <strong>Salva</strong> per confermare le modifiche</li></ol>"
-      },
-      {
-        "title": "Stati delle categorie",
-        "content": "<p>Le categorie e sottocategorie possono avere i seguenti stati:</p><ul><li><strong>Attiva</strong>: la categoria è visibile e utilizzabile</li><li><strong>Disabilitata</strong>: la categoria non è disponibile per nuovi progetti</li></ul><p>Nota: disabilitare una categoria non influisce sui progetti esistenti che già utilizzano quella categoria.</p>"
+        "title": "Azioni disponibili",
+        "description": "In questa colonna puoi modificare o attivare/disattivare una categoria.",
+        "selector": "th:nth-child(5)",
+        "position": "left"
       }
     ],
-    "tours": {
-      "panoramica": [
-        {
-          "title": "Benvenuto in Gestione Categorie",
-          "description": "Questo tour ti mostrerà come navigare e utilizzare la pagina di gestione delle categorie.",
-          "selector": ".card",
-          "position": "bottom"
-        },
-        {
-          "title": "Tabella delle categorie",
-          "description": "Qui puoi visualizzare tutte le categorie create e gestirle.",
-          "selector": "table",
-          "position": "top"
-        },
-        {
-          "title": "Colonna delle sottocategorie",
-          "description": "In questa colonna puoi vedere tutte le sottocategorie associate a una categoria e aggiungerne di nuove.",
-          "selector": "th:nth-child(3)",
-          "position": "bottom"
-        },
-        {
-          "title": "Stato delle categorie",
-          "description": "Qui puoi vedere se una categoria è attiva o disabilitata.",
-          "selector": "th:nth-child(4)",
-          "position": "bottom"
-        },
-        {
-          "title": "Azioni disponibili",
-          "description": "In questa colonna puoi modificare o attivare/disattivare una categoria.",
-          "selector": "th:nth-child(5)",
-          "position": "left"
-        }
-      ],
-      "nuova_categoria": [
-        {
-          "title": "Creare una nuova categoria",
-          "description": "Ti mostrerò come creare una nuova categoria di progetto.",
-          "selector": "button:has(.h-4.w-4)",
-          "position": "bottom"
-        },
-        {
-          "title": "Inserire il nome",
-          "description": "Qui puoi inserire il nome della nuova categoria.",
-          "selector": ".dialog-content input:first-of-type",
-          "position": "bottom"
-        },
-        {
-          "title": "Scegliere un colore",
-          "description": "Seleziona un colore per identificare visivamente la categoria.",
-          "selector": "input[type='color']",
-          "position": "top"
-        },
-        {
-          "title": "Salvare la categoria",
-          "description": "Clicca su Salva per confermare la creazione della categoria.",
-          "selector": ".dialog-content button:last-child",
-          "position": "top"
-        }
-      ],
-      "sottocategorie": [
-        {
-          "title": "Aggiungere sottocategorie",
-          "description": "Ti mostrerò come aggiungere sottocategorie a una categoria esistente.",
-          "selector": "tbody tr:first-child .flex.flex-wrap button:first-child",
-          "position": "bottom"
-        },
-        {
-          "title": "Inserire il nome della sottocategoria",
-          "description": "Qui puoi inserire il nome della nuova sottocategoria.",
-          "selector": ".dialog-content input:first-of-type",
-          "position": "bottom"
-        },
-        {
-          "title": "Salvare la sottocategoria",
-          "description": "Clicca su Salva per confermare la creazione della sottocategoria.",
-          "selector": ".dialog-content button:last-child",
-          "position": "top"
-        },
-        {
-          "title": "Sottocategorie create",
-          "description": "Le sottocategorie create appariranno qui come badge colorati.",
-          "selector": "tbody tr:first-child .flex.flex-wrap",
-          "position": "bottom"
-        },
-        {
-          "title": "Gestire lo stato delle sottocategorie",
-          "description": "Puoi attivare o disattivare una sottocategoria cliccando sull'icona dell'occhio.",
-          "selector": "tbody tr:first-child .badge button:first-child",
-          "position": "bottom"
-        }
-      ]
-    }
+    "nuova_categoria": [
+      {
+        "title": "Creare una nuova categoria",
+        "description": "Ti mostrerò come creare una nuova categoria di progetto.",
+        "selector": "button:has(.h-4.w-4)",
+        "position": "bottom"
+      },
+      {
+        "title": "Inserire il nome",
+        "description": "Qui puoi inserire il nome della nuova categoria.",
+        "selector": ".dialog-content input:first-of-type",
+        "position": "bottom"
+      },
+      {
+        "title": "Scegliere un colore",
+        "description": "Seleziona un colore per identificare visivamente la categoria.",
+        "selector": "input[type='color']",
+        "position": "top"
+      },
+      {
+        "title": "Salvare la categoria",
+        "description": "Clicca su Salva per confermare la creazione della categoria.",
+        "selector": ".dialog-content button:last-child",
+        "position": "top"
+      }
+    ],
+    "sottocategorie": [
+      {
+        "title": "Aggiungere sottocategorie",
+        "description": "Ti mostrerò come aggiungere sottocategorie a una categoria esistente.",
+        "selector": "tbody tr:first-child .flex.flex-wrap button:first-child",
+        "position": "bottom"
+      },
+      {
+        "title": "Inserire il nome della sottocategoria",
+        "description": "Qui puoi inserire il nome della nuova sottocategoria.",
+        "selector": ".dialog-content input:first-of-type",
+        "position": "bottom"
+      },
+      {
+        "title": "Salvare la sottocategoria",
+        "description": "Clicca su Salva per confermare la creazione della sottocategoria.",
+        "selector": ".dialog-content button:last-child",
+        "position": "top"
+      },
+      {
+        "title": "Sottocategorie create",
+        "description": "Le sottocategorie create appariranno qui come badge colorati.",
+        "selector": "tbody tr:first-child .flex.flex-wrap",
+        "position": "bottom"
+      },
+      {
+        "title": "Gestire lo stato delle sottocategorie",
+        "description": "Puoi attivare o disattivare una sottocategoria cliccando sull'icona dell'occhio.",
+        "selector": "tbody tr:first-child .badge button:first-child",
+        "position": "bottom"
+      }
+    ]
   }
+}
