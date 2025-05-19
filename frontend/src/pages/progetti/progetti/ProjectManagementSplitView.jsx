@@ -1295,7 +1295,9 @@ const ProjectManagementSplitView = () => {
 
   // Rendering
   return (
-    <div className="flex h-screen">
+    <div className="flex"
+      style={{height: 'calc(100vh - 150px)'}}
+    >
       {/* Sezione sinistra (1/3) - Dashboard */}
       <div className="w-1/3 border-r h-full flex flex-col p-4 overflow-hidden">
         <div className="flex justify-between items-center mb-4">
