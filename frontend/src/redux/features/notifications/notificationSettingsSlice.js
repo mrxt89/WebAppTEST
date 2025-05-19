@@ -1,12 +1,12 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice } from "@reduxjs/toolkit";
 
 const notificationSettingsSlice = createSlice({
-  name: 'notificationSettings',
+  name: "notificationSettings",
   initialState: {
     notificationsEnabled: true,
     soundEnabled: true,
     webNotificationsEnabled: false,
-    webNotificationsPermission: 'default'
+    webNotificationsPermission: "default",
   },
   reducers: {
     setNotificationsEnabled: (state, action) => {
@@ -20,15 +20,15 @@ const notificationSettingsSlice = createSlice({
     },
     setWebNotificationsPermission: (state, action) => {
       state.webNotificationsPermission = action.payload;
-    }
-  }
+    },
+  },
 });
 
-export const { 
+export const {
   setNotificationsEnabled,
   setSoundEnabled,
   setWebNotificationsEnabled,
-  setWebNotificationsPermission
+  setWebNotificationsPermission,
 } = notificationSettingsSlice.actions;
 
-export default notificationSettingsSlice.reducer; 
+export default notificationSettingsSlice.reducer;

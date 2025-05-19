@@ -1,14 +1,22 @@
-import React from 'react';
-import { CircleHelp } from 'lucide-react';
-import { useWikiContext } from './WikiContext';
-import { useLocation } from 'react-router-dom';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import React from "react";
+import { CircleHelp } from "lucide-react";
+import { useWikiContext } from "./WikiContext";
+import { useLocation } from "react-router-dom";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /**
  * Pulsante Wiki per la barra superiore (Header)
  * Versione semplificata che apre direttamente la wiki contestuale
  */
-const WikiButton = ({ fromNotificationSidebar = false, specificSection = null }) => {
+const WikiButton = ({
+  fromNotificationSidebar = false,
+  specificSection = null,
+}) => {
   const { openWiki } = useWikiContext();
   const location = useLocation();
 
@@ -18,36 +26,40 @@ const WikiButton = ({ fromNotificationSidebar = false, specificSection = null })
     if (specificSection) {
       return specificSection;
     }
-    
+
     // Verifica se siamo nella sidebar delle notifiche
     if (fromNotificationSidebar) {
-      return 'notifications';
+      return "notifications";
     }
-    
+
     // Verifica se siamo nella pagina delle attività
-    const isTasksPage = location.pathname.includes('/progetti/attivita');
-    
+    const isTasksPage = location.pathname.includes("/progetti/attivita");
+
     if (!isTasksPage) return null;
-    
+
     // Verifica se c'è una tab timesheet attiva
-    const isTimesheetActive = document.querySelector('button[value="timesheet"].active, button[value="timesheet"][data-state="active"], button[value="timesheet"][aria-selected="true"]');
-    if (isTimesheetActive) return 'timesheet';
-    
+    const isTimesheetActive = document.querySelector(
+      'button[value="timesheet"].active, button[value="timesheet"][data-state="active"], button[value="timesheet"][aria-selected="true"]',
+    );
+    if (isTimesheetActive) return "timesheet";
+
     // Verifica se c'è una tab reportistica attiva
-    const isReportActive = document.querySelector('button[value="report"].active, button[value="report"][data-state="active"], button[value="report"][aria-selected="true"]');
-    if (isReportActive) return 'report';
-    
+    const isReportActive = document.querySelector(
+      'button[value="report"].active, button[value="report"][data-state="active"], button[value="report"][aria-selected="true"]',
+    );
+    if (isReportActive) return "report";
+
     // Altrimenti assume che siamo in tasks (attività)
-    return 'tasks';
+    return "tasks";
   };
 
   // Apri la wiki contestuale per la vista corrente
   const handleOpenWiki = (e) => {
     // Previene che l'evento si propaghi (importante per evitare che la sidebar si chiuda)
     e.stopPropagation();
-    
+
     const currentView = getCurrentView();
-    
+
     // Se siamo già in una pagina supportata, passa il valore esatto della vista
     if (currentView) {
       openWiki(currentView, fromNotificationSidebar);
@@ -68,9 +80,13 @@ const WikiButton = ({ fromNotificationSidebar = false, specificSection = null })
             style={{
               // Assicura che il pulsante sia sempre visibile anche con modali aperti
               position: "relative",
-              zIndex: 1100 // Un valore più alto di quello dei modali
+              zIndex: 1100, // Un valore più alto di quello dei modali
             }}
-            id={fromNotificationSidebar ? "notification-sidebar-wiki-button" : "header-wiki-button"}
+            id={
+              fromNotificationSidebar
+                ? "notification-sidebar-wiki-button"
+                : "header-wiki-button"
+            }
           >
             <CircleHelp className="text-xl" />
           </button>

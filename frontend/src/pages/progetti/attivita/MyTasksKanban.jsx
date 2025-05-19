@@ -1,39 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent
-} from "@/components/ui/card";
+import React, { useState, useEffect, useRef } from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Loader2, 
-  AlertCircle, 
-  CheckCircle2, 
+import {
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
   ListTodo,
   AlertTriangle,
   Calendar,
   Clock,
-  ExternalLink
-} from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+  ExternalLink,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
 
 // TaskCard component con miglioramenti
 const TaskCard = ({ task, onClick, onDragStart, isDragging, canDrag }) => {
   const navigate = useNavigate();
-  
+
   const priorityColors = {
-    'ALTA': 'text-red-500 border-red-200 bg-red-50',
-    'MEDIA': 'text-yellow-500 border-yellow-200 bg-yellow-50',
-    'BASSA': 'text-green-500 border-green-200 bg-green-50'
+    ALTA: "text-red-500 border-red-200 bg-red-50",
+    MEDIA: "text-yellow-500 border-yellow-200 bg-yellow-50",
+    BASSA: "text-green-500 border-green-200 bg-green-50",
   };
 
   // Check if task is delayed
   const isDelayed = () => {
     const dueDate = new Date(task.DueDate);
     const today = new Date();
-    return dueDate < today && task.Status !== 'COMPLETATA';
+    return dueDate < today && task.Status !== "COMPLETATA";
   };
 
   const navigateToProject = (e) => {
@@ -42,9 +37,16 @@ const TaskCard = ({ task, onClick, onDragStart, isDragging, canDrag }) => {
   };
 
   return (
-    <Card 
-      className={`p-2 mb-2 transition-all duration-300 border-l-4 hover:scale-[1.01] ${isDragging ? 'opacity-50 scale-95' : 'opacity-100'} ${canDrag ? 'cursor-move' : 'cursor-pointer'} group-hover:shadow-md`}
-      style={{ borderLeftColor: task.Priority === 'ALTA' ? '#ef4444' : task.Priority === 'MEDIA' ? '#eab308' : '#22c55e' }}
+    <Card
+      className={`p-2 mb-2 transition-all duration-300 border-l-4 hover:scale-[1.01] ${isDragging ? "opacity-50 scale-95" : "opacity-100"} ${canDrag ? "cursor-move" : "cursor-pointer"} group-hover:shadow-md`}
+      style={{
+        borderLeftColor:
+          task.Priority === "ALTA"
+            ? "#ef4444"
+            : task.Priority === "MEDIA"
+              ? "#eab308"
+              : "#22c55e",
+      }}
       onClick={(e) => {
         // Solo se non stiamo trascinando
         if (!isDragging) onClick(task);
@@ -63,11 +65,16 @@ const TaskCard = ({ task, onClick, onDragStart, isDragging, canDrag }) => {
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           {isDelayed() && (
-            <Badge variant="" className="flex items-center gap-1 bg-red-100 text-red-500 border-red-200 text-xs h-5 px-1">
+            <Badge
+              variant=""
+              className="flex items-center gap-1 bg-red-100 text-red-500 border-red-200 text-xs h-5 px-1"
+            >
               <AlertTriangle className="w-3 h-3" />
             </Badge>
           )}
-          <Badge className={`${priorityColors[task.Priority]} text-xs h-5 px-1`}>
+          <Badge
+            className={`${priorityColors[task.Priority]} text-xs h-5 px-1`}
+          >
             {task.Priority}
           </Badge>
         </div>
@@ -91,12 +98,15 @@ const TaskCard = ({ task, onClick, onDragStart, isDragging, canDrag }) => {
             </span>
           )}
         </div>
-        
+
         {/* Riga date */}
         <div className="flex items-center gap-1 text-xs text-gray-500">
           <Clock className="w-3 h-3 shrink-0" />
-          <span className={`text-xs expandable-text ${isDelayed() ? 'text-red-400 font-medium' : ''}`}>
-            {new Date(task.StartDate).toLocaleDateString()} → {new Date(task.DueDate).toLocaleDateString()}
+          <span
+            className={`text-xs expandable-text ${isDelayed() ? "text-red-400 font-medium" : ""}`}
+          >
+            {new Date(task.StartDate).toLocaleDateString()} →{" "}
+            {new Date(task.DueDate).toLocaleDateString()}
           </span>
         </div>
       </div>
@@ -104,19 +114,25 @@ const TaskCard = ({ task, onClick, onDragStart, isDragging, canDrag }) => {
   );
 };
 
-const MyTasksKanban = ({ tasks = [], onTaskClick, onTaskUpdate, checkAdminPermission, isOwnTask }) => {
+const MyTasksKanban = ({
+  tasks = [],
+  onTaskClick,
+  onTaskUpdate,
+  checkAdminPermission,
+  isOwnTask,
+}) => {
   const [localTasks, setLocalTasks] = useState(tasks);
   const [draggedTask, setDraggedTask] = useState(null);
   const [dropTargetStatus, setDropTargetStatus] = useState(null);
   const dropTimeoutRef = useRef(null);
   const isUpdatingRef = useRef(false);
-  
+
   const TASK_STATES = {
-    'DA FARE': 'DA FARE',
-    'IN ESECUZIONE': 'IN ESECUZIONE',
-    'SOSPESA': 'SOSPESA',
-    'COMPLETATA': 'COMPLETATA',
-    'BLOCCATA': 'BLOCCATA'
+    "DA FARE": "DA FARE",
+    "IN ESECUZIONE": "IN ESECUZIONE",
+    SOSPESA: "SOSPESA",
+    COMPLETATA: "COMPLETATA",
+    BLOCCATA: "BLOCCATA",
   };
 
   // Aggiorna i task locali quando cambiano quelli in props
@@ -137,93 +153,103 @@ const MyTasksKanban = ({ tasks = [], onTaskClick, onTaskUpdate, checkAdminPermis
   const isTaskDelayed = (task) => {
     const dueDate = new Date(task.DueDate);
     const today = new Date();
-    return dueDate < today && task.Status !== 'COMPLETATA';
+    return dueDate < today && task.Status !== "COMPLETATA";
   };
 
   // Organizza i tasks per stato
   const tasksByStatus = {
-    [TASK_STATES['DA FARE']]: tasks.filter(task => task.Status === 'DA FARE'),
-    [TASK_STATES['IN ESECUZIONE']]: tasks.filter(task => task.Status === 'IN ESECUZIONE'),
-    [TASK_STATES['SOSPESA']]: tasks.filter(task => task.Status === 'SOSPESA'),
-    [TASK_STATES['COMPLETATA']]: tasks.filter(task => task.Status === 'COMPLETATA'),
-    [TASK_STATES['BLOCCATA']]: tasks.filter(task => task.Status === 'BLOCCATA')
+    [TASK_STATES["DA FARE"]]: tasks.filter((task) => task.Status === "DA FARE"),
+    [TASK_STATES["IN ESECUZIONE"]]: tasks.filter(
+      (task) => task.Status === "IN ESECUZIONE",
+    ),
+    [TASK_STATES["SOSPESA"]]: tasks.filter((task) => task.Status === "SOSPESA"),
+    [TASK_STATES["COMPLETATA"]]: tasks.filter(
+      (task) => task.Status === "COMPLETATA",
+    ),
+    [TASK_STATES["BLOCCATA"]]: tasks.filter(
+      (task) => task.Status === "BLOCCATA",
+    ),
   };
 
   // Configurazione per lo stile delle diverse sezioni
   const statusConfig = {
-    [TASK_STATES['DA FARE']]: {
-      label: 'Da Fare',
+    [TASK_STATES["DA FARE"]]: {
+      label: "Da Fare",
       icon: ListTodo,
-      color: 'bg-gray-100',
-      hoverColor: 'bg-gray-200',
-      activeColor: 'bg-gray-300 border-gray-400',
-      headerColor: 'text-gray-700'
+      color: "bg-gray-100",
+      hoverColor: "bg-gray-200",
+      activeColor: "bg-gray-300 border-gray-400",
+      headerColor: "text-gray-700",
     },
-    [TASK_STATES['IN ESECUZIONE']]: {
-      label: 'In Corso',
+    [TASK_STATES["IN ESECUZIONE"]]: {
+      label: "In Corso",
       icon: Loader2,
-      color: 'bg-blue-100',
-      hoverColor: 'bg-blue-200',
-      activeColor: 'bg-blue-300 border-blue-400',
-      headerColor: 'text-blue-700'
+      color: "bg-blue-100",
+      hoverColor: "bg-blue-200",
+      activeColor: "bg-blue-300 border-blue-400",
+      headerColor: "text-blue-700",
     },
-    [TASK_STATES['SOSPESA']]: {
-      label: 'Sospese',
+    [TASK_STATES["SOSPESA"]]: {
+      label: "Sospese",
       icon: AlertCircle,
-      color: 'bg-yellow-100',
-      hoverColor: 'bg-yellow-200',
-      activeColor: 'bg-yellow-300 border-yellow-400',
-      headerColor: 'text-yellow-700'
+      color: "bg-yellow-100",
+      hoverColor: "bg-yellow-200",
+      activeColor: "bg-yellow-300 border-yellow-400",
+      headerColor: "text-yellow-700",
     },
-    [TASK_STATES['COMPLETATA']]: {
-      label: 'Completate',
+    [TASK_STATES["COMPLETATA"]]: {
+      label: "Completate",
       icon: CheckCircle2,
-      color: 'bg-green-100',
-      hoverColor: 'bg-green-200',
-      activeColor: 'bg-green-300 border-green-400',
-      headerColor: 'text-green-700'
+      color: "bg-green-100",
+      hoverColor: "bg-green-200",
+      activeColor: "bg-green-300 border-green-400",
+      headerColor: "text-green-700",
     },
-    [TASK_STATES['BLOCCATA']]: {
-      label: 'Bloccate',
+    [TASK_STATES["BLOCCATA"]]: {
+      label: "Bloccate",
       icon: AlertCircle,
-      color: 'bg-red-100',
-      hoverColor: 'bg-red-200',
-      activeColor: 'bg-red-300 border-red-400',
-      headerColor: 'text-red-700'
-    }
+      color: "bg-red-100",
+      hoverColor: "bg-red-200",
+      activeColor: "bg-red-300 border-red-400",
+      headerColor: "text-red-700",
+    },
   };
 
   const handleDragStart = (e, task) => {
     // Verifica permessi
-    if (!checkAdminPermission({ AdminPermission: task.AdminPermission }) && !isOwnTask(task)) {
+    if (
+      !checkAdminPermission({ AdminPermission: task.AdminPermission }) &&
+      !isOwnTask(task)
+    ) {
       e.preventDefault();
       return;
     }
-    
+
     // Imposta l'effetto di trascinamento
-    e.dataTransfer.effectAllowed = 'move';
-    
+    e.dataTransfer.effectAllowed = "move";
+
     // Memorizza l'ID del task e lo stato attuale
-    e.dataTransfer.setData('taskId', task.TaskID);
-    e.dataTransfer.setData('currentStatus', task.Status);
-    
+    e.dataTransfer.setData("taskId", task.TaskID);
+    e.dataTransfer.setData("currentStatus", task.Status);
+
     // Imposta il task trascinato per effetti visivi
     setDraggedTask(task);
-    
+
     // Imposta un'immagine trasparente per il trascinamento personalizzato
     const img = new Image();
-    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // 1px transparent GIF
+    img.src =
+      "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; // 1px transparent GIF
     e.dataTransfer.setDragImage(img, 0, 0);
-    
+
     // Aggiunge una classe al documento per lo stile durante il trascinamento
-    document.body.classList.add('dragging-task');
+    document.body.classList.add("dragging-task");
   };
 
   const handleDragOver = (e, status) => {
     // Previene il comportamento predefinito e consente il rilascio
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    
+    e.dataTransfer.dropEffect = "move";
+
     // Imposta lo stato di destinazione per evidenziare la colonna
     if (dropTargetStatus !== status) {
       setDropTargetStatus(status);
@@ -232,12 +258,12 @@ const MyTasksKanban = ({ tasks = [], onTaskClick, onTaskUpdate, checkAdminPermis
 
   const handleDragLeave = (e) => {
     e.preventDefault();
-    
+
     // Pulisci lo stato di destinazione con un ritardo per evitare sfarfallio
     if (dropTimeoutRef.current) {
       clearTimeout(dropTimeoutRef.current);
     }
-    
+
     dropTimeoutRef.current = setTimeout(() => {
       setDropTargetStatus(null);
     }, 100);
@@ -247,8 +273,8 @@ const MyTasksKanban = ({ tasks = [], onTaskClick, onTaskUpdate, checkAdminPermis
     // Pulisci tutti gli stati di trascinamento
     setDraggedTask(null);
     setDropTargetStatus(null);
-    document.body.classList.remove('dragging-task');
-    
+    document.body.classList.remove("dragging-task");
+
     if (dropTimeoutRef.current) {
       clearTimeout(dropTimeoutRef.current);
       dropTimeoutRef.current = null;
@@ -257,57 +283,64 @@ const MyTasksKanban = ({ tasks = [], onTaskClick, onTaskUpdate, checkAdminPermis
 
   const handleDrop = async (e, newStatus) => {
     e.preventDefault();
-    
+
     // Se già stiamo aggiornando un task, blocca
     if (isUpdatingRef.current) return;
-    
+
     // Estrai i dati del task
-    const taskId = e.dataTransfer.getData('taskId');
-    const currentStatus = e.dataTransfer.getData('currentStatus');
-    const task = localTasks.find(t => t.TaskID.toString() === taskId);
-    
+    const taskId = e.dataTransfer.getData("taskId");
+    const currentStatus = e.dataTransfer.getData("currentStatus");
+    const task = localTasks.find((t) => t.TaskID.toString() === taskId);
+
     // Pulisci gli stati di trascinamento
     setDraggedTask(null);
     setDropTargetStatus(null);
-    document.body.classList.remove('dragging-task');
-    
+    document.body.classList.remove("dragging-task");
+
     // Verifica se il task esiste e se l'utente ha i permessi
     if (!task) return;
-    if (!checkAdminPermission({ AdminPermission: task.AdminPermission }) && !isOwnTask(task)) {
+    if (
+      !checkAdminPermission({ AdminPermission: task.AdminPermission }) &&
+      !isOwnTask(task)
+    ) {
       toast({
         title: "Permessi insufficienti",
         description: "Non hai il permesso di modificare questo task",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
-    
+
     // Se lo stato non è cambiato, non fare nulla
     if (task.Status === newStatus) return;
-    
+
     try {
       // Imposta il flag di aggiornamento
       isUpdatingRef.current = true;
-      
+
       // Ottimistic UI update: aggiorna localmente per feedback immediato
-      setLocalTasks(prevTasks => 
-        prevTasks.map(t => t.TaskID === task.TaskID ? {...t, Status: newStatus} : t)
+      setLocalTasks((prevTasks) =>
+        prevTasks.map((t) =>
+          t.TaskID === task.TaskID ? { ...t, Status: newStatus } : t,
+        ),
       );
-      
+
       // Preparazione simile a quella di TaskDetailsDialog
       // Estrae i partecipanti e mantiene le assegnazioni aggiuntive
-      const participants = task.Participants ? 
-        (typeof task.Participants === 'string' ? JSON.parse(task.Participants) : task.Participants) 
+      const participants = task.Participants
+        ? typeof task.Participants === "string"
+          ? JSON.parse(task.Participants)
+          : task.Participants
         : [];
-      
+
       const additionalAssignees = JSON.stringify(
-        Array.isArray(participants) 
+        Array.isArray(participants)
           ? participants
-              .map(p => typeof p === 'object' ? p.userId : p)
-              .filter(id => id !== task.AssignedTo)
-          : []
+              .map((p) => (typeof p === "object" ? p.userId : p))
+              .filter((id) => id !== task.AssignedTo)
+          : [],
       );
-      
+
       // Prepara i dati del task per l'aggiornamento
       const updatedTaskData = {
         ...task,
@@ -315,43 +348,48 @@ const MyTasksKanban = ({ tasks = [], onTaskClick, onTaskUpdate, checkAdminPermis
         AssignedTo: task.AssignedTo,
         AdditionalAssignees: additionalAssignees,
         ProjectID: task.ProjectID,
-        TaskID: task.TaskID
+        TaskID: task.TaskID,
       };
-      
+
       // Chiama la funzione di aggiornamento reale
       const result = await onTaskUpdate(updatedTaskData);
-      
+
       // Feedback di successo
       if (result && result.success) {
         toast({
           title: "Task aggiornato",
           description: `Stato cambiato in "${newStatus}"`,
-          variant: "default"
+          variant: "default",
         });
       } else {
         // Ripristina lo stato precedente in caso di errore
-        setLocalTasks(prevTasks => 
-          prevTasks.map(t => t.TaskID === task.TaskID ? {...t, Status: currentStatus} : t)
+        setLocalTasks((prevTasks) =>
+          prevTasks.map((t) =>
+            t.TaskID === task.TaskID ? { ...t, Status: currentStatus } : t,
+          ),
         );
-        
+
         toast({
           title: "Errore",
           description: "Non è stato possibile aggiornare lo stato del task",
-          variant: "destructive"
+          variant: "destructive",
         });
       }
     } catch (error) {
-      console.error('Error updating task status:', error);
-      
+      console.error("Error updating task status:", error);
+
       // Ripristina lo stato precedente in caso di errore
-      setLocalTasks(prevTasks => 
-        prevTasks.map(t => t.TaskID === task.TaskID ? {...t, Status: currentStatus} : t)
+      setLocalTasks((prevTasks) =>
+        prevTasks.map((t) =>
+          t.TaskID === task.TaskID ? { ...t, Status: currentStatus } : t,
+        ),
       );
-      
+
       toast({
         title: "Errore",
-        description: error.message || "Si è verificato un errore durante l'aggiornamento",
-        variant: "destructive"
+        description:
+          error.message || "Si è verificato un errore durante l'aggiornamento",
+        variant: "destructive",
       });
     } finally {
       // Ripulisci il flag di aggiornamento
@@ -367,15 +405,16 @@ const MyTasksKanban = ({ tasks = [], onTaskClick, onTaskUpdate, checkAdminPermis
           const StatusIcon = statusConfig[status]?.icon || ListTodo;
           const delayedInSection = statusTasks.filter(isTaskDelayed).length;
           const isDropTarget = dropTargetStatus === status;
-          
+
           return (
-            <div 
+            <div
               key={status}
               className={`
                 kanban-column group
-                ${isDropTarget 
-                  ? `${statusConfig[status].activeColor} border-2 border-dashed` 
-                  : `border ${statusConfig[status].color} shadow-sm`
+                ${
+                  isDropTarget
+                    ? `${statusConfig[status].activeColor} border-2 border-dashed`
+                    : `border ${statusConfig[status].color} shadow-sm`
                 }
               `}
               onDragOver={(e) => handleDragOver(e, status)}
@@ -384,7 +423,7 @@ const MyTasksKanban = ({ tasks = [], onTaskClick, onTaskUpdate, checkAdminPermis
               onDragEnd={handleDragEnd}
             >
               {/* Header della colonna */}
-              <div 
+              <div
                 className={`
                   flex items-center justify-between px-3 py-2 border-b
                   ${statusConfig[status].headerColor} 
@@ -393,17 +432,22 @@ const MyTasksKanban = ({ tasks = [], onTaskClick, onTaskUpdate, checkAdminPermis
               >
                 <div className="flex items-center gap-2">
                   <StatusIcon className="w-4 h-4" />
-                  <span className="font-medium text-sm expandable-text">{statusConfig[status].label}</span>
-                  <Badge 
-                    variant="outline" 
+                  <span className="font-medium text-sm expandable-text">
+                    {statusConfig[status].label}
+                  </span>
+                  <Badge
+                    variant="outline"
                     className={`${statusConfig[status].headerColor} border-current text-xs h-5 px-1.5`}
                   >
                     {statusTasks.length}
                   </Badge>
                 </div>
-                
-                {delayedInSection > 0 && status !== 'COMPLETATA' && (
-                  <Badge variant="" className="flex items-center gap-1 bg-red-100 text-red-500 border-red-200 text-xs h-5 px-1.5">
+
+                {delayedInSection > 0 && status !== "COMPLETATA" && (
+                  <Badge
+                    variant=""
+                    className="flex items-center gap-1 bg-red-100 text-red-500 border-red-200 text-xs h-5 px-1.5"
+                  >
                     <AlertTriangle className="w-3 h-3" />
                     {delayedInSection}
                   </Badge>
@@ -414,13 +458,18 @@ const MyTasksKanban = ({ tasks = [], onTaskClick, onTaskUpdate, checkAdminPermis
               <div className="overflow-y-auto p-2 flex-1 transition-all duration-300 group-hover:p-3">
                 {statusTasks.length > 0 ? (
                   <div className="space-y-2">
-                    {statusTasks.map(task => {
-                      const canDrag = checkAdminPermission({ AdminPermission: task.AdminPermission }) || isOwnTask(task);
+                    {statusTasks.map((task) => {
+                      const canDrag =
+                        checkAdminPermission({
+                          AdminPermission: task.AdminPermission,
+                        }) || isOwnTask(task);
                       return (
                         <div
                           key={task.TaskID}
                           className={`transition-all duration-300 ${
-                            draggedTask?.TaskID === task.TaskID ? 'opacity-50 scale-95' : 'opacity-100'
+                            draggedTask?.TaskID === task.TaskID
+                              ? "opacity-50 scale-95"
+                              : "opacity-100"
                           }`}
                         >
                           <TaskCard
@@ -446,8 +495,9 @@ const MyTasksKanban = ({ tasks = [], onTaskClick, onTaskUpdate, checkAdminPermis
       </div>
 
       {/* CSS per kanban orizzontale e effetti di espansione */}
-      <style dangerouslySetInnerHTML={{
-        __html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
           body.dragging-task {
             cursor: grabbing !important;
           }
@@ -516,8 +566,9 @@ const MyTasksKanban = ({ tasks = [], onTaskClick, onTaskUpdate, checkAdminPermis
           .border-dashed {
             animation: pulse-border 1.5s ease-in-out infinite;
           }
-        `
-      }} />
+        `,
+        }}
+      />
     </div>
   );
 };

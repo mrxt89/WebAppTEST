@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useAuth } from '../../context/AuthContext';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { useAuth } from "../../context/AuthContext";
 import { config } from "../../config";
-import { swal } from '../../lib/common'; 
+import { swal } from "../../lib/common";
 
 const UserProfile = () => {
   const { user } = useAuth();
@@ -17,8 +17,8 @@ const UserProfile = () => {
     role: user.role,
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const handleChange = (e) => {
     setProfile({ ...profile, [e.target.name]: e.target.value });
@@ -27,31 +27,32 @@ const UserProfile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.put(`${config.API_BASE_URL}/user/${user.UserId}`,
-        profile,{headers: { Authorization: `Bearer ${token}` },}
+      const token = localStorage.getItem("token");
+      const response = await axios.put(
+        `${config.API_BASE_URL}/user/${user.UserId}`,
+        profile,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       if (response.status !== 200) {
         swal.fire({
-          icon: 'error',
-          title: 'Errore Aggiornamento Profilo',
+          icon: "error",
+          title: "Errore Aggiornamento Profilo",
           showConfirmButton: false,
-          timer: 1500
+          timer: 1500,
         });
-      }
-      else {
+      } else {
         swal.fire({
-          icon: 'success',
-          title: 'Profilo Aggiornato',
+          icon: "success",
+          title: "Profilo Aggiornato",
           showConfirmButton: false,
-          timer: 1500
+          timer: 1500,
         });
       }
     } catch (error) {
-      setError('Error updating profile');
+      setError("Error updating profile");
     } finally {
       setLoading(false);
     }
@@ -118,10 +119,13 @@ const UserProfile = () => {
             name="role"
             value={profile.role}
             onChange={handleChange}
-            className="w-full p-2 border border-gray-300 rounded" disabled
+            className="w-full p-2 border border-gray-300 rounded"
+            disabled
           />
         </div>
-        <button type="submit" className="w-full primaryButton  p-2 rounded">Aggiorna Profilo</button>
+        <button type="submit" className="w-full primaryButton  p-2 rounded">
+          Aggiorna Profilo
+        </button>
       </form>
     </div>
   );

@@ -1,5 +1,5 @@
 // Frontend/src/components/itemAttachments/ItemAttachmentUploader.js
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -22,23 +22,23 @@ import {
   FormControl,
   Autocomplete,
   CircularProgress,
-  Divider
-} from '@mui/material';
+  Divider,
+} from "@mui/material";
 import {
   CloudUpload as UploadIcon,
   Close as CloseIcon,
   AttachFile as AttachFileIcon,
   Clear as ClearIcon,
-  Description as DescriptionIcon
-} from '@mui/icons-material';
-import FileDropZone from '../ui/FileDropZone';
-import useItemAttachmentsActions from '../../hooks/useItemAttachmentsActions';
-import { formatBytes } from '../../lib/common';
-import { useAuth } from '../../context/AuthContext';
+  Description as DescriptionIcon,
+} from "@mui/icons-material";
+import FileDropZone from "../ui/FileDropZone";
+import useItemAttachmentsActions from "../../hooks/useItemAttachmentsActions";
+import { formatBytes } from "../../lib/common";
+import { useAuth } from "../../context/AuthContext";
 
 /**
  * ItemAttachmentUploader - Componente per il caricamento di allegati per articoli
- * 
+ *
  * @param {boolean} open - Flag per mostrare/nascondere il dialog
  * @param {function} onClose - Callback per la chiusura del dialog
  * @param {string} itemCode - Codice articolo (per articoli da ERP)
@@ -46,35 +46,35 @@ import { useAuth } from '../../context/AuthContext';
  * @param {function} onUploadComplete - Callback per il completamento del caricamento
  * @param {Array} categories - Lista delle categorie disponibili
  */
-function ItemAttachmentUploader({ 
-  open, 
-  onClose, 
-  itemCode = null, 
+function ItemAttachmentUploader({
+  open,
+  onClose,
+  itemCode = null,
   projectItemId = null,
   onUploadComplete,
-  categories = []
+  categories = [],
 }) {
   // Auth context per ottenere l'utente corrente
   const auth = useAuth();
-  
+
   // Stati per il form
   const [selectedFile, setSelectedFile] = useState(null);
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [isErpAttachment, setIsErpAttachment] = useState(false);
   const [tags, setTags] = useState([]);
-  const [tagInput, setTagInput] = useState('');
+  const [tagInput, setTagInput] = useState("");
   const [selectedCategories, setSelectedCategories] = useState([]);
-  
+
   // Stati per il caricamento
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  
+
   // Hook per le azioni sugli allegati
-  const { 
-    uploadAttachmentByItemCode, 
+  const {
+    uploadAttachmentByItemCode,
     uploadAttachmentByProjectItemId,
-    loading 
+    loading,
   } = useItemAttachmentsActions();
 
   // Gestione selezione file
@@ -89,25 +89,27 @@ function ItemAttachmentUploader({
     if (!selectedFile) {
       return;
     }
-    
+
     setIsUploading(true);
     setUploadProgress(0);
-    
+
     try {
       // Prepara i metadati
       const metadata = {
         description: description || null,
         isPublic: isPublic.toString(),
         isErpAttachment: isErpAttachment.toString(),
-        tags: tags.length > 0 ? tags.join(', ') : null,
-        categoryIds: selectedCategories.map(cat => cat.CategoryID || cat).join(',')
+        tags: tags.length > 0 ? tags.join(", ") : null,
+        categoryIds: selectedCategories
+          .map((cat) => cat.CategoryID || cat)
+          .join(","),
       };
 
       let result;
-      
+
       // Simula la progress bar
       const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
+        setUploadProgress((prev) => {
           if (prev >= 90) {
             clearInterval(progressInterval);
             return 90;
@@ -115,88 +117,88 @@ function ItemAttachmentUploader({
           return prev + 10;
         });
       }, 300);
-      
+
       // Carica l'allegato in base al tipo di articolo
       if (itemCode) {
         result = await uploadAttachmentByItemCode(
           itemCode,
           selectedFile,
-          metadata
+          metadata,
         );
       } else if (projectItemId) {
         result = await uploadAttachmentByProjectItemId(
           projectItemId,
           selectedFile,
-          metadata
+          metadata,
         );
       }
-      
+
       // Completa la progress bar
       clearInterval(progressInterval);
       setUploadProgress(100);
-      
+
       // Notifica il completamento
       if (onUploadComplete) {
         onUploadComplete(result);
       }
-      
+
       // Reset del form
       resetForm();
     } catch (error) {
-      console.error('Error uploading file:', error);
-      
+      console.error("Error uploading file:", error);
+
       // Mostra notifica di errore
       if (window.swal && window.swal.fire) {
         window.swal.fire({
-          title: 'Errore',
-          text: 'Si è verificato un errore durante il caricamento',
-          icon: 'error',
-          confirmButtonText: 'OK'
+          title: "Errore",
+          text: "Si è verificato un errore durante il caricamento",
+          icon: "error",
+          confirmButtonText: "OK",
         });
       }
     } finally {
       setIsUploading(false);
     }
   };
-  
+
   // Gestione tag
   const handleTagInputChange = (event) => {
     setTagInput(event.target.value);
   };
-  
+
   const handleTagInputKeyDown = (event) => {
-    if (event.key === 'Enter' && tagInput.trim()) {
+    if (event.key === "Enter" && tagInput.trim()) {
       event.preventDefault();
       const newTag = tagInput.trim();
       if (!tags.includes(newTag)) {
         setTags([...tags, newTag]);
       }
-      setTagInput('');
+      setTagInput("");
     }
   };
-  
+
   const handleTagDelete = (tagToDelete) => {
-    setTags(tags.filter(tag => tag !== tagToDelete));
+    setTags(tags.filter((tag) => tag !== tagToDelete));
   };
-  
+
   // Reset del form
   const resetForm = () => {
     setSelectedFile(null);
-    setDescription('');
+    setDescription("");
     setIsPublic(false);
     setIsErpAttachment(false);
     setTags([]);
-    setTagInput('');
+    setTagInput("");
     setSelectedCategories([]);
     setUploadProgress(0);
   };
-  
+
   // Gestione chiusura
   const handleClose = () => {
     resetForm();
     onClose();
   };
-  
+
   // Funzione per renderizzare la preview del file
   const renderFilePreview = () => {
     if (!selectedFile) {
@@ -205,62 +207,64 @@ function ItemAttachmentUploader({
           onFilesSelected={handleFileSelect}
           disabled={isUploading}
           acceptedFileTypes={[
-            'application/pdf',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'image/*',
-            'text/plain',
-            'text/csv',
-            '.dxf',
-            '.dwg',
-            '.step',
-            '.stp',
-            '.iges',
-            '.igs',
-            '.stl'
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "image/*",
+            "text/plain",
+            "text/csv",
+            ".dxf",
+            ".dwg",
+            ".step",
+            ".stp",
+            ".iges",
+            ".igs",
+            ".stl",
           ]}
           sx={{
             height: 200,
-            mb: 3
+            mb: 3,
           }}
         />
       );
     }
-    
-    const isImage = selectedFile.type.startsWith('image/');
-    
+
+    const isImage = selectedFile.type.startsWith("image/");
+
     return (
-      <Paper 
-        elevation={0} 
-        sx={{ 
-          p: 2, 
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
           mb: 3,
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           borderRadius: 1,
-          border: '1px solid',
-          borderColor: 'divider'
+          border: "1px solid",
+          borderColor: "divider",
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ display: "flex", alignItems: "center" }}>
           {isImage ? (
-            <Box 
-              component="img" 
-              src={URL.createObjectURL(selectedFile)} 
-              alt="Preview" 
-              sx={{ 
-                width: 60, 
-                height: 60, 
-                borderRadius: 1, 
+            <Box
+              component="img"
+              src={URL.createObjectURL(selectedFile)}
+              alt="Preview"
+              sx={{
+                width: 60,
+                height: 60,
+                borderRadius: 1,
                 mr: 2,
-                objectFit: 'cover'
-              }} 
+                objectFit: "cover",
+              }}
             />
           ) : (
-            <DescriptionIcon sx={{ fontSize: 50, mr: 2, color: 'primary.main' }} />
+            <DescriptionIcon
+              sx={{ fontSize: 50, mr: 2, color: "primary.main" }}
+            />
           )}
           <Box>
             <Typography variant="subtitle1" noWrap>
@@ -271,8 +275,8 @@ function ItemAttachmentUploader({
             </Typography>
           </Box>
         </Box>
-        <IconButton 
-          size="small" 
+        <IconButton
+          size="small"
           onClick={() => setSelectedFile(null)}
           disabled={isUploading}
           color="error"
@@ -282,7 +286,7 @@ function ItemAttachmentUploader({
       </Paper>
     );
   };
-  
+
   // Render delle categorie
   const renderCategories = () => {
     if (categories.length === 0) {
@@ -292,7 +296,7 @@ function ItemAttachmentUploader({
         </Typography>
       );
     }
-    
+
     return (
       <FormControl fullWidth>
         <InputLabel id="categories-label">Categorie</InputLabel>
@@ -303,12 +307,17 @@ function ItemAttachmentUploader({
           onChange={(e) => setSelectedCategories(e.target.value)}
           disabled={isUploading}
           renderValue={(selected) => (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
               {selected.map((category) => (
-                <Chip 
-                  key={category.CategoryID || category} 
-                  label={category.CategoryName || categories.find(c => c.CategoryID === category)?.CategoryName || category} 
-                  size="small" 
+                <Chip
+                  key={category.CategoryID || category}
+                  label={
+                    category.CategoryName ||
+                    categories.find((c) => c.CategoryID === category)
+                      ?.CategoryName ||
+                    category
+                  }
+                  size="small"
                 />
               ))}
             </Box>
@@ -323,32 +332,36 @@ function ItemAttachmentUploader({
       </FormControl>
     );
   };
-  
+
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={isUploading ? null : handleClose}
       maxWidth="md"
       fullWidth
       sx={{
-        '& .MuiDialog-paper': {
-          height: '90vh',
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column'
-        }
+        "& .MuiDialog-paper": {
+          height: "90vh",
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+        },
       }}
     >
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h6">
             Carica un nuovo allegato
-            {itemCode && <Typography component="span" variant="subtitle1" sx={{ ml: 1 }}>
-              per l'articolo {itemCode}
-            </Typography>}
-            {projectItemId && <Typography component="span" variant="subtitle1" sx={{ ml: 1 }}>
-              per l'articolo progetto #{projectItemId}
-            </Typography>}
+            {itemCode && (
+              <Typography component="span" variant="subtitle1" sx={{ ml: 1 }}>
+                per l'articolo {itemCode}
+              </Typography>
+            )}
+            {projectItemId && (
+              <Typography component="span" variant="subtitle1" sx={{ ml: 1 }}>
+                per l'articolo progetto #{projectItemId}
+              </Typography>
+            )}
           </Typography>
           {!isUploading && (
             <IconButton size="small" onClick={handleClose}>
@@ -357,21 +370,21 @@ function ItemAttachmentUploader({
           )}
         </Box>
       </DialogTitle>
-      
-      <DialogContent sx={{ flex: 1, overflowY: 'auto' }}>
+
+      <DialogContent sx={{ flex: 1, overflowY: "auto" }}>
         <Box sx={{ pt: 1 }}>
           {/* File upload area */}
           {renderFilePreview()}
-          
+
           {/* Progress bar */}
           {isUploading && (
             <Box sx={{ mb: 3 }}>
               <Typography variant="body2" color="textSecondary" gutterBottom>
                 Caricamento in corso...
               </Typography>
-              <LinearProgress 
-                variant="determinate" 
-                value={uploadProgress} 
+              <LinearProgress
+                variant="determinate"
+                value={uploadProgress}
                 sx={{ height: 8, borderRadius: 4 }}
               />
               <Typography variant="body2" align="right" sx={{ mt: 0.5 }}>
@@ -379,13 +392,23 @@ function ItemAttachmentUploader({
               </Typography>
             </Box>
           )}
-          
+
           {/* Metadata form */}
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
-              <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                <Typography variant="h6" gutterBottom>Informazioni generali</Typography>
-                
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 1,
+                }}
+              >
+                <Typography variant="h6" gutterBottom>
+                  Informazioni generali
+                </Typography>
+
                 <TextField
                   label="Descrizione"
                   fullWidth
@@ -397,7 +420,7 @@ function ItemAttachmentUploader({
                   placeholder="Aggiungi una descrizione opzionale per questo allegato"
                   sx={{ mb: 2 }}
                 />
-                
+
                 <TextField
                   label="Tag"
                   fullWidth
@@ -409,19 +432,21 @@ function ItemAttachmentUploader({
                   helperText="I tag aiutano a categorizzare e trovare più facilmente gli allegati"
                   sx={{ mb: 2 }}
                 />
-                
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 3 }}>
+
+                <Box
+                  sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 3 }}
+                >
                   {tags.map((tag, index) => (
-                    <Chip 
-                      key={index} 
-                      label={tag} 
+                    <Chip
+                      key={index}
+                      label={tag}
                       onDelete={() => handleTagDelete(tag)}
                       disabled={isUploading}
                       size="small"
                     />
                   ))}
                 </Box>
-                
+
                 <FormControlLabel
                   control={
                     <Switch
@@ -431,9 +456,9 @@ function ItemAttachmentUploader({
                     />
                   }
                   label="Allegato pubblico (visibile a tutte le aziende)"
-                  sx={{ mb: 1, display: 'block' }}
+                  sx={{ mb: 1, display: "block" }}
                 />
-                
+
                 <FormControlLabel
                   control={
                     <Switch
@@ -443,40 +468,51 @@ function ItemAttachmentUploader({
                     />
                   }
                   label="Allegato da gestionale (ERP)"
-                  sx={{ display: 'block' }}
+                  sx={{ display: "block" }}
                 />
               </Paper>
             </Grid>
-            
+
             <Grid item xs={12} md={6}>
-              <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                <Typography variant="h6" gutterBottom>Categorie</Typography>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 1,
+                }}
+              >
+                <Typography variant="h6" gutterBottom>
+                  Categorie
+                </Typography>
                 {renderCategories()}
               </Paper>
             </Grid>
           </Grid>
         </Box>
       </DialogContent>
-      
-      <DialogActions sx={{ 
-        borderTop: '1px solid',
-        borderColor: 'divider',
-        padding: 2
-      }}>
-        <Button 
-          onClick={handleClose} 
-          disabled={isUploading}
-        >
+
+      <DialogActions
+        sx={{
+          borderTop: "1px solid",
+          borderColor: "divider",
+          padding: 2,
+        }}
+      >
+        <Button onClick={handleClose} disabled={isUploading}>
           Annulla
         </Button>
-        <Button 
-          variant="contained" 
-          color="primary" 
+        <Button
+          variant="contained"
+          color="primary"
           onClick={handleFileUpload}
           disabled={!selectedFile || isUploading}
-          startIcon={isUploading ? <CircularProgress size={16} /> : <UploadIcon />}
+          startIcon={
+            isUploading ? <CircularProgress size={16} /> : <UploadIcon />
+          }
         >
-          {isUploading ? 'Caricamento in corso...' : 'Carica allegato'}
+          {isUploading ? "Caricamento in corso..." : "Carica allegato"}
         </Button>
       </DialogActions>
     </Dialog>

@@ -1,8 +1,8 @@
 // components/ui/switch.jsx
-import React from 'react';
-import './ui.css';
+import React from "react";
+import "./ui.css";
 
-const Switch = ({ checked, onChange, id = 'react-switch-default' }) => {
+const Switch = ({ checked, onChange, id = "react-switch-default" }) => {
   return (
     <>
       <input
@@ -12,10 +12,7 @@ const Switch = ({ checked, onChange, id = 'react-switch-default' }) => {
         checked={checked}
         onChange={onChange}
       />
-      <label
-        className="react-switch-label"
-        htmlFor={id}
-      >
+      <label className="react-switch-label" htmlFor={id}>
         <span className={`react-switch-button`} />
       </label>
     </>

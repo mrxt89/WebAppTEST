@@ -1,12 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import ArticleForm from './ArticleForm';
-import { swal } from '@/lib/common';
-import { config } from '@/config';
-import {
-  AlertCircle,
-  Loader2
-} from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import ArticleForm from "./ArticleForm";
+import { swal } from "@/lib/common";
+import { config } from "@/config";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 /**
  * ArticlePage - Pagina per la gestione degli articoli di progetto
@@ -18,69 +15,71 @@ const ArticlePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [project, setProject] = useState(null);
-  
+
   // Effetto per validare i parametri e caricare i dati iniziali
   useEffect(() => {
     const validateAndLoad = async () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Verifica che il mode sia valido
-        if (!['new', 'edit', 'copy'].includes(mode)) {
+        if (!["new", "edit", "copy"].includes(mode)) {
           throw new Error(`Modalità non valida: ${mode}`);
         }
-        
+
         // Verifica che il projectId sia valido
         if (!projectId) {
-          throw new Error('ID progetto non specificato');
+          throw new Error("ID progetto non specificato");
         }
-        
+
         // Se in modalità edit o copy, verifica che l'itemId sia valido
-        if ((mode === 'edit' || mode === 'copy') && !itemId) {
-          throw new Error('ID articolo non specificato per la modalità ' + mode);
+        if ((mode === "edit" || mode === "copy") && !itemId) {
+          throw new Error(
+            "ID articolo non specificato per la modalità " + mode,
+          );
         }
-        
+
         // Carica informazioni progetto (per verificare che esista)
         await loadProject(projectId);
-        
+
         // Tutto ok, rimuovi loading
         setLoading(false);
       } catch (error) {
-        console.error('Error validating parameters:', error);
+        console.error("Error validating parameters:", error);
         setError(error.message);
         setLoading(false);
       }
     };
-    
+
     validateAndLoad();
   }, [mode, projectId, itemId]);
-  
+
   // Funzione per caricare informazioni progetto
   const loadProject = async (id) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const response = await fetch(`${config.API_BASE_URL}/projects/${id}`, {
         headers: {
-          Authorization: `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
-      
+
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error('Progetto non trovato');
+          throw new Error("Progetto non trovato");
         }
-        throw new Error('Errore nel caricamento del progetto');
+        throw new Error("Errore nel caricamento del progetto");
       }
-      
+
       const data = await response.json();
       setProject(data);
     } catch (error) {
-      console.error('Error loading project:', error);
+      console.error("Error loading project:", error);
       throw error;
     }
   };
-  
+
   // Gestione casi di loading e errore
   if (loading) {
     return (
@@ -90,7 +89,7 @@ const ArticlePage = () => {
       </div>
     );
   }
-  
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-6">
@@ -110,7 +109,7 @@ const ArticlePage = () => {
       </div>
     );
   }
-  
+
   // Tutto ok, renderizza l'ArticleForm
   return <ArticleForm />;
 };

@@ -1,12 +1,21 @@
 // frontend/src/components/chat/DocumentLinker.jsx
-import React, { useState, useEffect } from 'react';
-import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
-import { X, Search, FileText, File, Package, Users, Clipboard, Link } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from "react";
+import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
+import {
+  X,
+  Search,
+  FileText,
+  File,
+  Package,
+  Users,
+  Clipboard,
+  Link,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
-  const [documentType, setDocumentType] = useState('MO');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [documentType, setDocumentType] = useState("MO");
+  const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -14,20 +23,20 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
 
   // Opzioni di tipo documento
   const documentTypes = [
-    { id: 'MO', label: 'Ordini di produzione', icon: <Package /> },
-    { id: 'SaleOrd', label: 'Ordini cliente', icon: <FileText /> },
-    { id: 'PurchaseOrd', label: 'Ordini fornitore', icon: <FileText /> },
-    { id: 'SaleDoc', label: 'Documenti di vendita', icon: <File /> },
-    { id: 'PurchaseDoc', label: 'Documenti di acquisto', icon: <File /> },
-    { id: 'Item', label: 'Articoli', icon: <Package /> },
-    { id: 'CustSupp', label: 'Clienti/Fornitori', icon: <Users /> },
-    { id: 'BillOfMaterials', label: 'Distinte base', icon: <Clipboard /> }
+    { id: "MO", label: "Ordini di produzione", icon: <Package /> },
+    { id: "SaleOrd", label: "Ordini cliente", icon: <FileText /> },
+    { id: "PurchaseOrd", label: "Ordini fornitore", icon: <FileText /> },
+    { id: "SaleDoc", label: "Documenti di vendita", icon: <File /> },
+    { id: "PurchaseDoc", label: "Documenti di acquisto", icon: <File /> },
+    { id: "Item", label: "Articoli", icon: <Package /> },
+    { id: "CustSupp", label: "Clienti/Fornitori", icon: <Users /> },
+    { id: "BillOfMaterials", label: "Distinte base", icon: <Clipboard /> },
   ];
 
   // Reset alla chiusura
   useEffect(() => {
     if (!isOpen) {
-      setSearchTerm('');
+      setSearchTerm("");
       setSearchResults([]);
     }
   }, [isOpen]);
@@ -35,13 +44,13 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
   // Funzione di ricerca
   const handleSearch = async () => {
     if (!searchTerm.trim()) return;
-    
+
     setIsSearching(true);
     try {
       const response = await searchDocuments({ documentType, searchTerm });
       setSearchResults(response.results || []);
     } catch (error) {
-      console.error('Search error:', error);
+      console.error("Search error:", error);
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -51,10 +60,14 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
   // Collega un documento
   const handleLinkDocument = async (document) => {
     try {
-      await linkDocument(notificationId, document.DocumentId, document.DocumentType);
+      await linkDocument(
+        notificationId,
+        document.DocumentId,
+        document.DocumentType,
+      );
       onClose();
     } catch (error) {
-      console.error('Error linking document:', error);
+      console.error("Error linking document:", error);
     }
   };
 
@@ -73,10 +86,7 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 50, opacity: 0 }}
           >
-            <div    
-                className="flex items-center justify-between border-b border-gray-200 px-4 py-3"
-                
-                >
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <h3 className="text-lg font-medium flex items-center">
                 <Link className="h-5 w-5 mr-2 text-blue-500" />
                 Collega documento
@@ -88,7 +98,7 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <div className="p-4">
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -106,7 +116,7 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
                   ))}
                 </select>
               </div>
-              
+
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Cerca
@@ -116,7 +126,7 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                     placeholder="Inserisci numero, codice o descrizione..."
                     className="flex-1 border border-gray-300 rounded-l-md p-2 text-sm"
                   />
@@ -129,39 +139,50 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
                   </button>
                 </div>
               </div>
-              
+
               <div className="border rounded-md overflow-hidden">
                 <div className="bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 border-b">
                   Risultati
                 </div>
-                
+
                 <div className="max-h-64 overflow-y-auto">
                   {isSearching ? (
                     <div className="p-4 text-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-                      <p className="mt-2 text-sm text-gray-500">Ricerca in corso...</p>
+                      <p className="mt-2 text-sm text-gray-500">
+                        Ricerca in corso...
+                      </p>
                     </div>
                   ) : searchResults.length === 0 ? (
                     <div className="p-4 text-center text-gray-500">
-                      {searchTerm ? 'Nessun risultato trovato' : 'Inserisci un termine di ricerca'}
+                      {searchTerm
+                        ? "Nessun risultato trovato"
+                        : "Inserisci un termine di ricerca"}
                     </div>
                   ) : (
                     <div className="divide-y divide-gray-200">
                       {searchResults.map((doc, index) => (
-                        <div 
+                        <div
                           key={`${doc.DocumentId || doc.MOId}-${index}`}
                           className="p-3 flex items-center hover:bg-gray-50 transition-colors cursor-pointer"
                           onClick={() => handleLinkDocument(doc)}
                         >
                           <div className="mr-3 p-2 bg-gray-100 rounded-full">
-                            {documentTypes.find(t => t.id === documentType)?.icon || <File className="h-5 w-5" />}
+                            {documentTypes.find((t) => t.id === documentType)
+                              ?.icon || <File className="h-5 w-5" />}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm">{doc.DocumentNumber}</div>
-                            <div className="text-xs text-gray-500 truncate">{doc.DocumentDescription || doc.DocumentReference}</div>
+                            <div className="font-medium text-sm">
+                              {doc.DocumentNumber}
+                            </div>
+                            <div className="text-xs text-gray-500 truncate">
+                              {doc.DocumentDescription || doc.DocumentReference}
+                            </div>
                             {doc.DocumentDate && (
                               <div className="text-xs text-gray-400">
-                                {new Date(doc.DocumentDate).toLocaleDateString()}
+                                {new Date(
+                                  doc.DocumentDate,
+                                ).toLocaleDateString()}
                               </div>
                             )}
                           </div>
@@ -177,7 +198,7 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
                 </div>
               </div>
             </div>
-            
+
             <div className="border-t border-gray-200 px-4 py-3 flex justify-end space-x-2">
               <button
                 onClick={onClose}

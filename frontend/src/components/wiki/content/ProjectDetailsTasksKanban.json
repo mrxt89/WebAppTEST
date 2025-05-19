@@ -1,95 +1,95 @@
 {
-    "title": "Guida Kanban Attività",
-    "description": "Questa sezione mostra le attività del progetto in formato Kanban (schede).",
-    "sections": [
+  "title": "Guida Kanban Attività",
+  "description": "Questa sezione mostra le attività del progetto in formato Kanban (schede).",
+  "sections": [
+    {
+      "title": "Visualizzazione Kanban",
+      "content": "<p>La <strong>visualizzazione Kanban</strong> organizza le attività in colonne in base al loro stato:</p><ul><li><strong>Da Fare</strong>: attività non ancora iniziate</li><li><strong>In Corso</strong>: attività in fase di esecuzione</li><li><strong>Sospese</strong>: attività temporaneamente interrotte</li><li><strong>Completate</strong>: attività terminate con successo</li><li><strong>Bloccate</strong>: attività che non possono procedere a causa di impedimenti</li></ul><p>Questa visualizzazione offre una panoramica immediata dello stato del progetto e del flusso di lavoro.</p>",
+      "tourId": "kanban_visualizzazione"
+    },
+    {
+      "title": "Gestione Attività Kanban",
+      "content": "<p>Nella visualizzazione Kanban puoi:</p><ul><li><strong>Trascinare</strong> le attività da una colonna all'altra per cambiarne lo stato</li><li><strong>Fare clic</strong> su un'attività per visualizzarne i dettagli</li><li><strong>Aggiungere</strong> una nuova attività in una colonna specifica</li><li><strong>Filtrare</strong> le attività in ritardo utilizzando la casella di controllo in alto</li></ul><p>Il Kanban è particolarmente utile per team che utilizzano metodologie Agile o sistemi di gestione del flusso di lavoro.</p>",
+      "tourId": "kanban_gestione"
+    },
+    {
+      "title": "Schede Attività",
+      "content": "<p>Ogni <strong>scheda attività</strong> nel Kanban mostra:</p><ul><li><strong>Titolo</strong> dell'attività</li><li><strong>Priorità</strong> (Alta, Media, Bassa)</li><li><strong>Responsabile</strong> assegnato</li><li><strong>Date</strong> di inizio e scadenza</li><li>Indicatore di <strong>ritardo</strong> se l'attività è scaduta</li><li>Numero di <strong>commenti</strong> associati</li></ul><p>Queste informazioni permettono di valutare rapidamente lo stato e l'importanza di ciascuna attività.</p>",
+      "tourId": "kanban_schede"
+    }
+  ],
+  "tours": {
+    "kanban_visualizzazione": [
       {
         "title": "Visualizzazione Kanban",
-        "content": "<p>La <strong>visualizzazione Kanban</strong> organizza le attività in colonne in base al loro stato:</p><ul><li><strong>Da Fare</strong>: attività non ancora iniziate</li><li><strong>In Corso</strong>: attività in fase di esecuzione</li><li><strong>Sospese</strong>: attività temporaneamente interrotte</li><li><strong>Completate</strong>: attività terminate con successo</li><li><strong>Bloccate</strong>: attività che non possono procedere a causa di impedimenti</li></ul><p>Questa visualizzazione offre una panoramica immediata dello stato del progetto e del flusso di lavoro.</p>",
-        "tourId": "kanban_visualizzazione"
+        "description": "Il Kanban organizza le attività in colonne per stato.",
+        "selector": ".kanban-container",
+        "position": "top"
       },
       {
-        "title": "Gestione Attività Kanban",
-        "content": "<p>Nella visualizzazione Kanban puoi:</p><ul><li><strong>Trascinare</strong> le attività da una colonna all'altra per cambiarne lo stato</li><li><strong>Fare clic</strong> su un'attività per visualizzarne i dettagli</li><li><strong>Aggiungere</strong> una nuova attività in una colonna specifica</li><li><strong>Filtrare</strong> le attività in ritardo utilizzando la casella di controllo in alto</li></ul><p>Il Kanban è particolarmente utile per team che utilizzano metodologie Agile o sistemi di gestione del flusso di lavoro.</p>",
-        "tourId": "kanban_gestione"
+        "title": "Colonna Da Fare",
+        "description": "Attività che devono ancora essere iniziate.",
+        "selector": ".kanban-column:nth-child(1)",
+        "position": "top"
       },
       {
-        "title": "Schede Attività",
-        "content": "<p>Ogni <strong>scheda attività</strong> nel Kanban mostra:</p><ul><li><strong>Titolo</strong> dell'attività</li><li><strong>Priorità</strong> (Alta, Media, Bassa)</li><li><strong>Responsabile</strong> assegnato</li><li><strong>Date</strong> di inizio e scadenza</li><li>Indicatore di <strong>ritardo</strong> se l'attività è scaduta</li><li>Numero di <strong>commenti</strong> associati</li></ul><p>Queste informazioni permettono di valutare rapidamente lo stato e l'importanza di ciascuna attività.</p>",
-        "tourId": "kanban_schede"
+        "title": "Colonna In Corso",
+        "description": "Attività attualmente in fase di esecuzione.",
+        "selector": ".kanban-column:nth-child(2)",
+        "position": "top"
+      },
+      {
+        "title": "Colonna Completate",
+        "description": "Attività terminate con successo.",
+        "selector": ".kanban-column:nth-child(3)",
+        "position": "top"
       }
     ],
-    "tours": {
-      "kanban_visualizzazione": [
-        {
-          "title": "Visualizzazione Kanban",
-          "description": "Il Kanban organizza le attività in colonne per stato.",
-          "selector": ".kanban-container",
-          "position": "top"
-        },
-        {
-          "title": "Colonna Da Fare",
-          "description": "Attività che devono ancora essere iniziate.",
-          "selector": ".kanban-column:nth-child(1)",
-          "position": "top"
-        },
-        {
-          "title": "Colonna In Corso",
-          "description": "Attività attualmente in fase di esecuzione.",
-          "selector": ".kanban-column:nth-child(2)",
-          "position": "top"
-        },
-        {
-          "title": "Colonna Completate",
-          "description": "Attività terminate con successo.",
-          "selector": ".kanban-column:nth-child(3)",
-          "position": "top"
-        }
-      ],
-      "kanban_gestione": [
-        {
-          "title": "Gestione con Drag & Drop",
-          "description": "Puoi trascinare le attività da una colonna all'altra per cambiarne lo stato.",
-          "selector": ".kanban-column",
-          "position": "right"
-        },
-        {
-          "title": "Filtro Attività in Ritardo",
-          "description": "Spunta questa casella per visualizzare solo le attività in ritardo.",
-          "selector": "input[id='show-delayed']",
-          "position": "right"
-        },
-        {
-          "title": "Aggiungi Attività",
-          "description": "Fai clic sul pulsante '+' per aggiungere una nuova attività nella colonna.",
-          "selector": "button.h-7.w-75",
-          "position": "bottom"
-        }
-      ],
-      "kanban_schede": [
-        {
-          "title": "Scheda Attività",
-          "description": "Ogni scheda rappresenta un'attività del progetto.",
-          "selector": ".kanban-column > div > div:has(.task-card), .kanban-column .space-y-2 > div",
-          "position": "right"
-        },
-        {
-          "title": "Priorità Attività",
-          "description": "Indica l'importanza dell'attività (Alta, Media, Bassa).",
-          "selector": ".kanban-column .badge",
-          "position": "right"
-        },
-        {
-          "title": "Responsabile",
-          "description": "La persona assegnata all'attività.",
-          "selector": ".kanban-column span.text-gray-600",
-          "position": "right"
-        },
-        {
-          "title": "Indicatore di Ritardo",
-          "description": "Questo simbolo appare quando un'attività è scaduta.",
-          "selector": ".kanban-column svg.w-3.h-3",
-          "position": "left"
-        }
-      ]
-    }
+    "kanban_gestione": [
+      {
+        "title": "Gestione con Drag & Drop",
+        "description": "Puoi trascinare le attività da una colonna all'altra per cambiarne lo stato.",
+        "selector": ".kanban-column",
+        "position": "right"
+      },
+      {
+        "title": "Filtro Attività in Ritardo",
+        "description": "Spunta questa casella per visualizzare solo le attività in ritardo.",
+        "selector": "input[id='show-delayed']",
+        "position": "right"
+      },
+      {
+        "title": "Aggiungi Attività",
+        "description": "Fai clic sul pulsante '+' per aggiungere una nuova attività nella colonna.",
+        "selector": "button.h-7.w-75",
+        "position": "bottom"
+      }
+    ],
+    "kanban_schede": [
+      {
+        "title": "Scheda Attività",
+        "description": "Ogni scheda rappresenta un'attività del progetto.",
+        "selector": ".kanban-column > div > div:has(.task-card), .kanban-column .space-y-2 > div",
+        "position": "right"
+      },
+      {
+        "title": "Priorità Attività",
+        "description": "Indica l'importanza dell'attività (Alta, Media, Bassa).",
+        "selector": ".kanban-column .badge",
+        "position": "right"
+      },
+      {
+        "title": "Responsabile",
+        "description": "La persona assegnata all'attività.",
+        "selector": ".kanban-column span.text-gray-600",
+        "position": "right"
+      },
+      {
+        "title": "Indicatore di Ritardo",
+        "description": "Questo simbolo appare quando un'attività è scaduta.",
+        "selector": ".kanban-column svg.w-3.h-3",
+        "position": "left"
+      }
+    ]
   }
+}
