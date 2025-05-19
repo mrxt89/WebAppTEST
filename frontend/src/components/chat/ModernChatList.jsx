@@ -26,7 +26,9 @@ import {
   Heart,
   ThumbsUp,
   Smile,
-  ArrowBigDown
+  ArrowBigDown,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import FileViewer from '../ui/fileViewer';
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
@@ -43,7 +45,6 @@ import { FaFlag, FaRegSmile } from 'react-icons/fa';
 import ReactionPicker from './ReactionPicker';
 import MessageReactions from './MessageReactions';
 import MessageActionsMenu from './MessageActionsMenu';
-import '@/styles/ModernChatList.css';  // Importo il nuovo file CSS
 
 // Assicurati che il modal sia configurato per il tuo root element
 Modal.setAppElement('#root');
@@ -212,6 +213,13 @@ const ModernChatList = ({
   const [loadingVersions, setLoadingVersions] = useState(false);
   const reactionBatchSize = 20;
 
+  // Modifico lo stato per gestire solo gli ID dei messaggi da evidenziare
+  const [highlightedMessageIds, setHighlightedMessageIds] = useState(new Set());
+  const [isHighlightActive, setIsHighlightActive] = useState(false);
+
+  // Aggiungo lo stato per tracciare l'indice corrente del messaggio evidenziato
+  const [currentHighlightedIndex, setCurrentHighlightedIndex] = useState(0);
+
   // Creazione di un valore derivato per trovare la notifica corrente dal context
   const currentNotification = useMemo(() => {
     if (!notifications || !notificationId) return null;
@@ -222,14 +230,13 @@ const ModernChatList = ({
   useEffect(() => {
     if (currentNotification) {
       // Estrai i messaggi
-      const notificationMessages = Array.isArray(currentNotification.messages) 
+      let notificationMessages = Array.isArray(currentNotification.messages) 
         ? currentNotification.messages 
         : (typeof currentNotification.messages === 'string' 
            ? JSON.parse(currentNotification.messages || '[]') 
            : []);
 
       // Aggiorna i messaggi locali
-     
       setLocalMessages(notificationMessages);
       
       // Auto-scroll se necessario (solo se non c'è stato scrolling manuale)
@@ -323,92 +330,6 @@ useEffect(() => {
   // Cleanup al dismount
   return () => clearInterval(intervalId);
 }, [notificationId, hasLeftChat, currentUser]);
-
-  // NUOVO: Verifica direttamente dal context globale per i nuovi messaggi
-  // useEffect(() => {
-  //   // Solo se notificationId è valido
-  //   if (!notificationId) return;
-    
-  //   // Funzione per verificare nuovi messaggi nel context globale
-  //   const checkForNewMessages = () => {
-  //     try {
-  //       // Controlla se il context esiste e ha la notifica corrente
-  //       if (window.notificationsContext && 
-  //           window.notificationsContext.notifications && 
-  //           Array.isArray(window.notificationsContext.notifications)) {
-          
-  //         // Trova la notifica corrente nel context globale
-  //         const contextNotification = window.notificationsContext.notifications.find(
-  //           n => n.notificationId === parseInt(notificationId)
-  //         );
-          
-  //         if (!contextNotification) return;
-          
-  //         // Estrai i messaggi dalla notifica
-  //         const contextMessages = Array.isArray(contextNotification.messages) 
-  //           ? contextNotification.messages 
-  //           : (typeof contextNotification.messages === 'string' 
-  //             ? JSON.parse(contextNotification.messages || '[]') 
-  //             : []);
-          
-  //         // Confronta con lo stato locale
-  //         if (!isEqual(contextMessages, localMessages)) {
-  //           // Aggiorna lo stato locale
-  //           setLocalMessages(contextMessages);
-            
-  //           // Controlla se siamo in fondo alla chat
-  //           if (chatListRef.current) {
-  //             const { scrollTop, scrollHeight, clientHeight } = chatListRef.current;
-  //             const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-              
-  //             // Se siamo in fondo alla chat (entro 50px) e ci sono nuovi messaggi
-  //             if (distanceFromBottom < 50 && notificationId) {
-  //               // Marca come letta
-  //               toggleReadUnread(notificationId, true).then(() => {
-  //                 fetchNotificationById(notificationId, true).then(() => {
-  //                   document.dispatchEvent(new CustomEvent('notification-updated', {
-  //                     detail: { notificationId }
-  //                   }));
-  //                   if (onScrollToBottom) {
-  //                     onScrollToBottom();
-  //                   }
-  //                 });
-  //               });
-  //             }
-  //           }
-            
-  //           // Auto-scroll se necessario
-  //           if (!userHasScrolledRef.current && chatListRef.current) {
-  //             // Prevenzione loop degli eventi
-  //             scrollingToBottomRef.current = true;
-              
-  //             // Scroll
-  //             chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
-              
-  //             // Reset flag
-  //             setTimeout(() => {
-  //               scrollingToBottomRef.current = false;
-  //             }, 100);
-  //           } else {
-  //             // Altrimenti mostra indicatore nuovo messaggio
-  //             setShowScrollButton(true);
-  //           }
-  //         }
-  //       }
-  //     } catch (err) {
-  //       console.error('Errore nel controllare nuovi messaggi:', err);
-  //     }
-  //   };
-    
-  //   // Esegui subito e imposta intervallo per controlli periodici
-  //   checkForNewMessages();
-  //   const intervalId = setInterval(checkForNewMessages, 1000);
-    
-  //   // Cleanup
-  //   return () => {
-  //     clearInterval(intervalId);
-  //   };
-  // }, [notificationId, localMessages, chatListRef, toggleReadUnread, fetchNotificationById, onScrollToBottom]);
 
   // Modifico l'effetto di scroll per includere la logica di lettura
   useEffect(() => {
@@ -1413,6 +1334,80 @@ const handleReactionSelect = async (messageId, emoji) => {
     return users;
   });
 
+  // Gestisco l'evento di filtro per evidenziare i messaggi
+  useEffect(() => {
+    const handleFilterApplied = (event) => {
+      const { messageIds } = event.detail;
+      
+      // Verifica che messageIds sia un array valido
+      if (Array.isArray(messageIds)) {
+        setHighlightedMessageIds(new Set(messageIds));
+        setIsHighlightActive(true);
+        setCurrentHighlightedIndex(0);
+
+        if (onScrollToBottom) {
+          onScrollToBottom();
+        }
+      }
+    };
+
+    const handleFilterReset = () => {
+      setHighlightedMessageIds(new Set());
+      setIsHighlightActive(false);
+      setCurrentHighlightedIndex(0);
+    };
+
+    document.addEventListener('chat-filter-applied', handleFilterApplied);
+    document.addEventListener('chat-reset-filters', handleFilterReset);
+
+    return () => {
+      document.removeEventListener('chat-filter-applied', handleFilterApplied);
+      document.removeEventListener('chat-reset-filters', handleFilterReset);
+    };
+  }, []);
+
+  // Aggiungo un nuovo effetto per gestire la selezione dei risultati di ricerca
+  useEffect(() => {
+    const handleSearchResultSelected = (event) => {
+      const { messageId } = event.detail;
+      
+      if (messageId && chatListRef.current) {
+        // Trova l'elemento del messaggio
+        const messageElement = document.getElementById(`message-${messageId}`);
+        
+        if (messageElement) {
+          // Calcola la posizione dell'elemento rispetto al container
+          const containerRect = chatListRef.current.getBoundingClientRect();
+          const messageRect = messageElement.getBoundingClientRect();
+          
+          // Calcola la posizione di scroll necessaria per centrare il messaggio
+          // Tenendo conto della barra di navigazione (48px) e un po' di spazio extra
+          const scrollTop = messageRect.top - containerRect.top + chatListRef.current.scrollTop - 80;
+          
+          // Esegui lo scroll con animazione smooth
+          chatListRef.current.scrollTo({
+            top: scrollTop,
+            behavior: 'smooth'
+          });
+
+          // Aggiungi una classe temporanea per evidenziare il messaggio
+          messageElement.classList.add('current-highlight');
+          
+          // Rimuovi la classe dopo l'animazione
+          setTimeout(() => {
+            messageElement.classList.remove('current-highlight');
+          }, 2000);
+        }
+      }
+    };
+
+    document.addEventListener('chat-search-result-selected', handleSearchResultSelected);
+
+    return () => {
+      document.removeEventListener('chat-search-result-selected', handleSearchResultSelected);
+    };
+  }, []);
+
   // Mostra un banner informativo se l'utente ha abbandonato la chat
   if (hasLeftChat && localMessages.length > 0) {
     return (
@@ -1430,6 +1425,7 @@ const handleReactionSelect = async (messageId, emoji) => {
                   const senderName = isCurrentUserMessage ? "Tu" : message.senderName;
                   const messageColor = message.messageColor;
                   const containsPoll = isPollMessage(message);
+                  const isHighlighted = highlightedMessageIds.has(message.messageId);
                   
                   return (
                     <motion.div
@@ -1441,8 +1437,8 @@ const handleReactionSelect = async (messageId, emoji) => {
                       transition={{ duration: 0.2 }}
                       className={cn(
                         'flex p-2 mb-2 relative',
-                        isCurrentUserMessage == '1' ? 'justify-end' : 'justify-start',
-                        message.messageId === selectedMessageId ? 'highlight-message' : '',
+                        isCurrentUserMessage ? 'justify-end' : 'justify-start',
+                        isHighlighted ? 'highlighted-message bg-yellow-50 border-l-4 border-yellow-400 shadow-sm' : '',
                         message.messageId === animatedEditId ? 'just-edited' : '',
                         containsPoll ? 'poll-message' : ''
                       )}
@@ -1599,7 +1595,62 @@ const handleReactionSelect = async (messageId, emoji) => {
 
   return (
     <div className="flex-1 flex flex-col relative" style={{ height: '100%' }}>
-      <div className="flex-1 flex flex-col relative" style={{ height: '100%' }}>
+      {isHighlightActive && (
+        <div className="highlight-navigation">
+          <div className="flex items-center justify-between w-full px-4">
+            <span className="font-medium">
+              {highlightedMessageIds.size} messaggi trovati
+            </span>
+            
+            {highlightedMessageIds.size > 0 && (
+              <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full shadow-sm mx-auto">
+                <button
+                  onClick={() => {
+                    const messageIdsArray = Array.from(highlightedMessageIds);
+                    const newIndex = (currentHighlightedIndex - 1 + messageIdsArray.length) % messageIdsArray.length;
+                    setCurrentHighlightedIndex(newIndex);
+                    document.dispatchEvent(new CustomEvent('chat-search-result-selected', { 
+                      detail: { messageId: messageIdsArray[newIndex] } 
+                    }));
+                  }}
+                  className="p-1 rounded-full hover:bg-blue-50 transition-colors"
+                  title="Messaggio precedente (↑)"
+                >
+                  <ChevronDown className="h-4 w-4 text-blue-600" />
+                </button>
+                <span className="text-xs font-medium text-blue-700 min-w-[40px] text-center">
+                  {currentHighlightedIndex + 1}/{highlightedMessageIds.size}
+                </span>
+                <button
+                  onClick={() => {
+                    const messageIdsArray = Array.from(highlightedMessageIds);
+                    const newIndex = (currentHighlightedIndex + 1) % messageIdsArray.length;
+                    setCurrentHighlightedIndex(newIndex);
+                    document.dispatchEvent(new CustomEvent('chat-search-result-selected', { 
+                      detail: { messageId: messageIdsArray[newIndex] } 
+                    }));
+                  }}
+                  className="p-1 rounded-full hover:bg-blue-50 transition-colors"
+                  title="Messaggio successivo (↓)"
+                >
+                  <ChevronUp className="h-4 w-4 text-blue-600" />
+                </button>
+              </div>
+            )}
+            
+            <button
+              onClick={() => {
+                document.dispatchEvent(new CustomEvent('chat-reset-filters'));
+              }}
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium px-3 py-1 rounded-full hover:bg-blue-100 transition-colors"
+            >
+              Rimuovi evidenziazione
+            </button>
+          </div>
+        </div>
+      )}
+      
+      <div className="chat-list-container">
         {loading ? (
           <Spinner />
         ) : (
@@ -1620,7 +1671,7 @@ const handleReactionSelect = async (messageId, emoji) => {
                       const isCurrentUserMessage = message.selectedUser; // Flag per verificare se il messaggio è dell'utente corrente
                       const senderName = isCurrentUserMessage ? "Tu" : message.senderName;
                       const messageColor = message.messageColor; // Il colore del messaggio
-                      const isHighlighted = selectedMessageId === message.messageId;
+                      const isHighlighted = highlightedMessageIds.has(message.messageId);
                       const containsPoll = isPollMessage(message);
                       // Aggiungi una classe se il messaggio è stato appena modificato
                       const isJustEdited = animatedEditId === message.messageId;
@@ -1636,8 +1687,8 @@ const handleReactionSelect = async (messageId, emoji) => {
                           className={cn(
                             'flex p-2 mb-2 relative',
                             isCurrentUserMessage ? 'justify-end' : 'justify-start',
-                            isHighlighted ? 'highlight-message' : '',
-                            isJustEdited ? 'just-edited' : '',
+                            isHighlighted ? 'highlighted-message bg-yellow-50 border-l-4 border-yellow-400 shadow-sm' : '',
+                            message.messageId === animatedEditId ? 'just-edited' : '',
                             containsPoll ? 'poll-message' : ''
                           )}
                           id={`message-${message.messageId}`}
@@ -1719,34 +1770,36 @@ const handleReactionSelect = async (messageId, emoji) => {
                                   {/* Message Actions Menu (Improved) */}
                                   <AnimatePresence>
                                     {editingMessageId === message.messageId && (
-                                      <MessageActionsMenu
-                                        isOpen={true}
-                                        onClose={() => setEditingMessageId(null)}
-                                        onReply={() => handleReplyClick(message)}
-                                        onColorSelect={(e) => handleColorButtonClick(message.messageId, e)}
-                                        onEdit={() => handleEditMessage(message)}
-                                        onViewHistory={() => handleViewVersionHistory(message.messageId)}
-                                        onDelete={() => handleDeleteMessage(message.messageId)}
-                                        onAddReaction={(emoji) => {
-                                          handleReactionSelect(message.messageId, emoji);
-                                          setEditingMessageId(null);
-                                          // Forza un aggiornamento completo della chat
-                                          setTimeout(() => {
-                                            // Se hai una funzione per forzare l'aggiornamento completo
-                                            if (typeof restartNotificationWorker === 'function') {
-                                              restartNotificationWorker();
-                                            } else {
-                                              // Altrimenti, prova a ricaricare comunque la notifica
-                                              fetchNotificationById(notificationId, true);
-                                            }
-                                          }, 500); // Piccolo ritardo per assicurarsi che la reazione sia stata salvata
-                                        }}
-                                        canEdit={isCurrentUserMessage == '1'}
-                                        isEdited={message.isEdited == '1'}
-                                        hasLeftChat={hasLeftChat}
-                                        isCurrentUserMessage={isCurrentUserMessage == '1'}
-                                        isCancelled={message.cancelled == '1' }
-                                      />
+                                      <div className="relative" style={{ zIndex: 1000 }}>
+                                        <MessageActionsMenu
+                                          isOpen={true}
+                                          onClose={() => setEditingMessageId(null)}
+                                          onReply={() => handleReplyClick(message)}
+                                          onColorSelect={(e) => handleColorButtonClick(message.messageId, e)}
+                                          onEdit={() => handleEditMessage(message)}
+                                          onViewHistory={() => handleViewVersionHistory(message.messageId)}
+                                          onDelete={() => handleDeleteMessage(message.messageId)}
+                                          onAddReaction={(emoji) => {
+                                            handleReactionSelect(message.messageId, emoji);
+                                            setEditingMessageId(null);
+                                            // Forza un aggiornamento completo della chat
+                                            setTimeout(() => {
+                                              // Se hai una funzione per forzare l'aggiornamento completo
+                                              if (typeof restartNotificationWorker === 'function') {
+                                                restartNotificationWorker();
+                                              } else {
+                                                // Altrimenti, prova a ricaricare comunque la notifica
+                                                fetchNotificationById(notificationId, true);
+                                              }
+                                            }, 500); // Piccolo ritardo per assicurarsi che la reazione sia stata salvata
+                                          }}
+                                          canEdit={isCurrentUserMessage == '1'}
+                                          isEdited={message.isEdited == '1'}
+                                          hasLeftChat={hasLeftChat}
+                                          isCurrentUserMessage={isCurrentUserMessage == '1'}
+                                          isCancelled={message.cancelled == '1' }
+                                        />
+                                      </div>
                                     )}
                                   </AnimatePresence>
                                   
@@ -1926,9 +1979,6 @@ const handleReactionSelect = async (messageId, emoji) => {
             if (idToUpdate) {
               // Forza high priority update
               fetchNotificationById(idToUpdate, true)
-                .then(result => {
-                  // Tutto ok, aggiornamento riuscito
-                })
                 .catch(error => {
                   console.error("Errore nell'aggiornamento della notifica:", error);
                 });

@@ -304,7 +304,7 @@ export const clearMessageColor = createAsyncThunk(
 // Async thunk for filtering messages by color or text
 export const filterMessages = createAsyncThunk(
   'messageManagement/filterMessages',
-  async ({ notificationId, color, searchText }, { rejectWithValue }) => {
+  async ({ notificationId, color, searchText, messageType }, { rejectWithValue }) => {
     try {
       if (!notificationId) {
         return rejectWithValue('Invalid notificationId provided');
@@ -324,6 +324,10 @@ export const filterMessages = createAsyncThunk(
       if (searchText) {
         url += `&searchText=${encodeURIComponent(searchText)}`;
       }
+
+      if (messageType && messageType !== 'all') {
+        url += `&messageType=${encodeURIComponent(messageType)}`;
+      }
       
       const response = await axios.get(url, {
         headers: {
@@ -331,15 +335,31 @@ export const filterMessages = createAsyncThunk(
         }
       });
       
-      if (response.data && response.data.success) {
+      if (response.data) {
+        // Adattamento al nuovo formato dei messaggi
+        const messages = Array.isArray(response.data) ? response.data : [];
+        
+        // Se stiamo filtrando per sondaggi, verifichiamo che i messaggi contengano effettivamente un sondaggio
+        let filteredMessages = messages;
+        if (messageType === 'polls') {
+          filteredMessages = messages.filter(msg => {
+            // Verifica se il messaggio contiene un sondaggio
+            return msg.message && (
+              msg.message.includes('**Sondaggio creato**') || 
+              msg.pollId || 
+              msg.messageType === 'poll'
+            );
+          });
+        }
+        
         return {
           notificationId,
-          filteredMessages: response.data.messages || [],
-          totalFound: response.data.count || 0,
-          filter: { color, searchText }
+          filteredMessages,
+          totalFound: filteredMessages.length,
+          filter: { color, searchText, messageType }
         };
       } else {
-        return rejectWithValue(response.data?.message || 'Failed to filter messages');
+        return rejectWithValue('Failed to filter messages');
       }
     } catch (error) {
       console.error('Error filtering messages:', error);

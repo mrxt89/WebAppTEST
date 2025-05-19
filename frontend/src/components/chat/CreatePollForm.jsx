@@ -92,8 +92,7 @@ const CreatePollForm = ({ notificationId, messageId, onSuccess, onCancel }) => {
           swal.fire({
             title: 'Data non valida', 
             text: 'La data di scadenza deve essere nel futuro', 
-            icon: 'error',
-            zIndex: 9999
+            icon: 'error'
           });
           setLoading(false);
           return;
@@ -113,8 +112,7 @@ const CreatePollForm = ({ notificationId, messageId, onSuccess, onCancel }) => {
         swal.fire({
           title: 'Completato', 
           text: 'Sondaggio creato con successo', 
-          icon: 'success',
-          zIndex: 9999
+          icon: 'success'
         });
         if (onSuccess) onSuccess(result);
       }

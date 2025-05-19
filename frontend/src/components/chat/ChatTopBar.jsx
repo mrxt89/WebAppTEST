@@ -52,6 +52,7 @@ const ChatTopBar = ({
   const [isInfoVisible, setIsInfoVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
   const [searchTerm, setSearchTerm] = useState('');
+  const [messageSearchTerm, setMessageSearchTerm] = useState('');
   const [selectedUsers, setSelectedUsers] = useState(
     typeof receiversList === 'string' ? receiversList.split('-').filter(Boolean) : []
   );
@@ -76,6 +77,13 @@ const ChatTopBar = ({
 
   const [isDocumentLinkerOpen, setIsDocumentLinkerOpen] = useState(false);
   const documents = []; // Array vuoto per ora
+
+  // Aggiungo uno stato per tenere traccia dei filtri attivi
+  const [activeFilters, setActiveFilters] = useState({
+    color: null,
+    messageType: 'all',
+    searchText: ''
+  });
 
   // useEffect per impostare il titolo modificato
   useEffect(() => {
@@ -202,17 +210,6 @@ const ChatTopBar = ({
     if (diffMinutes <= 5) return "online";
     if (diffMinutes <= 30) return "away";
     return "offline";
-  };
-  
-  // Formatta data
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    try {
-      const date = new Date(dateString);
-      return format(date, 'd MMMM yyyy', { locale: it });
-    } catch (error) {
-      return '';
-    }
   };
   
   // Calcola il tempo dall'ultima attività
@@ -364,19 +361,69 @@ const ChatTopBar = ({
     updateReceiversList("");
   };
 
-  // Applica un filtro ai messaggi per parola chiave
-  const handleFilterMessages = (searchText) => {
-    if (!searchText || searchText.trim() === '') return;
+  // Modifico la funzione handleFilterMessages per gestire tutti i tipi di filtri
+  const handleFilterMessages = async (filters) => {
+    if (!notificationId) return;
     
-    filterMessages(notificationId, { searchText })
-      .then(results => {
+    try {
+      // Aggiorna i filtri attivi
+      setActiveFilters(prev => ({
+        ...prev,
+        ...filters
+      }));
+      
+      // Costruisci l'oggetto dei filtri da inviare
+      const filterParams = {
+        ...activeFilters,
+        ...filters
+      };
+      
+      const result = await filterMessages(notificationId, filterParams);
+      
+      if (result) {
         // Emetti un evento personalizzato che verrà catturato dalla chat per evidenziare i messaggi
         const event = new CustomEvent('chat-filter-applied', { 
-          detail: { messageIds: results.map(m => m.messageId) } 
+          detail: { 
+            messageIds: result.filteredMessages.map(m => m.messageId),
+            totalFound: result.totalFound,
+            targetNotificationId: notificationId,
+            activeFilters: filterParams // Includi i filtri attivi nell'evento
+          } 
         });
         document.dispatchEvent(event);
-      })
-      .catch(error => console.error('Errore nel filtraggio dei messaggi:', error));
+      }
+    } catch (error) {
+      console.error('Errore nel filtraggio dei messaggi:', error);
+      swal.fire({
+        icon: 'error',
+        title: 'Errore nella ricerca',
+        text: 'Si è verificato un errore durante la ricerca dei messaggi. Riprova più tardi.',
+        timer: 3000,
+        showConfirmButton: false
+      });
+    }
+  };
+
+  // Modifico la funzione handleResetFilters per resettare tutti i filtri
+  const handleResetFilters = () => {
+    setActiveFilters({
+      color: null,
+      messageType: 'all',
+      searchText: ''
+    });
+    setMessageSearchTerm('');
+    
+    const event = new CustomEvent('chat-reset-filters', {
+      detail: {
+        targetNotificationId: notificationId
+      }
+    });
+    document.dispatchEvent(event);
+  };
+
+  // Modifico la funzione handleFilterTypeChange per gestire i filtri dei sondaggi
+  const handleFilterTypeChange = (type) => {
+    handleFilterMessages({ messageType: type });
   };
 
   // Toggle per mostrare/nascondere la barra di ricerca
@@ -409,127 +456,122 @@ const ChatTopBar = ({
     }
   };
 
-  const handleFilterTypeChange = (type) => {
-    setCurrentFilter(type);
-    filterMessages(notificationId, { messageType: type });
-  };
-
   // Funzione per gestire l'archiviazione della chat
-const handleArchiveChat = async () => {
-  if (!archiveChat || !notificationId) return;
-  
-  try {
-    // Chiudi i menu aperti
-    setIsMoreMenuOpen(false);
-    setIsInfoVisible(false);
+  const handleArchiveChat = async () => {
+    if (!archiveChat || !notificationId) return;
     
-    // Chiama la funzione archiveChat passata come prop
-    await archiveChat(notificationId);
-    
-    // Non è necessario fare altro qui perché:
-    // 1. La funzione archiveChat aggiorna già lo stato della chat
-    // 2. Emette un evento che notifica altri componenti
-    // 3. Lo stato isArchived verrà aggiornato tramite il ricaricamento dati in ChatWindow
-  } catch (error) {
-    console.error('Errore durante l\'archiviazione della chat:', error);
-  }
-};
+    try {
+      // Chiudi i menu aperti
+      setIsMoreMenuOpen(false);
+      setIsInfoVisible(false);
+      
+      // Chiama la funzione archiveChat passata come prop
+      await archiveChat(notificationId);
+      
+      // Non è necessario fare altro qui perché:
+      // 1. La funzione archiveChat aggiorna già lo stato della chat
+      // 2. Emette un evento che notifica altri componenti
+      // 3. Lo stato isArchived verrà aggiornato tramite il ricaricamento dati in ChatWindow
+    } catch (error) {
+      console.error('Errore durante l\'archiviazione della chat:', error);
+    }
+  };
 
   // Funzione per gestire la rimozione dall'archivio della chat
-const handleUnarchiveChat = async () => {
-  if (!unarchiveChat || !notificationId) return;
-  
-  try {
-    // Chiudi i menu aperti
-    setIsMoreMenuOpen(false);
-    setIsInfoVisible(false);
+  const handleUnarchiveChat = async () => {
+    if (!unarchiveChat || !notificationId) return;
     
-    // Chiama la funzione unarchiveChat passata come prop
-    await unarchiveChat(notificationId);
-    
-    // Non è necessario fare altro qui perché:
-    // 1. La funzione unarchiveChat aggiorna già lo stato della chat
-    // 2. Emette un evento che notifica altri componenti
-    // 3. Lo stato isArchived verrà aggiornato tramite il ricaricamento dati in ChatWindow
-  } catch (error) {
-    console.error('Errore durante la rimozione dall\'archivio:', error);
-  }
-};
+    try {
+      // Chiudi i menu aperti
+      setIsMoreMenuOpen(false);
+      setIsInfoVisible(false);
+      
+      // Chiama la funzione unarchiveChat passata come prop
+      await unarchiveChat(notificationId);
+      
+      // Non è necessario fare altro qui perché:
+      // 1. La funzione unarchiveChat aggiorna già lo stato della chat
+      // 2. Emette un evento che notifica altri componenti
+      // 3. Lo stato isArchived verrà aggiornato tramite il ricaricamento dati in ChatWindow
+    } catch (error) {
+      console.error('Errore durante la rimozione dall\'archivio:', error);
+    }
+  };
 
   // Funzione per gestire l'abbandono della chat dal menu "More"
-const handleLeaveChat = async () => {
-  if (!leaveChat || !notificationId) return;
-  
-  try {
-    // Chiudi i menu aperti
-    setIsMoreMenuOpen(false);
-    setIsInfoVisible(false);
+  const handleLeaveChat = async () => {
+    if (!leaveChat || !notificationId) return;
     
-    // Mostra un indicatore di caricamento
-    swal.fire({
-      title: 'Abbandono in corso...',
-      allowOutsideClick: false,
-      showConfirmButton: false,
-      willOpen: () => {
-        swal.showLoading();
-      }
-    });
-    
-    // Chiama la funzione leaveChat passata come prop
-    const result = await leaveChat(notificationId);
-    
-    if (result) {
-      // Importante: Ricarica i dati aggiornati della chat
-      // Questa funzione deve essere disponibile come prop
-      if (typeof fetchNotificationData === 'function') {
-        await fetchNotificationData(notificationId);
-      }
+    try {
+      // Chiudi i menu aperti
+      setIsMoreMenuOpen(false);
+      setIsInfoVisible(false);
       
-      // Aggiorna lo stato locale immediatamente
-      setHasLeftChat(true);
-      
+      // Mostra un indicatore di caricamento
       swal.fire({
-        icon: 'success',
-        title: 'Chat abbandonata',
-        text: 'Hai abbandonato questa conversazione',
-        timer: 2000,
-        showConfirmButton: false
+        title: 'Abbandono in corso...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        willOpen: () => {
+          swal.showLoading();
+        }
       });
       
-      // Emetti un evento per notificare altri componenti
-      document.dispatchEvent(new CustomEvent('chat-status-changed', {
-        detail: { 
-          notificationId,
-          action: 'left',
-          timestamp: new Date().getTime()
+      // Chiama la funzione leaveChat passata come prop
+      const result = await leaveChat(notificationId);
+      
+      if (result) {
+        // Importante: Ricarica i dati aggiornati della chat
+        // Questa funzione deve essere disponibile come prop
+        if (typeof fetchNotificationData === 'function') {
+          await fetchNotificationData(notificationId);
         }
-      }));
+        
+        // Aggiorna lo stato locale immediatamente
+        setHasLeftChat(true);
+        
+        swal.fire({
+          icon: 'success',
+          title: 'Chat abbandonata',
+          text: 'Hai abbandonato questa conversazione',
+          timer: 2000,
+          showConfirmButton: false
+        });
+        
+        // Emetti un evento per notificare altri componenti
+        document.dispatchEvent(new CustomEvent('chat-status-changed', {
+          detail: { 
+            notificationId,
+            action: 'left',
+            timestamp: new Date().getTime()
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Errore durante l\'abbandono della chat:', error);
+      swal.fire({
+        icon: 'error',
+        title: 'Errore',
+        text: error.message || 'Si è verificato un errore durante l\'abbandono della chat'
+      });
     }
-  } catch (error) {
-    console.error('Errore durante l\'abbandono della chat:', error);
-    swal.fire({
-      icon: 'error',
-      title: 'Errore',
-      text: error.message || 'Si è verificato un errore durante l\'abbandono della chat'
-    });
-  }
-};
-
-useEffect(() => {
-  // Questa funzione verrà chiamata quando lo stato della chat cambia
-  // (hasLeftChat o isArchived vengono aggiornati dal componente padre)
-  const updateUIForChatStatus = () => {
-    // Puoi aggiungere logica di UI aggiuntiva qui se necessario
-    // Ad esempio, resettare alcuni stati, chiudere menu, ecc.
-    
-    // Chiudi eventuali menu aperti per mostrare lo stato aggiornato
-    setIsMoreMenuOpen(false);
-    setIsInfoVisible(false);
   };
-  
-  // Esegui la funzione quando lo stato cambia
-  updateUIForChatStatus();
-}, [hasLeftChat, isArchived]);
+
+  useEffect(() => {
+    // Questa funzione verrà chiamata quando lo stato della chat cambia
+    // (hasLeftChat o isArchived vengono aggiornati dal componente padre)
+    const updateUIForChatStatus = () => {
+      // Puoi aggiungere logica di UI aggiuntiva qui se necessario
+      // Ad esempio, resettare alcuni stati, chiudere menu, ecc.
+      
+      // Chiudi eventuali menu aperti per mostrare lo stato aggiornato
+      setIsMoreMenuOpen(false);
+      setIsInfoVisible(false);
+    };
+    
+    // Esegui la funzione quando lo stato cambia
+    updateUIForChatStatus();
+  }, [hasLeftChat, isArchived]);
 
   return (
     <div 
@@ -1222,265 +1264,363 @@ useEffect(() => {
                 </div>
               )}
 
-              {/* USERS TAB CONTENT */}
-              {activeRecipientTab === 'users' && (
-                <>
-                  <div className="mb-3">
-                    <div className="relative">
-                      <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                      <input 
-                        type="text"
-                        placeholder="Cerca utenti..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      />
-                      {searchTerm && (
-                        <button 
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                          onClick={() => setSearchTerm('')}
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                    {filteredUsers.length === 0 ? (
-                      <div className="text-center text-gray-500 py-4">
-                        {searchTerm ? 'Nessun utente trovato' : 'Nessun utente disponibile'}
-                      </div>
-                    ) : (
-                      filteredUsers.map((user) => (
-                        <div 
-                          key={user.userId}
-                          className={`flex items-center p-2 rounded-lg transition-colors cursor-pointer ${
-                            selectedUsers.includes(user.userId.toString())
-                            ? 'bg-blue-50' 
-                            : 'hover:bg-gray-100'
-                          }`}
-                          onClick={() => handleUserSelect(user.userId.toString())}
-                        >
-                          <div className="relative flex-shrink-0">
-                            <div 
-                              className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                selectedUsers.includes(user.userId.toString())
-                                  ? 'bg-blue-500 text-white'
-                                  : 'bg-gray-200 text-gray-700'
-                              }`}
-                            >
-                              {selectedUsers.includes(user.userId.toString()) ? (
-                                <Check className="h-4 w-4" />
-                              ) : (
-                                <span>{user.firstName?.charAt(0)}{user.lastName?.charAt(0)}</span>
-                              )}
-                            </div>
-                            <div 
-                              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${
-                                getOnlineStatus(user) === 'online' ? 'bg-green-500' :
-                                getOnlineStatus(user) === 'away' ? 'bg-yellow-500' : 'bg-gray-400'
-                              }`}
-                            ></div>
-                          </div>
-                          
-                          <div className="ml-3 min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">
-                              {user.firstName} {user.lastName}
-                            </p>
-                            <div className="flex items-center text-xs text-gray-500">
-                              <span className="truncate">
-                                {user.role || user.username || user.email || ''}
-                              </span>
-                              {user.companyName && (
-                                <span className="ml-1 text-gray-400 text-indigo-500">
-                                  - {user.companyName}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* CHANNELS TAB CONTENT */}
-              {activeRecipientTab === 'channels' && (
-                <>
-                  <div className="mb-3">
-                    <div className="relative">
-                      <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                      <input 
-                        type="text"
-                        placeholder="Cerca canali..."
-                        value={channelSearchTerm}
-                        onChange={(e) => setChannelSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      />
-                      {channelSearchTerm && (
-                        <button 
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                          onClick={() => setChannelSearchTerm('')}
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                 
-                  <div className="space-y-1 max-h-[300px] overflow-y-auto pr-1">
-                    {loadingChannels ? (
-                      <div className="px-4 py-6 text-center">
-                        <div className="inline-block animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                        <p className="mt-2 text-sm text-gray-500">Caricamento canali...</p>
-                      </div>
-                    ) : filteredChannels.length === 0 ? (
-                      <div className="px-4 py-6 text-center text-gray-500">
-                        {channelSearchTerm ? 'Nessun canale trovato' : 'Nessun canale disponibile'}
-                      </div>
-                    ) : (
-                      filteredChannels.map(channel => {
-                        const memberCount = channel.members?.length || 0;
-                        const isIntercompany = channel.intercompany === 1 || channel.intercompany === true;
-                        
-                        return (
-                          <div
-                            key={channel.notificationCategoryId}
-                            className="px-3 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer"
-                            onClick={() => handleChannelSelect(channel.notificationCategoryId)}
-                          >
-                            <div className="flex items-start">
-                              <div className="flex-shrink-0 mr-3">
-                                <div 
-                                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                                  style={{ backgroundColor: channel.hexColor || '#3b82f6' }}
-                                >
-                                  {isIntercompany ? (
-                                    <Globe className="h-4 w-4 text-white" />
-                                  ) : (
-                                    <Bell className="h-4 w-4 text-white" />
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex-grow min-w-0">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-sm font-medium text-gray-900 truncate">
-                                    {channel.name}
-                                  </p>
-                                  {isIntercompany && (
-                                    <span className="ml-2 text-xs bg-purple-100 text-purple-800 rounded-full px-2 py-0.5">
-                                      Intercompany
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-gray-500 truncate">
-                                  {channel.description}
-                                </p>
-                                <div className="mt-1 flex items-center">
-                                  <Users className="h-3 w-3 text-gray-400 mr-1" />
-                                  <span className="text-xs text-gray-500">
-                                    {memberCount} {memberCount === 1 ? 'membro' : 'membri'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-          
-          {/* SEARCH TAB */}
-          {activeTab === 'search' && (
-            <div className="p-4">
-              <h3 className="font-medium text-sm mb-3" style={{ color: categoryColor }}>
-                Cerca nei messaggi
-              </h3>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs text-gray-500">Parola chiave</label>
+            {/* USERS TAB CONTENT */}
+            {activeRecipientTab === 'users' && (
+              <>
+                <div className="mb-3">
                   <div className="relative">
-                    <input
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                    <input 
                       type="text"
-                      placeholder="Cerca nei messaggi..."
+                      placeholder="Cerca utenti..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleFilterMessages(searchTerm);
-                        }
-                      }}
-                      className="w-full py-2 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-blue-300"
+                      className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                     />
-                    <button
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 bg-blue-50 text-blue-600 rounded-md"
-                      onClick={() => handleFilterMessages(searchTerm)}
-                      disabled={!searchTerm}
-                    >
-                      <Search className="h-4 w-4" />
-                    </button>
+                    {searchTerm && (
+                      <button 
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        onClick={() => setSearchTerm('')}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <label className="text-xs text-gray-500">Filtra per colore</label>
-                  <div className="flex flex-wrap gap-2">
-                    {['#d62828', '#fad02c', '#00a14b', '#6ccff6', '#e5e9ec'].map((color) => (
+                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                  {filteredUsers.length === 0 ? (
+                    <div className="text-center text-gray-500 py-4">
+                      {searchTerm ? 'Nessun utente trovato' : 'Nessun utente disponibile'}
+                    </div>
+                  ) : (
+                    filteredUsers.map((user) => (
+                      <div 
+                        key={user.userId}
+                        className={`flex items-center p-2 rounded-lg transition-colors cursor-pointer ${
+                          selectedUsers.includes(user.userId.toString())
+                          ? 'bg-blue-50' 
+                          : 'hover:bg-gray-100'
+                        }`}
+                        onClick={() => handleUserSelect(user.userId.toString())}
+                      >
+                        <div className="relative flex-shrink-0">
+                          <div 
+                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              selectedUsers.includes(user.userId.toString())
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-200 text-gray-700'
+                            }`}
+                          >
+                            {selectedUsers.includes(user.userId.toString()) ? (
+                              <Check className="h-4 w-4" />
+                            ) : (
+                              <span>{user.firstName?.charAt(0)}{user.lastName?.charAt(0)}</span>
+                            )}
+                          </div>
+                          <div 
+                            className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${
+                              getOnlineStatus(user) === 'online' ? 'bg-green-500' :
+                              getOnlineStatus(user) === 'away' ? 'bg-yellow-500' : 'bg-gray-400'
+                            }`}
+                          ></div>
+                        </div>
+                        
+                        <div className="ml-3 min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">
+                            {user.firstName} {user.lastName}
+                          </p>
+                          <div className="flex items-center text-xs text-gray-500">
+                            <span className="truncate">
+                              {user.role || user.username || user.email || ''}
+                            </span>
+                            {user.companyName && (
+                              <span className="ml-1 text-gray-400 text-indigo-500">
+                                - {user.companyName}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* CHANNELS TAB CONTENT */}
+            {activeRecipientTab === 'channels' && (
+              <>
+                <div className="mb-3">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                    <input 
+                      type="text"
+                      placeholder="Cerca canali..."
+                      value={channelSearchTerm}
+                      onChange={(e) => setChannelSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                    {channelSearchTerm && (
                       <button
-                        key={color}
-                        className="w-8 h-8 rounded-full transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                        style={{ 
-                          backgroundColor: color,
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}
-                        onClick={() => {
-                          // Filtra messaggi per colore
-                          filterMessages(notificationId, { color });
-                        }}
-                        title={`Cerca messaggi con colore ${color}`}
-                      />
-                    ))}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        onClick={() => setChannelSearchTerm('')}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
-                <PollFilter 
-                  onFilterChange={(type) => handleFilterTypeChange(type)} 
-                  active={currentFilter === 'polls'} 
-                />
-                <div className="pt-2 border-t border-gray-100">
-                  <button 
-                    className="w-full py-2 px-3 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
-                    onClick={() => {
-                      // Resetta filtri e mostra tutti i messaggi
-                      const event = new CustomEvent('chat-reset-filters');
-                      document.dispatchEvent(event);
+
+               
+                <div className="space-y-1 max-h-[300px] overflow-y-auto pr-1">
+                  {loadingChannels ? (
+                    <div className="px-4 py-6 text-center">
+                      <div className="inline-block animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                      <p className="mt-2 text-sm text-gray-500">Caricamento canali...</p>
+                    </div>
+                  ) : filteredChannels.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-gray-500">
+                      {channelSearchTerm ? 'Nessun canale trovato' : 'Nessun canale disponibile'}
+                    </div>
+                  ) : (
+                    filteredChannels.map(channel => {
+                      const memberCount = channel.members?.length || 0;
+                      const isIntercompany = channel.intercompany === 1 || channel.intercompany === true;
+                      
+                      return (
+                        <div
+                          key={channel.notificationCategoryId}
+                          className="px-3 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => handleChannelSelect(channel.notificationCategoryId)}
+                        >
+                          <div className="flex items-start">
+                            <div className="flex-shrink-0 mr-3">
+                              <div 
+                                className="w-8 h-8 rounded-full flex items-center justify-center"
+                                style={{ backgroundColor: channel.hexColor || '#3b82f6' }}
+                              >
+                                {isIntercompany ? (
+                                  <Globe className="h-4 w-4 text-white" />
+                                ) : (
+                                  <Bell className="h-4 w-4 text-white" />
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex-grow min-w-0">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {channel.name}
+                                </p>
+                                {isIntercompany && (
+                                  <span className="ml-2 text-xs bg-purple-100 text-purple-800 rounded-full px-2 py-0.5">
+                                    Intercompany
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 truncate">
+                                {channel.description}
+                              </p>
+                              <div className="mt-1 flex items-center">
+                                <Users className="h-3 w-3 text-gray-400 mr-1" />
+                                <span className="text-xs text-gray-500">
+                                  {memberCount} {memberCount === 1 ? 'membro' : 'membri'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        
+        {/* SEARCH TAB */}
+        {activeTab === 'search' && (
+          <div className="p-4">
+            <h3 className="font-medium text-sm mb-3" style={{ color: categoryColor }}>
+              Cerca nei messaggi
+            </h3>
+            
+            <div className="space-y-4">
+              {/* Filtri attivi */}
+              {(activeFilters.color || activeFilters.messageType !== 'all' || activeFilters.searchText) && (
+                <div className="flex flex-wrap gap-2 p-2 bg-blue-50 rounded-lg">
+                  {activeFilters.color && (
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-sm">
+                      <span 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: activeFilters.color }}
+                      />
+                      <span>Colore</span>
+                      <button 
+                        onClick={() => handleFilterMessages({ color: null })}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                  
+                  {activeFilters.messageType !== 'all' && (
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-sm">
+                      <BarChart className="h-3 w-3 text-blue-500" />
+                      <span>Sondaggi</span>
+                      <button 
+                        onClick={() => handleFilterMessages({ messageType: 'all' })}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                  
+                  {activeFilters.searchText && (
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-sm">
+                      <Search className="h-3 w-3 text-blue-500" />
+                      <span>{activeFilters.searchText}</span>
+                      <button 
+                        onClick={() => {
+                          setMessageSearchTerm('');
+                          handleFilterMessages({ searchText: '' });
+                        }}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <label className="text-xs text-gray-500">Parola chiave</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Cerca nei messaggi..."
+                    value={messageSearchTerm}
+                    onChange={(e) => setMessageSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && messageSearchTerm.trim()) {
+                        handleFilterMessages({ searchText: messageSearchTerm.trim() });
+                      } else if (e.key === 'Escape') {
+                        setMessageSearchTerm('');
+                        handleResetFilters();
+                      }
                     }}
+                    className="w-full py-2 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-blue-300"
+                    autoFocus
+                  />
+                  <button
+                    className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-md ${
+                      messageSearchTerm.trim() 
+                        ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' 
+                        : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                    }`}
+                    onClick={() => messageSearchTerm.trim() && handleFilterMessages({ searchText: messageSearchTerm.trim() })}
+                    disabled={!messageSearchTerm.trim()}
                   >
-                    Mostra tutti i messaggi
+                    <Search className="h-4 w-4" />
+                  </button>
+                  {messageSearchTerm && (
+                    <button
+                      className="absolute right-10 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                      onClick={() => {
+                        setMessageSearchTerm('');
+                        handleFilterMessages({ searchText: '' });
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-xs text-gray-500">Filtra per colore</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { color: '#d62828', name: 'Rosso' },
+                    { color: '#fad02c', name: 'Giallo' },
+                    { color: '#00a14b', name: 'Verde' },
+                    { color: '#6ccff6', name: 'Azzurro' },
+                    { color: '#e5e9ec', name: 'Grigio' }
+                  ].map(({ color, name }) => (
+                    <button
+                      key={color}
+                      className={`w-8 h-8 rounded-full transition-all ${
+                        activeFilters.color === color 
+                          ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' 
+                          : 'hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400'
+                      }`}
+                      style={{ 
+                        backgroundColor: color,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                      onClick={() => handleFilterMessages({ 
+                        color: activeFilters.color === color ? null : color 
+                      })}
+                      title={`Cerca messaggi con colore ${name}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-xs text-gray-500">Filtra per tipo</label>
+                <div className="flex gap-2">
+                  <button
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      activeFilters.messageType === 'all'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    onClick={() => handleFilterMessages({ messageType: 'all' })}
+                  >
+                    Tutti
+                  </button>
+                  <button
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                      activeFilters.messageType === 'polls'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    onClick={() => handleFilterMessages({ messageType: 'polls' })}
+                  >
+                    <BarChart className="h-4 w-4" />
+                    Sondaggi
                   </button>
                 </div>
               </div>
+              
+              <div className="pt-2 border-t border-gray-100">
+                <button 
+                  className="w-full py-2 px-3 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
+                  onClick={handleResetFilters}
+                >
+                  Mostra tutti i messaggi
+                </button>
+              </div>
             </div>
-            )}
-            </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
-      <DocumentLinker
-        notificationId={notificationId}
-        isOpen={isDocumentLinkerOpen}
-        onClose={() => setIsDocumentLinkerOpen(false)}
-      />
-    </div>
-    );
-    
-    };
-    
-    export default ChatTopBar;
+        </div>
+      </motion.div>
+    )}
+  </AnimatePresence>
+  <DocumentLinker
+    notificationId={notificationId}
+    isOpen={isDocumentLinkerOpen}
+    onClose={() => setIsDocumentLinkerOpen(false)}
+  />
+</div>
+);
+
+};
+
+export default ChatTopBar;
