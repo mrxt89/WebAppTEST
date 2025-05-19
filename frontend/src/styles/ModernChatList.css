@@ -281,7 +281,7 @@
 /* Miglioramenti per la leggibilità */
 .message-bubble {
   position: relative;
-  z-index: 1;
+
 }
 
 .highlighted-message .message-bubble {
