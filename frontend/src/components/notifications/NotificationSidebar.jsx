@@ -1330,11 +1330,11 @@ useEffect(() => {
         <div className="mt-3" style={{ height: '50vh', overflowY: 'auto' }}>
           {/* Document Search Results */}
           {documentsSearchResults.length > 0 && (
-            <div className="mb-3" style={{ height: '50vh', overflowY: 'auto' }}>
+            <div className="mb-3">
               <h4 className="text-xs font-medium text-gray-600 mb-2">
                 Documenti trovati ({documentsSearchResults.length})
               </h4>
-              <div className="space-y-2 overflow-y-auto pr-1 documents-list">
+              <div className="space-y-2 overflow-y-auto pr-1 documents-list" style={{ maxHeight: '30vh' }}>
                 {documentsSearchResults.map(doc => (
                   <div 
                     key={`doc-${doc.DocumentType}-${doc.DocumentId}`}
@@ -1384,9 +1384,9 @@ useEffect(() => {
             </div>
           )}
           
-          {/* Document-Related Chats */}
+          {/* Document-Related Chats - Spostato fuori dal div dei risultati */}
           {selectedDocument && (
-            <div className="mt-4">
+            <div className="mt-4 border-t pt-4">
               <h4 className="text-xs font-medium text-gray-600 mb-2 flex items-center">
                 <MessageSquare className="h-3.5 w-3.5 mr-1" />
                 Chat legate a: 
