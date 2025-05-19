@@ -10,7 +10,76 @@ import {
 let worker = null;
 let isWorkerInitialized = false;
 let lastNotificationUpdate = 0;
-const UPDATE_THROTTLE_MS = 2000; // Limitazione aggiornamenti: 2 secondi
+const UPDATE_THROTTLE_MS = 3000; // Aumentato da 2000 a 3000 ms
+
+/**
+ * Verifica se ci sono cambiamenti significativi tra le notifiche attuali e quelle nuove
+ * per evitare aggiornamenti non necessari che causano sfarfallio
+ *
+ * @param {Array} currentNotifications - Le notifiche attualmente nello store
+ * @param {Array} newNotifications - Le nuove notifiche ricevute dal worker
+ * @return {Boolean} true se ci sono cambiamenti significativi, false altrimenti
+ */
+function hasNotificationChanges(currentNotifications, newNotifications) {
+  // Se le lunghezze sono diverse, c'è sicuramente un cambiamento
+  if (currentNotifications.length !== newNotifications.length) {
+    return true;
+  }
+  
+  // Crea una mappa delle notifiche attuali per una ricerca veloce
+  const currentMap = new Map();
+  currentNotifications.forEach(notification => {
+    if (notification && notification.notificationId) {
+      // Memorizziamo solo i campi che ci interessano per il confronto
+      currentMap.set(notification.notificationId, {
+        isReadByUser: notification.isReadByUser,
+        isClosed: notification.isClosed,
+        pinned: notification.pinned,
+        favorite: notification.favorite,
+        isMuted: notification.isMuted,
+        archived: notification.archived,
+        chatLeft: notification.chatLeft,
+        lastMessage: notification.lastMessage,
+        // Contiamo il numero di messaggi per verificare se ce ne sono di nuovi
+        messagesCount: Array.isArray(notification.messages) 
+          ? notification.messages.length 
+          : (typeof notification.messages === 'string'
+              ? JSON.parse(notification.messages || '[]').length
+              : 0)
+      });
+    }
+  });
+  
+  // Verifica se c'è almeno una notifica modificata
+  return newNotifications.some(notification => {
+    if (!notification || !notification.notificationId) return false;
+    
+    const current = currentMap.get(notification.notificationId);
+    
+    // Se la notifica non esiste nello stato corrente, è nuova
+    if (!current) return true;
+    
+    // Contiamo i messaggi nella nuova notifica
+    const newMessagesCount = Array.isArray(notification.messages) 
+      ? notification.messages.length 
+      : (typeof notification.messages === 'string'
+          ? JSON.parse(notification.messages || '[]').length
+          : 0);
+    
+    // Controlla se ci sono cambiamenti significativi
+    return (
+      current.isReadByUser !== notification.isReadByUser ||
+      current.isClosed !== notification.isClosed ||
+      current.pinned !== notification.pinned ||
+      current.favorite !== notification.favorite ||
+      current.isMuted !== notification.isMuted ||
+      current.archived !== notification.archived ||
+      current.chatLeft !== notification.chatLeft ||
+      current.lastMessage !== notification.lastMessage ||
+      current.messagesCount !== newMessagesCount
+    );
+  });
+}
 
 // Middleware per gestire il worker delle notifiche
 const notificationsWorkerMiddleware = store => {
@@ -89,19 +158,39 @@ const notificationsWorkerMiddleware = store => {
               lastNotificationUpdate = now;
               
               if (newNotifications) {
-                // Dispatch action per aggiornare le notifiche nello store
-                store.dispatch({
-                  type: 'notifications/updateFromWorker',
-                  payload: newNotifications
-                });
-                
-                // Emetti un evento per notificare altri componenti
-                document.dispatchEvent(new CustomEvent('notifications-updated', {
-                  detail: { 
-                    timestamp: Date.now(),
-                    source: 'worker'
+                try {
+                  // Ottieni lo stato corrente prima dell'aggiornamento
+                  const currentState = store.getState();
+                  const currentNotifications = currentState.notifications?.notifications || [];
+                  
+                  // Trova le notifiche nuove o modificate (evita aggiornamenti non necessari)
+                  const hasChanges = hasNotificationChanges(currentNotifications, newNotifications);
+                  
+                  // Esegui l'aggiornamento solo se ci sono effettivamente cambiamenti
+                  if (hasChanges) {
+                    // Dispatch action per aggiornare le notifiche nello store
+                    store.dispatch({
+                      type: 'notifications/updateFromWorker',
+                      payload: newNotifications,
+                      meta: {
+                        // Aggiungi un flag per indicare l'origine dell'aggiornamento
+                        source: 'worker',
+                        timestamp: Date.now()
+                      }
+                    });
+                    
+                    // Emetti un evento per notificare altri componenti
+                    document.dispatchEvent(new CustomEvent('notifications-updated', {
+                      detail: { 
+                        timestamp: Date.now(),
+                        source: 'worker',
+                        hasChanges: true
+                      }
+                    }));
                   }
-                }));
+                } catch (error) {
+                  console.error('Error processing notification update:', error);
+                }
               }
               break;
               
@@ -253,7 +342,11 @@ const notificationsWorkerMiddleware = store => {
                     }));
                     document.dispatchEvent(new CustomEvent('new-message-received', {
                       detail: {
-                        notificationId
+                        notificationId,
+                        timestamp: now,
+                        // Aggiungi un flag per indicare che questo è un aggiornamento incrementale
+                        // per evitare che l'UI faccia un refresh completo
+                        isIncremental: true
                       }
                     }));
                     
