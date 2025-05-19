@@ -16,7 +16,7 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
   const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [selectedPoll, setSelectedPoll] = useState(null);
   
-  const { sendNotification, createPoll } = useNotifications();
+  const { sendNotification } = useNotifications();
   
   // Usa useCallback per memorizzare le funzioni tra i render
   const handleShowPollModal = useCallback(() => {
@@ -28,12 +28,6 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
     console.log("Event 'show-polls-list' received - Opening polls list");
     setIsListModalOpen(true);
   }, []);
-  
-  // Esponi le funzioni come metodi pubblici del componente
-  React.useImperativeHandle(React.useRef(), () => ({
-    openCreateModal: () => setIsCreateModalOpen(true),
-    openListModal: () => setIsListModalOpen(true)
-  }));
   
   // Aggiungi gli event listener con dipendenze appropriate
   useEffect(() => {
@@ -80,19 +74,66 @@ const PollButton = ({ notificationId, onPollCreated, currentUserId }) => {
   };
   
   // Gestisci la creazione di un sondaggio
-  const handlePollCreated = async (poll) => {
+  const handlePollCreated = async (pollData) => {
     setIsCreateModalOpen(false);
     
     try {
-      console.log('Creating poll with data:', poll);
+      console.log('Creating poll with data:', pollData);
+      
+      // FASE 1: Prima invio un messaggio nella chat per indicare che sto creando un sondaggio
+      const messageData = {
+        notificationId: notificationId,
+        message: `📊 **Sondaggio creato**: "${pollData.question}"`,
+        messageType: 'poll' // Tipo di messaggio specifico per i sondaggi
+      };
+      
+      // Invio il messaggio
+      const messageResult = await sendNotification(messageData);
+      
+      if (!messageResult || !messageResult.notificationId) {
+        throw new Error("Errore durante l'invio del messaggio per il sondaggio");
+      }
+      
+      // Ottieni il messageId dal risultato
+      // In un caso reale, dovresti estrarre il messageId corretto dalla risposta
+      let messageId;
+      
+      if (messageResult.messages) {
+        // Se messages è una stringa JSON, parseizzala
+        const messagesArray = typeof messageResult.messages === 'string'
+          ? JSON.parse(messageResult.messages)
+          : messageResult.messages;
+        
+        if (Array.isArray(messagesArray) && messagesArray.length > 0) {
+          // Usa l'ultimo messaggio inviato (dovrebbe essere quello del sondaggio)
+          messageId = messagesArray[messagesArray.length - 1].messageId;
+        }
+      }
+      
+      if (!messageId) {
+        throw new Error("Impossibile trovare l'ID del messaggio per il sondaggio");
+      }
+      
+      // FASE 2: Ora che abbiamo il messageId, aggiungi questo a pollData e crea il sondaggio
+      const pollDataWithMessageId = {
+        ...pollData,
+        notificationId: notificationId,
+        messageId: messageId
+      };
+      
+      // Il resto della creazione del sondaggio verrebbe gestito dall'API
+      // In questo caso non lo implementiamo perché dipende dal backend
       
       // Chiama la funzione onPollCreated se disponibile
       if (typeof onPollCreated === 'function') {
-        onPollCreated(poll);
+        onPollCreated(pollDataWithMessageId, messageResult);
       }
+      
+      return true;
     } catch (error) {
       console.error('Error in poll creation flow:', error);
       swal.fire('Errore', 'Si è verificato un errore durante la creazione del sondaggio: ' + error.message, 'error');
+      return false;
     }
   };
   
