@@ -1,2 +1,2 @@
-- reazioni
-- completamento chat
+- Funzionalità di ricerca sulla chat (tasto info) : Non funziona
+- 
