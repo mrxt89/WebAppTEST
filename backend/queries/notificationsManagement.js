@@ -26,8 +26,12 @@ async function getUserNotifications(userId) {
   }
 }
 
-async function getNotificationById(userId, notificationId) {
+async function getNotificationById(userId, notificationId, isOpenChat = true) {
   try {
+    // Prima ricreiamo la vista con i messaggi completi per questa notifica specifica
+    await createDBNotificationsView(userId, notificationId, 0, isOpenChat);
+    
+    // Poi recuperiamo i dati dalla vista
     let pool = await sql.connect(config.dbConfig);
     let result = await pool.request()
       .input('userId', sql.Int, userId)
@@ -310,12 +314,15 @@ async function sendNotification(data) {
   }
 }
 
-async function createDBNotificationsView(userId) {
+async function createDBNotificationsView(userId, notificationId = 0, allNotificationsByUser = 1, isOpenChat = false) {
   try {
     const pool = await sql.connect(config.dbConfig);
     const result = await pool.request()
       .input('userId', sql.Int, userId)
-      .query('EXEC CreateNotificationsView @userId = @userId, @notificationId = 0, @allNotificationsByUser = 1; EXEC GetUserNotifications @userId = @userId, @notificationId =0');
+      .input('notificationId', sql.Int, notificationId)
+      .input('allNotificationsByUser', sql.Int, allNotificationsByUser)
+      .input('OpenChat', sql.Bit, isOpenChat ? 1 : 0)
+      .execute('CreateNotificationsView');
     return result.recordset;
   } catch (err) {
     console.error('Error creating DB notifications view:', err);

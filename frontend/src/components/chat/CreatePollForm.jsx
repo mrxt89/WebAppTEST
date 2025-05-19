@@ -1,18 +1,16 @@
-// CreatePollForm.jsx - File COMPLETO
+// CreatePollForm.jsx - Versione corretta
 
 import React, { useState } from 'react';
 import { BarChart, PlusCircle, XCircle, Calendar, AlertTriangle, Check } from 'lucide-react';
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
 import { swal } from '../../lib/common';
 
-const CreatePollForm = ({ notificationId, messageId, onSuccess, onCancel }) => {
+const CreatePollForm = ({ notificationId, onSuccess, onCancel }) => {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
   const [allowMultipleAnswers, setAllowMultipleAnswers] = useState(false);
   const [expirationDate, setExpirationDate] = useState('');
   const [loading, setLoading] = useState(false);
-  
-  const { createPoll } = useNotifications();
   
   // Aggiungi una nuova opzione
   const addOption = () => {
@@ -99,14 +97,14 @@ const CreatePollForm = ({ notificationId, messageId, onSuccess, onCancel }) => {
         }
       }
       
-      const result = await createPoll(
-        notificationId,
-        messageId,
-        question.trim(),
-        filledOptions,
+      // Preparazione dei dati del sondaggio
+      const pollData = {
+        notificationId: notificationId, 
+        question: question.trim(),
+        options: filledOptions,
         allowMultipleAnswers,
-        expiration
-      );
+        expirationDate: expiration
+      };
       
       if (result) {
         swal.fire({
@@ -116,6 +114,15 @@ const CreatePollForm = ({ notificationId, messageId, onSuccess, onCancel }) => {
         });
         if (onSuccess) onSuccess(result);
       }
+      
+      // Feedback di successo
+      swal.fire({
+        title: 'Completato', 
+        text: 'Sondaggio creato con successo', 
+        icon: 'success',
+        zIndex: 9999
+      });
+      
     } catch (error) {
       console.error('Error creating poll:', error);
       swal.fire({

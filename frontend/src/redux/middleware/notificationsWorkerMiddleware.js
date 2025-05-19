@@ -138,7 +138,7 @@ const notificationsWorkerMiddleware = store => {
             senderName,
             messagePreview
           } = event.data;
-          
+          console.log('event.data', event.data);
           switch (type) {
             case 'auth_error':
               // Gestisci errori di autenticazione (sessione scaduta)
@@ -204,6 +204,7 @@ const notificationsWorkerMiddleware = store => {
               
            case 'new_message':
               if (notificationId) {
+                console.log('new_message', notificationId);
                 try {
                   // Controlli di sicurezza
                   const state = store.getState();

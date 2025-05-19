@@ -8,13 +8,16 @@ let notificationCache = []; // Cache to track changes
 let forcedRefreshRequested = false;
 let highPriorityUpdate = false; // Flag per gli aggiornamenti ad alta priorità
 let debugEnabled = true; // Set to true to enable extensive logging
+let isOpenChat = false; // Flag per indicare se stiamo caricando per una chat aperta
 
 // Set per prevenire notifiche duplicate ravvicinate
 let recentNotifications = new Set();
+// Tracking per identificare quali notifiche hanno nuovi messaggi in un ciclo
+let notificationsWithNewMessages = new Set(); 
 
 // Constants
 const POLLING_INTERVAL = 10000; // 10 seconds
-const FORCED_REFRESH_INTERVAL = 300; // 300ms for forced refresh (reduced from 2000ms)
+const FORCED_REFRESH_INTERVAL = 300; // 300ms for forced refresh
 const REQUEST_TIMEOUT = 30000; // 30 seconds timeout for requests
 const THROTTLE_INTERVAL = 2000; // Minimo tempo tra richieste consecutive
 
@@ -29,15 +32,18 @@ function logError(...args) {
 
 // Check if notifications have changed by comparing with cache
 function haveNotificationsChanged(newNotifications) {
-  if (!notificationCache || notificationCache.length === 0) {
+  // Reset the set tracking which notifications have new messages
+  notificationsWithNewMessages.clear();
   
+  if (!notificationCache || notificationCache.length === 0) {
     return true; // No cache, consider it changed
   }
   
   if (newNotifications.length !== notificationCache.length) {
-   
     return true; // Different number of notifications
   }
+  
+  let hasChanges = false;
   
   // Compare each notification for changes
   for (let i = 0; i < newNotifications.length; i++) {
@@ -45,28 +51,50 @@ function haveNotificationsChanged(newNotifications) {
     const cachedNotif = notificationCache.find(n => n.notificationId === newNotif.notificationId);
     
     if (!cachedNotif) {
-      return true; // New notification found
+      hasChanges = true; // New notification found
+      continue;
     }
+
+    // Check for messages using messageCount field
+    const newMsgCount = newNotif.messageCount || 0;
+    const cachedMsgCount = cachedNotif.messageCount || 0;
     
-    // Check for message count changes
-    const newMsgCount = getMsgCount(newNotif.messages);
-    const cachedMsgCount = getMsgCount(cachedNotif.messages);
-    
-    if (newMsgCount !== cachedMsgCount) {
-      return true; // Message count changed
+    if (newNotif.notificationId == 25) {
+      console.log('newMsgCount', newMsgCount);
+      console.log('cachedMsgCount', cachedMsgCount);
+      console.log('newNotif', newNotif);
+      console.log('cachedNotif', cachedNotif);
+
+    }
+
+    // Prendo dalla cche data ora dell'ultimo messaggio ricevuto (lastMessage) 
+    const newLastMessageDate = new Date(newNotif.lastMessage);
+    const cachedLastMessageDate = new Date(cachedNotif.lastMessage);
+
+    // Se la data dell'ultimo messaggio è più recente di quella in cache, allora ho un nuovo messaggio
+    if (newLastMessageDate > cachedLastMessageDate) {
+      hasChanges = true;
+    }
+
+    // Track which notifications have new messages
+    if (newMsgCount > cachedMsgCount) {
+      notificationsWithNewMessages.add(newNotif.notificationId);
+      hasChanges = true;
     }
     
     // Check for read status changes
     if (newNotif.isReadByUser !== cachedNotif.isReadByUser) {
-      return true; // Read status changed
+      hasChanges = true; // Read status changed
     }
     
-    // Check for other changes (pin, archive, etc)
+    // Check for other status changes
     if (newNotif.pinned !== cachedNotif.pinned || 
         newNotif.favorite !== cachedNotif.favorite ||
         newNotif.archived !== cachedNotif.archived ||
-        newNotif.isClosed !== cachedNotif.isClosed) {
-      return true; // Status changed
+        newNotif.isClosed !== cachedNotif.isClosed ||
+        newNotif.isMuted !== cachedNotif.isMuted ||
+        newNotif.lastMessage !== cachedNotif.lastMessage) {
+      hasChanges = true; // Status changed
     }
   }
   
@@ -76,22 +104,7 @@ function haveNotificationsChanged(newNotifications) {
     return true;
   }
 
-  return false; // No changes detected
-}
-
-// Helper to get message count safely
-function getMsgCount(messages) {
-  if (!messages) return 0;
-  if (Array.isArray(messages)) return messages.length;
-  if (typeof messages === 'string') {
-    try {
-      return JSON.parse(messages).length;
-    } catch (err) {
-      logError('Error parsing messages:', err);
-      return 0;
-    }
-  }
-  return 0;
+  return hasChanges;
 }
 
 // Extract last message text for notification preview
@@ -108,22 +121,13 @@ function extractLastMessagePreview(messages) {
   return "Nuovo messaggio";
 }
 
-// Funzione per preparare messaggi di aggiornamento allegati
-function prepareAttachmentMessage(notificationId) {
-  return {
-    type: 'attachments_update_needed',
-    notificationId: notificationId,
-    timestamp: Date.now()
-  };
-}
-
 // Main function to fetch notifications
-async function fetchNotifications() {
+async function fetchNotifications(notificationIdToFetch = null) {
   // Rate limit check - evita richieste troppo frequenti
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
   
-  if (timeSinceLastRequest < THROTTLE_INTERVAL && !highPriorityUpdate) {
+  if (timeSinceLastRequest < THROTTLE_INTERVAL && !highPriorityUpdate && !notificationIdToFetch) {
     // Riprogramma per quando sarà passato l'intervallo minimo
     const waitTime = THROTTLE_INTERVAL - timeSinceLastRequest;
     if (pollingTimeout) {
@@ -141,26 +145,31 @@ async function fetchNotifications() {
   // Aggiorna timestamp della richiesta
   lastRequestTime = now;
   isRequestInProgress = true;
-  const fetchStartTime = now;
   
-
-  // Request with timeout
-  const fetchPromise = fetch(`${apiBaseUrl}/notifications`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache, no-store',
-      'Pragma': 'no-cache'
-    }
-  });
-  
-  // Create timeout promise
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Request timeout')), REQUEST_TIMEOUT);
-  });
-
   try {
+    let url = `${apiBaseUrl}/notifications`;
+    
+    // Se è richiesta una notifica specifica, modifica l'URL
+    if (notificationIdToFetch) {
+      url = `${apiBaseUrl}/notifications/${notificationIdToFetch}?openChat=${isOpenChat ? 'true' : 'false'}`;
+    }
+
+    // Request with timeout
+    const fetchPromise = fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store',
+        'Pragma': 'no-cache'
+      }
+    });
+    
+    // Create timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout')), REQUEST_TIMEOUT);
+    });
+
     // Race between fetch and timeout
     const response = await Promise.race([fetchPromise, timeoutPromise]);
     
@@ -177,20 +186,28 @@ async function fetchNotifications() {
       throw new Error(`Network response was not ok: ${response.status}`);
     }
 
-    const notifications = await response.json();
-    const fetchEndTime = Date.now();
+    let notifications;
+    
+    if (notificationIdToFetch) {
+      // Se abbiamo richiesto una notifica specifica, otteniamo un oggetto singolo
+      const notification = await response.json();
+      notifications = [notification]; // Lo convertiamo in array per compatibilità
+    } else {
+      // Altrimenti otteniamo l'array completo
+      notifications = await response.json();
+    }
     
     // Sort notifications by pin and date
     notifications.sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
-      return new Date(b.tbCreated) - new Date(a.tbCreated);
+      return new Date(b.lastMessage) - new Date(a.lastMessage);
     });
     
-    // Check if notifications have changed
+    // Check if notifications have changed and track which ones have new messages
     const hasChanges = haveNotificationsChanged(notifications);
     
-    if (hasChanges || highPriorityUpdate) {
+    if (hasChanges || highPriorityUpdate || notificationIdToFetch) {
       if (highPriorityUpdate) {
         highPriorityUpdate = false; // Reset flag
       }
@@ -198,21 +215,25 @@ async function fetchNotifications() {
       // Track last update time
       lastUpdateTime = Date.now();
 
-      // Check for new messages by comparing with cache
-      for (const notification of notifications) {
-        // Find the notification in cache
-        const cachedNotificationIndex = notificationCache.findIndex(n => n.notificationId === notification.notificationId);
-        const cachedNotification = cachedNotificationIndex !== -1 ? notificationCache[cachedNotificationIndex] : null;
-        
-        if (cachedNotification) {
-          // Check for new messages
-          const newMsgCount = getMsgCount(notification.messages);
-          const cachedMsgCount = getMsgCount(cachedNotification.messages);
-          
-          if (newMsgCount > cachedMsgCount) {
+      // Solo se ci sono nuovi messaggi, emetti un unico evento batch
+      // per evitare duplicazioni delle notifiche
+      if (notificationsWithNewMessages.size > 0) {
+        // Crea informazioni sulle notifiche con nuovi messaggi
+        const newMessagesInfo = notifications
+          .filter(notification => notificationsWithNewMessages.has(notification.notificationId))
+          .map(notification => {
+            // Trova la notifica in cache
+            const cachedNotification = notificationCache.find(n => n.notificationId === notification.notificationId);
             
-            // Get name of sender
+            // Calcola incremento messaggi
+            const newMsgCount = notification.messageCount || 0;
+            const cachedMsgCount = cachedNotification ? (cachedNotification.messageCount || 0) : 0;
+            const increment = newMsgCount - cachedMsgCount;
+            
+            // Estrai preview e sender
             let senderName = 'Unknown';
+            let messagePreview = 'Nuovo messaggio';
+            
             try {
               const messages = Array.isArray(notification.messages) ? 
                 notification.messages : 
@@ -221,45 +242,52 @@ async function fetchNotifications() {
               if (messages.length > 0) {
                 const lastMessage = messages[messages.length - 1];
                 senderName = lastMessage.senderName || notification.title || 'Unknown';
+                messagePreview = lastMessage.message || 'Nuovo messaggio';
               }
             } catch (e) {
-              logError(`Error getting sender name:`, e);
+              logError(`Error getting sender and preview:`, e);
             }
             
-            // Extract message preview for notification
-            const messagePreview = extractLastMessagePreview(notification.messages);
-            
-            // Verifica se questa notifica è già stata inviata recentemente (30 secondi)
+            // Controlla se questa notifica è stata mostrata di recente
             const notificationKey = `${notification.notificationId}_${Math.floor(Date.now() / 30000)}`;
-            if (recentNotifications.has(notificationKey)) {
-              continue;
+            const isRecent = recentNotifications.has(notificationKey);
+            
+            // Se non è recente, registrala
+            if (!isRecent) {
+              recentNotifications.add(notificationKey);
+              
+              // Limita dimensioni del set
+              if (recentNotifications.size > 100) {
+                const oldKeys = Array.from(recentNotifications).slice(0, 50);
+                oldKeys.forEach(key => recentNotifications.delete(key));
+              }
             }
             
-            // Registra questa notifica
-            recentNotifications.add(notificationKey);
-            
-            // Limita dimensioni del set
-            if (recentNotifications.size > 100) {
-              const oldKeys = Array.from(recentNotifications).slice(0, 50);
-              oldKeys.forEach(key => recentNotifications.delete(key));
-            }
-            
-            // Emit explicit message for each chat with new messages
-            self.postMessage({ 
-              type: 'new_message',
+            return {
               notificationId: notification.notificationId,
-              newMessageCount: newMsgCount - cachedMsgCount,
-              senderName: senderName,
-              messagePreview: messagePreview
-            });
-            
-            // Richiedi anche aggiornamento allegati per questa notifica
+              newMessageCount: increment,
+              senderName,
+              messagePreview,
+              isRecent
+            };
+          });
+          
+        // Invia un solo evento con tutte le informazioni sui nuovi messaggi
+        if (newMessagesInfo.length > 0) {
+          self.postMessage({
+            type: 'batch_new_messages',
+            newMessagesInfo,
+            timestamp: Date.now()
+          });
+          
+          // Richiedi aggiornamento allegati per le notifiche con nuovi messaggi
+          const notificationIdsToUpdate = Array.from(notificationsWithNewMessages);
+          if (notificationIdsToUpdate.length > 0) {
             self.postMessage({
               type: 'attachments_update',
-              notificationIds: [notification.notificationId],
+              notificationIds: notificationIdsToUpdate.slice(0, 5), // Limita a 5 per non sovraccaricare
               updateTime: Date.now()
             });
-            
           }
         }
       }
@@ -275,14 +303,10 @@ async function fetchNotifications() {
       });
       
       // Invia richiesta di aggiornamento allegati
-      // Seleziona massimo 5 notifiche da aggiornare (per limitare il carico)
-      if (notifications && notifications.length > 0) {
+      // solo se non abbiamo già inviato aggiornamenti specifici
+      if (notificationsWithNewMessages.size === 0 && notifications && notifications.length > 0) {
         const notificationsToUpdate = notifications
-          .filter((notification, index) => {
-            // Considera solo le prime 5 notifiche più recenti o con modifiche
-            // Limita il numero per non sovraccaricare il server
-            return index < 5;
-          })
+          .filter((notification, index) => index < 5)
           .map(notification => notification.notificationId);
         
         if (notificationsToUpdate.length > 0) {
@@ -293,9 +317,6 @@ async function fetchNotifications() {
           });
         }
       }
-      
-    } else {
-     
     }
 
   } catch (error) {
@@ -344,6 +365,8 @@ self.onmessage = (event) => {
           debugEnabled = true;
         }
         
+        // Default to sidebar mode (isOpenChat = false)
+        isOpenChat = data.isOpenChat || false;
         
         // Start fetching immediately
         fetchNotifications();
@@ -361,12 +384,14 @@ self.onmessage = (event) => {
         token = data.token || token;
         apiBaseUrl = data.apiBaseUrl || apiBaseUrl;
         
+        // Imposta lo stato isOpenChat
+        isOpenChat = data.isOpenChat || false;
+        
         // Set flag to force update regardless of change detection
         forcedRefreshRequested = true;
         
         // Imposta il flag di alta priorità se specificato
         highPriorityUpdate = data.highPriority || false;
-        
         
         // Cancel any pending fetch and start immediately
         if (pollingTimeout) {
@@ -380,6 +405,23 @@ self.onmessage = (event) => {
           // Normale ritardo di aggiornamento forzato
           pollingTimeout = setTimeout(fetchNotifications, FORCED_REFRESH_INTERVAL);
         }
+        break;
+      
+      case 'fetch_notification':
+        // Fetch a specific notification with the full message history
+        token = data.token || token;
+        apiBaseUrl = data.apiBaseUrl || apiBaseUrl;
+        
+        // Imposta lo stato isOpenChat (di solito true per questa operazione)
+        isOpenChat = data.isOpenChat || true;
+        
+        // Cancel any pending fetch
+        if (pollingTimeout) {
+          clearTimeout(pollingTimeout);
+        }
+        
+        // Execute fetch immediately for the specified notification
+        fetchNotifications(data.notificationId);
         break;
         
       case 'debug':
