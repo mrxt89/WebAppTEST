@@ -1,2 +1,2 @@
-- Funzionalità di ricerca sulla chat (tasto info) : Non funziona
-- 
+- z-index opzioni messaggio
+- fix sondaggi 
