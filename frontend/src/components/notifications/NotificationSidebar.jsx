@@ -128,50 +128,50 @@ const NotificationSidebar = ({
 
   // Funzione per filtrare le notifiche
   const filterNotifications = () => {
-    // Prima filtra in base ai criteri di ricerca
+    // Utilizziamo memoizzazione per migliorare le performance
+    const lastFilterKey = JSON.stringify({
+      filterMentioned, 
+      filterMessagesSent, 
+      showUnreadOnly, 
+      searchTerm, 
+      selectedCategory, 
+      filterFavorites,
+      completedFilter,
+      filterLeftChats,
+      filterArchivedChats,
+      filterMutedChats
+    });
+    
+    // Memorizziamo l'ultimo stato di scrolling prima dell'aggiornamento
+    if (notificationBarRef.current) {
+      scrollPosition.current = notificationBarRef.current.scrollTop;
+    }
+    
+    // Primo passo: applicare i filtri
     const filtered = (notifications || []).filter(notification => {
       // Gestione delle notifiche archiviate
       const isArchived = notification.archived === 1 || notification.archived === true;
       
       // Se filterArchivedChats è attivo, mostra SOLO le notifiche archiviate
       // Se filterArchivedChats NON è attivo, mostra SOLO le notifiche NON archiviate
-      if (filterArchivedChats && !isArchived) {
-        return false;
-      }
-      if (!filterArchivedChats && isArchived) {
-        return false;
-      }
+      if (filterArchivedChats && !isArchived) return false;
+      if (!filterArchivedChats && isArchived) return false;
       
-      if (filterMentioned && !notification.isMentioned) {
-        return false;
-      }
-      if (filterMessagesSent && !notification.messagesSent) {
-        return false;
-      }
-      if (showUnreadOnly && notification.isReadByUser) {
-        return false;
-      }
-      if (filterFavorites && !notification.favorite) {
-        return false;
-      }
-      if (selectedCategory !== 'all' && notification.notificationCategoryId.toString() !== selectedCategory) {
-        return false;
-      }
+      if (filterMentioned && !notification.isMentioned) return false;
+      if (filterMessagesSent && !notification.messagesSent) return false;
+      if (showUnreadOnly && notification.isReadByUser) return false;
+      if (filterFavorites && !notification.favorite) return false;
+      if (selectedCategory !== 'all' && notification.notificationCategoryId.toString() !== selectedCategory) return false;
+      
       // Filtra per stato completato/chiuso
-      if (completedFilter === 'completed' && !notification.isClosed) {
-        return false;
-      }
-      if (completedFilter === 'active' && notification.isClosed) {
-        return false;
-      }
+      if (completedFilter === 'completed' && !notification.isClosed) return false;
+      if (completedFilter === 'active' && notification.isClosed) return false;
+      
       // Filtro per chat abbandonate
-      if (filterLeftChats && notification.chatLeft !== 1) {
-        return false;
-      }
+      if (filterLeftChats && notification.chatLeft !== 1) return false;
+      
       // Filtro per chat silenziate
-      if (filterMutedChats && !isNotificationMuted(notification)) {
-        return false;
-      }
+      if (filterMutedChats && !isNotificationMuted(notification)) return false;
       
       if (searchTerm) {
         const lowerSearchTerm = searchTerm.toLowerCase();
@@ -184,28 +184,37 @@ const NotificationSidebar = ({
       return true;
     });
   
-    // Poi ordina il risultato: prima per pin, poi per data
-    const sortedFiltered = [...filtered].sort((a, b) => {
+    // Secondo passo: ordinare il risultato con uno stabile algorithm per evitare sfarfallio
+    const sortedFiltered = stableSort([...filtered], (a, b) => {
       // Prima le notifiche con pin
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
       
-      // Poi per data di creazione/ultimo messaggio (più recenti in alto)
-      // Ottieni l'ultima data di messaggio o usa la data di creazione
-      const messagesA = parseMessages(a.messages);
-      const messagesB = parseMessages(b.messages);
-      
-      const lastMessageA = messagesA.length > 0 ? messagesA[messagesA.length - 1] : null;
-      const lastMessageB = messagesB.length > 0 ? messagesB[messagesB.length - 1] : null;
-      
-      const dateA = lastMessageA ? new Date(lastMessageA.tbCreated) : new Date(a.tbCreated || 0);
-      const dateB = lastMessageB ? new Date(lastMessageB.tbCreated) : new Date(b.tbCreated || 0);
-      
-      return dateB - dateA; // Ordine discendente (più recenti prima)
+      // Poi per lastMessage (più recenti in alto)
+      // Utilizziamo il campo lastMessage fornito dal backend
+      return parseFloat(b.lastMessage || 0) - parseFloat(a.lastMessage || 0);
     });
   
-    // Aggiorna lo stato con le notifiche filtrate e ordinate
-    setFilteredNotifications(sortedFiltered);
+    // Aggiorna lo stato solo se è effettivamente cambiato
+    if (JSON.stringify(sortedFiltered.map(n => n.notificationId)) !== 
+        JSON.stringify(filteredNotifications.map(n => n.notificationId))) {
+      setFilteredNotifications(sortedFiltered);
+    }
+  };
+  
+  // 2. Aggiungi questa funzione di ordinamento stabile per prevenire il riordinamento casuale
+  const stableSort = (array, comparator) => {
+    // Per mantenere l'ordinamento stabile, aggiungiamo un indice a ciascun elemento
+    const stabilizedThis = array.map((el, index) => [el, index]);
+    
+    // Ordiniamo prima in base al comparatore fornito, poi in base all'indice originale
+    stabilizedThis.sort((a, b) => {
+      const order = comparator(a[0], b[0]);
+      if (order !== 0) return order;
+      return a[1] - b[1]; // Se il comparatore restituisce 0, mantieni l'ordine originale
+    });
+    
+    return stabilizedThis.map(el => el[0]);
   };
 
   // Effetto per forzare il caricamento delle notifiche
@@ -277,10 +286,15 @@ const NotificationSidebar = ({
   // Effetto per filtrare le notifiche ogni volta che cambiano o cambia un filtro
   useEffect(() => {
     if (notifications && notifications.length > 0) {
-      const timer = setTimeout(() => {
-        filterNotifications();
-      }, 50);
-      return () => clearTimeout(timer);
+      // Esegui il filtro immediatamente, senza timeout
+      filterNotifications();
+      
+      // Ripristina la posizione di scorrimento dopo il render
+      requestAnimationFrame(() => {
+        if (notificationBarRef.current) {
+          notificationBarRef.current.scrollTop = scrollPosition.current;
+        }
+      });
     }
   }, [
     notifications, 
@@ -499,14 +513,40 @@ const NotificationSidebar = ({
     setTimeout(restoreScrollPosition, 0);
   }, [filteredNotifications]);
 
-  const handleOpenChat = (notificationId) => {
-    // Solo se la notifica esiste
-    if (notificationId) {
-      // Non è necessario chiudere la sidebar quando si apre una chat
-      // Questo permette di avere sia la sidebar che la chat aperte contemporaneamente
-      openChatModal(notificationId);
+  // Effetto per mantenere la posizione di scorrimento durante gli aggiornamenti
+useEffect(() => {
+  const handleScrollRestore = () => {
+    if (notificationBarRef.current && scrollPosition.current > 0) {
+      notificationBarRef.current.scrollTop = scrollPosition.current;
     }
   };
+  
+  // Aggiungiamo un listener per ripristinare la posizione dopo che il DOM è stato aggiornato
+  const observer = new MutationObserver(handleScrollRestore);
+  
+  if (notificationBarRef.current) {
+    observer.observe(notificationBarRef.current, { 
+      childList: true, 
+      subtree: true 
+    });
+    
+    // Salva la posizione durante lo scorrimento
+    const handleScroll = () => {
+      scrollPosition.current = notificationBarRef.current.scrollTop;
+    };
+    
+    notificationBarRef.current.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      observer.disconnect();
+      if (notificationBarRef.current) {
+        notificationBarRef.current.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }
+}, []);
+
+
 
   const handleNotificationClick = (notification, e) => {
     // Ferma la propagazione dell'evento per evitare che il click arrivi al document
@@ -622,7 +662,6 @@ const NotificationSidebar = ({
     }, {})
   );
 
-  // Funzione per gestire l'aggiornamento del pin
   const handleTogglePin = (notificationId, currentPinnedStatus, e) => {
     // Ferma la propagazione per evitare l'apertura della chat
     e.stopPropagation();
@@ -630,8 +669,13 @@ const NotificationSidebar = ({
     // Ottimistic UI update
     const newPinnedStatus = !currentPinnedStatus;
     
-    // Se stiamo pinnando (non spinnando), avviamo l'animazione
+    // Se stiamo pinnando, avvia l'animazione
     if (newPinnedStatus) {
+      // Salva lo stato corrente di scorrimento
+      if (notificationBarRef.current) {
+        scrollPosition.current = notificationBarRef.current.scrollTop;
+      }
+      
       // Prima fase: l'elemento esce verso destra
       setAnimatingItemId(notificationId);
       setAnimationPhase('exit');
@@ -641,7 +685,7 @@ const NotificationSidebar = ({
         // Esegui il riordinamento
         togglePin(notificationId, newPinnedStatus)
           .then(() => {
-            // Filtriamo e riordiniamo le notifiche
+            // Applica i filtri e mantieni l'ordine
             filterNotifications();
             
             // Seconda fase: l'elemento entra da sinistra
@@ -651,6 +695,11 @@ const NotificationSidebar = ({
             animationTimeoutRef.current = setTimeout(() => {
               setAnimatingItemId(null);
               setAnimationPhase(null);
+              
+              // Ripristina la posizione di scorrimento
+              if (notificationBarRef.current) {
+                notificationBarRef.current.scrollTop = scrollPosition.current;
+              }
             }, 600);
           })
           .catch((error) => {
@@ -658,6 +707,7 @@ const NotificationSidebar = ({
             setAnimatingItemId(null);
             setAnimationPhase(null);
             
+            // Rollback in caso di errore
             setFilteredNotifications((prevNotifications) =>
               prevNotifications.map((notification) =>
                 notification.notificationId === notificationId
@@ -668,19 +718,32 @@ const NotificationSidebar = ({
           });
       }, 400);
     } else {
-      setFilteredNotifications((prevNotifications) =>
-        prevNotifications.map((notification) =>
-          notification.notificationId === notificationId
-            ? { ...notification, pinned: newPinnedStatus }
-            : notification
-        )
+      // Per l'unpin, aggiorna lo stato in modo ottimistico ma stabile
+      const updatedNotifications = [...filteredNotifications].map((notification) =>
+        notification.notificationId === notificationId
+          ? { ...notification, pinned: newPinnedStatus }
+          : notification
       );
       
+      // Esegui l'ordinamento stabile
+      const sortedUpdated = stableSort(updatedNotifications, (a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        
+        // Usa lastMessage dal backend invece di calcolare manualmente la data
+        return parseFloat(b.lastMessage || 0) - parseFloat(a.lastMessage || 0);
+      });
+      
+      setFilteredNotifications(sortedUpdated);
+      
+      // Esegui l'operazione reale
       togglePin(notificationId, newPinnedStatus)
         .then(() => {
+          // Riapplica i filtri se necessario
           filterNotifications();
         })
         .catch(() => {
+          // Rollback in caso di errore
           setFilteredNotifications((prevNotifications) =>
             prevNotifications.map((notification) =>
               notification.notificationId === notificationId
