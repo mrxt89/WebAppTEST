@@ -126,6 +126,7 @@ const ChatSidebar = forwardRef((props, ref) => {
         setLoading(true);
         getLinkedDocuments(notificationId)
           .then(response => {
+            console.log('Documenti ricevuti:', response);
             if (response && response.documents) {
               setDocuments(response.documents);
             } else {
@@ -134,6 +135,7 @@ const ChatSidebar = forwardRef((props, ref) => {
           })
           .catch(error => {
             console.error('Error refreshing documents:', error);
+            setDocuments([]);
           })
           .finally(() => {
             setLoading(false);
@@ -144,6 +146,9 @@ const ChatSidebar = forwardRef((props, ref) => {
     // Aggiungi listener per gli eventi di collegamento/scollegamento
     document.addEventListener('document-linked', handleDocumentChange);
     document.addEventListener('document-unlinked', handleDocumentChange);
+    
+    // Esegui il caricamento iniziale
+    handleDocumentChange();
     
     // Rimuovi i listener quando il componente viene smontato
     return () => {
