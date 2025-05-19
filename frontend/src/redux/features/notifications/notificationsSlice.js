@@ -615,13 +615,6 @@ const notificationsSlice = createSlice({
           // Crea una copia locale delle notifiche dal payload
           const notifications = [...action.payload];
           
-          // Ordina le notifiche
-          notifications.sort((a, b) => {
-            const dateA = new Date(a.tbCreated || a.lastUpdated || 0);
-            const dateB = new Date(b.tbCreated || b.lastUpdated || 0);
-            return dateB - dateA;
-          });
-          
           // Calcola il conteggio dei messaggi non letti direttamente dal payload
           const unreadCount = notifications.reduce((count, notification) => {
             return count + (notification.isReadByUser ? 0 : 1);
@@ -899,13 +892,6 @@ const notificationsSlice = createSlice({
         
         if (notification) {
           notification.pinned = pinned;
-          
-          // Re-sort notifications
-          state.notifications.sort((a, b) => {
-            if (a.pinned && !b.pinned) return -1;
-            if (!a.pinned && b.pinned) return 1;
-            return new Date(b.tbCreated) - new Date(a.tbCreated);
-          });
         }
       })
       
@@ -1057,27 +1043,12 @@ const notificationsSlice = createSlice({
           // Aggiorna solo se ci sono dati validi
           const newNotifications = [...action.payload]; // Crea una copia per evitare problemi con i proxy
           
-          // Ordina le notifiche per pin e data
-          const sortedNotifications = newNotifications.sort((a, b) => {
-            // Protezione contro valori null/undefined
-            if (!a || !b) return 0;
-            
-            if ((a.pinned === true) && (!b.pinned === true)) return -1;
-            if ((!a.pinned === true) && (b.pinned === true)) return 1;
-            
-            // Controllo di sicurezza per le date
-            const dateA = a.tbCreated ? new Date(a.tbCreated) : new Date(0);
-            const dateB = b.tbCreated ? new Date(b.tbCreated) : new Date(0);
-            
-            return dateB - dateA;
-          });
-          
           // Aggiorna le notifiche nello state in modo sicuro
-          state.notifications = sortedNotifications;
+          state.notifications = newNotifications;
           
           // Calcola in modo sicuro il conteggio non letti
           try {
-            state.unreadCount = sortedNotifications.filter(n => 
+            state.unreadCount = newNotifications.filter(n => 
               n && n.isReadByUser === false && n.archived !== '1'
             ).length;
           } catch (countError) {
