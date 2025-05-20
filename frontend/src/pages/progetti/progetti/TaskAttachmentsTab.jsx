@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Download, Trash2, Upload, File } from "lucide-react";
+import { Download, Trash2, Upload, File, X } from "lucide-react";
 import { swal } from "../../../lib/common";
 import useAttachmentsActions from "../../../hooks/useAttachmentsActions";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
@@ -23,6 +23,7 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
     open: false,
     attachmentId: null,
   });
+  const [showUploadPanel, setShowUploadPanel] = useState(false);
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
 
@@ -75,21 +76,27 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
     try {
       setUploading(true);
 
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const result = await uploadAttachment(task.ProjectID, task.TaskID, file);
+      // Usa la nuova versione con oggetto options
+      const result = await uploadAttachment(file, {
+        projectId: task.ProjectID,
+        taskId: task.TaskID,
+      });
 
       if (result.success) {
         await loadAttachments();
-        onAttachmentChange && onAttachmentChange();
+        // Chiamiamo onAttachmentChange con un parametro che indica di mantenere la tab attiva
+        if (onAttachmentChange) onAttachmentChange(() => {
+          // Questo callback serve a eseguire operazioni dopo il refresh
+          // ma non cambia la tab attiva
+        });
+        
+        // Nascondo il pannello dopo caricamento completato
+        setShowUploadPanel(false);
         swal.fire({
           title: "Successo",
           text: "Allegato caricato con successo",
           icon: "success",
-          timer: 1500,
-          showProgressBar: true,
-          showConfirmButton: false,
+          timer: 1500
         });
       }
     } catch (error) {
@@ -112,14 +119,17 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
     try {
       await deleteAttachment(deleteModal.attachmentId);
       await loadAttachments();
-      onAttachmentChange && onAttachmentChange();
+      // Chiamiamo onAttachmentChange con un parametro che indica di mantenere la tab attiva
+      if (onAttachmentChange) onAttachmentChange(() => {
+        // Questo callback serve a eseguire operazioni dopo il refresh
+        // ma non cambia la tab attiva
+      });
+      
       swal.fire({
         title: "Successo",
         text: "Allegato eliminato con successo",
         icon: "success",
-        timer: 1500,
-        showProgressBar: true,
-        showConfirmButton: false,
+        timer: 1500
       });
     } catch (error) {
       swal.fire({
@@ -146,13 +156,15 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
     }
   };
 
+  const toggleUploadPanel = () => {
+    setShowUploadPanel(!showUploadPanel);
+  };
+
   return (
-    <FileDropZone
-      onFileSelect={handleFileSelect}
-      disabled={!canEdit || uploading}
-    >
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
+    <div className="space-y-4">
+      {/* Azioni e tabella */}
+      <div>
+        <div className="flex justify-between items-center mb-4">
           {canEdit && (
             <div className="flex gap-2">
               <input
@@ -162,7 +174,7 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
                 className="hidden"
               />
               <Button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={toggleUploadPanel}
                 disabled={uploading || loading}
               >
                 {uploading ? (
@@ -184,7 +196,7 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
             <Button
               variant="outline"
               onClick={() =>
-                downloadAllAttachments(task.ProjectID, task.TaskID)
+                downloadAllAttachments({ projectId: task.ProjectID, taskId: task.TaskID })
               }
               disabled={loading}
             >
@@ -203,6 +215,44 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
           )}
         </div>
 
+        {/* Pannello di caricamento a scomparsa */}
+        {showUploadPanel && canEdit && (
+          <div className="relative mb-6 rounded-lg overflow-hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 z-10 bg-background/80 hover:bg-background/90"
+              onClick={() => setShowUploadPanel(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <FileDropZone
+              onFileSelect={handleFileSelect}
+              disabled={uploading}
+              multiple={false}
+              sx={{ minHeight: "200px", border: "2px dashed", borderColor: "primary.light" }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {uploading ? (
+                <div className="flex flex-col items-center py-12">
+                  <Upload className="h-14 w-14 mb-4 animate-spin text-primary" />
+                  <p className="text-xl font-medium">Caricamento in corso...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center py-12">
+                  <Upload className="h-14 w-14 mb-4 text-primary" />
+                  <p className="text-xl font-medium">
+                    Trascina qui i file o clicca per selezionare
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Clicca per selezionare manualmente o trascina direttamente i file qui
+                  </p>
+                </div>
+              )}
+            </FileDropZone>
+          </div>
+        )}
+
         <ScrollArea className="h-[400px] rounded-md border">
           <Table>
             <TableHeader>
@@ -215,7 +265,15 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {attachments.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8">
+                    <div className="flex items-center justify-center">
+                      <span className="mr-2">Caricamento allegati...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : attachments.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-gray-500">
                     Nessun allegato presente
@@ -286,7 +344,7 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
         isOpen={!!selectedFile}
         onClose={() => setSelectedFile(null)}
       />
-    </FileDropZone>
+    </div>
   );
 };
 

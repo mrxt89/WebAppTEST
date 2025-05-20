@@ -277,7 +277,7 @@ const ProjectOverview = ({ project }) => (
 );
 
 // Componente per il dettaglio del progetto incorporato
-const ProjectDetailContainer = ({ projectId }) => {
+const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedProject }) => {
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -293,6 +293,8 @@ const ProjectDetailContainer = ({ projectId }) => {
   // Stato per gestire la vista delle attività (kanban o tabella)
   const [tasksViewMode, setTasksViewMode] = useState("kanban");
   const [userSearchQuery, setUserSearchQuery] = useState("");
+  // Stato per mantenere la tab attiva nel TaskDetailsDialog
+  const [taskDialogActiveTab, setTaskDialogActiveTab] = useState("information");
 
   // Aggiungiamo i refs necessari
   const isMounted = useRef(true);
@@ -330,11 +332,17 @@ const ProjectDetailContainer = ({ projectId }) => {
   });
 
   const loadProject = useCallback(
-    async (callback) => {
+    async (forceUpdate = false, callback) => {
+      // Supporto per callback come primo parametro (retrocompatibilità)
+      if (typeof forceUpdate === 'function') {
+        callback = forceUpdate;
+        forceUpdate = false;
+      }
+      
       if (!isMounted.current || refreshInProgress.current) return;
 
-      // Evita di ricaricare lo stesso progetto se è già in corso
-      if (lastLoadedProjectId.current === projectId && project) return;
+      // Evita di ricaricare lo stesso progetto se è già in corso e non è forzato
+      if (!forceUpdate && lastLoadedProjectId.current === projectId && project) return;
 
       try {
         refreshInProgress.current = true;
@@ -354,7 +362,7 @@ const ProjectDetailContainer = ({ projectId }) => {
 
         const projectData = await getProjectById(parseInt(projectId));
         if (!isMounted.current) return;
-
+        
         // Aggiorna il progetto ma mantiene lo stato delle attività esistenti per evitare
         // rimontaggi del componente che potrebbero causare problemi con gli eventi UI
         setProject((prevProject) => {
@@ -465,6 +473,7 @@ const ProjectDetailContainer = ({ projectId }) => {
       tasksViewMode,
       project,
       getProjectById,
+      navigate,
     ],
   );
 
@@ -501,7 +510,7 @@ const ProjectDetailContainer = ({ projectId }) => {
         Name: editedProject.Name,
         Description: editedProject.Description || "",
         StartDate: editedProject.StartDate?.split("T")[0],
-        EndDate: editedProject.EndDate?.split("T")[0],
+        EndDate: editedProject.EndDate?.split("T")[0] || null,
         Status: editedProject.Status,
         ProjectCategoryId: parseInt(editedProject.ProjectCategoryId) || 0,
         ProjectCategoryDetailLine:
@@ -527,7 +536,7 @@ const ProjectDetailContainer = ({ projectId }) => {
     }
   };
 
-  const handleDisableProject = async () => {
+  const handleDisableProject = async (projectId) => {
     const disabledProject = {
       ...project,
       Disabled: 1,
@@ -535,10 +544,27 @@ const ProjectDetailContainer = ({ projectId }) => {
     try {
       const result = await addUpdateProject(disabledProject);
       if (result.success) {
-        setProject(disabledProject);
-        setEditedProject(disabledProject);
-        swal.fire("Successo", "Progetto disabilitato con successo", "success");
-        navigate("/progetti/dashboard");
+        // Resettiamo completamente il progetto e il suo stato
+        setProject(null);
+        setEditedProject(null);
+        setIsEditModalOpen(false);
+        
+        // Reset della selezione nel componente padre
+        if (resetSelectedProject) {
+          resetSelectedProject();
+        }
+        
+        // Aggiorniamo la lista dei progetti nel componente padre
+        if (refreshAllProjects) {
+          await refreshAllProjects();
+        }
+        
+        swal.fire({
+          title: "Successo",
+          text: "Progetto disabilitato con successo",
+          icon: "success",
+          timer: 1500,
+        });
       }
     } catch (error) {
       console.error("Error disabling project:", error);
@@ -634,7 +660,8 @@ const ProjectDetailContainer = ({ projectId }) => {
           }
 
           // Aggiorna il progetto in background solo dopo aver gestito l'UI
-          await loadProject();
+          // Passa lo stato della tab attiva nel refresh
+          await loadProject(true);
 
           // Restituisci un oggetto di successo con il task aggiornato
           return { success: true, task: { ...completeTaskData } };
@@ -704,6 +731,10 @@ const ProjectDetailContainer = ({ projectId }) => {
       setSelectedTask(task);
       setIsTaskDialogOpen(true);
     }
+  };
+
+  const handleTaskDialogTabChange = (tabValue) => {
+    setTaskDialogActiveTab(tabValue);
   };
 
   const handleAddComment = async (taskId, comment) => {
@@ -969,7 +1000,7 @@ const ProjectDetailContainer = ({ projectId }) => {
                   tasks={project.tasks}
                   onTaskUpdate={handleTaskUpdate}
                   onTaskClick={handleTaskClick}
-                  refreshProject={loadProject}
+                  refreshProject={(callback) => loadProject(true, callback)}
                 />
               )}
               {tasksViewMode === "table" && (
@@ -993,7 +1024,7 @@ const ProjectDetailContainer = ({ projectId }) => {
                   isOwnTask={isOwnTask}
                   updateTaskSequence={updateTaskSequence}
                   getProjectById={getProjectById}
-                  refreshProject={loadProject}
+                  refreshProject={(callback) => loadProject(true, callback)}
                   users={users}
                 />
               )}
@@ -1116,14 +1147,11 @@ const ProjectDetailContainer = ({ projectId }) => {
           {/* Tab Allegati */}
           <TabsContent value="attachments" className="flex-1 mt-2">
             <Card className="h-full flex flex-col">
-              <CardHeader className="flex-none">
-                <CardTitle className="text-lg">Allegati</CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 overflow-hidden">
+              <CardContent className="flex-1 mt-4 overflow-hidden">
                 <ProjectAttachmentsTab
                   project={project}
                   canEdit={true}
-                  onAttachmentChange={loadProject}
+                  onAttachmentChange={(callback) => loadProject(true, callback)}
                 />
               </CardContent>
             </Card>
@@ -1136,7 +1164,7 @@ const ProjectDetailContainer = ({ projectId }) => {
           <TabsContent value="analytics" className="flex-1 mt-2">
             <ProjectAnalyticsTab
               project={project}
-              refreshProject={loadProject}
+              refreshProject={(callback) => loadProject(true, callback)}
             />
           </TabsContent>
         </Tabs>
@@ -1151,12 +1179,14 @@ const ProjectDetailContainer = ({ projectId }) => {
         onClose={() => {
           setIsTaskDialogOpen(false);
           setSelectedTask(null);
-          loadProject();
+          loadProject(true);
         }}
         onAddComment={handleAddComment}
         onUpdate={handleTaskUpdate}
         assignableUsers={users}
-        refreshProject={loadProject}
+        refreshProject={(callback) => loadProject(true, callback)}
+        activeTabOnReopen={taskDialogActiveTab}
+        onTabChange={handleTaskDialogTabChange}
       />
 
       <ProjectEditModalWithTemplate
@@ -1200,8 +1230,6 @@ const ProjectManagementSplitView = () => {
   const [selectedProjectId, setSelectedProjectId] = useState(
     projectId && !isNaN(parseInt(projectId)) ? parseInt(projectId) : null,
   );
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [loadingProjectDetail, setLoadingProjectDetail] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [filters, setFilters] = useState({
     status: "all",
@@ -1401,7 +1429,6 @@ const ProjectManagementSplitView = () => {
     if (!newProject.Name?.trim()) validationErrors.Name = "Campo obbligatorio";
     if (!newProject.StartDate)
       validationErrors.StartDate = "Campo obbligatorio";
-    if (!newProject.EndDate) validationErrors.EndDate = "Campo obbligatorio";
 
     if (Object.keys(validationErrors).length > 0) {
       setFormErrors(validationErrors);
@@ -1459,6 +1486,24 @@ const ProjectManagementSplitView = () => {
       taskAssignedTo: null,
     });
   };
+
+  // Funzione per forzare un refresh completo dei progetti
+  const refreshAllProjects = useCallback(async () => {
+    try {
+      setLoading(true);
+      await fetchProjects(0, 100, filters);
+      await getUserProjectStatistics().then(setStatistics);
+    } catch (error) {
+      console.error("Error refreshing projects:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchProjects, getUserProjectStatistics, filters]);
+
+  // Funzione per resettare il progetto selezionato
+  const resetSelectedProject = useCallback(() => {
+    setSelectedProjectId(null);
+  }, []);
 
   // Rendering
   return (
@@ -1824,7 +1869,11 @@ const ProjectManagementSplitView = () => {
       {/* Sezione destra (2/3) - Dettaglio progetto */}
       <div className="w-2/3 h-full overflow-hidden">
         {selectedProjectId ? (
-          <ProjectDetailContainer projectId={selectedProjectId} />
+          <ProjectDetailContainer 
+            projectId={selectedProjectId} 
+            refreshAllProjects={refreshAllProjects}
+            resetSelectedProject={resetSelectedProject}
+          />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
             <PieChart className="h-16 w-16 mb-4 text-gray-300" />
