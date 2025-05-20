@@ -1140,14 +1140,11 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
           {/* Tab Allegati */}
           <TabsContent value="attachments" className="flex-1 mt-2">
             <Card className="h-full flex flex-col">
-              <CardHeader className="flex-none">
-                <CardTitle className="text-lg">Allegati</CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 overflow-hidden">
+              <CardContent className="flex-1 mt-4 overflow-hidden">
                 <ProjectAttachmentsTab
                   project={project}
                   canEdit={true}
-                  onAttachmentChange={loadProject}
+                  onAttachmentChange={(callback) => loadProject(true, callback)}
                 />
               </CardContent>
             </Card>

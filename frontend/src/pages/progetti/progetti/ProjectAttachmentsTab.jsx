@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Download, Trash2, Upload, File } from "lucide-react";
+import { Download, Trash2, Upload, File, X } from "lucide-react";
 import { swal } from "../../../lib/common";
 import useAttachmentsActions from "../../../hooks/useAttachmentsActions";
 import DeleteConfirmationModal from "./DeleteConfirmationModal";
@@ -23,6 +23,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
     open: false,
     attachmentId: null,
   });
+  const [showUploadPanel, setShowUploadPanel] = useState(false);
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
 
@@ -105,13 +106,13 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
       if (result.success) {
         await loadAttachments();
         onAttachmentChange && onAttachmentChange();
+        // Nascondo il pannello dopo caricamento completato
+        setShowUploadPanel(false);
         swal.fire({
           title: "Successo",
           text: "Allegato caricato con successo",
           icon: "success",
-          timer: 1500,
-          showProgressBar: true,
-          showConfirmButton: false,
+          timer: 1500
         });
       }
     } catch (error) {
@@ -139,9 +140,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
         title: "Successo",
         text: "Allegato eliminato con successo",
         icon: "success",
-        timer: 1500,
-        showProgressBar: true,
-        showConfirmButton: false,
+        timer: 1500
       });
     } catch (error) {
       console.error("Error deleting attachment:", error);
@@ -149,7 +148,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
         title: "Errore",
         text: "Errore nell'eliminazione dell'allegato",
         icon: "error",
-        timer: 1500,
+        timer: 1500
       });
     } finally {
       setDeleteModal({ open: false, attachmentId: null });
@@ -190,13 +189,15 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
     }
   };
 
+  const toggleUploadPanel = () => {
+    setShowUploadPanel(!showUploadPanel);
+  };
+
   return (
-    <FileDropZone
-      onFileSelect={handleFileSelect}
-      disabled={!canEdit || uploading || !project?.ProjectID}
-    >
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
+    <div className="space-y-4">
+      {/* Azioni e tabella */}
+      <div>
+        <div className="flex justify-between items-center mb-4">
           {canEdit && (
             <div className="flex gap-2">
               <input
@@ -206,7 +207,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
                 className="hidden"
               />
               <Button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={toggleUploadPanel}
                 disabled={uploading || loading || !project?.ProjectID}
               >
                 {uploading ? (
@@ -244,6 +245,46 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
             </Button>
           )}
         </div>
+
+        {/* Pannello di caricamento a scomparsa */}
+        {showUploadPanel && canEdit && (
+          <div className="relative mb-6 rounded-lg overflow-hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 z-10 bg-background/80 hover:bg-background/90"
+              onClick={() => setShowUploadPanel(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <FileDropZone
+              onFileSelect={handleFileSelect}
+              disabled={uploading || !project?.ProjectID}
+              multiple={false}
+              sx={{ minHeight: "200px", border: "2px dashed", borderColor: "primary.light" }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {uploading ? (
+                <div className="flex flex-col items-center py-12">
+                  <Upload className="h-14 w-14 mb-4 animate-spin text-primary" />
+                  <p className="text-xl font-medium">Caricamento in corso...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center py-12">
+                  <Upload className="h-14 w-14 mb-4 text-primary" />
+                  <p className="text-xl font-medium">
+                    Trascina qui i file o clicca per selezionare
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {!project?.ProjectID
+                      ? "Seleziona un progetto per caricare file"
+                      : "Clicca per selezionare manualmente o trascina direttamente i file qui"}
+                  </p>
+                </div>
+              )}
+            </FileDropZone>
+          </div>
+        )}
 
         <ScrollArea className="h-[400px] rounded-md border">
           <Table>
@@ -344,7 +385,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
         isOpen={!!selectedFile}
         onClose={() => setSelectedFile(null)}
       />
-    </FileDropZone>
+    </div>
   );
 };
 
