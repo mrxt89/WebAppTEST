@@ -46,9 +46,6 @@ class BrotherPrinter {
         const logFile = path.join(logsDir, `print_${Date.now()}.log`);
         fs.writeFileSync(logFile, JSON.stringify(logData, null, 2));
         
-        console.log('Test di stampa completato. Log salvato in:', logFile);
-        console.log(logData.printSimulation);
-        
         return true;
       }
 

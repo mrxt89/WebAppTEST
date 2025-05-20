@@ -1,8 +1,14 @@
 /* ModernChatList Styles */
 @keyframes pulse-highlight {
-  0% { background-color: rgba(59, 130, 246, 0.3); }
-  50% { background-color: rgba(59, 130, 246, 0.1); }
-  100% { background-color: transparent; }
+  0% {
+    background-color: rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    background-color: rgba(59, 130, 246, 0.1);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 .highlight-message {
@@ -10,9 +16,15 @@
 }
 
 @keyframes pulse-edit {
-  0% { background-color: rgba(236, 72, 153, 0.2); }
-  50% { background-color: rgba(236, 72, 153, 0.1); }
-  100% { background-color: transparent; }
+  0% {
+    background-color: rgba(236, 72, 153, 0.2);
+  }
+  50% {
+    background-color: rgba(236, 72, 153, 0.1);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 .just-edited {
@@ -26,7 +38,7 @@
 }
 
 .edited-message-content:after {
-  content: '✎';
+  content: "✎";
   position: absolute;
   right: -12px;
   bottom: 0;
@@ -35,19 +47,27 @@
 }
 
 @keyframes chatMessageIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .message-bubble {
-  animation: chatMessageIn 0.35s cubic-bezier(0.4,0,0.2,1);
+  animation: chatMessageIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 20px;
   padding: 12px 18px;
   max-width: 100%;
   position: relative;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
   margin-bottom: 4px;
-  transition: background 0.2s, box-shadow 0.2s;
+  transition:
+    background 0.2s,
+    box-shadow 0.2s;
   font-size: 1.05rem;
   word-break: break-word;
 }
@@ -57,7 +77,7 @@
   color: #fff;
   margin-left: auto;
   border-bottom-right-radius: 6px;
-  box-shadow: 0 2px 8px rgba(59,130,246,0.08);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
 }
 
 .message-bubble.received {
@@ -65,17 +85,17 @@
   color: #222;
   margin-right: auto;
   border-bottom-left-radius: 6px;
-  box-shadow: 0 2px 8px rgba(100,116,139,0.07);
+  box-shadow: 0 2px 8px rgba(100, 116, 139, 0.07);
 }
 
 .message-bubble.sent:hover {
   background: linear-gradient(135deg, #2563eb 0%, #6366f1 100%);
-  box-shadow: 0 6px 18px rgba(59,130,246,0.13);
+  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.13);
 }
 
 .message-bubble.received:hover {
   background: #e0f2fe;
-  box-shadow: 0 6px 18px rgba(100,116,139,0.13);
+  box-shadow: 0 6px 18px rgba(100, 116, 139, 0.13);
 }
 
 .message-timestamp {
@@ -102,12 +122,12 @@
   font-size: 0.85rem;
   font-weight: 500;
   margin: 0 auto;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
-.chat-date-separator:before, 
+.chat-date-separator:before,
 .chat-date-separator:after {
-  content: '';
+  content: "";
   flex: 1;
   height: 1px;
   background: #e5e7eb;
@@ -127,24 +147,33 @@
 .message-flag {
   font-size: 1.1rem;
   margin: 0 4px;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.08));
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.08));
   cursor: pointer;
-  transition: transform 0.18s cubic-bezier(0.4,0,0.2,1);
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .message-flag:hover {
   transform: scale(1.18) rotate(-8deg);
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.13));
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.13));
 }
 
 @keyframes flag-pop {
-  0% { transform: scale(0.7) rotate(-20deg); opacity: 0; }
-  60% { transform: scale(1.15) rotate(8deg); opacity: 1; }
-  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  0% {
+    transform: scale(0.7) rotate(-20deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15) rotate(8deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
 }
 
 .animate-flag {
-  animation: flag-pop 0.38s cubic-bezier(0.4,0,0.2,1);
+  animation: flag-pop 0.38s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .message-reactions {
@@ -186,9 +215,15 @@
 }
 
 @keyframes refresh-pulse {
-  0% { opacity: 0.7; }
-  50% { opacity: 1; }
-  100% { opacity: 0.7; }
+  0% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.7;
+  }
 }
 
 .message-reactions.refreshing {
@@ -202,7 +237,7 @@
 }
 
 .highlighted-message::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   top: 0;
@@ -281,7 +316,6 @@
 /* Miglioramenti per la leggibilità */
 .message-bubble {
   position: relative;
-
 }
 
 .highlighted-message .message-bubble {
@@ -329,7 +363,9 @@
 .message-transition-enter-active {
   opacity: 1;
   transform: translateY(0);
-  transition: opacity 200ms, transform 200ms;
+  transition:
+    opacity 200ms,
+    transform 200ms;
 }
 
 .message-transition-exit {
@@ -340,7 +376,9 @@
 .message-transition-exit-active {
   opacity: 0;
   transform: translateY(-20px);
-  transition: opacity 200ms, transform 200ms;
+  transition:
+    opacity 200ms,
+    transform 200ms;
 }
 
 /* Gestione del layout principale */
@@ -367,7 +405,10 @@
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  padding-bottom: env(safe-area-inset-bottom, 20px); /* Supporto per dispositivi con notch */
+  padding-bottom: env(
+    safe-area-inset-bottom,
+    20px
+  ); /* Supporto per dispositivi con notch */
 }
 
 /* Bottombar fissa */
@@ -377,12 +418,12 @@
   left: 0;
   right: 0;
   background: white;
-  padding: 0.5rem 1rem;  /* Ridotto il padding verticale da 0.75rem a 0.5rem */
+  padding: 0.5rem 1rem; /* Ridotto il padding verticale da 0.75rem a 0.5rem */
   border-top: 1px solid #e5e7eb;
   z-index: 5;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
-  min-height: 48px;  /* Ridotto da 60px a 48px */
-  max-height: 48px;  /* Ridotto da 60px a 48px */
+  min-height: 48px; /* Ridotto da 60px a 48px */
+  max-height: 48px; /* Ridotto da 60px a 48px */
   display: flex;
   align-items: center;
 }

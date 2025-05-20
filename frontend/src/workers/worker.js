@@ -1,4 +1,4 @@
-import { config } from '../config.js';
+import { config } from "../config.js";
 
 let token = null;
 
@@ -10,21 +10,21 @@ self.onmessage = (event) => {
 
 const updateLastOnline = async () => {
   if (!token) {
-    console.error('Token not available');
+    console.error("Token not available");
     return;
   }
 
   try {
     await fetch(`${config.API_BASE_URL}/update-last-online`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
     });
     postMessage({ success: true });
   } catch (error) {
-    console.error('Error updating last online:', error);
+    console.error("Error updating last online:", error);
     postMessage({ success: false });
   }
 };

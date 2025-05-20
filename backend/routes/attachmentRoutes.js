@@ -250,9 +250,6 @@ router.post('/attachments/itemCode', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'ItemCode is required' });
         }
         
-        // Log the parameters for debugging
-        console.log('Fetching attachments for itemCode:', itemCode);
-        
         const attachments = await getAttachments(
             null, // projectId
             null, // taskId
@@ -358,11 +355,7 @@ router.post('/attachments/itemCode/upload/:itemCode', authenticateToken, upload.
         const userId = req.user.UserId;
         const companyId = req.user.CompanyId;  // Ottieni il CompanyId dall'utente autenticato
         
-        // Stampa req.params per debug
-        console.log('URL params:', req.params);
-        
         const itemCode = req.params.itemCode;
-        console.log('ItemCode from URL:', itemCode);
         
         if (!itemCode) {
             return res.status(400).json({ success: 0, message: 'ItemCode is required' });
@@ -377,7 +370,6 @@ router.post('/attachments/itemCode/upload/:itemCode', authenticateToken, upload.
         }
 
         // Usa valori espliciti per projectId e taskId, passando anche companyId
-        console.log('Calling saveFile with itemCode:', itemCode, 'and companyId:', companyId);
         const fileInfo = await fileService.saveFile(
             req.file,      // file
             null,          // projectId
@@ -524,34 +516,27 @@ router.get('/attachments/itemCode/:itemCode/download-all', authenticateToken, as
 router.get('/email-preview/:attachmentId', authenticateToken, async (req, res) => {
     try {
       const attachmentId = parseInt(req.params.attachmentId);
-      console.log('Fetching attachment with ID:', attachmentId);
       
       const attachment = await getAttachmentById(attachmentId);
       if (!attachment) {
-        console.log('Attachment not found');
         return res.status(404).json({ error: 'Attachment not found' });
       }
-      console.log('Attachment found:', attachment);
+  
   
       // Verifica che sia un file email
       if (!attachment.FileType.includes('message/') && 
           !attachment.FileName.toLowerCase().endsWith('.eml') && 
           !attachment.FileName.toLowerCase().endsWith('.msg')) {
-        console.log('Invalid file type:', attachment.FileType);
         return res.status(400).json({ error: 'Not an email file' });
       }
   
       // Leggi il file
       const filePath = path.join(fileService.baseUploadPath, attachment.FilePath);
-      console.log('Reading file from:', filePath);
       
       const emailFile = await fs.readFile(filePath);
-      console.log('File read successfully, size:', emailFile.length);
       
       // Parsa l'email
-      console.log('Parsing email...');
       const parsed = await simpleParser(emailFile);
-      console.log('Email parsed successfully');
       
       // Prepara la risposta
       const response = {
@@ -569,7 +554,6 @@ router.get('/email-preview/:attachmentId', authenticateToken, async (req, res) =
         }))
       };
       
-      console.log('Sending response');
       res.json(response);
     } catch (error) {
       console.error('Error parsing email:', error);

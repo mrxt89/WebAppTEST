@@ -1,6 +1,6 @@
 // spinner.jsx
-import React from 'react';
-import './ui.css'; // Assicurati che il file CSS sia importato
+import React from "react";
+import "./ui.css"; // Assicurati che il file CSS sia importato
 
 const Spinner = () => {
   return (

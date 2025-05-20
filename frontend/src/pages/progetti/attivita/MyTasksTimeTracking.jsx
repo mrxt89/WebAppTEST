@@ -1,20 +1,24 @@
-import React, { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, BarChart as BarChart2 } from 'lucide-react';
-import EnhancedTimesheet from './EnhancedTimesheet';
-import TimeReportsView from './TimeReportsView';
-import useTimeTracking from '../../../hooks/useTimeTracking';
+import React, { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Clock, BarChart as BarChart2 } from "lucide-react";
+import EnhancedTimesheet from "./EnhancedTimesheet";
+import TimeReportsView from "./TimeReportsView";
+import useTimeTracking from "../../../hooks/useTimeTracking";
 
 // Componente principale per la scheda di tracciamento del tempo
-const MyTasksTimeTracking = ({ currentUserId, isAdmin = false, users = [] }) => {
-  const [activeView, setActiveView] = useState('timesheet');
+const MyTasksTimeTracking = ({
+  currentUserId,
+  isAdmin = false,
+  users = [],
+}) => {
+  const [activeView, setActiveView] = useState("timesheet");
   const { isUserAdmin } = useTimeTracking();
 
   // Verifica se l'utente è effettivamente admin (usando i gruppi)
   const userHasAdminRights = isAdmin || isUserAdmin();
 
   return (
-    <div className="space-y-6" id ="task-time-tracking">
+    <div className="space-y-6" id="task-time-tracking">
       {/* Header con sezioni */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -26,11 +30,18 @@ const MyTasksTimeTracking = ({ currentUserId, isAdmin = false, users = [] }) => 
             Gestisci e monitora le ore lavorate sui progetti
           </p>
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <Tabs defaultValue="timesheet" className="w-[300px]" onValueChange={setActiveView}>
+          <Tabs
+            defaultValue="timesheet"
+            className="w-[300px]"
+            onValueChange={setActiveView}
+          >
             <TabsList className="grid grid-cols-2">
-              <TabsTrigger value="timesheet" className="flex items-center gap-1">
+              <TabsTrigger
+                value="timesheet"
+                className="flex items-center gap-1"
+              >
                 <Clock className="h-4 w-4" />
                 <span className="hidden sm:inline">Quadratura</span>
               </TabsTrigger>
@@ -45,19 +56,19 @@ const MyTasksTimeTracking = ({ currentUserId, isAdmin = false, users = [] }) => 
 
       {/* Contenuto principale */}
       <div>
-        {activeView === 'timesheet' && (
-          <EnhancedTimesheet 
-            currentUserId={currentUserId} 
-            isAdmin={userHasAdminRights} 
-            users={users} 
+        {activeView === "timesheet" && (
+          <EnhancedTimesheet
+            currentUserId={currentUserId}
+            isAdmin={userHasAdminRights}
+            users={users}
           />
         )}
-        
-        {activeView === 'report' && (
-          <TimeReportsView 
-            currentUserId={currentUserId} 
-            isAdmin={userHasAdminRights} 
-            users={users} 
+
+        {activeView === "report" && (
+          <TimeReportsView
+            currentUserId={currentUserId}
+            isAdmin={userHasAdminRights}
+            users={users}
           />
         )}
       </div>

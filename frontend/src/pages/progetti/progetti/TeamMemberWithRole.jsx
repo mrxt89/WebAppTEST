@@ -1,14 +1,14 @@
-import React from 'react';
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import MemberRoleSelect from './MemberRoleSelect';
+import MemberRoleSelect from "./MemberRoleSelect";
 
-export const TeamMemberWithRole = ({ 
-  member, 
-  onRemove, 
-  onRoleUpdate, 
+export const TeamMemberWithRole = ({
+  member,
+  onRemove,
+  onRoleUpdate,
   canEditRole,
-  currentUserId
+  currentUserId,
 }) => {
   const isCurrentUser = member.UserID === parseInt(currentUserId);
   const handleRoleUpdate = async (updatedMember) => {
@@ -19,8 +19,12 @@ export const TeamMemberWithRole = ({
   };
 
   const getInitials = (name) => {
-    if (!name) return '';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+    if (!name) return "";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
   };
 
   return (
@@ -34,20 +38,22 @@ export const TeamMemberWithRole = ({
         <div>
           <p className="font-medium">{member.userName}</p>
           <div className="flex items-center gap-2 mt-1">
-            <MemberRoleSelect 
+            <MemberRoleSelect
               member={member}
               onRoleUpdate={handleRoleUpdate}
               disabled={!canEditRole}
             />
             {isCurrentUser && (
-              <span className="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">Tu</span>
+              <span className="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">
+                Tu
+              </span>
             )}
           </div>
         </div>
       </div>
-      
+
       {onRemove && !isCurrentUser && (
-        <Button 
+        <Button
           variant="ghost"
           size="sm"
           className="text-red-500 hover:text-red-700 hover:bg-red-50"

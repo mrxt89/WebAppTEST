@@ -1,5 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { useDrag, useDrop } from 'react-dnd';
+import React, { useRef, useState, useEffect } from "react";
+import { useDrag, useDrop } from "react-dnd";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,17 +12,17 @@ import { cn } from "@/lib/utils";
  * @param {boolean} isDraggingEnabled - Whether dragging is enabled for this task
  * @param {number} totalTasks - Total number of tasks in the list
  */
-const DraggableTask = ({ 
-    task, 
-    index, 
-    moveTask, 
-    onTaskSequenceUpdate,
-    renderTask,
-    isDraggingEnabled = true,
-    totalTasks
-  }) => {
+const DraggableTask = ({
+  task,
+  index,
+  moveTask,
+  onTaskSequenceUpdate,
+  renderTask,
+  isDraggingEnabled = true,
+  totalTasks,
+}) => {
   const ref = useRef(null);
-  const initialPosition = useRef(null); 
+  const initialPosition = useRef(null);
   const [dragDelay, setDragDelay] = useState(false);
   const [updateInProgress, setUpdateInProgress] = useState(false);
   const [visualFeedback, setVisualFeedback] = useState(false);
@@ -38,14 +38,14 @@ const DraggableTask = ({
   }, [visualFeedback]);
 
   const [{ isDragging }, drag] = useDrag({
-    type: 'TASK',
+    type: "TASK",
     item: () => {
       // Store initial position to calculate movement
       initialPosition.current = index;
-      return { 
-        id: task.TaskID, 
-        index, 
-        initialSequence: task.TaskSequence 
+      return {
+        id: task.TaskID,
+        index,
+        initialSequence: task.TaskSequence,
       };
     },
     canDrag: () => {
@@ -60,11 +60,11 @@ const DraggableTask = ({
         // Handle case where drag was canceled
         return;
       }
-    }
+    },
   });
 
   const [{ handlerId, isOver }, drop] = useDrop({
-    accept: 'TASK',
+    accept: "TASK",
     collect(monitor) {
       return {
         handlerId: monitor.getHandlerId(),
@@ -73,7 +73,7 @@ const DraggableTask = ({
     },
     hover(item, monitor) {
       if (!ref.current || updateInProgress) return;
-      
+
       const dragIndex = item.index;
       const hoverIndex = index;
 
@@ -82,7 +82,8 @@ const DraggableTask = ({
 
       // Determine mouse position relative to the center of the item
       const hoverBoundingRect = ref.current?.getBoundingClientRect();
-      const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+      const hoverMiddleY =
+        (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
       const clientOffset = monitor.getClientOffset();
       const hoverClientY = clientOffset.y - hoverBoundingRect.top;
 
@@ -94,7 +95,7 @@ const DraggableTask = ({
 
       // Time to actually perform the action
       moveTask(dragIndex, hoverIndex);
-      
+
       // Note: we're mutating the monitor item here!
       // Generally it's better to avoid mutations,
       // but it's good here for the sake of performance
@@ -104,23 +105,26 @@ const DraggableTask = ({
     drop(item) {
       const dropIndex = index;
       const startIndex = initialPosition.current;
-      
+
       if (startIndex !== dropIndex) {
         // Lock interactions during update
         setDragDelay(true);
         setUpdateInProgress(true);
         setVisualFeedback(true);
-        
+
         // Perform backend update for sequence
         onTaskSequenceUpdate(task.TaskID, task.ProjectID, dropIndex)
-          .then(result => {
+          .then((result) => {
             if (!result || !result.success) {
               // If there's an error, we remove the success feedback
               setVisualFeedback(false);
             }
           })
-          .catch(error => {
-            console.error(`DraggableTask ${task.TaskID}: Sequence update error:`, error);
+          .catch((error) => {
+            console.error(
+              `DraggableTask ${task.TaskID}: Sequence update error:`,
+              error,
+            );
             setVisualFeedback(false);
           })
           .finally(() => {
@@ -138,15 +142,15 @@ const DraggableTask = ({
   drag(drop(ref));
 
   return (
-    <div 
+    <div
       ref={ref}
       className={cn(
-        'transition-all duration-200',
-        isDragging && 'opacity-50',
-        dragDelay && 'cursor-wait',
-        updateInProgress && 'bg-blue-50',
-        visualFeedback && 'bg-green-50 border-green-200',
-        isOver && 'border-2 border-blue-300'
+        "transition-all duration-200",
+        isDragging && "opacity-50",
+        dragDelay && "cursor-wait",
+        updateInProgress && "bg-blue-50",
+        visualFeedback && "bg-green-50 border-green-200",
+        isOver && "border-2 border-blue-300",
       )}
       data-handler-id={handlerId}
       data-task-id={task.TaskID}

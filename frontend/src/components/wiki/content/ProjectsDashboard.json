@@ -1,140 +1,140 @@
 {
-    "title": "Guida Dashboard Progetti",
-    "description": "Questa sezione permette di visualizzare e gestire tutti i progetti disponibili.",
-    "sections": [
+  "title": "Guida Dashboard Progetti",
+  "description": "Questa sezione permette di visualizzare e gestire tutti i progetti disponibili.",
+  "sections": [
+    {
+      "title": "Panoramica della Dashboard",
+      "content": "<p>La <strong>Dashboard Progetti</strong> ti permette di vedere e gestire tutti i progetti disponibili. Con questa interfaccia puoi:</p><ul><li>Visualizzare tutti i progetti attivi, completati e sospesi</li><li>Filtrare i progetti per stato, cliente, categoria, etc.</li><li>Creare nuovi progetti</li><li>Accedere ai dettagli di ogni progetto</li></ul><p>La dashboard mostra statistiche generali come il numero di progetti attivi, in ritardo, e le attività associate.</p>",
+      "tourId": "dashboard_panoramica"
+    },
+    {
+      "title": "Filtri Progetti",
+      "content": "<p>Puoi filtrare i progetti utilizzando vari criteri:</p><ol><li>Utilizza il campo di ricerca per cercare testo nel titolo o nella descrizione</li><li>Filtra per stato (Attivo, Completato, Sospeso)</li><li>Filtra per cliente utilizzando il campo apposito</li><li>Filtra per categoria o per ID ERP</li></ol><p>I filtri possono essere combinati per trovare esattamente ciò che stai cercando.</p>",
+      "tourId": "dashboard_filtri",
+      "selector": ".filters-container"
+    },
+    {
+      "title": "Statistiche Progetti",
+      "content": "<p>Le <strong>Statistiche Progetti</strong> in alto mostrano una panoramica rapida dello stato di tutti i progetti:</p><ul><li><strong>Progetti Attivi</strong>: numero totale di progetti attualmente in corso</li><li><strong>Progetti in Ritardo</strong>: progetti che hanno attività scadute ma non completate</li><li><strong>Attività in Corso</strong>: numero totale di attività in fase di esecuzione</li><li><strong>Attività in Ritardo</strong>: attività la cui data di scadenza è stata superata</li></ul><p>Queste statistiche ti aiutano a monitorare rapidamente lo stato generale del lavoro.</p>",
+      "tourId": "dashboard_statistiche",
+      "selector": "#projects-dashboard-stats"
+    },
+    {
+      "title": "Creazione Nuovo Progetto",
+      "content": "<p>Per creare un nuovo progetto:</p><ol><li>Fai clic sul pulsante <strong>Nuovo Progetto</strong> in alto a destra</li><li>Inserisci le informazioni richieste nel modulo che appare:</li><ul><li>Nome del progetto (obbligatorio)</li><li>Descrizione</li><li>Date di inizio e fine (obbligatorie)</li><li>Cliente (se applicabile)</li><li>Categoria e sottocategoria</li><li>Stato (impostato su Attivo per default)</li></ul><li>Fai clic su <strong>Salva</strong> per creare il progetto</li></ol><p>Il nuovo progetto apparirà nella lista dei progetti attivi.</p>",
+      "tourId": "dashboard_nuovo_progetto"
+    },
+    {
+      "title": "Navigazione tra i Progetti",
+      "content": "<p>I progetti sono organizzati in tre categorie principali, accessibili tramite le schede in alto:</p><ul><li><strong>Attivi</strong>: progetti in corso</li><li><strong>Completati</strong>: progetti terminati con successo</li><li><strong>Sospesi</strong>: progetti temporaneamente interrotti</li></ul><p>Fai clic su una scheda per visualizzare i progetti nella categoria corrispondente. Per visualizzare i dettagli di un progetto specifico, fai clic sul pulsante <strong>Dettagli</strong> sulla card del progetto.</p>",
+      "tourId": "dashboard_navigazione",
+      "selector": "#projects-dashboard-tabs"
+    }
+  ],
+  "tours": {
+    "dashboard_panoramica": [
       {
-        "title": "Panoramica della Dashboard",
-        "content": "<p>La <strong>Dashboard Progetti</strong> ti permette di vedere e gestire tutti i progetti disponibili. Con questa interfaccia puoi:</p><ul><li>Visualizzare tutti i progetti attivi, completati e sospesi</li><li>Filtrare i progetti per stato, cliente, categoria, etc.</li><li>Creare nuovi progetti</li><li>Accedere ai dettagli di ogni progetto</li></ul><p>La dashboard mostra statistiche generali come il numero di progetti attivi, in ritardo, e le attività associate.</p>",
-        "tourId": "dashboard_panoramica"
-      },
-      {
-        "title": "Filtri Progetti",
-        "content": "<p>Puoi filtrare i progetti utilizzando vari criteri:</p><ol><li>Utilizza il campo di ricerca per cercare testo nel titolo o nella descrizione</li><li>Filtra per stato (Attivo, Completato, Sospeso)</li><li>Filtra per cliente utilizzando il campo apposito</li><li>Filtra per categoria o per ID ERP</li></ol><p>I filtri possono essere combinati per trovare esattamente ciò che stai cercando.</p>",
-        "tourId": "dashboard_filtri",
-        "selector": ".filters-container"
+        "title": "Benvenuto nella Dashboard Progetti",
+        "description": "Questo tour ti mostrerà come utilizzare la dashboard dei progetti.",
+        "selector": ".space-y-6, .p-6",
+        "position": "bottom"
       },
       {
         "title": "Statistiche Progetti",
-        "content": "<p>Le <strong>Statistiche Progetti</strong> in alto mostrano una panoramica rapida dello stato di tutti i progetti:</p><ul><li><strong>Progetti Attivi</strong>: numero totale di progetti attualmente in corso</li><li><strong>Progetti in Ritardo</strong>: progetti che hanno attività scadute ma non completate</li><li><strong>Attività in Corso</strong>: numero totale di attività in fase di esecuzione</li><li><strong>Attività in Ritardo</strong>: attività la cui data di scadenza è stata superata</li></ul><p>Queste statistiche ti aiutano a monitorare rapidamente lo stato generale del lavoro.</p>",
-        "tourId": "dashboard_statistiche",
-        "selector": "#projects-dashboard-stats"
+        "description": "Qui puoi vedere statistiche riassuntive di tutti i tuoi progetti.",
+        "selector": "#projects-dashboard-stats",
+        "position": "bottom"
       },
       {
-        "title": "Creazione Nuovo Progetto",
-        "content": "<p>Per creare un nuovo progetto:</p><ol><li>Fai clic sul pulsante <strong>Nuovo Progetto</strong> in alto a destra</li><li>Inserisci le informazioni richieste nel modulo che appare:</li><ul><li>Nome del progetto (obbligatorio)</li><li>Descrizione</li><li>Date di inizio e fine (obbligatorie)</li><li>Cliente (se applicabile)</li><li>Categoria e sottocategoria</li><li>Stato (impostato su Attivo per default)</li></ul><li>Fai clic su <strong>Salva</strong> per creare il progetto</li></ol><p>Il nuovo progetto apparirà nella lista dei progetti attivi.</p>",
-        "tourId": "dashboard_nuovo_progetto"
+        "title": "Lista Progetti",
+        "description": "Qui visualizzi tutti i progetti filtrati per categoria.",
+        "selector": "#projects-dashboard-tabs",
+        "position": "top"
       },
       {
-        "title": "Navigazione tra i Progetti",
-        "content": "<p>I progetti sono organizzati in tre categorie principali, accessibili tramite le schede in alto:</p><ul><li><strong>Attivi</strong>: progetti in corso</li><li><strong>Completati</strong>: progetti terminati con successo</li><li><strong>Sospesi</strong>: progetti temporaneamente interrotti</li></ul><p>Fai clic su una scheda per visualizzare i progetti nella categoria corrispondente. Per visualizzare i dettagli di un progetto specifico, fai clic sul pulsante <strong>Dettagli</strong> sulla card del progetto.</p>",
-        "tourId": "dashboard_navigazione",
-        "selector": "#projects-dashboard-tabs"
+        "title": "Filtri",
+        "description": "Usa questi filtri per trovare rapidamente progetti specifici.",
+        "selector": ".filters-container",
+        "position": "bottom"
       }
     ],
-    "tours": {
-      "dashboard_panoramica": [
-        {
-          "title": "Benvenuto nella Dashboard Progetti",
-          "description": "Questo tour ti mostrerà come utilizzare la dashboard dei progetti.",
-          "selector": ".space-y-6, .p-6",
-          "position": "bottom"
-        },
-        {
-          "title": "Statistiche Progetti",
-          "description": "Qui puoi vedere statistiche riassuntive di tutti i tuoi progetti.",
-          "selector": "#projects-dashboard-stats",
-          "position": "bottom"
-        },
-        {
-          "title": "Lista Progetti",
-          "description": "Qui visualizzi tutti i progetti filtrati per categoria.",
-          "selector": "#projects-dashboard-tabs",
-          "position": "top"
-        },
-        {
-          "title": "Filtri",
-          "description": "Usa questi filtri per trovare rapidamente progetti specifici.",
-          "selector": ".filters-container",
-          "position": "bottom"
-        }
-      ],
-      "dashboard_filtri": [
-        {
-          "title": "Filtri Progetti",
-          "description": "Ti mostrerò come filtrare efficacemente la lista dei progetti.",
-          "selector": ".filters-container",
-          "position": "bottom"
-        },
-        {
-          "title": "Filtro per Stato",
-          "description": "Seleziona lo stato dei progetti che vuoi visualizzare.",
-          "selector": ".filters-container select:first-child",
-          "position": "bottom"
-        },
-        {
-          "title": "Filtro per Cliente",
-          "description": "Filtra i progetti per cliente.",
-          "selector": ".CustomerSearchSelect",
-          "position": "bottom"
-        },
-        {
-          "title": "Ricerca Testuale",
-          "description": "Cerca progetti per nome o descrizione.",
-          "selector": ".filters-container input[placeholder*='Cerca']",
-          "position": "bottom"
-        }
-      ],
-      "dashboard_statistiche": [
-        {
-          "title": "Statistiche Progetti",
-          "description": "Ti mostrerò come interpretare le statistiche dei progetti.",
-          "selector": "#projects-dashboard-stats",
-          "position": "bottom"
-        },
-        {
-          "title": "Progetti Attivi",
-          "description": "Numero totale di progetti in corso attualmente.",
-          "selector": "#projects-dashboard-stats > div:nth-child(1)",
-          "position": "bottom"
-        },
-        {
-          "title": "Progetti in Ritardo",
-          "description": "Progetti che hanno attività scadute non completate.",
-          "selector": "#projects-dashboard-stats > div:nth-child(2)",
-          "position": "bottom"
-        },
-        {
-          "title": "Attività in Corso",
-          "description": "Numero totale di attività in fase di esecuzione.",
-          "selector": "#projects-dashboard-stats > div:nth-child(3)",
-          "position": "bottom"
-        },
-        {
-          "title": "Attività in Ritardo",
-          "description": "Attività la cui data di scadenza è stata superata.",
-          "selector": "#projects-dashboard-stats > div:nth-child(4)",
-          "position": "bottom"
-        }
-      ],
-      "dashboard_navigazione": [
-        {
-          "title": "Navigazione tra Categorie",
-          "description": "Utilizza queste schede per navigare tra progetti attivi, completati e sospesi.",
-          "selector": "#projects-dashboard-tabs button[role='tab']",
-          "position": "bottom"
-        },
-        {
-          "title": "Card Progetto",
-          "description": "Ogni progetto è rappresentato da una card con le informazioni principali.",
-          "selector": ".project-card",
-          "position": "top"
-        },
-        {
-          "title": "Accesso ai Dettagli",
-          "description": "Fai clic qui per accedere ai dettagli completi del progetto.",
-          "selector": "button:contains('Dettagli')",
-          "position": "left"
-        }
-      ]
-    }
+    "dashboard_filtri": [
+      {
+        "title": "Filtri Progetti",
+        "description": "Ti mostrerò come filtrare efficacemente la lista dei progetti.",
+        "selector": ".filters-container",
+        "position": "bottom"
+      },
+      {
+        "title": "Filtro per Stato",
+        "description": "Seleziona lo stato dei progetti che vuoi visualizzare.",
+        "selector": ".filters-container select:first-child",
+        "position": "bottom"
+      },
+      {
+        "title": "Filtro per Cliente",
+        "description": "Filtra i progetti per cliente.",
+        "selector": ".CustomerSearchSelect",
+        "position": "bottom"
+      },
+      {
+        "title": "Ricerca Testuale",
+        "description": "Cerca progetti per nome o descrizione.",
+        "selector": ".filters-container input[placeholder*='Cerca']",
+        "position": "bottom"
+      }
+    ],
+    "dashboard_statistiche": [
+      {
+        "title": "Statistiche Progetti",
+        "description": "Ti mostrerò come interpretare le statistiche dei progetti.",
+        "selector": "#projects-dashboard-stats",
+        "position": "bottom"
+      },
+      {
+        "title": "Progetti Attivi",
+        "description": "Numero totale di progetti in corso attualmente.",
+        "selector": "#projects-dashboard-stats > div:nth-child(1)",
+        "position": "bottom"
+      },
+      {
+        "title": "Progetti in Ritardo",
+        "description": "Progetti che hanno attività scadute non completate.",
+        "selector": "#projects-dashboard-stats > div:nth-child(2)",
+        "position": "bottom"
+      },
+      {
+        "title": "Attività in Corso",
+        "description": "Numero totale di attività in fase di esecuzione.",
+        "selector": "#projects-dashboard-stats > div:nth-child(3)",
+        "position": "bottom"
+      },
+      {
+        "title": "Attività in Ritardo",
+        "description": "Attività la cui data di scadenza è stata superata.",
+        "selector": "#projects-dashboard-stats > div:nth-child(4)",
+        "position": "bottom"
+      }
+    ],
+    "dashboard_navigazione": [
+      {
+        "title": "Navigazione tra Categorie",
+        "description": "Utilizza queste schede per navigare tra progetti attivi, completati e sospesi.",
+        "selector": "#projects-dashboard-tabs button[role='tab']",
+        "position": "bottom"
+      },
+      {
+        "title": "Card Progetto",
+        "description": "Ogni progetto è rappresentato da una card con le informazioni principali.",
+        "selector": ".project-card",
+        "position": "top"
+      },
+      {
+        "title": "Accesso ai Dettagli",
+        "description": "Fai clic qui per accedere ai dettagli completi del progetto.",
+        "selector": "button:contains('Dettagli')",
+        "position": "left"
+      }
+    ]
   }
+}

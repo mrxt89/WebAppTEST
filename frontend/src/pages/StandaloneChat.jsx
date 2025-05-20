@@ -1,19 +1,20 @@
 // src/pages/StandaloneChat.jsx
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams } from 'react-router-dom';
-import { useNotifications } from '../redux/features/notifications/notificationsHooks';
-import ChatWindow from '../components/chat/ChatWindow';
-import useWindowManager from '../hooks/useWindowManager';
-import { CircleX } from 'lucide-react';
-import { swal } from '../lib/common';
-import axios from 'axios';
-import { config } from '../config';
-import { useSelector } from 'react-redux';
-import { selectNotifications } from '../redux/features/notifications/notificationsSlice';
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useParams } from "react-router-dom";
+import { useNotifications } from "../redux/features/notifications/notificationsHooks";
+import ChatWindow from "../components/chat/ChatWindow";
+import useWindowManager from "../hooks/useWindowManager";
+import { CircleX } from "lucide-react";
+import { swal } from "../lib/common";
+import axios from "axios";
+import { config } from "../config";
+import { useSelector } from "react-redux";
+import { selectNotifications } from "../redux/features/notifications/notificationsSlice";
 
 // Aggiungi un identificatore univoco per la finestra
 if (!window.WINDOW_ID) {
-  window.WINDOW_ID = Date.now().toString(36) + Math.random().toString(36).substring(2);
+  window.WINDOW_ID =
+    Date.now().toString(36) + Math.random().toString(36).substring(2);
 }
 
 // Loading screen component
@@ -58,7 +59,7 @@ const ErrorScreen = ({ error, onClose, onRetry }) => (
 const StandaloneChat = () => {
   const { id } = useParams();
   const notificationId = parseInt(id);
-  const windowManager = useWindowManager('standalone-');
+  const windowManager = useWindowManager("standalone-");
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -67,10 +68,10 @@ const StandaloneChat = () => {
   const [responseOptions, setResponseOptions] = useState([]);
   const chatRegisteredRef = useRef(false);
   const initializationAttempted = useRef(false);
-  
+
   // Extract functions from the hook
-  const { 
-    fetchNotificationById, 
+  const {
+    fetchNotificationById,
     initializeWorker,
     unregisterStandaloneChat,
     registerOpenChat,
@@ -78,28 +79,29 @@ const StandaloneChat = () => {
     registerStandaloneChat,
     DBNotificationsView,
     reloadNotifications,
-    restartNotificationWorker
+    restartNotificationWorker,
   } = useNotifications();
 
   // Aggiungi selettore per le notifiche
   const notifications = useSelector(selectNotifications);
-  
+
   // Effect per monitorare le notifiche nello store
   useEffect(() => {
     if (notificationId && notifications.length > 0) {
-      const foundNotification = notifications.find(n => n.notificationId === notificationId);
+      const foundNotification = notifications.find(
+        (n) => n.notificationId === notificationId,
+      );
       if (foundNotification && !loaded) {
-        console.log("Notifica trovata nello store:", foundNotification);
         setNotification(foundNotification);
         setLoaded(true);
-        document.title = `Chat: ${foundNotification.title || 'Conversazione'}`;
+        document.title = `Chat: ${foundNotification.title || "Conversazione"}`;
       }
     }
   }, [notificationId, notifications, loaded]);
 
   // Miglioramento: funzione per recuperare il token e l'URL API in modo sicuro
   const getApiConfig = () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (!token) {
       throw new Error("Token non disponibile. Effettua nuovamente il login.");
     }
@@ -110,37 +112,39 @@ const StandaloneChat = () => {
   const fetchUsers = async () => {
     try {
       const { token, apiBaseUrl } = getApiConfig();
-      
-      console.log("Caricamento utenti...");
-      
+
       const response = await axios.get(`${apiBaseUrl}/users`, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store',
-          'Pragma': 'no-cache'
-        }
+          "Cache-Control": "no-cache, no-store",
+          Pragma: "no-cache",
+        },
       });
-      
+
       if (response.data) {
-        console.log(`Caricati ${response.data.length} utenti`);
         setUsers(response.data);
         return response.data;
       }
-      
+
       throw new Error("Risposta vuota dal server");
     } catch (error) {
       console.error("Errore caricamento utenti:", error);
-      
+
       // Provide default users only in development
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         const defaultUsers = [
-          { userId: 1, firstName: "Utente", lastName: "Corrente", isCurrentUser: true },
-          { userId: 2, firstName: "Support", lastName: "Team" }
+          {
+            userId: 1,
+            firstName: "Utente",
+            lastName: "Corrente",
+            isCurrentUser: true,
+          },
+          { userId: 2, firstName: "Support", lastName: "Team" },
         ];
         setUsers(defaultUsers);
         return defaultUsers;
       }
-      
+
       throw error;
     }
   };
@@ -149,38 +153,35 @@ const StandaloneChat = () => {
   const fetchResponseOptions = async () => {
     try {
       const { token, apiBaseUrl } = getApiConfig();
-      
-      console.log("Caricamento opzioni di risposta...");
-      
+
       const response = await axios.get(`${apiBaseUrl}/response-options`, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store',
-          'Pragma': 'no-cache'
-        }
+          "Cache-Control": "no-cache, no-store",
+          Pragma: "no-cache",
+        },
       });
-      
+
       if (response.data) {
-        console.log("Opzioni di risposta caricate con successo");
         setResponseOptions(response.data);
         return response.data;
       }
-      
+
       throw new Error("Risposta vuota dal server");
     } catch (error) {
       console.error("Errore caricamento opzioni di risposta:", error);
-      
+
       // Provide default options only in development
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         const defaultOptions = [
           { id: 1, text: "Grazie per l'informazione" },
           { id: 2, text: "Capisco, procederò come indicato" },
-          { id: 3, text: "Potrebbe fornirmi maggiori dettagli?" }
+          { id: 3, text: "Potrebbe fornirmi maggiori dettagli?" },
         ];
         setResponseOptions(defaultOptions);
         return defaultOptions;
       }
-      
+
       // In production, rethrow to handle properly
       throw error;
     }
@@ -189,10 +190,10 @@ const StandaloneChat = () => {
   // Function to handle retries
   const handleRetry = useCallback(() => {
     setError(null);
-    setRetryCount(prev => prev + 1);
+    setRetryCount((prev) => prev + 1);
     setLoaded(false);
     initializationAttempted.current = false;
-    
+
     // Force restart notifications worker on retry
     restartNotificationWorker(true);
   }, [restartNotificationWorker]);
@@ -201,54 +202,44 @@ const StandaloneChat = () => {
   const initialize = useCallback(async () => {
     if (initializationAttempted.current) return;
     initializationAttempted.current = true;
-    
+
     try {
-      console.log(`Inizializzazione della chat standalone per ID: ${notificationId}`);
       document.title = "Caricamento chat...";
-      
+
       // Verify token
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("Sessione scaduta, effettua il login");
       }
-      
+
       if (!notificationId || isNaN(notificationId)) {
         throw new Error("ID chat non valido");
       }
-      
+
       // Initialize redux worker with forceInit flag
-      console.log("Inizializzazione worker con forceInit");
       initializeWorker(true);
-      
+
       // Ensure DB view is created
-      console.log("Creazione vista DB");
       await DBNotificationsView();
-      
+
       // Aspetta che il worker sia pronto
-      console.log("Attesa worker...");
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       // Carica la notifica con priorità alta
-      console.log("Chiamata fetchNotificationById...");
       await fetchNotificationById(notificationId, true);
-      
+
       // Aspetta che lo store sia aggiornato
-      console.log("Attesa aggiornamento store...");
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       // Register this chat as open in redux store
       if (!chatRegisteredRef.current) {
-        console.log("Registrazione della chat come standalone");
         registerStandaloneChat(notificationId);
         registerOpenChat(notificationId);
         chatRegisteredRef.current = true;
-        
+
         // Mark the notification as read
         await toggleReadUnread(notificationId, true);
       }
-      
-      console.log("Inizializzazione completata con successo");
-      
     } catch (error) {
       console.error("Errore inizializzazione:", error);
       setError(error.message || "Errore di caricamento");
@@ -256,76 +247,93 @@ const StandaloneChat = () => {
       return null;
     }
   }, [
-    notificationId, 
-    fetchNotificationById, 
-    initializeWorker, 
-    DBNotificationsView, 
-    reloadNotifications, 
-    registerStandaloneChat, 
-    registerOpenChat, 
+    notificationId,
+    fetchNotificationById,
+    initializeWorker,
+    DBNotificationsView,
+    reloadNotifications,
+    registerStandaloneChat,
+    registerOpenChat,
     toggleReadUnread,
-    notifications
+    notifications,
   ]);
-  
+
   // Initialization effect
   useEffect(() => {
     // Execute initialization
     initialize();
-    
+
     // Set listener for window closing
     const handleBeforeUnload = () => {
       if (notificationId && chatRegisteredRef.current) {
         unregisterStandaloneChat(notificationId);
       }
     };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     // Cleanup
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
       if (notificationId && chatRegisteredRef.current) {
         unregisterStandaloneChat(notificationId);
       }
     };
   }, [notificationId, initialize, unregisterStandaloneChat, retryCount]);
-  
+
   // Effect to handle notification updates from events
   useEffect(() => {
     const handleNotificationUpdate = (event) => {
       const { notificationId: updatedId } = event.detail || {};
-      
+
       // Only update if it matches our notification
       if (updatedId && updatedId === notificationId && loaded) {
-        console.log(`Aggiornamento ricevuto per notifica ${updatedId}`);
-        
         fetchNotificationById(notificationId)
-          .then(updatedNotification => {
+          .then((updatedNotification) => {
             if (updatedNotification) {
               setNotification(updatedNotification);
             }
           })
-          .catch(err => console.error("Errore aggiornamento da evento:", err));
+          .catch((err) =>
+            console.error("Errore aggiornamento da evento:", err),
+          );
       }
     };
-    
+
     // Listen for various notification update events
-    document.addEventListener('notifications-updated', handleNotificationUpdate);
-    document.addEventListener('chat-message-sent', handleNotificationUpdate);
-    document.addEventListener('message-updated', handleNotificationUpdate);
-    document.addEventListener('message-reaction-updated', handleNotificationUpdate);
-    document.addEventListener('new-message-received', handleNotificationUpdate);
-    
+    document.addEventListener(
+      "notifications-updated",
+      handleNotificationUpdate,
+    );
+    document.addEventListener("chat-message-sent", handleNotificationUpdate);
+    document.addEventListener("message-updated", handleNotificationUpdate);
+    document.addEventListener(
+      "message-reaction-updated",
+      handleNotificationUpdate,
+    );
+    document.addEventListener("new-message-received", handleNotificationUpdate);
+
     return () => {
-      document.removeEventListener('notifications-updated', handleNotificationUpdate);
-      document.removeEventListener('chat-message-sent', handleNotificationUpdate);
-      document.removeEventListener('message-updated', handleNotificationUpdate);
-      document.removeEventListener('message-reaction-updated', handleNotificationUpdate);
-      document.removeEventListener('new-message-received', handleNotificationUpdate);
+      document.removeEventListener(
+        "notifications-updated",
+        handleNotificationUpdate,
+      );
+      document.removeEventListener(
+        "chat-message-sent",
+        handleNotificationUpdate,
+      );
+      document.removeEventListener("message-updated", handleNotificationUpdate);
+      document.removeEventListener(
+        "message-reaction-updated",
+        handleNotificationUpdate,
+      );
+      document.removeEventListener(
+        "new-message-received",
+        handleNotificationUpdate,
+      );
     };
   }, [notificationId, fetchNotificationById, loaded]);
-  
-  
+
   // Function to close the window
   const handleClose = useCallback(() => {
     // Before closing, unregister the chat
@@ -333,41 +341,39 @@ const StandaloneChat = () => {
       unregisterStandaloneChat(notificationId);
       chatRegisteredRef.current = false;
     }
-    
+
     // Close the window
     window.close();
-    
+
     // If window doesn't close (browser might block), show a message
     setTimeout(() => {
       // Window is still open, show message
       swal.fire({
-        title: 'Chiusura finestra bloccata',
-        text: 'Il browser ha impedito la chiusura automatica della finestra. Chiudila manualmente.',
-        icon: 'info',
-        confirmButtonText: 'OK'
+        title: "Chiusura finestra bloccata",
+        text: "Il browser ha impedito la chiusura automatica della finestra. Chiudila manualmente.",
+        icon: "info",
+        confirmButtonText: "OK",
       });
     }, 500);
   }, [notificationId, unregisterStandaloneChat]);
 
   // If there was an error, show error message
   if (error) {
-    return <ErrorScreen 
-      error={error} 
-      onClose={handleClose} 
-      onRetry={handleRetry}
-    />;
+    return (
+      <ErrorScreen error={error} onClose={handleClose} onRetry={handleRetry} />
+    );
   }
-  
+
   // If data is not loaded yet, show spinner
   if (!loaded || !notification) {
     return <LoadingScreen />;
   }
-  
+
   // Render the chat
   return (
     <div className="h-screen w-screen bg-gray-100 overflow-hidden">
-      <ChatWindow 
-        notification={notification} 
+      <ChatWindow
+        notification={notification}
         onClose={handleClose}
         onMinimize={() => window.blur()}
         windowManager={windowManager}
@@ -375,7 +381,7 @@ const StandaloneChat = () => {
         // Pass users and response options directly as props
         standaloneData={{
           users: users,
-          responseOptions: responseOptions
+          responseOptions: responseOptions,
         }}
       />
     </div>

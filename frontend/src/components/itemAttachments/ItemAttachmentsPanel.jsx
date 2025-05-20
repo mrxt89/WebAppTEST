@@ -1,17 +1,17 @@
 // Frontend/src/components/itemAttachments/ItemAttachmentsPanel.js
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
-  Box, 
-  Button, 
-  Typography, 
-  Paper, 
-  Grid, 
-  IconButton, 
-  Tooltip, 
+  Box,
+  Button,
+  Typography,
+  Paper,
+  Grid,
+  IconButton,
+  Tooltip,
   Chip,
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
+  Dialog,
+  DialogTitle,
+  DialogContent,
   DialogActions,
   TextField,
   FormControlLabel,
@@ -30,9 +30,9 @@ import {
   Card,
   CardContent,
   CardHeader,
-  Alert
-} from '@mui/material';
-import { 
+  Alert,
+} from "@mui/material";
+import {
   CloudUpload as UploadIcon,
   Download as DownloadIcon,
   Delete as DeleteIcon,
@@ -51,23 +51,23 @@ import {
   Close as CloseIcon,
   Info as InfoIcon,
   Restore as RestoreIcon,
-  VisibilityOff as HideIcon
-} from '@mui/icons-material';
-import { formatDistanceToNow } from 'date-fns';
-import { it } from 'date-fns/locale';
-import useItemAttachmentsActions from '../../hooks/useItemAttachmentsActions';
-import { useAuthContext } from '../../contexts/AuthContext';
-import { formatBytes } from '../../lib/common';
-import ItemAttachmentUploader from './ItemAttachmentUploader';
-import ItemAttachmentDetails from './ItemAttachmentDetails';
-import ItemAttachmentVersions from './ItemAttachmentVersions';
-import ItemAttachmentSharing from './ItemAttachmentSharing';
-import ItemAttachmentCategories from './ItemAttachmentCategories';
-import FileViewer from '../ui/fileViewer';
+  VisibilityOff as HideIcon,
+} from "@mui/icons-material";
+import { formatDistanceToNow } from "date-fns";
+import { it } from "date-fns/locale";
+import useItemAttachmentsActions from "../../hooks/useItemAttachmentsActions";
+import { useAuthContext } from "../../contexts/AuthContext";
+import { formatBytes } from "../../lib/common";
+import ItemAttachmentUploader from "./ItemAttachmentUploader";
+import ItemAttachmentDetails from "./ItemAttachmentDetails";
+import ItemAttachmentVersions from "./ItemAttachmentVersions";
+import ItemAttachmentSharing from "./ItemAttachmentSharing";
+import ItemAttachmentCategories from "./ItemAttachmentCategories";
+import FileViewer from "../ui/fileViewer";
 
 /**
  * ItemAttachmentsPanel - Componente per visualizzare e gestire gli allegati di un articolo
- * 
+ *
  * @param {string} itemCode - Codice dell'articolo (per articoli da ERP)
  * @param {number} projectItemId - ID dell'articolo progetto (per articoli temporanei)
  * @param {boolean} readOnly - Flag per modalità sola lettura
@@ -75,21 +75,21 @@ import FileViewer from '../ui/fileViewer';
  * @param {number} maxHeight - Altezza massima del pannello
  * @param {number} companyId - ID dell'azienda (opzionale, altrimenti usa quello dell'utente corrente)
  */
-function ItemAttachmentsPanel({ 
+function ItemAttachmentsPanel({
   itemCode = null,
   projectItemId = null,
   readOnly = false,
   showHeader = true,
   maxHeight = 400,
-  companyId = null
+  companyId = null,
 }) {
   const { authState } = useAuthContext();
   const [userCompanyId] = useState(companyId || authState.user?.CompanyId);
-  
+
   // Stato locale
   const [selectedAttachment, setSelectedAttachment] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogType, setDialogType] = useState(''); // 'details', 'versions', 'sharing', 'categories'
+  const [dialogType, setDialogType] = useState(""); // 'details', 'versions', 'sharing', 'categories'
   const [uploaderOpen, setUploaderOpen] = useState(false);
   const [filterPublic, setFilterPublic] = useState(false);
   const [filterErp, setFilterErp] = useState(null); // null = tutti, true = solo ERP, false = solo non ERP
@@ -101,7 +101,7 @@ function ItemAttachmentsPanel({
   const [detailsTabValue, setDetailsTabValue] = useState(0);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  
+
   // Utilizziamo l'hook per le azioni sugli allegati
   const {
     loading,
@@ -125,7 +125,7 @@ function ItemAttachmentsPanel({
     getAttachmentVersions,
     addAttachmentVersion,
     downloadAllAttachmentsByItemCode,
-    downloadAllAttachmentsByProjectItemId
+    downloadAllAttachmentsByProjectItemId,
   } = useItemAttachmentsActions();
 
   // Caricamento iniziale degli allegati
@@ -135,36 +135,43 @@ function ItemAttachmentsPanel({
     } else if (projectItemId) {
       getAttachmentsByProjectItemId(projectItemId);
     }
-    
+
     // Carica le categorie se non sono già caricate
     if (categories.length === 0) {
       getAttachmentCategories();
     }
-  }, [itemCode, projectItemId, getAttachmentsByItemCode, getAttachmentsByProjectItemId, getAttachmentCategories, categories.length]);
+  }, [
+    itemCode,
+    projectItemId,
+    getAttachmentsByItemCode,
+    getAttachmentsByProjectItemId,
+    getAttachmentCategories,
+    categories.length,
+  ]);
 
   // Funzione per filtrare gli allegati
   const filteredAttachments = useCallback(() => {
-    return attachments.filter(attachment => {
+    return attachments.filter((attachment) => {
       // Filtra per pubblico/privato
       if (filterPublic && !attachment.IsPublic) {
         return false;
       }
-      
+
       // Filtra per ERP/non ERP
       if (filterErp !== null && attachment.IsErpAttachment !== filterErp) {
         return false;
       }
-      
+
       // Filtra per visibilità
       if (filterVisible && attachment.IsVisible === false) {
         return false;
       }
-      
+
       // Filtra per categoria
       if (filterCategory && !attachment.Categories?.includes(filterCategory)) {
         return false;
       }
-      
+
       return true;
     });
   }, [attachments, filterPublic, filterErp, filterCategory, filterVisible]);
@@ -203,7 +210,7 @@ function ItemAttachmentsPanel({
     } else if (projectItemId) {
       getAttachmentsByProjectItemId(projectItemId);
     }
-    
+
     setUploaderOpen(false);
   };
 
@@ -225,7 +232,7 @@ function ItemAttachmentsPanel({
   // Gestione visualizzazione dettagli
   const handleViewDetails = (attachment) => {
     setSelectedAttachment(attachment);
-    setDialogType('details');
+    setDialogType("details");
     setDialogOpen(true);
     handleMenuClose();
   };
@@ -241,7 +248,7 @@ function ItemAttachmentsPanel({
   const handleEdit = (attachment) => {
     if (canEditAttachment(attachment)) {
       setSelectedAttachment(attachment);
-      setDialogType('details');
+      setDialogType("details");
       setDetailsTabValue(1); // Tab di modifica
       setDialogOpen(true);
     }
@@ -261,7 +268,7 @@ function ItemAttachmentsPanel({
   const handleConfirmDelete = async () => {
     if (selectedAttachment && canEditAttachment(selectedAttachment)) {
       await deleteAttachment(selectedAttachment.AttachmentID);
-      
+
       // Aggiorna la lista dopo l'eliminazione
       if (itemCode) {
         getAttachmentsByItemCode(itemCode);
@@ -269,7 +276,7 @@ function ItemAttachmentsPanel({
         getAttachmentsByProjectItemId(projectItemId);
       }
     }
-    
+
     setConfirmDeleteOpen(false);
   };
 
@@ -286,7 +293,7 @@ function ItemAttachmentsPanel({
   const handleConfirmRestore = async () => {
     if (selectedAttachment && canEditAttachment(selectedAttachment)) {
       await restoreAttachment(selectedAttachment.AttachmentID);
-      
+
       // Aggiorna la lista dopo il ripristino
       if (itemCode) {
         getAttachmentsByItemCode(itemCode);
@@ -294,7 +301,7 @@ function ItemAttachmentsPanel({
         getAttachmentsByProjectItemId(projectItemId);
       }
     }
-    
+
     setConfirmRestoreOpen(false);
   };
 
@@ -302,7 +309,7 @@ function ItemAttachmentsPanel({
   const handleShare = (attachment) => {
     if (canEditAttachment(attachment)) {
       setSelectedAttachment(attachment);
-      setDialogType('sharing');
+      setDialogType("sharing");
       setDialogOpen(true);
     }
     handleMenuClose();
@@ -311,7 +318,7 @@ function ItemAttachmentsPanel({
   // Gestione visualizzazione versioni
   const handleVersions = (attachment) => {
     setSelectedAttachment(attachment);
-    setDialogType('versions');
+    setDialogType("versions");
     setDialogOpen(true);
     handleMenuClose();
   };
@@ -320,7 +327,7 @@ function ItemAttachmentsPanel({
   const handleCategories = (attachment) => {
     if (canEditAttachment(attachment)) {
       setSelectedAttachment(attachment);
-      setDialogType('categories');
+      setDialogType("categories");
       setDialogOpen(true);
     }
     handleMenuClose();
@@ -330,7 +337,7 @@ function ItemAttachmentsPanel({
   const handleDialogClose = () => {
     setDialogOpen(false);
     setDetailsTabValue(0); // Reset alla tab di visualizzazione
-    
+
     // Aggiorna la lista degli allegati se necessario
     if (itemCode) {
       getAttachmentsByItemCode(itemCode);
@@ -350,38 +357,40 @@ function ItemAttachmentsPanel({
 
   // Icona per tipo di file
   const getFileIcon = (fileType, fileName) => {
-    const extension = fileName.split('.').pop().toLowerCase();
-    
-    if (fileType && fileType.startsWith('image/')) {
-      return <img 
-        src={`data:${fileType};base64,${attachment?.thumbnail || ''}`} 
-        alt="thumbnail" 
-        style={{ width: 40, height: 40, objectFit: 'cover' }} 
-      />;
+    const extension = fileName.split(".").pop().toLowerCase();
+
+    if (fileType && fileType.startsWith("image/")) {
+      return (
+        <img
+          src={`data:${fileType};base64,${attachment?.thumbnail || ""}`}
+          alt="thumbnail"
+          style={{ width: 40, height: 40, objectFit: "cover" }}
+        />
+      );
     }
-    
+
     switch (extension) {
-      case 'pdf':
-        return <FileIcon style={{ color: 'red' }} />;
-      case 'doc':
-      case 'docx':
-        return <FileIcon style={{ color: 'blue' }} />;
-      case 'xls':
-      case 'xlsx':
-        return <FileIcon style={{ color: 'green' }} />;
-      case 'ppt':
-      case 'pptx':
-        return <FileIcon style={{ color: 'orange' }} />;
-      case 'zip':
-      case 'rar':
-        return <FileIcon style={{ color: 'purple' }} />;
-      case 'dwg':
-      case 'dxf':
-      case 'step':
-      case 'stp':
-      case 'iges':
-      case 'igs':
-        return <FileIcon style={{ color: 'teal' }} />;
+      case "pdf":
+        return <FileIcon style={{ color: "red" }} />;
+      case "doc":
+      case "docx":
+        return <FileIcon style={{ color: "blue" }} />;
+      case "xls":
+      case "xlsx":
+        return <FileIcon style={{ color: "green" }} />;
+      case "ppt":
+      case "pptx":
+        return <FileIcon style={{ color: "orange" }} />;
+      case "zip":
+      case "rar":
+        return <FileIcon style={{ color: "purple" }} />;
+      case "dwg":
+      case "dxf":
+      case "step":
+      case "stp":
+      case "iges":
+      case "igs":
+        return <FileIcon style={{ color: "teal" }} />;
       default:
         return <FileIcon />;
     }
@@ -389,7 +398,15 @@ function ItemAttachmentsPanel({
 
   // Render dei filtri
   const renderFilters = () => (
-    <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+    <Box
+      sx={{
+        mb: 2,
+        display: "flex",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: 1,
+      }}
+    >
       <FormControlLabel
         control={
           <Switch
@@ -400,7 +417,7 @@ function ItemAttachmentsPanel({
         }
         label="Solo pubblici"
       />
-      
+
       <FormControlLabel
         control={
           <Switch
@@ -411,9 +428,11 @@ function ItemAttachmentsPanel({
         }
         label="Solo visibili"
       />
-      
-      <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
-        <Typography variant="body2" sx={{ mr: 1 }}>Tipo:</Typography>
+
+      <Box sx={{ display: "flex", alignItems: "center", ml: 2 }}>
+        <Typography variant="body2" sx={{ mr: 1 }}>
+          Tipo:
+        </Typography>
         <Box sx={{ minWidth: 120 }}>
           <TextField
             select
@@ -431,10 +450,12 @@ function ItemAttachmentsPanel({
           </TextField>
         </Box>
       </Box>
-      
+
       {categories.length > 0 && (
-        <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
-          <Typography variant="body2" sx={{ mr: 1 }}>Categoria:</Typography>
+        <Box sx={{ display: "flex", alignItems: "center", ml: 2 }}>
+          <Typography variant="body2" sx={{ mr: 1 }}>
+            Categoria:
+          </Typography>
           <Box sx={{ minWidth: 150 }}>
             <TextField
               select
@@ -456,7 +477,7 @@ function ItemAttachmentsPanel({
           </Box>
         </Box>
       )}
-      
+
       <Button
         variant="outlined"
         size="small"
@@ -468,7 +489,7 @@ function ItemAttachmentsPanel({
           setFilterVisible(true);
           handleRefresh();
         }}
-        sx={{ ml: 'auto' }}
+        sx={{ ml: "auto" }}
       >
         Reset
       </Button>
@@ -478,42 +499,42 @@ function ItemAttachmentsPanel({
   // Render della lista allegati
   const renderAttachmentsList = () => {
     const filteredList = filteredAttachments();
-    
+
     if (loading) {
       return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
           <CircularProgress />
         </Box>
       );
     }
-    
+
     if (filteredList.length === 0) {
       return (
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            p: 3, 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            backgroundColor: 'background.default',
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "background.default",
             borderRadius: 1,
-            border: '1px dashed',
-            borderColor: 'divider'
+            border: "1px dashed",
+            borderColor: "divider",
           }}
         >
           <InfoIcon color="disabled" sx={{ fontSize: 48, mb: 2 }} />
           <Typography color="textSecondary">
-            {attachments.length === 0 
-              ? "Nessun allegato disponibile per questo articolo" 
+            {attachments.length === 0
+              ? "Nessun allegato disponibile per questo articolo"
               : "Nessun allegato corrisponde ai filtri selezionati"}
           </Typography>
           {!readOnly && (
-            <Button 
-              variant="contained" 
-              color="primary" 
-              startIcon={<UploadIcon />} 
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<UploadIcon />}
               onClick={handleUploaderOpen}
               sx={{ mt: 2 }}
             >
@@ -523,30 +544,30 @@ function ItemAttachmentsPanel({
         </Paper>
       );
     }
-    
+
     return (
-      <List 
-        sx={{ 
-          maxHeight: maxHeight, 
-          overflow: 'auto',
-          border: '1px solid',
-          borderColor: 'divider',
+      <List
+        sx={{
+          maxHeight: maxHeight,
+          overflow: "auto",
+          border: "1px solid",
+          borderColor: "divider",
           borderRadius: 1,
-          backgroundColor: 'background.paper'
+          backgroundColor: "background.paper",
         }}
       >
         {filteredList.map((attachment) => (
           <React.Fragment key={attachment.AttachmentID}>
-            <ListItem 
-              sx={{ 
-                '&:hover': { 
-                  backgroundColor: 'action.hover' 
+            <ListItem
+              sx={{
+                "&:hover": {
+                  backgroundColor: "action.hover",
                 },
                 // Aggiunge uno stile visivo se l'allegato è nascosto
                 ...(attachment.IsVisible === false && {
                   opacity: 0.6,
-                  backgroundColor: 'action.disabledBackground'
-                })
+                  backgroundColor: "action.disabledBackground",
+                }),
               }}
             >
               <ListItemIcon>
@@ -558,34 +579,38 @@ function ItemAttachmentsPanel({
                     variant="body1"
                     component="div"
                     sx={{
-                      fontWeight: 'medium',
-                      display: 'flex',
-                      alignItems: 'center'
+                      fontWeight: "medium",
+                      display: "flex",
+                      alignItems: "center",
                     }}
                   >
                     {attachment.FileName}
                     {attachment.IsPublic && (
                       <Tooltip title="Allegato pubblico">
-                        <PublicIcon fontSize="small" color="primary" sx={{ ml: 1 }} />
+                        <PublicIcon
+                          fontSize="small"
+                          color="primary"
+                          sx={{ ml: 1 }}
+                        />
                       </Tooltip>
                     )}
                     {attachment.IsErpAttachment && (
                       <Tooltip title="Allegato da ERP">
-                        <Chip 
-                          label="ERP" 
-                          color="info" 
-                          size="small" 
-                          sx={{ ml: 1, height: 20, fontSize: '0.7rem' }} 
+                        <Chip
+                          label="ERP"
+                          color="info"
+                          size="small"
+                          sx={{ ml: 1, height: 20, fontSize: "0.7rem" }}
                         />
                       </Tooltip>
                     )}
                     {attachment.IsVisible === false && (
                       <Tooltip title="Allegato nascosto (soft delete)">
-                        <Chip 
-                          label="Nascosto" 
-                          color="error" 
-                          size="small" 
-                          sx={{ ml: 1, height: 20, fontSize: '0.7rem' }} 
+                        <Chip
+                          label="Nascosto"
+                          color="error"
+                          size="small"
+                          sx={{ ml: 1, height: 20, fontSize: "0.7rem" }}
                         />
                       </Tooltip>
                     )}
@@ -593,35 +618,50 @@ function ItemAttachmentsPanel({
                 }
                 secondary={
                   <React.Fragment>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                    <Box
+                      sx={{ display: "flex", alignItems: "center", mt: 0.5 }}
+                    >
                       <Typography
                         variant="body2"
                         color="text.secondary"
-                        sx={{ fontSize: '0.75rem' }}
+                        sx={{ fontSize: "0.75rem" }}
                       >
-                        {formatBytes(attachment.FileSizeKB * 1024)} • 
-                        Caricato {formatDistanceToNow(new Date(attachment.UploadedAt), { addSuffix: true, locale: it })} • 
-                        Da {attachment.UploadedByFullName || attachment.UploadedByUsername}
-                        {attachment.OwnerCompanyId !== userCompanyId && ` (${attachment.OwnerCompanyName})`}
+                        {formatBytes(attachment.FileSizeKB * 1024)} • Caricato{" "}
+                        {formatDistanceToNow(new Date(attachment.UploadedAt), {
+                          addSuffix: true,
+                          locale: it,
+                        })}{" "}
+                        • Da{" "}
+                        {attachment.UploadedByFullName ||
+                          attachment.UploadedByUsername}
+                        {attachment.OwnerCompanyId !== userCompanyId &&
+                          ` (${attachment.OwnerCompanyName})`}
                       </Typography>
                     </Box>
                     {attachment.Description && (
                       <Typography
                         variant="body2"
                         color="text.secondary"
-                        sx={{ mt: 0.5, fontSize: '0.75rem' }}
+                        sx={{ mt: 0.5, fontSize: "0.75rem" }}
                       >
                         {attachment.Description}
                       </Typography>
                     )}
                     {attachment.Tags && (
-                      <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {attachment.Tags.split(',').map((tag, index) => (
-                          <Chip 
-                            key={index} 
-                            label={tag.trim()} 
-                            size="small" 
-                            sx={{ height: 20, fontSize: '0.7rem' }} 
+                      <Box
+                        sx={{
+                          mt: 0.5,
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 0.5,
+                        }}
+                      >
+                        {attachment.Tags.split(",").map((tag, index) => (
+                          <Chip
+                            key={index}
+                            label={tag.trim()}
+                            size="small"
+                            sx={{ height: 20, fontSize: "0.7rem" }}
                           />
                         ))}
                       </Box>
@@ -630,22 +670,23 @@ function ItemAttachmentsPanel({
                 }
               />
               <ListItem>
-                <Box sx={{ display: 'flex' }}>
+                <Box sx={{ display: "flex" }}>
                   {/* Per allegati nascosti, mostra un pulsante di ripristino se l'utente è autorizzato */}
-                  {attachment.IsVisible === false && canEditAttachment(attachment) && (
-                    <Tooltip title="Ripristina">
-                      <IconButton
-                        edge="end"
-                        aria-label="restore"
-                        onClick={() => handleRestore(attachment)}
-                        size="small"
-                        color="primary"
-                      >
-                        <RestoreIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  
+                  {attachment.IsVisible === false &&
+                    canEditAttachment(attachment) && (
+                      <Tooltip title="Ripristina">
+                        <IconButton
+                          edge="end"
+                          aria-label="restore"
+                          onClick={() => handleRestore(attachment)}
+                          size="small"
+                          color="primary"
+                        >
+                          <RestoreIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+
                   {/* Per gli allegati visibili, mostra le azioni standard */}
                   {attachment.IsVisible !== false && (
                     <>
@@ -671,7 +712,7 @@ function ItemAttachmentsPanel({
                       </Tooltip>
                     </>
                   )}
-                  
+
                   <IconButton
                     edge="end"
                     aria-label="more"
@@ -693,10 +734,10 @@ function ItemAttachmentsPanel({
   // Render del menu contestuale
   const renderMenu = () => {
     if (!selectedAttachment) return null;
-    
+
     const isOwner = canEditAttachment(selectedAttachment);
     const isVisible = selectedAttachment.IsVisible !== false;
-    
+
     return (
       <Menu
         anchorEl={menuAnchorEl}
@@ -709,7 +750,7 @@ function ItemAttachmentsPanel({
           </ListItemIcon>
           <ListItemText>Dettagli</ListItemText>
         </MenuItem>
-        
+
         {isVisible && (
           <MenuItem onClick={() => handleViewPreview(selectedAttachment)}>
             <ListItemIcon>
@@ -718,7 +759,7 @@ function ItemAttachmentsPanel({
             <ListItemText>Visualizza</ListItemText>
           </MenuItem>
         )}
-        
+
         {isVisible && (
           <MenuItem onClick={() => handleDownload(selectedAttachment)}>
             <ListItemIcon>
@@ -727,7 +768,7 @@ function ItemAttachmentsPanel({
             <ListItemText>Scarica</ListItemText>
           </MenuItem>
         )}
-        
+
         {isVisible && (
           <MenuItem onClick={() => handleVersions(selectedAttachment)}>
             <ListItemIcon>
@@ -736,7 +777,7 @@ function ItemAttachmentsPanel({
             <ListItemText>Versioni</ListItemText>
           </MenuItem>
         )}
-        
+
         {isOwner && isVisible && (
           <MenuItem onClick={() => handleShare(selectedAttachment)}>
             <ListItemIcon>
@@ -745,7 +786,7 @@ function ItemAttachmentsPanel({
             <ListItemText>Condividi</ListItemText>
           </MenuItem>
         )}
-        
+
         {isOwner && isVisible && (
           <MenuItem onClick={() => handleCategories(selectedAttachment)}>
             <ListItemIcon>
@@ -754,7 +795,7 @@ function ItemAttachmentsPanel({
             <ListItemText>Gestisci categorie</ListItemText>
           </MenuItem>
         )}
-        
+
         {isOwner && isVisible && (
           <>
             <Divider />
@@ -764,25 +805,25 @@ function ItemAttachmentsPanel({
               </ListItemIcon>
               <ListItemText>Modifica</ListItemText>
             </MenuItem>
-            
-            <MenuItem 
+
+            <MenuItem
               onClick={() => handleDelete(selectedAttachment)}
-              sx={{ color: 'error.main' }}
+              sx={{ color: "error.main" }}
             >
-              <ListItemIcon sx={{ color: 'error.main' }}>
+              <ListItemIcon sx={{ color: "error.main" }}>
                 <DeleteIcon fontSize="small" />
               </ListItemIcon>
               <ListItemText>Elimina</ListItemText>
             </MenuItem>
           </>
         )}
-        
+
         {isOwner && !isVisible && (
-          <MenuItem 
+          <MenuItem
             onClick={() => handleRestore(selectedAttachment)}
-            sx={{ color: 'success.main' }}
+            sx={{ color: "success.main" }}
           >
-            <ListItemIcon sx={{ color: 'success.main' }}>
+            <ListItemIcon sx={{ color: "success.main" }}>
               <RestoreIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText>Ripristina</ListItemText>
@@ -793,20 +834,20 @@ function ItemAttachmentsPanel({
   };
 
   return (
-    <Box sx={{ width: '100%' }}>
+    <Box sx={{ width: "100%" }}>
       {showHeader && (
         <Box sx={{ mb: 2 }}>
           <Typography variant="h6" component="div">
-            Allegati {itemCode ? `(Articolo ${itemCode})` : ''}
+            Allegati {itemCode ? `(Articolo ${itemCode})` : ""}
           </Typography>
           <Typography variant="body2" color="textSecondary">
             Gestisci i documenti e gli allegati associati a questo articolo
           </Typography>
         </Box>
       )}
-      
+
       {/* Azioni principali */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
         <Box>
           {!readOnly && (
             <Button
@@ -829,44 +870,44 @@ function ItemAttachmentsPanel({
             </Button>
           )}
         </Box>
-        
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+
+        <Box sx={{ display: "flex", alignItems: "center" }}>
           <Tooltip title="Aggiorna">
             <IconButton onClick={handleRefresh} size="small" sx={{ mr: 1 }}>
               <RefreshIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          
-          <Badge 
-            badgeContent={attachments.length} 
+
+          <Badge
+            badgeContent={attachments.length}
             color="primary"
             sx={{
-              '& .MuiBadge-badge': {
+              "& .MuiBadge-badge": {
                 right: -3,
                 top: 3,
               },
             }}
           >
             <Typography variant="body2">
-              {attachments.length === 1 
-                ? "1 allegato" 
+              {attachments.length === 1
+                ? "1 allegato"
                 : `${attachments.length} allegati`}
             </Typography>
           </Badge>
         </Box>
       </Box>
-      
+
       {/* Filtri */}
       {attachments.length > 0 && renderFilters()}
-      
+
       {/* Lista allegati */}
       {renderAttachmentsList()}
-      
+
       {/* Menu contestuale */}
       {renderMenu()}
-      
+
       {/* Dialog per i dettagli */}
-      {selectedAttachment && dialogOpen && dialogType === 'details' && (
+      {selectedAttachment && dialogOpen && dialogType === "details" && (
         <ItemAttachmentDetails
           open={dialogOpen}
           attachment={selectedAttachment}
@@ -877,9 +918,9 @@ function ItemAttachmentsPanel({
           onUpdate={handleDialogClose}
         />
       )}
-      
+
       {/* Dialog per le versioni */}
-      {selectedAttachment && dialogOpen && dialogType === 'versions' && (
+      {selectedAttachment && dialogOpen && dialogType === "versions" && (
         <ItemAttachmentVersions
           open={dialogOpen}
           attachment={selectedAttachment}
@@ -887,9 +928,9 @@ function ItemAttachmentsPanel({
           readOnly={!canEditAttachment(selectedAttachment)}
         />
       )}
-      
+
       {/* Dialog per la condivisione */}
-      {selectedAttachment && dialogOpen && dialogType === 'sharing' && (
+      {selectedAttachment && dialogOpen && dialogType === "sharing" && (
         <ItemAttachmentSharing
           open={dialogOpen}
           attachment={selectedAttachment}
@@ -897,9 +938,9 @@ function ItemAttachmentsPanel({
           readOnly={!canEditAttachment(selectedAttachment)}
         />
       )}
-      
+
       {/* Dialog per le categorie */}
-      {selectedAttachment && dialogOpen && dialogType === 'categories' && (
+      {selectedAttachment && dialogOpen && dialogType === "categories" && (
         <ItemAttachmentCategories
           open={dialogOpen}
           attachment={selectedAttachment}
@@ -907,7 +948,7 @@ function ItemAttachmentsPanel({
           readOnly={!canEditAttachment(selectedAttachment)}
         />
       )}
-      
+
       {/* Dialog per la conferma di eliminazione */}
       <Dialog
         open={confirmDeleteOpen}
@@ -916,18 +957,19 @@ function ItemAttachmentsPanel({
         <DialogTitle>Conferma eliminazione</DialogTitle>
         <DialogContent>
           <Typography>
-            Sei sicuro di voler eliminare l'allegato "{selectedAttachment?.FileName}"?
+            Sei sicuro di voler eliminare l'allegato "
+            {selectedAttachment?.FileName}"?
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            Questa operazione eseguirà una "soft delete" dell'allegato. L'allegato non sarà visibile ma potrà essere ripristinato in seguito.
+            Questa operazione eseguirà una "soft delete" dell'allegato.
+            L'allegato non sarà visibile ma potrà essere ripristinato in
+            seguito.
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDeleteOpen(false)}>
-            Annulla
-          </Button>
-          <Button 
-            onClick={handleConfirmDelete} 
+          <Button onClick={() => setConfirmDeleteOpen(false)}>Annulla</Button>
+          <Button
+            onClick={handleConfirmDelete}
             color="error"
             variant="contained"
           >
@@ -935,7 +977,7 @@ function ItemAttachmentsPanel({
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Dialog per la conferma di ripristino */}
       <Dialog
         open={confirmRestoreOpen}
@@ -944,18 +986,17 @@ function ItemAttachmentsPanel({
         <DialogTitle>Conferma ripristino</DialogTitle>
         <DialogContent>
           <Typography>
-            Sei sicuro di voler ripristinare l'allegato "{selectedAttachment?.FileName}"?
+            Sei sicuro di voler ripristinare l'allegato "
+            {selectedAttachment?.FileName}"?
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
             L'allegato sarà nuovamente visibile a tutti gli utenti autorizzati.
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmRestoreOpen(false)}>
-            Annulla
-          </Button>
-          <Button 
-            onClick={handleConfirmRestore} 
+          <Button onClick={() => setConfirmRestoreOpen(false)}>Annulla</Button>
+          <Button
+            onClick={handleConfirmRestore}
             color="success"
             variant="contained"
           >
@@ -963,7 +1004,7 @@ function ItemAttachmentsPanel({
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Uploader */}
       <ItemAttachmentUploader
         open={uploaderOpen}
@@ -981,7 +1022,7 @@ function ItemAttachmentsPanel({
             AttachmentID: selectedAttachment.AttachmentID,
             FileName: selectedAttachment.FileName,
             FileType: selectedAttachment.FileType,
-            FilePath: selectedAttachment.FilePath
+            FilePath: selectedAttachment.FilePath,
           }}
           isOpen={isPreviewOpen}
           onClose={() => setIsPreviewOpen(false)}

@@ -57,8 +57,6 @@ const addUpdateItem = async (action, companyId, itemData, userId, projectId = nu
         // Esecuzione della stored procedure
         await request.execute('MA_ProjectArticles_AddUpdateItem');
 
-        console.log('Executing MA_ProjectArticles_AddUpdateItem:', request.parameters);
-
         // Controllo errori
         const errorCode = request.parameters.ErrorCode.value ? request.parameters.ErrorCode.value : 0;
         if (errorCode !== 0) {
@@ -90,10 +88,6 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
         let pool = await sql.connect(config.dbConfig);
         const request = pool.request();
 
-        // Debug per vedere l'azione esatta e i dati ricevuti
-        console.log('Action received:', action, 'Type:', typeof action);
-        console.log('bomData received:', bomData);
-
         // Parametri obbligatori
         request.input('Action', sql.NVarChar(50), action);
         request.input('CompanyId', sql.Int, companyId);
@@ -104,8 +98,6 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
 
         // CASO 1: REPLACE_WITH_NEW_COMPONENT - Gestito per primo per evitare conflitti
         if (action === 'REPLACE_WITH_NEW_COMPONENT') {
-            console.log('Executing REPLACE_WITH_NEW_COMPONENT with data:', bomData);
-            
             request.input('Id', sql.BigInt, bomData.Id);
             request.input('ComponentLine', sql.Int, bomData.ComponentLine);
             
@@ -325,18 +317,8 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
         request.output('ErrorMessage', sql.NVarChar(4000));
         request.output('CreatedComponentCode', sql.VarChar(21)); 
 
-        // Debug
-        console.log('Executing MA_ProjectArticles_AddUpdateBOM:', request.parameters);
-        
         // Esecuzione della stored procedure
         await request.execute('MA_ProjectArticles_AddUpdateBOM');
-
-        // debug con ReturnValue, ErrorCode e ErrorMessage
-        console.log('MA_ProjectArticles_AddUpdateBOM results:', {
-            ReturnValue: request.parameters.ReturnValue.value,
-            ErrorCode: request.parameters.ErrorCode.value,
-            ErrorMessage: request.parameters.ErrorMessage.value
-        });
 
         // Controllo errori
         const errorCode = request.parameters.ErrorCode.value ? request.parameters.ErrorCode.value : 0;
@@ -367,8 +349,6 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
 
 const getBOMData = async (action, companyId, id, itemId = null, version = null, options = {}) => {
     try {
-        console.log('getBOMData called with:', { action, companyId, id, itemId, version, options });
-        
         let pool = await sql.connect(config.dbConfig);
         const request = pool.request();
 
@@ -379,10 +359,8 @@ const getBOMData = async (action, companyId, id, itemId = null, version = null, 
         // Parametri ID (o Id o ItemId)
         if (id) {
             request.input('Id', sql.BigInt, id);
-            console.log('Using Id for BOM lookup:', id);
         } else if (itemId) {
             request.input('ItemId', sql.BigInt, itemId);
-            console.log('Using ItemId for BOM lookup:', itemId);
             if (version) request.input('Version', sql.Int, version);
         } else {
             console.error('Neither Id nor ItemId provided for getBOMData');
@@ -399,11 +377,8 @@ const getBOMData = async (action, companyId, id, itemId = null, version = null, 
         request.output('ErrorCode', sql.Int);
         request.output('ErrorMessage', sql.NVarChar(4000));
 
-        console.log('Executing MA_ProjectArticles_GetBOMDatas with params:', request.parameters);
-        
         // Esecuzione della stored procedure
         const result = await request.execute('MA_ProjectArticles_GetBOMDatas');
-        console.log('SP execution complete');
 
         // Controllo errori
         const errorCode = request.parameters.ErrorCode.value ? request.parameters.ErrorCode.value : 0;
@@ -411,17 +386,6 @@ const getBOMData = async (action, companyId, id, itemId = null, version = null, 
             const errorMsg = request.parameters.ErrorMessage.value || `Error code: ${errorCode}`;
             console.error('Error returned from SP:', errorMsg);
             throw new Error(errorMsg);
-        }
-        
-        // Debug result recordsets
-        console.log('Result recordsets count:', result.recordsets ? result.recordsets.length : 0);
-        if (result.recordsets && result.recordsets.length > 0) {
-            result.recordsets.forEach((rs, i) => {
-                console.log(`Recordset ${i}: ${rs.length} records`);
-                if (rs.length > 0) {
-                    console.log('First record sample keys:', Object.keys(rs[0]));
-                }
-            });
         }
 
         // Gestione dei risultati in base all'azione
@@ -468,32 +432,6 @@ const getBOMData = async (action, companyId, id, itemId = null, version = null, 
             default:
                 console.error(`Invalid action: ${action}`);
                 throw new Error(`Invalid action: ${action}`);
-        }
-        
-        console.log('Processed result type:', processedResult ? typeof processedResult : 'null');
-        if (processedResult) {
-            if (Array.isArray(processedResult)) {
-                console.log('Result is array with length:', processedResult.length);
-            } else if (typeof processedResult === 'object') {
-                console.log('Result is object with keys:', Object.keys(processedResult));
-                if (processedResult.components) {
-                    console.log('Components count:', processedResult.components.length);
-                    if (processedResult.components.length > 0) {
-                        console.log('First component sample:', 
-                            JSON.stringify({
-                                Level: processedResult.components[0].Level,
-                                ComponentId: processedResult.components[0].ComponentId,
-                                ItemId: processedResult.components[0].ItemId,
-                                Path: processedResult.components[0].Path,
-                                ComponentItemCode: processedResult.components[0].ComponentItemCode
-                            })
-                        );
-                    }
-                }
-                if (processedResult.routing) {
-                    console.log('Routing count:', processedResult.routing.length);
-                }
-            }
         }
         
         return processedResult;
@@ -796,9 +734,7 @@ const getPaginatedItems = async (companyId, page = 0, pageSize = 50, filters = {
 const getItemById = async (companyId, itemId) => {
     try {
         let pool = await sql.connect(config.dbConfig);
-        // debug
-        console.log('getItemById:', { companyId, itemId });
-        
+
         if (!itemId) {
             console.error('getItemById: Missing itemId parameter');
             return null;
@@ -824,19 +760,12 @@ const getItemById = async (companyId, itemId) => {
                 WHERE i.CompanyId = @CompanyId AND i.Id = @Id
             `);
         
-        console.log('Item result rows:', itemResult.recordset.length);
-        
         if (itemResult.recordset.length === 0) {
-            console.log(`Item with ID ${itemId} not found for company ${companyId}`);
             return null;
         }
         
         const item = itemResult.recordset[0];
-        console.log('Item basic data:', {
-            Id: item.Id,
-            Item: item.Item,
-            Description: item.Description
-        });
+        
         
         try {
             // Query per i progetti associati
@@ -853,7 +782,6 @@ const getItemById = async (companyId, itemId) => {
                 `);
             
             item.projects = projectsResult.recordset;
-            console.log('Projects count:', item.projects.length);
         } catch (projErr) {
             console.error('Error fetching projects for item:', projErr);
             item.projects = [];
@@ -874,7 +802,6 @@ const getItemById = async (companyId, itemId) => {
                 `);
             
             item.boms = bomsResult.recordset;
-            console.log('BOMs count:', item.boms.length);
         } catch (bomErr) {
             console.error('Error fetching BOMs for item:', bomErr);
             item.boms = [];
@@ -910,7 +837,6 @@ const getItemById = async (companyId, itemId) => {
                 `);
             
             item.references = referencesResult.recordset;
-            console.log('References count:', item.references.length);
         } catch (refErr) {
             console.error('Error fetching references for item:', refErr);
             item.references = [];
@@ -1004,7 +930,6 @@ const getERPBOMs = async (companyId, searchText = '') => {
             })
         );
         
-        console.log('bomsWithComponents:', bomsWithComponents);
         return bomsWithComponents;
     } catch (err) {
         console.error('Error in getERPBOMs:', err);
@@ -1187,10 +1112,6 @@ const getReferenceBOMs = async (companyId, filters = {}, pagination = { page: 1,
 // Nuova implementazione della funzione reorderBOMComponents
 const reorderBOMComponents = async (companyId, bomId, components, userId) => {
     try {
-        console.log('REORDER_COMPONENTS - Parametri:', {
-            companyId, bomId, components, userId
-        });
-        
         let pool = await sql.connect(config.dbConfig);
         
         // Inizia una transazione
@@ -1220,8 +1141,6 @@ const reorderBOMComponents = async (companyId, bomId, components, userId) => {
                     SET Line = @TempLine
                     WHERE CompanyId = @CompanyId AND BOMId = @BOMId AND Line = @OldLine
                 `);
-                
-                console.log(`Componente ${oldLine} spostato temporaneamente a linea ${tempLine}`);
             }
             
             // Ora assegna le nuove linee definitive
@@ -1242,8 +1161,6 @@ const reorderBOMComponents = async (companyId, bomId, components, userId) => {
                     SET Line = @NewOrder
                     WHERE CompanyId = @CompanyId AND BOMId = @BOMId AND Line = @TempLine
                 `);
-                
-                console.log(`Componente temporaneo ${tempLine} spostato definitivamente a linea ${newOrder}`);
             }
             
             // Commit della transazione
@@ -1381,13 +1298,8 @@ const importERPItem = async (companyId, userId, projectId, erpItem, importBOM = 
         request.output('ErrorCode', sql.Int);
         request.output('ErrorMessage', sql.NVarChar(4000));
         
-        console.log('Request parameters before execution:', request.parameters);
-        
         // Esecuzione della stored procedure con gestione appropriata del risultato
         const result = await request.execute('MA_AddUpdateItemProjectFromERP');
-        
-        console.log('Stored procedure execution result:', result);
-        console.log('Request parameters after execution:', request.parameters);
         
         // Controllo errori
         const errorCode = request.parameters.ErrorCode.value || 0;
@@ -1400,7 +1312,6 @@ const importERPItem = async (companyId, userId, projectId, erpItem, importBOM = 
         
         // Estrazione corretta del valore di ritorno
         const returnValue = request.parameters.ReturnValue.value;
-        console.log('Return value:', returnValue);
         
         // Verifica esplicita del valore ritornato
         if (!returnValue || returnValue === 0) {
@@ -1713,10 +1624,6 @@ const copyBOMFromItem = async (companyId, targetItemId, sourceItemId = null, sou
 // Sostituisci un componente con un componente esistente
 const replaceComponent = async (companyId, bomId, componentLine, newComponentId, newComponentCode, userId) => {
     try {
-        console.log('REPLACE_COMPONENT - Parametri:', {
-            companyId, bomId, componentLine, newComponentId, newComponentCode, userId
-        });
-        
         let pool = await sql.connect(config.dbConfig);
         const request = pool.request();
         
@@ -1739,26 +1646,13 @@ const replaceComponent = async (companyId, bomId, componentLine, newComponentId,
         request.output('ErrorMessage', sql.NVarChar(4000));
         request.output('CreatedComponentCode', sql.VarChar(64));
         
-        // Debug - mostra tutti i parametri passati
-        console.log('Parametri della richiesta:', request.parameters);
-        
         // Execute the stored procedure
         const result = await request.execute('MA_ProjectArticles_AddUpdateBOM');
-        
-        // Debug - mostra i risultati completi
-        console.log('Risultato completo della stored procedure:', JSON.stringify(result, null, 2));
-        console.log('Parametri dopo l\'esecuzione:', request.parameters);
         
         // Controllo valori dei parametri di output
         const returnValue = request.parameters.ReturnValue.value || 0;
         const errorCode = request.parameters.ErrorCode.value || 0;
         const errorMessage = request.parameters.ErrorMessage.value || '';
-        
-        console.log('Risultati della sostituzione:', {
-            returnValue,
-            errorCode,
-            errorMessage
-        });
         
         // Check for errors
         if (errorCode !== 0) {
@@ -1778,11 +1672,9 @@ const replaceComponent = async (companyId, bomId, componentLine, newComponentId,
                 .input('CompanyId', sql.Int, companyId);
                 
             const checkResult = await checkRequest.query(checkQuery);
-            console.log('Verifica componente dopo sostituzione:', checkResult.recordset);
             
             if (checkResult.recordset && checkResult.recordset.length > 0) {
                 const componentIdAfterReplace = checkResult.recordset[0].ComponentId;
-                console.log('ComponentId dopo sostituzione:', componentIdAfterReplace);
                 
                 if (componentIdAfterReplace == newComponentId) {
                     // La sostituzione è avvenuta con successo nonostante i valori di ritorno null
@@ -1854,21 +1746,9 @@ const replaceWithNewComponent = async (companyId, bomId, componentLine, newCompo
         request.output('ErrorCode', sql.Int);
         request.output('ErrorMessage', sql.NVarChar(4000));
         request.output('CreatedComponentCode', sql.VarChar(64));
-        
-        // Debug
-        console.log('Request parameters before execution:', request.parameters);
 
         // Execute the stored procedure
         const spResult = await request.execute('MA_ProjectArticles_AddUpdateBOM');
-        
-        // Debug
-        console.log('Stored procedure execution result:', spResult);
-        console.log('Output parameters after execution:', {
-            ReturnValue: request.parameters.ReturnValue.value,
-            ErrorCode: request.parameters.ErrorCode.value, 
-            ErrorMessage: request.parameters.ErrorMessage.value,
-            CreatedComponentCode: request.parameters.CreatedComponentCode.value
-        });
         
         // Check for errors
         const errorCode = request.parameters.ErrorCode.value;

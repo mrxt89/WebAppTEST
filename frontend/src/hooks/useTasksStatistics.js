@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { config } from '../config';
+import { useState, useCallback } from "react";
+import { config } from "../config";
 
 /**
  * Hook personalizzato per ottenere statistiche sulle attività con filtri dinamici
@@ -17,41 +17,55 @@ const useTasksStatistics = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Costruisci i parametri della query dai filtri
       const queryParams = new URLSearchParams();
-      
-      if (filters.searchText) queryParams.append('searchText', filters.searchText);
-      if (filters.priority && filters.priority !== 'all') queryParams.append('priority', filters.priority);
-      if (filters.status && filters.status !== 'all') queryParams.append('status', filters.status);
-      if (filters.projectId && filters.projectId !== 'all') queryParams.append('projectId', filters.projectId);
-      if (filters.dueDate && filters.dueDate !== 'all') queryParams.append('dueDate', filters.dueDate);
-      if (filters.assignedTo) queryParams.append('assignedTo', filters.assignedTo);
-      
+
+      if (filters.searchText)
+        queryParams.append("searchText", filters.searchText);
+      if (filters.priority && filters.priority !== "all")
+        queryParams.append("priority", filters.priority);
+      if (filters.status && filters.status !== "all")
+        queryParams.append("status", filters.status);
+      if (filters.projectId && filters.projectId !== "all")
+        queryParams.append("projectId", filters.projectId);
+      if (filters.dueDate && filters.dueDate !== "all")
+        queryParams.append("dueDate", filters.dueDate);
+      if (filters.assignedTo)
+        queryParams.append("assignedTo", filters.assignedTo);
+
       // Ottieni token di autenticazione
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error('Utente non autenticato');
+        throw new Error("Utente non autenticato");
       }
-      
+
       // Esegui la richiesta API
-      const response = await fetch(`${config.API_BASE_URL}/tasks/statistics?${queryParams.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `${config.API_BASE_URL}/tasks/statistics?${queryParams.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         },
-      });
-      
+      );
+
       if (!response.ok) {
-        throw new Error('Errore nel recupero delle statistiche: ' + response.statusText);
+        throw new Error(
+          "Errore nel recupero delle statistiche: " + response.statusText,
+        );
       }
-      
+
       const data = await response.json();
       setStatistics(data);
       return data;
     } catch (err) {
-      console.error('Errore in getTasksStatistics:', err);
-      setError(err.message || 'Si è verificato un errore durante il recupero delle statistiche');
+      console.error("Errore in getTasksStatistics:", err);
+      setError(
+        err.message ||
+          "Si è verificato un errore durante il recupero delle statistiche",
+      );
       return null;
     } finally {
       setLoading(false);
@@ -74,16 +88,16 @@ const useTasksStatistics = () => {
         upcomingTasks: 0,
         byStatus: {},
         byPriority: {},
-        byAssignee: {}
+        byAssignee: {},
       };
     }
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const nextWeek = new Date(today);
     nextWeek.setDate(today.getDate() + 7);
-    
+
     // Statistiche di base
     const stats = {
       totalTasks: tasks.length,
@@ -93,34 +107,36 @@ const useTasksStatistics = () => {
       upcomingTasks: 0,
       byStatus: {},
       byPriority: {},
-      byAssignee: {}
+      byAssignee: {},
     };
-    
+
     // Analisi delle attività
-    tasks.forEach(task => {
+    tasks.forEach((task) => {
       // Statistiche per stato
       stats.byStatus[task.Status] = (stats.byStatus[task.Status] || 0) + 1;
-      
+
       // Statistiche per priorità
-      stats.byPriority[task.Priority] = (stats.byPriority[task.Priority] || 0) + 1;
-      
+      stats.byPriority[task.Priority] =
+        (stats.byPriority[task.Priority] || 0) + 1;
+
       // Statistiche per assegnatario
       if (task.AssignedToName) {
-        stats.byAssignee[task.AssignedToName] = (stats.byAssignee[task.AssignedToName] || 0) + 1;
+        stats.byAssignee[task.AssignedToName] =
+          (stats.byAssignee[task.AssignedToName] || 0) + 1;
       }
-      
+
       // Conteggi specifici
-      if (task.Status === 'COMPLETATA') {
+      if (task.Status === "COMPLETATA") {
         stats.completedTasks++;
-      } else if (task.Status === 'IN ESECUZIONE') {
+      } else if (task.Status === "IN ESECUZIONE") {
         stats.inProgressTasks++;
       }
-      
+
       // Attività in ritardo
-      if (task.Status !== 'COMPLETATA' && task.DueDate) {
+      if (task.Status !== "COMPLETATA" && task.DueDate) {
         const dueDate = new Date(task.DueDate);
         dueDate.setHours(0, 0, 0, 0);
-        
+
         if (dueDate < today) {
           stats.delayedTasks++;
         } else if (dueDate <= nextWeek) {
@@ -128,7 +144,7 @@ const useTasksStatistics = () => {
         }
       }
     });
-    
+
     return stats;
   }, []);
 
@@ -137,7 +153,7 @@ const useTasksStatistics = () => {
     calculateLocalStatistics,
     loading,
     error,
-    statistics
+    statistics,
   };
 };
 
