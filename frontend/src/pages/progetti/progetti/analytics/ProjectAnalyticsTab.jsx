@@ -102,8 +102,6 @@ const ProjectAnalyticsTab = ({ project, refreshProject }) => {
         if (allCosts.length > 0) {
           setCostData(allCosts);
           setForceRefresh(Date.now());
-        } else {
-          console.warn("Nessun costo trovato per le attività");
         }
       } catch (error) {
         console.error("Error loading analytics data:", error);

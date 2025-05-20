@@ -78,9 +78,7 @@ const AttachmentUploader = ({ notificationId, onAttachmentUploaded }) => {
           title: "Successo",
           text: "Allegato caricato con successo",
           icon: "success",
-          timer: 1500,
-          showProgressBar: true,
-          showConfirmButton: false,
+          timer: 1500
         });
       }
     } catch (error) {
