@@ -1315,14 +1315,6 @@ const ChatWindow = ({
           setZIndex(windowManager.getZIndex(windowId));
         }
 
-        // Only update position if not currently dragging and not updated by user
-        if (!isDraggingRef.current && !positionUpdatedByUserRef.current) {
-          setPosition({
-            x: windowState.x !== undefined ? windowState.x : initialX,
-            y: windowState.y !== undefined ? windowState.y : initialY,
-          });
-        }
-
         // Only update size if not currently resizing and not updated by user
         if (!isResizing && !sizeUpdatedByUserRef.current) {
           setSize({
