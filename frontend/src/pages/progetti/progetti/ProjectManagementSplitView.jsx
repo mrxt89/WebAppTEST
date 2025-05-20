@@ -683,7 +683,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         }, 300);
       }
     },
-    [projectId, selectedTask, addUpdateProjectTask, loadProject],
+    [projectId, selectedTask, addUpdateProjectTask, loadProject]
   );
 
   const updateMemberRole = async (memberData) => {
@@ -1034,113 +1034,24 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
           {/* Tab Team */}
           <TabsContent value="team" className="flex-1 mt-2">
             <Card className="h-full flex flex-col">
-              <CardHeader className="flex-none flex flex-row items-center justify-between">
-                {
-                  <Dialog
-                    open={isAddMemberDialogOpen}
-                    onOpenChange={setIsAddMemberDialogOpen}
-                  >
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="flex items-center gap-2">
-                        Aggiungi Utente
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Aggiungi utente al Team</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 pt-4">
-                        <div>
-                          <Label htmlFor="userSearch">Cerca utente</Label>
-                          <Input
-                            id="userSearch"
-                            placeholder="Cerca per nome o cognome..."
-                            value={userSearchQuery}
-                            onChange={(e) => setUserSearchQuery(e.target.value)}
-                            className="mb-2"
-                          />
-                          <Label htmlFor="userId">Utente</Label>
-                          <Select
-                            value={newMember.userId}
-                            onValueChange={(value) =>
-                              setNewMember({ ...newMember, userId: value })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleziona utente" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getFilteredUsers().map((user) => (
-                                <SelectItem
-                                  key={user.userId}
-                                  value={user.userId.toString()}
-                                >
-                                  {user.firstName} {user.lastName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="role">Ruolo</Label>
-                          <Select
-                            value={newMember.role}
-                            onValueChange={(value) =>
-                              setNewMember({ ...newMember, role: value })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleziona ruolo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ADMIN">Admin</SelectItem>
-                              <SelectItem value="MANAGER">Manager</SelectItem>
-                              <SelectItem value="USER">User</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <Button
-                          onClick={handleAddMember}
-                          className="w-full"
-                          disabled={!newMember.userId || !project}
-                        >
-                          Aggiungi al Team
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                }
+              <CardHeader>
+                <ProjectTeamSection
+                  project={project}
+                  users={users}
+                  isAddMemberDialogOpen={isAddMemberDialogOpen}
+                  setIsAddMemberDialogOpen={setIsAddMemberDialogOpen}
+                  newMember={newMember}
+                  setNewMember={setNewMember}
+                  handleAddMember={handleAddMember}
+                  handleRemoveMember={handleRemoveMember}
+                  updateMemberRole={updateMemberRole}
+                  currentUserId={currentUserId}
+                  userSearchQuery={userSearchQuery}
+                  setUserSearchQuery={setUserSearchQuery}
+                  getFilteredUsers={getFilteredUsers}
+                />
               </CardHeader>
-              <CardContent className="flex-1 overflow-y-auto min-h-0">
-                <div className="space-y-3">
-                  {project.members?.length > 0 ? (
-                    project.members.map((member) => (
-                      <TeamMemberWithRole
-                        key={member.ProjectMemberID}
-                        member={member}
-                        onRemove={
-                          checkAdminPermission(project)
-                            ? handleRemoveMember
-                            : handleRemoveMember
-                        }
-                        onRoleUpdate={updateMemberRole}
-                        canEditRole={canEditMemberRole(
-                          project,
-                          currentUserId,
-                          member.UserID,
-                        )}
-                        currentUserId={currentUserId}
-                      />
-                    ))
-                  ) : (
-                    <Alert>
-                      <AlertDescription>
-                        Nessun utente nel team.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-              </CardContent>
+              {/* La lista membri è ora gestita da ProjectTeamSection */}
             </Card>
           </TabsContent>
 

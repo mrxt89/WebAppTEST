@@ -190,18 +190,6 @@ const addUpdateProjectTask = async (taskData, userId) => {
         request.input('PredecessorTaskID', sql.Int, taskData.PredecessorTaskID || null);
         request.input('UserId', sql.Int, userId);
         request.input('AdditionalAssignees', sql.NVarChar(sql.MAX), taskData.AdditionalAssignees ? taskData.AdditionalAssignees : null);
-        console.log("[DEBUG] TaskID:", taskData.TaskID);
-        console.log("[DEBUG] ProjectID:", taskData.ProjectID);
-        console.log("[DEBUG] Title:", taskData.Title);  
-        console.log("[DEBUG] Description:", taskData.Description);
-        console.log("[DEBUG] AssignedTo:", taskData.AssignedTo);
-        console.log("[DEBUG] Priority:", taskData.Priority);
-        console.log("[DEBUG] Status:", taskData.Status);
-        console.log("[DEBUG] DueDate:", taskData.DueDate);
-        console.log("[DEBUG] StartDate:", taskData.StartDate);
-        console.log("[DEBUG] PredecessorTaskID:", taskData.PredecessorTaskID);
-        console.log("[DEBUG] AdditionalAssignees:", taskData.AdditionalAssignees);
-        
 
         const result = await request.execute('MA_AddUpdateProjectTask');
         console.log("[DEBUG] Result:", result.recordset[0]);
