@@ -128,7 +128,6 @@ const CreatePollForm = ({ notificationId, onSuccess, onCancel }) => {
         title: "Completato",
         text: "Sondaggio creato con successo",
         icon: "success",
-        zIndex: 9999,
       });
     } catch (error) {
       console.error("Error creating poll:", error);
@@ -136,7 +135,6 @@ const CreatePollForm = ({ notificationId, onSuccess, onCancel }) => {
         title: "Errore",
         text: "Si è verificato un errore durante la creazione del sondaggio",
         icon: "error",
-        zIndex: 9999,
       });
     } finally {
       setLoading(false);

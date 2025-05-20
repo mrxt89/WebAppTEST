@@ -194,7 +194,7 @@ const ProjectEditModalWithTemplate = ({
   // Gestione disabilitazione progetto
   const handleDisable = () => setConfirmModalOpen(true);
   const confirmDisable = () => {
-    onDisable();
+    onDisable(localProject.ProjectID);
     setConfirmModalOpen(false);
     onClose();
   };
@@ -433,15 +433,15 @@ const ProjectEditModalWithTemplate = ({
                 )}
               </div>
               <div className="flex-1">
-                <Label htmlFor="endDate" className="flex items-center">
-                  Data Fine <span className="text-red-500 ml-1">*</span>
+                <Label htmlFor="endDate">
+                  Data Fine
                 </Label>
                 <Input
                   id="endDate"
                   type="date"
-                  value={localProject.EndDate?.split("T")[0]}
+                  value={localProject.EndDate?.split("T")[0] || ""}
                   min={localProject.StartDate?.split("T")[0]}
-                  onChange={(e) => handleChange("EndDate", e.target.value)}
+                  onChange={(e) => handleChange("EndDate", e.target.value || null)}
                   className={formErrors?.EndDate ? "border-red-500" : ""}
                 />
                 {formErrors?.EndDate && (
