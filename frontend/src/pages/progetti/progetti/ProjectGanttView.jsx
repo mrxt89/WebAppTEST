@@ -88,19 +88,6 @@ const ProjectGanttView = ({
     showDelayed: false,
   });
 
-  // Debug render count
-  useEffect(() => {
-    renderCount.current++;
-    console.log(
-      `[GANTT] Render #${renderCount.current} (Normal React lifecycle)`,
-    );
-    return () => {
-      console.log(
-        `[GANTT] Component unmounted after render #${renderCount.current}`,
-      );
-    };
-  }, []);
-
   // Monitora l'elemento del container
   useEffect(() => {
     ganttContainerRef.current = document.querySelector(".gantt-container");
@@ -390,13 +377,6 @@ const ProjectGanttView = ({
   // Funzione diretta per l'aggiornamento della sequenza senza debounce
   const executeTaskSequenceUpdate = async (taskId, projectId, newIndex) => {
     try {
-      console.log(
-        "[GANTT] Esecuzione della chiamata updateTaskSequence:",
-        taskId,
-        projectId,
-        newIndex,
-      );
-
       // Assicurati che updateTaskSequence sia una funzione
       if (typeof updateTaskSequence !== "function") {
         console.error("[GANTT] updateTaskSequence non è una funzione");
@@ -405,7 +385,6 @@ const ProjectGanttView = ({
 
       // Effettua la chiamata API direttamente
       const result = await updateTaskSequence(taskId, projectId, newIndex);
-      console.log("[GANTT] Risultato updateTaskSequence:", result);
 
       // Se la chiamata ha avuto successo, aggiorna la UI
       if (result && result.success) {
@@ -424,33 +403,20 @@ const ProjectGanttView = ({
 
   // Callback per lo spostamento tramite drag (aggiorna la sequenza)
   const handleTaskMove = async (task, orderIndex) => {
-    // Evita di processare se questo click è già stato gestito
-    if (clickHandledRef.current) {
-      console.log("[GANTT] Click già gestito, ignoro");
-      return;
-    }
-
     // Imposta la flag di elaborazione immediata
     clickHandledRef.current = true;
     moveInProgress.current = true;
 
     // Stampo immediatamente per verificare la chiamata
     clickCount.current++;
-    console.log(
-      `[GANTT] handleTaskMove #${clickCount.current} chiamato con:`,
-      task,
-      orderIndex,
-    );
 
     try {
       // Converti l'ID del task da stringa a numero se necessario
       const taskId = typeof task.id === "string" ? parseInt(task.id) : task.id;
-      console.log("[GANTT] TaskID convertito:", taskId);
 
       // Trova il task originale usando l'ID corretto
       const originalTask = tasks.find((t) => t.TaskID === taskId);
       if (!originalTask) {
-        console.log("[GANTT] Task originale non trovato");
         moveInProgress.current = false;
         clickHandledRef.current = false;
         return;
@@ -458,7 +424,7 @@ const ProjectGanttView = ({
 
       // Controllo permessi
       if (!checkAdminPermission(project) && !isOwnTask(originalTask)) {
-        console.log("[GANTT] Permessi insufficienti");
+        console.error("Permessi insufficienti");
         swal.fire(
           "Attenzione",
           "Non hai i permessi per spostare questa attività",
@@ -479,20 +445,12 @@ const ProjectGanttView = ({
         }
       }
 
-      console.log(
-        "[GANTT] Chiamata diretta executeTaskSequenceUpdate con:",
-        taskId,
-        project.ProjectID,
-        orderIndex,
-      );
-
       // Usa la funzione diretta invece di quella debounced
       const result = await executeTaskSequenceUpdate(
         taskId,
         project.ProjectID,
         orderIndex,
       );
-      console.log("[GANTT] Risultato executeTaskSequenceUpdate:", result);
 
       if (result && result.success) {
         // Mostra una notifica di successo temporanea
@@ -516,9 +474,6 @@ const ProjectGanttView = ({
       setTimeout(() => {
         moveInProgress.current = false;
         clickHandledRef.current = false;
-        console.log(
-          "[GANTT] Operazione di spostamento completata, flag ripristinati",
-        );
       }, 800);
     }
   };
@@ -566,24 +521,17 @@ const ProjectGanttView = ({
 
   // Funzione per gestire il click sui pulsanti di riordinamento - Log aggiuntivi
   const handleMoveButtonClick = (e, task, direction) => {
-    // Debug iniziale
-    console.log("[GANTT] Button click:", direction, task.id);
     e.preventDefault();
     e.stopPropagation();
 
     // Verifica se è già in corso un'operazione di spostamento
     if (moveInProgress.current || clickHandledRef.current) {
-      console.log(
-        "[GANTT] Operazione di spostamento già in corso, ignoro la richiesta",
-      );
       return;
     }
 
     const taskIndex = ganttTasks.findIndex((t) => t.id === task.id);
-    console.log("[GANTT] Task index trovato:", taskIndex);
 
     if (taskIndex === -1) {
-      console.log("[GANTT] Task non trovato nella lista");
       return;
     }
 
@@ -592,12 +540,10 @@ const ProjectGanttView = ({
       (direction === "up" && taskIndex === 0) ||
       (direction === "down" && taskIndex === ganttTasks.length - 1)
     ) {
-      console.log("[GANTT] Movimento non valido: ai confini della lista");
       return;
     }
 
     const newIndex = direction === "up" ? taskIndex - 1 : taskIndex + 1;
-    console.log("[GANTT] Nuovo indice calcolato:", newIndex);
 
     // Imposta il flag di click elaborato immediatamente per evitare doppie elaborazioni
     clickHandledRef.current = true;
@@ -632,9 +578,6 @@ const ProjectGanttView = ({
         const targetTask = ganttTasks[newIndex].originalTask;
         newSequenceValue = parseInt(targetTask.TaskSequence);
       }
-
-      console.log("[GANTT] Valore della nuova sequenza:", newSequenceValue);
-      console.log("[GANTT] Avvio spostamento effettivo verso", direction);
 
       // Trasforma il task in un oggetto con TaskID numerico
       const taskId = parseInt(task.id);

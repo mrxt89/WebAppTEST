@@ -1,4 +1,2 @@
 - [x] Da verificare se template attività vengono caricati in base alla categoria inserita [si -> guarda ProjectEditModalWithTemplate riga 392 -> filteredTemplates(riga 203) ]
-- [ ] Frontend: Problemi aggiornamento gantt.
-- [ ] Problema cambio sequenza task su visualizzaizone Gantt.
 - [ ] Gestione allegati su Progetti/Attività
