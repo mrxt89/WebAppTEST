@@ -345,8 +345,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
       try {
         refreshInProgress.current = true;
         lastLoadedProjectId.current = projectId;
-        
-        console.log(`[PROJECT] Caricamento progetto ${projectId}${forceUpdate ? ' (forzato)' : ''}`);
 
         // Salva lo stato attuale dei task prima di aggiornare
         const currentTaskStates = {};
