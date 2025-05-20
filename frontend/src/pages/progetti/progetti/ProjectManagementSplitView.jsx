@@ -330,15 +330,23 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
   });
 
   const loadProject = useCallback(
-    async (callback) => {
+    async (forceUpdate = false, callback) => {
+      // Supporto per callback come primo parametro (retrocompatibilità)
+      if (typeof forceUpdate === 'function') {
+        callback = forceUpdate;
+        forceUpdate = false;
+      }
+      
       if (!isMounted.current || refreshInProgress.current) return;
 
-      // Evita di ricaricare lo stesso progetto se è già in corso
-      if (lastLoadedProjectId.current === projectId && project) return;
+      // Evita di ricaricare lo stesso progetto se è già in corso e non è forzato
+      if (!forceUpdate && lastLoadedProjectId.current === projectId && project) return;
 
       try {
         refreshInProgress.current = true;
         lastLoadedProjectId.current = projectId;
+        
+        console.log(`[PROJECT] Caricamento progetto ${projectId}${forceUpdate ? ' (forzato)' : ''}`);
 
         // Salva lo stato attuale dei task prima di aggiornare
         const currentTaskStates = {};
@@ -652,7 +660,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
           }
 
           // Aggiorna il progetto in background solo dopo aver gestito l'UI
-          await loadProject();
+          await loadProject(true);
 
           // Restituisci un oggetto di successo con il task aggiornato
           return { success: true, task: { ...completeTaskData } };
@@ -987,7 +995,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
                   tasks={project.tasks}
                   onTaskUpdate={handleTaskUpdate}
                   onTaskClick={handleTaskClick}
-                  refreshProject={loadProject}
+                  refreshProject={(callback) => loadProject(true, callback)}
                 />
               )}
               {tasksViewMode === "table" && (
@@ -1011,7 +1019,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
                   isOwnTask={isOwnTask}
                   updateTaskSequence={updateTaskSequence}
                   getProjectById={getProjectById}
-                  refreshProject={loadProject}
+                  refreshProject={(callback) => loadProject(true, callback)}
                   users={users}
                 />
               )}
@@ -1154,7 +1162,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
           <TabsContent value="analytics" className="flex-1 mt-2">
             <ProjectAnalyticsTab
               project={project}
-              refreshProject={loadProject}
+              refreshProject={(callback) => loadProject(true, callback)}
             />
           </TabsContent>
         </Tabs>
@@ -1169,12 +1177,12 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         onClose={() => {
           setIsTaskDialogOpen(false);
           setSelectedTask(null);
-          loadProject();
+          loadProject(true);
         }}
         onAddComment={handleAddComment}
         onUpdate={handleTaskUpdate}
         assignableUsers={users}
-        refreshProject={loadProject}
+        refreshProject={(callback) => loadProject(true, callback)}
       />
 
       <ProjectEditModalWithTemplate
