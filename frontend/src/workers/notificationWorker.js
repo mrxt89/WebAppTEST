@@ -61,20 +61,12 @@ function haveNotificationsChanged(newNotifications) {
     const newMsgCount = newNotif.messageCount || 0;
     const cachedMsgCount = cachedNotif.messageCount || 0;
 
-    if (newNotif.notificationId == 25) {
-      console.log("newMsgCount", newMsgCount);
-      console.log("cachedMsgCount", cachedMsgCount);
-      console.log("newNotif", newNotif);
-      console.log("cachedNotif", cachedNotif);
-    }
-
     // Prendo dalla cche data ora dell'ultimo messaggio ricevuto (lastMessage)
     const newLastMessageDate = new Date(newNotif.lastMessage);
     const cachedLastMessageDate = new Date(cachedNotif.lastMessage);
 
     // Se la data dell'ultimo messaggio è più recente di quella in cache, allora ho un nuovo messaggio
     if (newLastMessageDate > cachedLastMessageDate) {
-      console.log("Nuova notifica con un messaggio più recente");
       hasChanges = true;
     }
 
