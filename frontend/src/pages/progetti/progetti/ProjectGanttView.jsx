@@ -1068,17 +1068,30 @@ const ProjectGanttView = ({
   );
 };
 
-// Ottimizzazione per evitare re-render inutili
+// Ottimizzazione per evitare re-render inutili, ma garantendo aggiornamenti quando necessario
 export default React.memo(ProjectGanttView, (prevProps, nextProps) => {
   // Controlla se le props principali sono cambiate
+  // Verifica più completa includendo tutti i campi rilevanti dei task
   const tasksUnchanged =
     prevProps.tasks.length === nextProps.tasks.length &&
     JSON.stringify(
-      prevProps.tasks.map((t) => t.TaskID + "-" + t.TaskSequence),
+      prevProps.tasks.map((t) => ({
+        id: t.TaskID,
+        seq: t.TaskSequence,
+        start: t.StartDate,
+        end: t.DueDate,
+        status: t.Status
+      }))
     ) ===
-      JSON.stringify(
-        nextProps.tasks.map((t) => t.TaskID + "-" + t.TaskSequence),
-      );
+    JSON.stringify(
+      nextProps.tasks.map((t) => ({
+        id: t.TaskID,
+        seq: t.TaskSequence,
+        start: t.StartDate,
+        end: t.DueDate,
+        status: t.Status
+      }))
+    );
 
   const projectUnchanged =
     prevProps.project.ProjectID === nextProps.project.ProjectID;
