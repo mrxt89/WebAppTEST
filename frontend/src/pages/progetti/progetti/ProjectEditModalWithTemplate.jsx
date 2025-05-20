@@ -16,7 +16,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2 } from "lucide-react";
+import { 
+  Trash2, 
+  FileText, 
+  User, 
+  Calendar, 
+  Bookmark, 
+  Tag, 
+  ListTodo, 
+  Info,
+  Hash
+} from "lucide-react";
 import useCategoryActions from "../../../hooks/useCategoryActions";
 import { CustomerSearchSelect } from "./ProjectComponents";
 import useTemplateActions from "../../../hooks/useTemplateActions";
@@ -218,262 +228,322 @@ const ProjectEditModalWithTemplate = ({
     ? projectStatuses.filter((status) => status.IsActive === 1)
     : [];
 
-  // Funzione per ottenere il nome del template selezionato
-  const getSelectedTemplateName = () => {
-    if (selectedTemplateId === null) return "Nessun template";
-    const template = templates.find((t) => t.TemplateID === selectedTemplateId);
-    return template ? template.Description : "Template selezionato";
-  };
-
   if (!localProject) return null;
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle>
+        <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-2 mb-2 shrink-0">
+            <DialogTitle className="text-xl font-semibold">
               {project?.ProjectID ? "Modifica Progetto" : "Nuovo Progetto"}
             </DialogTitle>
             {project?.ProjectID && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-red-500 hover:text-red-700 hover:bg-red-100"
+                className="text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
                 onClick={handleDisable}
+                title="Disabilita progetto"
               >
                 <Trash2 className="h-5 w-5" />
               </Button>
             )}
           </DialogHeader>
 
-          <div className="space-y-4 pt-4">
-            <div>
-              <Label htmlFor="name" className="flex items-center">
-                Nome Progetto <span className="text-red-500 ml-1">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={localProject.Name}
-                onChange={(e) => handleChange("Name", e.target.value)}
-                className={formErrors?.Name ? "border-red-500" : ""}
-              />
-              {formErrors?.Name && (
-                <p className="text-sm text-red-500 mt-1">{formErrors.Name}</p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="projectErpId">ID ERP</Label>
-              <Input
-                id="projectErpId"
-                value={localProject.ProjectErpID}
-                onChange={(e) => handleChange("ProjectErpID", e.target.value)}
-                placeholder="Inserisci ID ERP"
-              />
-            </div>
-            <div>
-              <Label htmlFor="description">Descrizione</Label>
-              <Textarea
-                id="description"
-                value={localProject.Description}
-                onChange={(e) => handleChange("Description", e.target.value)}
-                rows={4}
-              />
-            </div>
-            <div>
-              <Label htmlFor="customer">Cliente</Label>
-              <CustomerSearchSelect
-                value={localProject.CustSupp}
-                onChange={(value) => handleChange("CustSupp", value)}
-                projectCustomers={projectCustomers}
-                loading={loadingCustomers}
-              />
-            </div>
-            <div>
-              <Label htmlFor="status">Stato</Label>
-              <Select
-                value={localProject.Status}
-                onValueChange={(value) => handleChange("Status", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona stato" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeStatuses.map((status) => (
-                    <SelectItem key={status.Id} value={status.Id}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: status.HexColor }}
-                        />
-                        {status.StatusDescription}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="category">Categoria</Label>
-              <Select
-                value={selectedCategory?.toString() || "0"}
-                onValueChange={handleCategoryChange}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleziona categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">Nessuna categoria</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem
-                      key={category.ProjectCategoryId}
-                      value={category.ProjectCategoryId.toString()}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: category.HexColor }}
-                        />
-                        {category.Description}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedCategory > 0 &&
-              categories.find((c) => c.ProjectCategoryId === selectedCategory)
-                ?.details?.length > 0 && (
+          <div className="space-y-3 pt-0 overflow-y-auto pr-2">
+            {/* Dati principali */}
+            <div className="bg-gray-50 p-3 rounded-lg space-y-3">
+              <h3 className="text-xs font-medium text-gray-500">Informazioni principali</h3>
+              
+              <div className="grid grid-cols-1 gap-3">
                 <div>
-                  <Label htmlFor="subcategory">Sottocategoria</Label>
-                  <Select
-                    value={selectedSubcategory?.toString() || "0"}
-                    onValueChange={handleSubcategoryChange}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Seleziona sottocategoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">Nessuna sottocategoria</SelectItem>
-                      {categories
-                        .find((c) => c.ProjectCategoryId === selectedCategory)
-                        ?.details?.filter((d) => !d.Disabled)
-                        ?.map((subcategory) => (
-                          <SelectItem
-                            key={subcategory.Line}
-                            value={subcategory.Line.toString()}
-                          >
-                            {subcategory.Description}
+                  <Label htmlFor="name" className="flex items-center text-sm">
+                    <FileText className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                    Nome Progetto <span className="text-red-500 ml-1">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    value={localProject.Name}
+                    onChange={(e) => handleChange("Name", e.target.value)}
+                    className={`mt-1 ${formErrors?.Name ? "border-red-500" : ""}`}
+                    placeholder="Inserisci nome progetto"
+                  />
+                  {formErrors?.Name && (
+                    <p className="text-xs text-red-500 mt-0.5">{formErrors.Name}</p>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="projectErpId" className="flex items-center text-sm">
+                      <Hash className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                      ID ERP
+                    </Label>
+                    <Input
+                      id="projectErpId"
+                      value={localProject.ProjectErpID}
+                      onChange={(e) => handleChange("ProjectErpID", e.target.value)}
+                      placeholder="Inserisci ID ERP"
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="status" className="flex items-center text-sm">
+                      <Bookmark className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                      Stato
+                    </Label>
+                    <Select
+                      value={localProject.Status}
+                      onValueChange={(value) => handleChange("Status", value)}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Seleziona stato" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {activeStatuses.map((status) => (
+                          <SelectItem key={status.Id} value={status.Id}>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: status.HexColor }}
+                              />
+                              {status.StatusDescription}
+                            </div>
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Dettagli progetto */}
+              <div className="bg-gray-50 p-3 rounded-lg space-y-3">
+                <h3 className="text-xs font-medium text-gray-500">Dettagli</h3>
+                
+                <div>
+                  <Label htmlFor="description" className="flex items-center text-sm">
+                    <Info className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                    Descrizione
+                  </Label>
+                  <Textarea
+                    id="description"
+                    value={localProject.Description}
+                    onChange={(e) => handleChange("Description", e.target.value)}
+                    rows={2}
+                    className="mt-1"
+                    placeholder="Inserisci descrizione progetto"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="customer" className="flex items-center text-sm">
+                    <User className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                    Cliente
+                  </Label>
+                  <CustomerSearchSelect
+                    value={localProject.CustSupp}
+                    onChange={(value) => handleChange("CustSupp", value)}
+                    projectCustomers={projectCustomers}
+                    loading={loadingCustomers}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              
+              {/* Date */}
+              <div className="bg-gray-50 p-3 rounded-lg space-y-3">
+                <h3 className="text-xs font-medium text-gray-500">Date</h3>
+                
+                <div>
+                  <Label htmlFor="startDate" className="flex items-center text-sm">
+                    <Calendar className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                    Data Inizio <span className="text-red-500 ml-1">*</span>
+                  </Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={localProject.StartDate?.split("T")[0]}
+                    onChange={(e) => handleChange("StartDate", e.target.value)}
+                    className={`mt-1 ${formErrors?.StartDate ? "border-red-500" : ""}`}
+                  />
+                  {formErrors?.StartDate && (
+                    <p className="text-xs text-red-500 mt-0.5">
+                      {formErrors.StartDate}
+                    </p>
+                  )}
+                </div>
+                
+                <div>
+                  <Label htmlFor="endDate" className="flex items-center text-sm">
+                    <Calendar className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                    Data Fine
+                  </Label>
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={localProject.EndDate?.split("T")[0] || ""}
+                    min={localProject.StartDate?.split("T")[0]}
+                    onChange={(e) => handleChange("EndDate", e.target.value || null)}
+                    className={`mt-1 ${formErrors?.EndDate ? "border-red-500" : ""}`}
+                  />
+                  {formErrors?.EndDate && (
+                    <p className="text-xs text-red-500 mt-0.5">
+                      {formErrors.EndDate}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Classificazione e template */}
+            <div className="bg-gray-50 p-3 rounded-lg space-y-3">
+              <h3 className="text-xs font-medium text-gray-500">Classificazione e template</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="category" className="flex items-center text-sm">
+                    <Tag className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                    Categoria
+                  </Label>
+                  <Select
+                    value={selectedCategory?.toString() || "0"}
+                    onValueChange={handleCategoryChange}
+                  >
+                    <SelectTrigger className="w-full mt-1">
+                      <SelectValue placeholder="Seleziona categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Nessuna categoria</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem
+                          key={category.ProjectCategoryId}
+                          value={category.ProjectCategoryId.toString()}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: category.HexColor }}
+                            />
+                            {category.Description}
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-              )}
 
-            {/* Selezione template ottimizzata */}
-            <div>
-              <Label htmlFor="template">Template di Attività</Label>
-              <Select
-                value={
-                  selectedTemplateId !== null
-                    ? selectedTemplateId.toString()
-                    : "0"
-                }
-                onValueChange={handleTemplateChange}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleziona template" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">Nessun template</SelectItem>
-                  {filteredTemplates.map((template) => (
-                    <SelectItem
-                      key={template.TemplateID}
-                      value={template.TemplateID.toString()}
-                      style={{
-                        display: template.IsActive == "1" ? "block" : "none",
-                      }}
-                    >
-                      {template.Description}{" "}
-                      {template.TaskCount > 0
-                        ? `(${template.TaskCount} attività)`
-                        : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {selectedCategory > 0 &&
+                  categories.find((c) => c.ProjectCategoryId === selectedCategory)
+                    ?.details?.length > 0 ? (
+                    <div>
+                      <Label htmlFor="subcategory" className="flex items-center text-sm">
+                        <Tag className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                        Sottocategoria
+                      </Label>
+                      <Select
+                        value={selectedSubcategory?.toString() || "0"}
+                        onValueChange={handleSubcategoryChange}
+                      >
+                        <SelectTrigger className="w-full mt-1">
+                          <SelectValue placeholder="Seleziona sottocategoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Nessuna sottocategoria</SelectItem>
+                          {categories
+                            .find((c) => c.ProjectCategoryId === selectedCategory)
+                            ?.details?.filter((d) => !d.Disabled)
+                            ?.map((subcategory) => (
+                              <SelectItem
+                                key={subcategory.Line}
+                                value={subcategory.Line.toString()}
+                              >
+                                {subcategory.Description}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="hidden md:block">
+                      {/* Spazio vuoto nel caso non ci siano sottocategorie */}
+                    </div>
+                  )}
 
-              {selectedTemplateId && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Le attività verranno create automaticamente in base al
-                  template selezionato.
-                </p>
-              )}
-            </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="template" className="flex items-center text-sm">
+                    <ListTodo className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                    Template di Attività
+                  </Label>
+                  <Select
+                    value={
+                      selectedTemplateId !== null
+                        ? selectedTemplateId.toString()
+                        : "0"
+                    }
+                    onValueChange={handleTemplateChange}
+                  >
+                    <SelectTrigger className="w-full mt-1">
+                      <SelectValue placeholder="Seleziona template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Nessun template</SelectItem>
+                      {filteredTemplates.map((template) => (
+                        <SelectItem
+                          key={template.TemplateID}
+                          value={template.TemplateID.toString()}
+                          style={{
+                            display: template.IsActive == "1" ? "block" : "none",
+                          }}
+                        >
+                          {template.Description}{" "}
+                          {template.TaskCount > 0
+                            ? `(${template.TaskCount} attività)`
+                            : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <Label htmlFor="startDate" className="flex items-center">
-                  Data Inizio <span className="text-red-500 ml-1">*</span>
-                </Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={localProject.StartDate?.split("T")[0]}
-                  onChange={(e) => handleChange("StartDate", e.target.value)}
-                  className={formErrors?.StartDate ? "border-red-500" : ""}
-                />
-                {formErrors?.StartDate && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {formErrors.StartDate}
-                  </p>
-                )}
+                  {selectedTemplateId && (
+                    <p className="text-xs text-gray-500 mt-1 px-2 py-1 bg-blue-50 rounded border border-blue-100">
+                      <Info className="h-3 w-3 inline mr-1" />
+                      Le attività verranno create automaticamente dal template.
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="flex-1">
-                <Label htmlFor="endDate">
-                  Data Fine
-                </Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={localProject.EndDate?.split("T")[0] || ""}
-                  min={localProject.StartDate?.split("T")[0]}
-                  onChange={(e) => handleChange("EndDate", e.target.value || null)}
-                  className={formErrors?.EndDate ? "border-red-500" : ""}
-                />
-                {formErrors?.EndDate && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {formErrors.EndDate}
-                  </p>
-                )}
-              </div>
             </div>
+          </div>
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={onClose}>
-                Annulla
-              </Button>
-              <Button onClick={() => onSave(localProject)}>
-                {project?.ProjectID ? "Salva Modifiche" : "Crea Progetto"}
-              </Button>
-            </div>
+          <div className="flex justify-end gap-3 pt-2 mt-2 border-t shrink-0">
+            <Button variant="outline" onClick={onClose} className="px-4">
+              Annulla
+            </Button>
+            <Button onClick={() => onSave(localProject)} className="px-5 shadow-sm">
+              {project?.ProjectID ? "Salva Modifiche" : "Crea Progetto"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
         <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle className="text-red-600">Sei sicuro?</DialogTitle>
+          <DialogHeader className="border-b pb-3 mb-3">
+            <DialogTitle className="text-red-600 flex items-center">
+              <Trash2 className="h-5 w-5 mr-2" />
+              Sei sicuro?
+            </DialogTitle>
           </DialogHeader>
           <p className="text-gray-700">
             Il progetto verrà disabilitato. Questa azione non può essere
             annullata!
           </p>
-          <div className="flex justify-end gap-2 mt-4">
+          <div className="flex justify-end gap-2 mt-4 pt-2 border-t">
             <Button
               variant="outline"
               onClick={() => setConfirmModalOpen(false)}

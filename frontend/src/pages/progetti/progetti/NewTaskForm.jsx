@@ -28,7 +28,16 @@ import { Badge } from "@/components/ui/badge";
 import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, User } from "lucide-react";
+import { 
+  Users, 
+  User, 
+  FileText, 
+  Calendar, 
+  ListTodo,
+  Clock,
+  AlertTriangle,
+  Flag
+} from "lucide-react";
 import { config } from "../../../config";
 import useUsers from "../../../hooks/useUsersActions";
 import { swal } from "../../../lib/common";
@@ -236,379 +245,451 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Label htmlFor="taskTitle">Titolo *</Label>
-        <Input
-          id="taskTitle"
-          value={taskData.Title}
-          onChange={(e) => setTaskData({ ...taskData, Title: e.target.value })}
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="taskDescription">Descrizione</Label>
-        <Textarea
-          id="taskDescription"
-          value={taskData.Description}
-          onChange={(e) =>
-            setTaskData({ ...taskData, Description: e.target.value })
-          }
-        />
-      </div>
-
-      {/* Tabs per la selezione dell'assegnazione */}
-      <div>
-        <Label className="mb-2 block">Tipo di assegnazione</Label>
-        <Tabs
-          value={assignmentType}
-          onValueChange={setAssignmentType}
-          className="w-full"
-        >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="individual" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span>Utente</span>
-            </TabsTrigger>
-            <TabsTrigger value="group" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span>Gruppo</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="individual" className="pt-4">
+    <div className="flex flex-col max-h-[70vh]">
+      <div className="border-b-2 border-black mb-2" />
+      <ScrollArea className="flex-grow overflow-y-auto pr-2">
+        <div className="space-y-3 pb-2">
+          {/* Dati principali */}
+          <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+            <h3 className="text-xs font-medium text-gray-500">Informazioni attività</h3>
+            
             <div>
-              <Label htmlFor="taskAssignedTo">Responsabile *</Label>
-              <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={openCombobox}
-                    className="w-full justify-between"
-                  >
-                    {taskData.AssignedTo
-                      ? getSelectedUser(taskData.AssignedTo)
-                        ? `${getSelectedUser(taskData.AssignedTo).firstName} ${getSelectedUser(taskData.AssignedTo).lastName}`
-                        : "Seleziona responsabile"
-                      : "Seleziona responsabile"}
-                    <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-full p-0"
-                  style={{ height: "40vh" }}
-                >
-                  <Command>
-                    <CommandInput
-                      placeholder="Cerca per nome, cognome o ruolo..."
-                      value={searchValue}
-                      onValueChange={setSearchValue}
-                    />
-                    <CommandEmpty>Nessun utente trovato.</CommandEmpty>
-                    <CommandGroup className="max-h-[100px] overflow-auto">
-                      {filterUsers.map((user) => (
-                        <CommandItem
-                          key={user.userId}
-                          value={user.userId.toString()}
-                          onSelect={(value) => {
-                            setTaskData((prev) => ({
-                              ...prev,
-                              AssignedTo: value,
-                              DefaultGroupId: null,
-                            }));
-                            setOpenCombobox(false);
-                            setSearchValue("");
-                          }}
-                        >
-                          <CheckIcon
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              taskData.AssignedTo === user.userId.toString()
-                                ? "opacity-100"
-                                : "opacity-0",
-                            )}
-                          />
-                          {user.firstName} {user.lastName} - {user.role}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="group" className="pt-4 space-y-4">
-            <div>
-              <Label htmlFor="taskGroupId">Gruppo *</Label>
-              <Select
-                value={selectedGroupId?.toString() || "null"}
-                onValueChange={handleGroupChange}
-                disabled={isLoadingGroups}
-              >
-                <SelectTrigger className="w-full" id="taskGroupId">
-                  <SelectValue
-                    placeholder={
-                      isLoadingGroups
-                        ? "Caricamento gruppi..."
-                        : "Seleziona gruppo"
-                    }
-                  >
-                    {selectedGroupId
-                      ? getSelectedGroup(selectedGroupId)?.groupName
-                      : "Seleziona gruppo"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="null">Nessun gruppo</SelectItem>
-                  {availableGroups.map((group) => (
-                    <SelectItem
-                      key={group.groupId}
-                      value={group.groupId.toString()}
-                    >
-                      <div className="flex items-center">
-                        <Users className="h-4 w-4 mr-2" />
-                        <span>
-                          {group.groupName} - {group.description}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500 mt-1">
-                L'attività verrà assegnata a tutti i membri del gruppo
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="groupAssignedTo">Responsabile principale *</Label>
-              <Popover
-                open={openCombobox && assignmentType === "group"}
-                onOpenChange={setOpenCombobox}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={openCombobox && assignmentType === "group"}
-                    className="w-full justify-between"
-                    disabled={!selectedGroupId}
-                  >
-                    {taskData.AssignedTo && assignmentType === "group"
-                      ? getSelectedUser(taskData.AssignedTo)
-                        ? `${getSelectedUser(taskData.AssignedTo).firstName} ${getSelectedUser(taskData.AssignedTo).lastName}`
-                        : "Seleziona responsabile"
-                      : "Seleziona responsabile"}
-                    <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandInput
-                      placeholder="Cerca per nome, cognome o ruolo..."
-                      value={searchValue}
-                      onValueChange={setSearchValue}
-                    />
-                    <CommandEmpty>Nessun utente trovato.</CommandEmpty>
-                    <CommandGroup className="max-h-[100px] overflow-auto">
-                      {filterUsers.map((user) => (
-                        <CommandItem
-                          key={user.userId}
-                          value={user.userId.toString()}
-                          onSelect={(value) => {
-                            setTaskData((prev) => ({
-                              ...prev,
-                              AssignedTo: value,
-                            }));
-                            setOpenCombobox(false);
-                            setSearchValue("");
-                          }}
-                        >
-                          <CheckIcon
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              taskData.AssignedTo === user.userId.toString()
-                                ? "opacity-100"
-                                : "opacity-0",
-                            )}
-                          />
-                          {user.firstName} {user.lastName} - {user.role}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* Mostra partecipanti solo se è selezionato "individual" */}
-      {assignmentType === "individual" && (
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <Label>Partecipanti</Label>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="showSelected"
-                className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
-                checked={showSelectedOnly}
-                onCheckedChange={(checked) => setShowSelectedOnly(checked)}
-              />
-              <Label
-                htmlFor="showSelected"
-                className="text-sm text-gray-500 cursor-pointer"
-              >
-                Mostra solo selezionati
+              <Label htmlFor="taskTitle" className="flex items-center text-sm">
+                <FileText className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                Titolo <span className="text-red-500 ml-1">*</span>
               </Label>
+              <Input
+                id="taskTitle"
+                value={taskData.Title}
+                onChange={(e) => setTaskData({ ...taskData, Title: e.target.value })}
+                className="mt-1"
+                placeholder="Inserisci titolo attività"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="taskDescription" className="flex items-center text-sm">
+                <FileText className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                Descrizione
+              </Label>
+              <Textarea
+                id="taskDescription"
+                value={taskData.Description}
+                onChange={(e) =>
+                  setTaskData({ ...taskData, Description: e.target.value })
+                }
+                className="mt-1"
+                placeholder="Inserisci descrizione dell'attività"
+                rows={2}
+              />
             </div>
           </div>
-          <ScrollArea className="h-[100px] border rounded-md">
-            <div className="p-2">
-              {filteredParticipants.map((user) => (
-                <div
-                  key={user.userId}
-                  className="flex items-center space-x-2 hover:bg-gray-100 p-2 rounded"
-                >
-                  <Checkbox
-                    className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
-                    checked={taskData.Participants.includes(
-                      user.userId.toString(),
-                    )}
-                    onCheckedChange={(checked) => {
-                      setTaskData((prev) => ({
-                        ...prev,
-                        Participants: checked
-                          ? [...prev.Participants, user.userId.toString()]
-                          : prev.Participants.filter(
-                              (id) => id !== user.userId.toString(),
-                            ),
-                      }));
-                    }}
-                    id={`user-${user.userId}`}
-                  />
-                  <Label
-                    htmlFor={`user-${user.userId}`}
-                    className="flex-grow cursor-pointer text-sm"
-                  >
-                    {user.firstName} {user.lastName} - {user.role}
-                  </Label>
-                </div>
-              ))}
+
+          {/* Date e priorità */}
+          <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+            <h3 className="text-xs font-medium text-gray-500">Date e priorità</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="taskStartDate" className="flex items-center text-sm">
+                  <Calendar className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                  Data Inizio <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <Input
+                  id="taskStartDate"
+                  type="date"
+                  value={taskData.StartDate}
+                  onChange={(e) => {
+                    const startDate = e.target.value;
+                    setTaskData((prev) => ({
+                      ...prev,
+                      StartDate: startDate,
+                      DueDate:
+                        prev.DueDate && prev.DueDate < startDate
+                          ? startDate
+                          : prev.DueDate,
+                    }));
+                  }}
+                  className="mt-1"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="taskDueDate" className="flex items-center text-sm">
+                  <Clock className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                  Data Scadenza <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <Input
+                  id="taskDueDate"
+                  type="date"
+                  value={taskData.DueDate}
+                  min={taskData.StartDate}
+                  onChange={(e) =>
+                    setTaskData({ ...taskData, DueDate: e.target.value })
+                  }
+                  className="mt-1"
+                />
+              </div>
             </div>
-          </ScrollArea>
-        </div>
-      )}
 
-      <div>
-        <Label htmlFor="predecessorTask">Attività Precedente</Label>
-        <Select
-          value={taskData.PredecessorTaskID?.toString() || "0"}
-          onValueChange={(value) =>
-            setTaskData((prev) => ({
-              ...prev,
-              PredecessorTaskID: value === "0" ? null : parseInt(value),
-            }))
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Seleziona predecessore" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0">Nessuna attività collegata</SelectItem>
-            {projectTasks.map((t) => (
-              <SelectItem key={t.TaskID} value={t.TaskID.toString()}>
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={
-                        t.Status === "COMPLETATA"
-                          ? "bg-green-100 text-green-700"
-                          : t.Status === "IN ESECUZIONE"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-gray-100 text-gray-700"
-                      }
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="taskPriority" className="flex items-center text-sm">
+                  <Flag className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                  Priorità
+                </Label>
+                <Select
+                  value={taskData.Priority}
+                  onValueChange={(value) =>
+                    setTaskData({ ...taskData, Priority: value })
+                  }
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Seleziona priorità" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BASSA">
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                        Bassa
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="MEDIA">
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                        Media
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ALTA">
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                        Alta
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="predecessorTask" className="flex items-center text-sm">
+                  <ListTodo className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                  Attività Precedente
+                </Label>
+                <Select
+                  value={taskData.PredecessorTaskID?.toString() || "0"}
+                  onValueChange={(value) =>
+                    setTaskData((prev) => ({
+                      ...prev,
+                      PredecessorTaskID: value === "0" ? null : parseInt(value),
+                    }))
+                  }
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Seleziona predecessore" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Nessuna attività collegata</SelectItem>
+                    {projectTasks.map((t) => (
+                      <SelectItem key={t.TaskID} value={t.TaskID.toString()}>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className={
+                                t.Status === "COMPLETATA"
+                                  ? "bg-green-100 text-green-700"
+                                  : t.Status === "IN ESECUZIONE"
+                                    ? "bg-blue-100 text-blue-700"
+                                    : "bg-gray-100 text-gray-700"
+                              }
+                            >
+                              {t.Status}
+                            </Badge>
+                            <span className="font-medium truncate">{t.Title}</span>
+                          </div>
+                          <div className="flex gap-2 text-xs text-gray-500">
+                            <span>
+                              Inizio: {new Date(t.StartDate).toLocaleDateString()}
+                            </span>
+                            <span>→</span>
+                            <span>
+                              Fine: {new Date(t.DueDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Assegnazione */}
+          <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+            <h3 className="text-xs font-medium text-gray-500">Assegnazione</h3>
+            
+            {/* Tabs per la selezione dell'assegnazione */}
+            <div>
+              <Tabs
+                value={assignmentType}
+                onValueChange={setAssignmentType}
+                className="w-full"
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="individual" className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    <span>Utente</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="group" className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span>Gruppo</span>
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="individual" className="pt-3 space-y-2">
+                  <div>
+                    <Label htmlFor="taskAssignedTo" className="flex items-center text-sm">
+                      <User className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                      Responsabile <span className="text-red-500 ml-1">*</span>
+                    </Label>
+                    <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={openCombobox}
+                          className="w-full justify-between mt-1"
+                        >
+                          {taskData.AssignedTo
+                            ? getSelectedUser(taskData.AssignedTo)
+                              ? `${getSelectedUser(taskData.AssignedTo).firstName} ${getSelectedUser(taskData.AssignedTo).lastName}`
+                              : "Seleziona responsabile"
+                            : "Seleziona responsabile"}
+                          <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-full p-0"
+                        style={{ maxHeight: "250px" }}
+                      >
+                        <Command>
+                          <CommandInput
+                            placeholder="Cerca per nome, cognome o ruolo..."
+                            value={searchValue}
+                            onValueChange={setSearchValue}
+                          />
+                          <CommandEmpty>Nessun utente trovato.</CommandEmpty>
+                          <CommandGroup className="max-h-[200px] overflow-auto">
+                            {filterUsers.map((user) => (
+                              <CommandItem
+                                key={user.userId}
+                                value={user.userId.toString()}
+                                onSelect={(value) => {
+                                  setTaskData((prev) => ({
+                                    ...prev,
+                                    AssignedTo: value,
+                                    DefaultGroupId: null,
+                                  }));
+                                  setOpenCombobox(false);
+                                  setSearchValue("");
+                                }}
+                              >
+                                <CheckIcon
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    taskData.AssignedTo === user.userId.toString()
+                                      ? "opacity-100"
+                                      : "opacity-0",
+                                  )}
+                                />
+                                {user.firstName} {user.lastName} - {user.role}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <Label className="flex items-center text-sm">
+                        <Users className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                        Partecipanti
+                      </Label>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="showSelected"
+                          className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                          checked={showSelectedOnly}
+                          onCheckedChange={(checked) => setShowSelectedOnly(checked)}
+                        />
+                        <Label
+                          htmlFor="showSelected"
+                          className="text-xs text-gray-500 cursor-pointer"
+                        >
+                          Mostra solo selezionati
+                        </Label>
+                      </div>
+                    </div>
+                    <ScrollArea className="h-[80px] border rounded-md bg-white">
+                      <div className="p-2">
+                        {filteredParticipants.map((user) => (
+                          <div
+                            key={user.userId}
+                            className="flex items-center space-x-2 hover:bg-gray-100 p-1 rounded"
+                          >
+                            <Checkbox
+                              className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                              checked={taskData.Participants.includes(
+                                user.userId.toString(),
+                              )}
+                              onCheckedChange={(checked) => {
+                                setTaskData((prev) => ({
+                                  ...prev,
+                                  Participants: checked
+                                    ? [...prev.Participants, user.userId.toString()]
+                                    : prev.Participants.filter(
+                                        (id) => id !== user.userId.toString(),
+                                      ),
+                                }));
+                              }}
+                              id={`user-${user.userId}`}
+                            />
+                            <Label
+                              htmlFor={`user-${user.userId}`}
+                              className="flex-grow cursor-pointer text-xs"
+                            >
+                              {user.firstName} {user.lastName} - {user.role}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="group" className="pt-3 space-y-2">
+                  <div>
+                    <Label htmlFor="taskGroupId" className="flex items-center text-sm">
+                      <Users className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                      Gruppo <span className="text-red-500 ml-1">*</span>
+                    </Label>
+                    <Select
+                      value={selectedGroupId?.toString() || "null"}
+                      onValueChange={handleGroupChange}
+                      disabled={isLoadingGroups}
                     >
-                      {t.Status}
-                    </Badge>
-                    <span className="font-medium truncate">{t.Title}</span>
+                      <SelectTrigger className="w-full mt-1" id="taskGroupId">
+                        <SelectValue
+                          placeholder={
+                            isLoadingGroups
+                              ? "Caricamento gruppi..."
+                              : "Seleziona gruppo"
+                          }
+                        >
+                          {selectedGroupId
+                            ? getSelectedGroup(selectedGroupId)?.groupName
+                            : "Seleziona gruppo"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="null">Nessun gruppo</SelectItem>
+                        {availableGroups.map((group) => (
+                          <SelectItem
+                            key={group.groupId}
+                            value={group.groupId.toString()}
+                          >
+                            <div className="flex items-center">
+                              <Users className="h-4 w-4 mr-2 text-gray-500" />
+                              <span>
+                                {group.groupName} - {group.description}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500 mt-1 px-1 py-1 bg-blue-50 rounded border border-blue-100">
+                      <AlertTriangle className="h-3 w-3 inline mr-1 text-blue-500" />
+                      L'attività verrà assegnata a tutti i membri del gruppo
+                    </p>
                   </div>
-                  <div className="flex gap-2 text-xs text-gray-500">
-                    <span>
-                      Inizio: {new Date(t.StartDate).toLocaleDateString()}
-                    </span>
-                    <span>→</span>
-                    <span>
-                      Fine: {new Date(t.DueDate).toLocaleDateString()}
-                    </span>
+
+                  <div>
+                    <Label htmlFor="groupAssignedTo" className="flex items-center text-sm">
+                      <User className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                      Responsabile principale <span className="text-red-500 ml-1">*</span>
+                    </Label>
+                    <Popover
+                      open={openCombobox && assignmentType === "group"}
+                      onOpenChange={setOpenCombobox}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={openCombobox && assignmentType === "group"}
+                          className="w-full justify-between mt-1"
+                          disabled={!selectedGroupId}
+                        >
+                          {taskData.AssignedTo && assignmentType === "group"
+                            ? getSelectedUser(taskData.AssignedTo)
+                              ? `${getSelectedUser(taskData.AssignedTo).firstName} ${getSelectedUser(taskData.AssignedTo).lastName}`
+                              : "Seleziona responsabile"
+                            : "Seleziona responsabile"}
+                          <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput
+                            placeholder="Cerca per nome, cognome o ruolo..."
+                            value={searchValue}
+                            onValueChange={setSearchValue}
+                          />
+                          <CommandEmpty>Nessun utente trovato.</CommandEmpty>
+                          <CommandGroup className="max-h-[200px] overflow-auto">
+                            {filterUsers.map((user) => (
+                              <CommandItem
+                                key={user.userId}
+                                value={user.userId.toString()}
+                                onSelect={(value) => {
+                                  setTaskData((prev) => ({
+                                    ...prev,
+                                    AssignedTo: value,
+                                  }));
+                                  setOpenCombobox(false);
+                                  setSearchValue("");
+                                }}
+                              >
+                                <CheckIcon
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    taskData.AssignedTo === user.userId.toString()
+                                      ? "opacity-100"
+                                      : "opacity-0",
+                                  )}
+                                />
+                                {user.firstName} {user.lastName} - {user.role}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div>
-        <Label htmlFor="taskPriority">Priorità</Label>
-        <Select
-          value={taskData.Priority}
-          onValueChange={(value) =>
-            setTaskData({ ...taskData, Priority: value })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Seleziona priorità" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="BASSA">Bassa</SelectItem>
-            <SelectItem value="MEDIA">Media</SelectItem>
-            <SelectItem value="ALTA">Alta</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <Label htmlFor="taskStartDate">Data Inizio *</Label>
-          <Input
-            id="taskStartDate"
-            type="date"
-            value={taskData.StartDate}
-            onChange={(e) => {
-              const startDate = e.target.value;
-              setTaskData((prev) => ({
-                ...prev,
-                StartDate: startDate,
-                DueDate:
-                  prev.DueDate && prev.DueDate < startDate
-                    ? startDate
-                    : prev.DueDate,
-              }));
-            }}
-          />
+                </TabsContent>
+              </Tabs>
+            </div>
+          </div>
         </div>
-        <div className="flex-1">
-          <Label htmlFor="taskDueDate">Data Scadenza *</Label>
-          <Input
-            id="taskDueDate"
-            type="date"
-            value={taskData.DueDate}
-            min={taskData.StartDate}
-            onChange={(e) =>
-              setTaskData({ ...taskData, DueDate: e.target.value })
-            }
-          />
-        </div>
-      </div>
+      </ScrollArea>
 
-      <div className="flex gap-2 pt-4">
+      <div className="flex gap-2 pt-3 mt-2 border-t shrink-0">
         <Button
-          className="flex-1"
+          className="flex-1 shadow-sm"
           onClick={handleSubmit}
           disabled={
             !taskData.Title || !taskData.DueDate || !taskData.AssignedTo
