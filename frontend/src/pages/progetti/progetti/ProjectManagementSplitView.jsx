@@ -277,7 +277,7 @@ const ProjectOverview = ({ project }) => (
 );
 
 // Componente per il dettaglio del progetto incorporato
-const ProjectDetailContainer = ({ projectId }) => {
+const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedProject }) => {
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -354,7 +354,7 @@ const ProjectDetailContainer = ({ projectId }) => {
 
         const projectData = await getProjectById(parseInt(projectId));
         if (!isMounted.current) return;
-
+        
         // Aggiorna il progetto ma mantiene lo stato delle attività esistenti per evitare
         // rimontaggi del componente che potrebbero causare problemi con gli eventi UI
         setProject((prevProject) => {
@@ -465,6 +465,7 @@ const ProjectDetailContainer = ({ projectId }) => {
       tasksViewMode,
       project,
       getProjectById,
+      navigate,
     ],
   );
 
@@ -501,7 +502,7 @@ const ProjectDetailContainer = ({ projectId }) => {
         Name: editedProject.Name,
         Description: editedProject.Description || "",
         StartDate: editedProject.StartDate?.split("T")[0],
-        EndDate: editedProject.EndDate?.split("T")[0],
+        EndDate: editedProject.EndDate?.split("T")[0] || null,
         Status: editedProject.Status,
         ProjectCategoryId: parseInt(editedProject.ProjectCategoryId) || 0,
         ProjectCategoryDetailLine:
@@ -527,7 +528,7 @@ const ProjectDetailContainer = ({ projectId }) => {
     }
   };
 
-  const handleDisableProject = async () => {
+  const handleDisableProject = async (projectId) => {
     const disabledProject = {
       ...project,
       Disabled: 1,
@@ -535,10 +536,27 @@ const ProjectDetailContainer = ({ projectId }) => {
     try {
       const result = await addUpdateProject(disabledProject);
       if (result.success) {
-        setProject(disabledProject);
-        setEditedProject(disabledProject);
-        swal.fire("Successo", "Progetto disabilitato con successo", "success");
-        navigate("/progetti/dashboard");
+        // Resettiamo completamente il progetto e il suo stato
+        setProject(null);
+        setEditedProject(null);
+        setIsEditModalOpen(false);
+        
+        // Reset della selezione nel componente padre
+        if (resetSelectedProject) {
+          resetSelectedProject();
+        }
+        
+        // Aggiorniamo la lista dei progetti nel componente padre
+        if (refreshAllProjects) {
+          await refreshAllProjects();
+        }
+        
+        swal.fire({
+          title: "Successo",
+          text: "Progetto disabilitato con successo",
+          icon: "success",
+          timer: 1500,
+        });
       }
     } catch (error) {
       console.error("Error disabling project:", error);
@@ -1200,8 +1218,6 @@ const ProjectManagementSplitView = () => {
   const [selectedProjectId, setSelectedProjectId] = useState(
     projectId && !isNaN(parseInt(projectId)) ? parseInt(projectId) : null,
   );
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [loadingProjectDetail, setLoadingProjectDetail] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [filters, setFilters] = useState({
     status: "all",
@@ -1401,7 +1417,6 @@ const ProjectManagementSplitView = () => {
     if (!newProject.Name?.trim()) validationErrors.Name = "Campo obbligatorio";
     if (!newProject.StartDate)
       validationErrors.StartDate = "Campo obbligatorio";
-    if (!newProject.EndDate) validationErrors.EndDate = "Campo obbligatorio";
 
     if (Object.keys(validationErrors).length > 0) {
       setFormErrors(validationErrors);
@@ -1459,6 +1474,24 @@ const ProjectManagementSplitView = () => {
       taskAssignedTo: null,
     });
   };
+
+  // Funzione per forzare un refresh completo dei progetti
+  const refreshAllProjects = useCallback(async () => {
+    try {
+      setLoading(true);
+      await fetchProjects(0, 100, filters);
+      await getUserProjectStatistics().then(setStatistics);
+    } catch (error) {
+      console.error("Error refreshing projects:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchProjects, getUserProjectStatistics, filters]);
+
+  // Funzione per resettare il progetto selezionato
+  const resetSelectedProject = useCallback(() => {
+    setSelectedProjectId(null);
+  }, []);
 
   // Rendering
   return (
@@ -1824,7 +1857,11 @@ const ProjectManagementSplitView = () => {
       {/* Sezione destra (2/3) - Dettaglio progetto */}
       <div className="w-2/3 h-full overflow-hidden">
         {selectedProjectId ? (
-          <ProjectDetailContainer projectId={selectedProjectId} />
+          <ProjectDetailContainer 
+            projectId={selectedProjectId} 
+            refreshAllProjects={refreshAllProjects}
+            resetSelectedProject={resetSelectedProject}
+          />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
             <PieChart className="h-16 w-16 mb-4 text-gray-300" />

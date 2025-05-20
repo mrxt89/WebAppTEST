@@ -1,11 +1,10 @@
-import React, { useRef, useState, useEffect, useLayoutEffect } from "react";
+import { useRef, useState, useEffect, useLayoutEffect } from "react";
 import {
   SendHorizontal,
   ThumbsUp,
   RefreshCcw,
   SquareCheck,
   Paperclip,
-  Camera,
   X,
   Reply,
   FileIcon,
@@ -17,9 +16,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import EmojiPicker from "./Emoji-picker";
 import { swal } from "../../lib/common";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import FileDropZone from "@/components/ui/FileDropZone";
 import { debounce } from "lodash";
-import { Margin } from "@mui/icons-material";
 import "@/styles/chat-components.css";
 
 const ChatBottomBar = ({
