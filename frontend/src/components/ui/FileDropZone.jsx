@@ -9,7 +9,7 @@ import {
 /**
  * Componente per il caricamento di file tramite drag and drop
  *
- * @param {Function} onFilesSelected - Callback quando i file vengono selezionati
+ * @param {Function} onFileSelect - Callback quando i file vengono selezionati
  * @param {boolean} disabled - Flag per disabilitare il componente
  * @param {boolean} multiple - Flag per permettere la selezione di più file
  * @param {string[]} acceptedFileTypes - Array di tipi MIME accettati
@@ -17,7 +17,7 @@ import {
  * @param {number} maxSize - Dimensione massima in bytes (default: 50MB)
  */
 const FileDropZone = ({
-  onFilesSelected,
+  onFileSelect,
   disabled = false,
   multiple = false,
   acceptedFileTypes = [],
@@ -143,7 +143,7 @@ const FileDropZone = ({
 
     if (validFiles.length > 0) {
       // Chiamata callback con i file validi
-      onFilesSelected(multiple ? validFiles : validFiles[0]);
+      onFileSelect(multiple ? validFiles : validFiles[0]);
 
       // Reset input file per permettere di selezionare lo stesso file più volte
       if (fileInputRef.current) {

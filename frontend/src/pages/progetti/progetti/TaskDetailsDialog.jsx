@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -295,6 +296,9 @@ const TaskDetailsDialog = ({
           <DialogTitle className="sr-only">
             Dettagli Attività: {editedTask?.Title}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Gestisci i dettagli e le informazioni dell'attività
+          </DialogDescription>
           <div className="flex justify-between items-start">
             <div className="space-y-2 flex-1">
               {isEditing ? (
