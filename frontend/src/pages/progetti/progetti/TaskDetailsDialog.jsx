@@ -47,6 +47,8 @@ const TaskDetailsDialog = ({
   onAddComment,
   assignableUsers = [],
   refreshProject,
+  activeTabOnReopen = null,
+  onTabChange,
 }) => {
   const isRefreshing = useRef(false);
   const [editedTask, setEditedTask] = useState(task);
@@ -55,6 +57,7 @@ const TaskDetailsDialog = ({
   const { checkAdminPermission, isOwnTask } = useProjectActions();
   const { syncCalendarEvent } = useCalendar();
   const canEdit = checkAdminPermission(project) || isOwnTask(task);
+  const lastTabRef = useRef(null);
 
   // Stato calendario consolidato
   const [calendarState, setCalendarState] = useState({
@@ -80,7 +83,8 @@ const TaskDetailsDialog = ({
         variant: "success",
         style: { backgroundColor: "#44917a" },
       });
-      refreshProject();
+      // Passa la tab attuale come parametro per mantenerla dopo il refresh
+      refreshProject(activeTab);
     } catch (error) {
       console.error("Error updating calendar:", error);
       setCalendarState((prev) => ({
@@ -96,6 +100,13 @@ const TaskDetailsDialog = ({
       setCalendarState((prev) => ({ ...prev, loading: false }));
     }
   };
+
+  // Imposta la tab attiva quando cambia activeTabOnReopen
+  useEffect(() => {
+    if (activeTabOnReopen) {
+      setActiveTab(activeTabOnReopen);
+    }
+  }, [activeTabOnReopen]);
 
   // Sincronizza editedTask con il task in ingresso
   useEffect(() => {
@@ -116,7 +127,6 @@ const TaskDetailsDialog = ({
   useEffect(() => {
     if (!isOpen) {
       setIsEditing(false);
-      setActiveTab("information");
     }
   }, [isOpen]);
 
@@ -128,8 +138,22 @@ const TaskDetailsDialog = ({
 
   const handleCloseDialog = () => {
     if (isRefreshing.current) return;
+    // Assicuriamoci che l'ultima tab attiva sia stata registrata
+    if (onTabChange) {
+      onTabChange(activeTab);
+    }
     setIsEditing(false);
     onClose();
+  };
+
+  // Aggiorna la ref dell'ultima tab quando cambia la tab attiva
+  const handleTabChange = (value) => {
+    setActiveTab(value);
+    lastTabRef.current = value;
+    // Comunica il cambio di tab al componente padre
+    if (onTabChange) {
+      onTabChange(value);
+    }
   };
 
   const handleCostOperation = async (operation) => {
@@ -170,7 +194,7 @@ const TaskDetailsDialog = ({
         if (result.task.Status !== editedTask.Status) {
           onClose();
         }
-        refreshProject?.();
+        refreshProject(activeTab);
       }
     } catch (error) {
       console.error("Error updating task status:", error);
@@ -200,7 +224,7 @@ const TaskDetailsDialog = ({
       const result = await onUpdate(updatedTaskData);
       if (result?.success && result?.task) {
         setEditedTask(result.task);
-        refreshProject?.();
+        refreshProject(activeTab);
       }
     } catch (error) {
       console.error("Error updating task priority:", error);
@@ -414,7 +438,7 @@ const TaskDetailsDialog = ({
         <div className="flex-1 overflow-hidden flex flex-col">
           <Tabs
             value={activeTab}
-            onValueChange={setActiveTab}
+            onValueChange={handleTabChange}
             className="flex-1 flex flex-col"
           >
             <TabsList className="px-6 border-b shrink-0 bg-gray-50">
@@ -550,7 +574,10 @@ const TaskDetailsDialog = ({
                 <TaskAttachmentsTab
                   task={editedTask}
                   canEdit={canEdit}
-                  onAttachmentChange={refreshProject}
+                  onAttachmentChange={() => {
+                    // Passa la tab da mantenere attiva al refreshProject
+                    refreshProject?.(activeTab);
+                  }}
                 />
               </TabsContent>
 

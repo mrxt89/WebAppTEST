@@ -293,6 +293,8 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
   // Stato per gestire la vista delle attività (kanban o tabella)
   const [tasksViewMode, setTasksViewMode] = useState("kanban");
   const [userSearchQuery, setUserSearchQuery] = useState("");
+  // Stato per mantenere la tab attiva nel TaskDetailsDialog
+  const [taskDialogActiveTab, setTaskDialogActiveTab] = useState("information");
 
   // Aggiungiamo i refs necessari
   const isMounted = useRef(true);
@@ -658,6 +660,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
           }
 
           // Aggiorna il progetto in background solo dopo aver gestito l'UI
+          // Passa lo stato della tab attiva nel refresh
           await loadProject(true);
 
           // Restituisci un oggetto di successo con il task aggiornato
@@ -728,6 +731,10 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
       setSelectedTask(task);
       setIsTaskDialogOpen(true);
     }
+  };
+
+  const handleTaskDialogTabChange = (tabValue) => {
+    setTaskDialogActiveTab(tabValue);
   };
 
   const handleAddComment = async (taskId, comment) => {
@@ -1178,6 +1185,8 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         onUpdate={handleTaskUpdate}
         assignableUsers={users}
         refreshProject={(callback) => loadProject(true, callback)}
+        activeTabOnReopen={taskDialogActiveTab}
+        onTabChange={handleTaskDialogTabChange}
       />
 
       <ProjectEditModalWithTemplate
