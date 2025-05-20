@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Table,
   TableBody,
@@ -25,9 +25,9 @@ import {
   CheckCircle,
   Database,
   ListFilter,
-  Eye
-} from 'lucide-react';
-import ArticleActionsDropdown from './ArticleActionsDropdown';
+  Eye,
+} from "lucide-react";
+import ArticleActionsDropdown from "./ArticleActionsDropdown";
 
 /**
  * ArticlesList - Componente per la visualizzazione della lista di articoli
@@ -40,15 +40,15 @@ import ArticleActionsDropdown from './ArticleActionsDropdown';
  * @param {Object} project - Oggetto contenente i dati del progetto corrente
  * @param {Function} onRefresh - Callback per aggiornare la lista degli articoli
  */
-const ArticlesList = ({ 
-  items = [], 
-  loading, 
-  onSelect, 
-  onViewBOM, 
-  onCopy, 
-  canEdit, 
+const ArticlesList = ({
+  items = [],
+  loading,
+  onSelect,
+  onViewBOM,
+  onCopy,
+  canEdit,
   project,
-  onRefresh 
+  onRefresh,
 }) => {
   // Funzione per ottenere icona e colori in base alla natura dell'articolo
   const getNatureDetails = (nature) => {
@@ -56,26 +56,26 @@ const ArticlesList = ({
       case 22413312: // Semilavorato
         return {
           icon: <Package className="h-4 w-4" />,
-          label: 'Semilavorato',
-          color: 'bg-blue-100 text-blue-700 border-blue-200'
+          label: "Semilavorato",
+          color: "bg-blue-100 text-blue-700 border-blue-200",
         };
       case 22413313: // Prodotto Finito
         return {
           icon: <Package className="h-4 w-4" />,
-          label: 'Prodotto Finito',
-          color: 'bg-green-100 text-green-700 border-green-200'
+          label: "Prodotto Finito",
+          color: "bg-green-100 text-green-700 border-green-200",
         };
       case 22413314: // Acquisto
         return {
           icon: <ShoppingCart className="h-4 w-4" />,
-          label: 'Acquisto',
-          color: 'bg-amber-100 text-amber-700 border-amber-200'
+          label: "Acquisto",
+          color: "bg-amber-100 text-amber-700 border-amber-200",
         };
       default:
         return {
           icon: <Package className="h-4 w-4" />,
-          label: 'Altro',
-          color: 'bg-gray-100 text-gray-700 border-gray-200'
+          label: "Altro",
+          color: "bg-gray-100 text-gray-700 border-gray-200",
         };
     }
   };
@@ -83,30 +83,30 @@ const ArticlesList = ({
   // Funzione per ottenere icona e colori in base allo stato dell'articolo
   const getStatusDetails = (statusCode) => {
     switch (statusCode) {
-      case 'BOZZA':
+      case "BOZZA":
         return {
           icon: <AlertCircle className="h-4 w-4" />,
-          color: 'bg-gray-100 text-gray-700 border-gray-200'
+          color: "bg-gray-100 text-gray-700 border-gray-200",
         };
-      case 'IN_PROD':
+      case "IN_PROD":
         return {
           icon: <CheckCircle className="h-4 w-4" />,
-          color: 'bg-blue-100 text-blue-700 border-blue-200'
+          color: "bg-blue-100 text-blue-700 border-blue-200",
         };
-      case 'DEL':
+      case "DEL":
         return {
           icon: <CircleSlash className="h-4 w-4" />,
-          color: 'bg-red-100 text-red-700 border-red-200'
+          color: "bg-red-100 text-red-700 border-red-200",
         };
-      case 'STDBY':
+      case "STDBY":
         return {
           icon: <TimerOff className="h-4 w-4" />,
-          color: 'bg-amber-100 text-amber-700 border-amber-200'
+          color: "bg-amber-100 text-amber-700 border-amber-200",
         };
       default:
         return {
           icon: <AlertCircle className="h-4 w-4" />,
-          color: 'bg-gray-100 text-gray-700 border-gray-200'
+          color: "bg-gray-100 text-gray-700 border-gray-200",
         };
     }
   };
@@ -147,7 +147,7 @@ const ArticlesList = ({
               const natureDetails = getNatureDetails(item.Nature);
               const statusDetails = getStatusDetails(item.StatusCode);
               const isFromERP = item.stato_erp === 1;
-              
+
               // Dimensioni
               const dimensions = [];
               if (item.Diameter) dimensions.push(`Ø${item.Diameter}`);
@@ -155,7 +155,7 @@ const ArticlesList = ({
               if (item.Depth) dimensions.push(`P${item.Depth}`);
               if (item.Length) dimensions.push(`L${item.Length}`);
               if (item.MediumRadius) dimensions.push(`R${item.MediumRadius}`);
-              
+
               return (
                 <TableRow key={item.Id} className="hover:bg-slate-50">
                   <TableCell className="font-medium">
@@ -175,7 +175,7 @@ const ArticlesList = ({
                       )}
                     </div>
                   </TableCell>
-                  <TableCell 
+                  <TableCell
                     className="max-w-[300px] truncate cursor-pointer hover:underline"
                     onClick={() => onSelect(item)}
                   >
@@ -187,26 +187,32 @@ const ArticlesList = ({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge className={`flex items-center gap-1 ${natureDetails.color}`}>
+                    <Badge
+                      className={`flex items-center gap-1 ${natureDetails.color}`}
+                    >
                       {natureDetails.icon}
                       <span>{natureDetails.label}</span>
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge className={`flex items-center gap-1 ${statusDetails.color}`}>
+                    <Badge
+                      className={`flex items-center gap-1 ${statusDetails.color}`}
+                    >
                       {statusDetails.icon}
                       <span>{item.StatusDescription}</span>
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge className={`${isFromERP ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
-                      {isFromERP ? 'Sì' : 'No'}
+                    <Badge
+                      className={`${isFromERP ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"}`}
+                    >
+                      {isFromERP ? "Sì" : "No"}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     {dimensions.length > 0 ? (
                       <span className="text-xs text-gray-700">
-                        {dimensions.join(' | ')}
+                        {dimensions.join(" | ")}
                       </span>
                     ) : (
                       <span className="text-xs text-gray-400">-</span>
@@ -218,8 +224,8 @@ const ArticlesList = ({
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="icon"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -235,13 +241,13 @@ const ArticlesList = ({
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      
+
                       {/* Bottone per visualizzare i dettagli */}
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="icon"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -257,9 +263,9 @@ const ArticlesList = ({
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      
+
                       {/* Menu azioni aggiuntive */}
-                      <ArticleActionsDropdown 
+                      <ArticleActionsDropdown
                         item={item}
                         project={project}
                         canEdit={canEdit}

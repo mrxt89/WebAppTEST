@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { Input, Button, Card, Alert } from "@/components/ui";
-import { config } from '../../config';
-import { swal } from '../../lib/common'; 
+import { config } from "../../config";
+import { swal } from "../../lib/common";
 
 const Register = () => {
   const [username, setUsername] = useState("");
@@ -55,18 +55,19 @@ const Register = () => {
               type="password"
               placeholder="Password"
               value={password}
-              onChange={(e) => 
+              onChange={(e) =>
                 // Verifica se la password contiene almeno 8 caratteri, un numero, una lettera maiuscola e una minuscola. Se non soddisfa i requisiti, mostra un errore
                 {
                   setPassword(e.target.value);
                   const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
                   if (!passwordRegex.test(e.target.value)) {
-                    setError("La password deve contenere almeno 8 caratteri, un numero, una lettera maiuscola e una minuscola.");
+                    setError(
+                      "La password deve contenere almeno 8 caratteri, un numero, una lettera maiuscola e una minuscola.",
+                    );
                   } else {
                     setError(null);
                   }
                 }
-
               }
               required
             />
@@ -81,7 +82,9 @@ const Register = () => {
               required
             />
           </div>
-          <Button type="submit" className="w-full mt-4">Registra</Button>
+          <Button type="submit" className="w-full mt-4">
+            Registra
+          </Button>
           {error && (
             <Alert variant="destructive" className="mt-4">
               {error}

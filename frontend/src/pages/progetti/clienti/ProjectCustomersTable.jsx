@@ -1,139 +1,145 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { debounce } from 'lodash';
-import { CUSTOMER_TYPE, SUPPLIER_TYPE } from "../../../hooks/useProjectCustomersActions";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { debounce } from "lodash";
+import {
+  CUSTOMER_TYPE,
+  SUPPLIER_TYPE,
+} from "../../../hooks/useProjectCustomersActions";
 import { swal } from "../../../lib/common";
 
 const PAGE_SIZE = 50;
 
 const columns = [
   {
-    field: 'Id',
-    header: 'ID',
+    field: "Id",
+    header: "ID",
     readOnly: true,
     fixed: true,
     minWidth: 100,
     maxWidth: 100,
   },
   {
-    field: 'CustomerCode',
-    header: 'Codice Cliente',
+    field: "CustomerCode",
+    header: "Codice Cliente",
     fixed: true,
     minWidth: 150,
     maxWidth: 150,
   },
   {
-    field: 'CompanyName',
-    header: 'Ragione Sociale',
+    field: "CompanyName",
+    header: "Ragione Sociale",
     fixed: true,
     minWidth: 350,
     maxWidth: 350,
   },
   {
-    field: 'TaxIdNumber',
-    header: 'P.IVA',
+    field: "TaxIdNumber",
+    header: "P.IVA",
     minWidth: 150,
     maxWidth: 150,
   },
   {
-    field: 'Address',
-    header: 'Indirizzo',
+    field: "Address",
+    header: "Indirizzo",
     minWidth: 250,
     maxWidth: 250,
   },
   {
-    field: 'ZIPCode',
-    header: 'CAP',
+    field: "ZIPCode",
+    header: "CAP",
     minWidth: 80,
     maxWidth: 80,
   },
   {
-    field: 'City',
-    header: 'Città',
+    field: "City",
+    header: "Città",
     minWidth: 150,
     maxWidth: 150,
   },
   {
-    field: 'County',
-    header: 'Provincia',
+    field: "County",
+    header: "Provincia",
     minWidth: 100,
     maxWidth: 100,
   },
   {
-    field: 'Country',
-    header: 'Nazione',
+    field: "Country",
+    header: "Nazione",
     minWidth: 150,
     maxWidth: 150,
   },
   {
-    field: 'Region',
-    header: 'Regione',
+    field: "Region",
+    header: "Regione",
     minWidth: 150,
     maxWidth: 150,
   },
   {
-    field: 'ERPCustSupp',
-    header: 'Cliente ERP',
+    field: "ERPCustSupp",
+    header: "Cliente ERP",
     readOnly: true,
     minWidth: 120,
     maxWidth: 120,
   },
   {
-    field: 'fscodice',
-    header: 'Codice FS',
+    field: "fscodice",
+    header: "Codice FS",
     minWidth: 150,
     maxWidth: 150,
   },
   {
-    field: 'actions',
-    header: 'Azioni',
-    type: 'actions',
+    field: "actions",
+    header: "Azioni",
+    type: "actions",
     minWidth: 200,
     maxWidth: 200,
-  }
+  },
 ];
 
-const ProjectCustomersTable = ({ 
-  projectCustomers, 
-  loading, 
+const ProjectCustomersTable = ({
+  projectCustomers,
+  loading,
   onUpdateCustomer,
-  onAddCustomer, 
-  onExportExcel, 
+  onAddCustomer,
+  onExportExcel,
   onFileUpload,
-  onLinkToErp
+  onLinkToErp,
 }) => {
   const [page, setPage] = useState(0);
-  const [sort, setSort] = useState({ field: 'Id', direction: 'asc' });
+  const [sort, setSort] = useState({ field: "Id", direction: "asc" });
   const [localChanges, setLocalChanges] = useState({});
   const [filters, setFilters] = useState({});
   const [activeFilterField, setActiveFilterField] = useState(null);
 
   // Gestione dei cambiamenti nelle celle
-  const handleCellChange = useCallback((rowIndex, field, value) => {
-    const item = projectCustomers[rowIndex];
-    if (!item) return;
+  const handleCellChange = useCallback(
+    (rowIndex, field, value) => {
+      const item = projectCustomers[rowIndex];
+      if (!item) return;
 
-    setLocalChanges(prev => ({
-      ...prev,
-      [item.Id]: {
-        ...(prev[item.Id] || {}),
-        [field]: value
-      }
-    }));
-  }, [projectCustomers]);
+      setLocalChanges((prev) => ({
+        ...prev,
+        [item.Id]: {
+          ...(prev[item.Id] || {}),
+          [field]: value,
+        },
+      }));
+    },
+    [projectCustomers],
+  );
 
   // Salvataggio delle modifiche
   const handleSaveChanges = async () => {
     try {
       const changesEntries = Object.entries(localChanges);
-      
+
       for (const [customerId, changes] of changesEntries) {
         await onUpdateCustomer(customerId, changes);
       }
-  
+
       setLocalChanges({});
-      
+
       swal.fire({
         title: "Successo",
         text: "Modifiche salvate con successo",
@@ -144,33 +150,36 @@ const ProjectCustomersTable = ({
         timer: 3000,
       });
     } catch (error) {
-      console.error('Error saving changes:', error);
-      swal.fire('Errore', 'Errore nel salvataggio delle modifiche', 'error');
+      console.error("Error saving changes:", error);
+      swal.fire("Errore", "Errore nel salvataggio delle modifiche", "error");
     }
   };
 
   // Gestione dell'ordinamento
   const handleSort = (field) => {
-    setSort(prev => ({
+    setSort((prev) => ({
       field,
-      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+      direction:
+        prev.field === field && prev.direction === "asc" ? "desc" : "asc",
     }));
   };
 
   // Gestione dei filtri con debounce
   const handleFilterChange = debounce((field, value) => {
-    setFilters(prev => ({
+    setFilters((prev) => ({
       ...prev,
-      [field]: value || undefined
+      [field]: value || undefined,
     }));
   }, 300);
 
   // Ottiene i valori unici per ogni campo per i suggerimenti dei filtri
   const uniqueValues = useMemo(() => {
     const values = {};
-    columns.forEach(column => {
-      if (column.type !== 'actions') {
-        const fieldValues = new Set(projectCustomers.map(item => item[column.field]).filter(Boolean));
+    columns.forEach((column) => {
+      if (column.type !== "actions") {
+        const fieldValues = new Set(
+          projectCustomers.map((item) => item[column.field]).filter(Boolean),
+        );
         values[column.field] = Array.from(fieldValues).sort();
       }
     });
@@ -180,13 +189,13 @@ const ProjectCustomersTable = ({
   // Gestione del click fuori dai suggerimenti
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (!event.target.closest('.filter-suggestions')) {
+      if (!event.target.closest(".filter-suggestions")) {
         setActiveFilterField(null);
       }
     };
 
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
   // Filtraggio e ordinamento dei dati
@@ -196,8 +205,10 @@ const ProjectCustomersTable = ({
     // Applica i filtri
     Object.entries(filters).forEach(([field, value]) => {
       if (value) {
-        result = result.filter(item => 
-          String(item[field] || '').toLowerCase().includes(String(value).toLowerCase())
+        result = result.filter((item) =>
+          String(item[field] || "")
+            .toLowerCase()
+            .includes(String(value).toLowerCase()),
         );
       }
     });
@@ -206,8 +217,8 @@ const ProjectCustomersTable = ({
     result.sort((a, b) => {
       const aValue = a[sort.field];
       const bValue = b[sort.field];
-      
-      if (sort.direction === 'asc') {
+
+      if (sort.direction === "asc") {
         return aValue > bValue ? 1 : -1;
       }
       return aValue < bValue ? 1 : -1;
@@ -224,18 +235,21 @@ const ProjectCustomersTable = ({
 
   // Rendering di una cella della tabella
   const renderCell = (item, column, columnIndex) => {
-    const value = localChanges[item.Id]?.[column.field] !== undefined 
-                  ? localChanges[item.Id][column.field] 
-                  : item[column.field] !== undefined ? item[column.field] : '';
-  
+    const value =
+      localChanges[item.Id]?.[column.field] !== undefined
+        ? localChanges[item.Id][column.field]
+        : item[column.field] !== undefined
+          ? item[column.field]
+          : "";
+
     const isFixed = column.fixed;
     const leftOffset = columns
       .slice(0, columnIndex)
-      .filter(col => col.fixed)
+      .filter((col) => col.fixed)
       .reduce((sum, col) => sum + col.minWidth, 0);
-    
+
     // Colonna azioni
-    if (column.type === 'actions') {
+    if (column.type === "actions") {
       return (
         <div className="flex space-x-2">
           {/* Pulsante per collegare a cliente ERP esistente */}
@@ -248,35 +262,37 @@ const ProjectCustomersTable = ({
             <i className="fas fa-link mr-1"></i>
             ERP
           </Button>
-          
+
           {/* Visualizzazione dello stato di collegamento */}
           {item.ERPCustSupp && (
             <span className="text-green-600 flex items-center">
-              <i className="fas fa-check-circle mr-1"></i> 
+              <i className="fas fa-check-circle mr-1"></i>
               Collegato
             </span>
           )}
         </div>
       );
     }
-  
+
     // Celle normali
     return (
       <Input
         type="text"
         value={value}
         readOnly={column.readOnly || !!item.ERPCustSupp} // ReadOnly se collegato a ERP
-        onChange={e => handleCellChange(
-          filteredAndSortedData.indexOf(item),
-          column.field,
-          e.target.value
-        )}
+        onChange={(e) =>
+          handleCellChange(
+            filteredAndSortedData.indexOf(item),
+            column.field,
+            e.target.value,
+          )
+        }
         className="w-full p-2"
         style={{
-          position: isFixed ? 'sticky' : 'initial',
-          left: isFixed ? `${leftOffset}px` : 'initial',
-          zIndex: isFixed ? 2 : 'auto',
-          backgroundColor: isFixed ? '#fff' : 'inherit',
+          position: isFixed ? "sticky" : "initial",
+          left: isFixed ? `${leftOffset}px` : "initial",
+          zIndex: isFixed ? 2 : "auto",
+          backgroundColor: isFixed ? "#fff" : "inherit",
         }}
       />
     );
@@ -287,43 +303,50 @@ const ProjectCustomersTable = ({
     const isFixed = column.fixed;
     const leftOffset = columns
       .slice(0, columnIndex)
-      .filter(col => col.fixed)
+      .filter((col) => col.fixed)
       .reduce((sum, col) => sum + col.minWidth, 0);
 
     return (
       <th
         key={column.field}
         className="border-b bg-gray-50 cursor-pointer select-none"
-        onClick={() => column.type !== 'actions' && handleSort(column.field)}
+        onClick={() => column.type !== "actions" && handleSort(column.field)}
         style={{
-          position: isFixed ? 'sticky' : 'initial',
-          left: isFixed ? `${leftOffset}px` : 'initial',
-          zIndex: isFixed ? 3 : 'auto',
+          position: isFixed ? "sticky" : "initial",
+          left: isFixed ? `${leftOffset}px` : "initial",
+          zIndex: isFixed ? 3 : "auto",
           minWidth: column.minWidth,
           maxWidth: column.maxWidth,
           width: column.minWidth,
-          boxShadow: isFixed ? '2px 0 4px rgba(0,0,0,0.1)' : 'none',
+          boxShadow: isFixed ? "2px 0 4px rgba(0,0,0,0.1)" : "none",
         }}
       >
         <div className="px-3 py-2">
           <div className="flex items-center justify-between whitespace-nowrap">
             <span>{column.header}</span>
-            {column.type !== 'actions' && (
+            {column.type !== "actions" && (
               <span className="ml-2">
-                {sort.field === column.field ? (
-                  sort.direction === 'asc' ? '↑' : '↓'
-                ) : ''}
+                {sort.field === column.field
+                  ? sort.direction === "asc"
+                    ? "↑"
+                    : "↓"
+                  : ""}
               </span>
             )}
           </div>
 
-          {column.type !== 'actions' && (
-            <div className="relative filter-suggestions" onClick={e => e.stopPropagation()}>
+          {column.type !== "actions" && (
+            <div
+              className="relative filter-suggestions"
+              onClick={(e) => e.stopPropagation()}
+            >
               <Input
                 placeholder="Filtra..."
-                value={filters[column.field] || ''}
-                onChange={e => handleFilterChange(column.field, e.target.value)}
-                onClick={e => {
+                value={filters[column.field] || ""}
+                onChange={(e) =>
+                  handleFilterChange(column.field, e.target.value)
+                }
+                onClick={(e) => {
                   e.stopPropagation();
                   setActiveFilterField(column.field);
                 }}
@@ -331,9 +354,9 @@ const ProjectCustomersTable = ({
               />
               {filters[column.field] && (
                 <button
-                  onClick={e => {
+                  onClick={(e) => {
                     e.stopPropagation();
-                    setFilters(prev => {
+                    setFilters((prev) => {
                       const newFilters = { ...prev };
                       delete newFilters[column.field];
                       return newFilters;
@@ -344,25 +367,26 @@ const ProjectCustomersTable = ({
                   ✕
                 </button>
               )}
-              {activeFilterField === column.field && uniqueValues[column.field]?.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-white border rounded-md shadow-lg">
-                  {uniqueValues[column.field].map((value, idx) => (
-                    <div
-                      key={idx}
-                      className="mx-2 p-1 hover:bg-gray-100 cursor-pointer"
-                      onClick={() => {
-                        setFilters(prev => ({
-                          ...prev,
-                          [column.field]: value,
-                        }));
-                        setActiveFilterField(null);
-                      }}
-                    >
-                      {value}
-                    </div>
-                  ))}
-                </div>
-              )}
+              {activeFilterField === column.field &&
+                uniqueValues[column.field]?.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-white border rounded-md shadow-lg">
+                    {uniqueValues[column.field].map((value, idx) => (
+                      <div
+                        key={idx}
+                        className="mx-2 p-1 hover:bg-gray-100 cursor-pointer"
+                        onClick={() => {
+                          setFilters((prev) => ({
+                            ...prev,
+                            [column.field]: value,
+                          }));
+                          setActiveFilterField(null);
+                        }}
+                      >
+                        {value}
+                      </div>
+                    ))}
+                  </div>
+                )}
             </div>
           )}
         </div>
@@ -371,7 +395,11 @@ const ProjectCustomersTable = ({
   };
 
   if (loading && projectCustomers.length === 0) {
-    return <div className="flex items-center justify-center h-full">Caricamento...</div>;
+    return (
+      <div className="flex items-center justify-center h-full">
+        Caricamento...
+      </div>
+    );
   }
 
   return (
@@ -386,21 +414,21 @@ const ProjectCustomersTable = ({
             className="hidden"
             id="csvFileInput"
           />
-          <Button 
-            onClick={() => document.getElementById('csvFileInput').click()}
+          <Button
+            onClick={() => document.getElementById("csvFileInput").click()}
             className="bg-purple-500 hover:bg-purple-600"
           >
             <i className="fas fa-file-import mr-2" />
             Importa CSV
           </Button>
-          <Button 
+          <Button
             onClick={onAddCustomer}
             className="bg-blue-500 hover:bg-blue-600"
           >
             <i className="fas fa-plus mr-2" />
             Nuovo Cliente Prospect
           </Button>
-          <Button 
+          <Button
             onClick={onExportExcel}
             className="bg-yellow-500 hover:bg-yellow-600"
           >
@@ -422,7 +450,7 @@ const ProjectCustomersTable = ({
       <div className="overflow-auto flex-1 relative">
         <table className="w-max border-collapse">
           <colgroup>
-            {columns.map(col => (
+            {columns.map((col) => (
               <col
                 key={col.field}
                 style={{
@@ -439,20 +467,22 @@ const ProjectCustomersTable = ({
             </tr>
           </thead>
           <tbody>
-            {paginatedData.map(item => (
+            {paginatedData.map((item) => (
               <tr
                 key={item.Id}
                 className={`hover:bg-gray-50 ${
-                  localChanges[item.Id] ? 'bg-yellow-50 hover:bg-yellow-100' : ''
-                } ${item.Disabled ? 'bg-red-50 hover:bg-red-100' : ''} ${
-                  item.ERPCustSupp ? 'bg-blue-50 hover:bg-blue-100' : ''
+                  localChanges[item.Id]
+                    ? "bg-yellow-50 hover:bg-yellow-100"
+                    : ""
+                } ${item.Disabled ? "bg-red-50 hover:bg-red-100" : ""} ${
+                  item.ERPCustSupp ? "bg-blue-50 hover:bg-blue-100" : ""
                 }`}
               >
                 {columns.map((column, index) => {
                   const isFixed = column.fixed;
                   const leftOffset = columns
                     .slice(0, index)
-                    .filter(col => col.fixed)
+                    .filter((col) => col.fixed)
                     .reduce((sum, col) => sum + col.minWidth, 0);
 
                   return (
@@ -460,21 +490,23 @@ const ProjectCustomersTable = ({
                       key={`${item.Id}-${column.field}`}
                       className="border-b relative"
                       style={{
-                        position: isFixed ? 'sticky' : 'initial',
-                        left: isFixed ? `${leftOffset}px` : 'initial',
+                        position: isFixed ? "sticky" : "initial",
+                        left: isFixed ? `${leftOffset}px` : "initial",
                         minWidth: column.minWidth,
                         maxWidth: column.maxWidth,
                         width: column.minWidth,
                         backgroundColor: isFixed
-                          ? '#fff'
+                          ? "#fff"
                           : item.Disabled
-                          ? '#fef2f2'
-                          : item.ERPCustSupp
-                          ? '#eff6ff'
-                          : localChanges[item.Id]
-                          ? '#fefce8'
-                          : 'inherit',
-                        boxShadow: isFixed ? '2px 0 4px rgba(0,0,0,0.1)' : 'none',
+                            ? "#fef2f2"
+                            : item.ERPCustSupp
+                              ? "#eff6ff"
+                              : localChanges[item.Id]
+                                ? "#fefce8"
+                                : "inherit",
+                        boxShadow: isFixed
+                          ? "2px 0 4px rgba(0,0,0,0.1)"
+                          : "none",
                       }}
                     >
                       <div className="px-3 py-1">
@@ -493,19 +525,20 @@ const ProjectCustomersTable = ({
       <div className="flex justify-between items-center p-2 border-t bg-white">
         <div id="pageNumberSection">
           <span>
-            Pagina {page + 1} di {Math.ceil(filteredAndSortedData.length / PAGE_SIZE)}
+            Pagina {page + 1} di{" "}
+            {Math.ceil(filteredAndSortedData.length / PAGE_SIZE)}
           </span>
         </div>
-        <div id="paginationButtons" className='flex gap-2'>
+        <div id="paginationButtons" className="flex gap-2">
           <Button
-            onClick={() => setPage(p => Math.max(0, p - 1))}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0}
             className="bg-blue-500 hover:bg-blue-600"
           >
             Precedente
           </Button>
           <Button
-            onClick={() => setPage(p => p + 1)}
+            onClick={() => setPage((p) => p + 1)}
             disabled={(page + 1) * PAGE_SIZE >= filteredAndSortedData.length}
             className="bg-blue-500 hover:bg-blue-600"
           >

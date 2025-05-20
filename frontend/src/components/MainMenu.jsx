@@ -1,5 +1,5 @@
-import React, { forwardRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { forwardRef } from "react";
+import { useNavigate } from "react-router-dom";
 
 const MainMenu = forwardRef(({ menuItems, onNavigate }, ref) => {
   const navigate = useNavigate();
@@ -27,10 +27,7 @@ const MainMenu = forwardRef(({ menuItems, onNavigate }, ref) => {
   };
 
   return (
-    <div
-      ref={ref}
-      className="w-full pt-20 pb-8 px-4"
-    >
+    <div ref={ref} className="w-full pt-20 pb-8 px-4">
       {renderMenu(menuItems)}
     </div>
   );

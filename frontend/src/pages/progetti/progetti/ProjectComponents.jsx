@@ -1,37 +1,49 @@
 // src/components/projects/ProjectComponents.jsx
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Calendar, ListTodo, Loader2, CheckCircle2, ClipboardList, Triangle, TriangleAlert } from 'lucide-react';
+import {
+  Calendar,
+  ListTodo,
+  Loader2,
+  CheckCircle2,
+  ClipboardList,
+  Triangle,
+  TriangleAlert,
+} from "lucide-react";
 
 // Componente per la card del progetto
 export const ProjectCard = ({ project, onViewDetails, tasks }) => (
-  
   <Card className="hover:bg-gray-50 transition-colors duration-200">
-    
     <CardContent className="p-4">
       <div className="flex flex-col gap-2 min-h-[150px]">
         {/* Header della card con nome e status */}
         <div className="flex justify-between items-start">
           <div className="flex flex-col gap-2">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <h3 className="font-semibold text-base sm:text-lg line-clamp-1">{project.Name}</h3>
+              <h3 className="font-semibold text-base sm:text-lg line-clamp-1">
+                {project.Name}
+              </h3>
               <div className="flex items-center gap-2">
-                <Badge 
-                  style={{ 
-                    backgroundColor: project.StatusColor ? `${project.StatusColor}20` : '', 
-                    color: project.StatusColor || 'currentColor',
-                    borderColor: project.StatusColor ? `${project.StatusColor}40` : ''
+                <Badge
+                  style={{
+                    backgroundColor: project.StatusColor
+                      ? `${project.StatusColor}20`
+                      : "",
+                    color: project.StatusColor || "currentColor",
+                    borderColor: project.StatusColor
+                      ? `${project.StatusColor}40`
+                      : "",
                   }}
                   className="capitalize"
                 >
                   {project.StatusDescription || project.Status}
                 </Badge>
                 {project.ProjectErpID && (
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className="bg-blue-50 text-blue-700 border-blue-200"
                   >
                     {project.ProjectErpID}
@@ -40,7 +52,7 @@ export const ProjectCard = ({ project, onViewDetails, tasks }) => (
               </div>
             </div>
           </div>
-          <Button 
+          <Button
             variant="outline"
             onClick={(e) => {
               e.stopPropagation();
@@ -64,31 +76,40 @@ export const ProjectCard = ({ project, onViewDetails, tasks }) => (
           {/* Descrizione sulla sinistra */}
           <div className="flex-1">
             <div className="text-gray-600 text-sm line-clamp-2 min-h-[3em]">
-              {project.Description || 'Nessuna descrizione disponibile'}
+              {project.Description || "Nessuna descrizione disponibile"}
             </div>
           </div>
-          
+
           {/* Mini cards sulla destra */}
           <div className="flex gap-2">
             {/* Indicatore percentuale completamento */}
             {(() => {
-              const totalTasks = project.TaskCompletate + project.TaskAperteInRitardo + project.TaskAperteNonRitardo;
-              const completionPercentage = totalTasks > 0 
-                ? Math.round((project.TaskCompletate / totalTasks) * 100)
-                : 0;
-              
+              const totalTasks =
+                project.TaskCompletate +
+                project.TaskAperteInRitardo +
+                project.TaskAperteNonRitardo;
+              const completionPercentage =
+                totalTasks > 0
+                  ? Math.round((project.TaskCompletate / totalTasks) * 100)
+                  : 0;
+
               // Determina il colore in base alla percentuale
               const getColorClasses = (percentage) => {
-                if (percentage >= 90) return 'bg-green-100 hover:bg-green-200 text-green-700';
-                if (percentage >= 70) return 'bg-blue-100 hover:bg-blue-200 text-blue-700';
-                if (percentage >= 50) return 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700';
-                return 'bg-gray-100 hover:bg-gray-200 text-gray-700';
+                if (percentage >= 90)
+                  return "bg-green-100 hover:bg-green-200 text-green-700";
+                if (percentage >= 70)
+                  return "bg-blue-100 hover:bg-blue-200 text-blue-700";
+                if (percentage >= 50)
+                  return "bg-yellow-100 hover:bg-yellow-200 text-yellow-700";
+                return "bg-gray-100 hover:bg-gray-200 text-gray-700";
               };
-              
+
               const colorClasses = getColorClasses(completionPercentage);
-              
+
               return (
-                <div className={`flex items-center px-2 py-1 rounded-md transition-colors ${colorClasses}`}>
+                <div
+                  className={`flex items-center px-2 py-1 rounded-md transition-colors ${colorClasses}`}
+                >
                   <CheckCircle2 className="w-3 h-3 mr-1" />
                   <span className="text-xs font-medium">
                     {completionPercentage}%
@@ -96,18 +117,18 @@ export const ProjectCard = ({ project, onViewDetails, tasks }) => (
                 </div>
               );
             })()}
-            
+
             <div className="flex items-center px-2 py-1 rounded-md bg-gray-100 hover:bg-gray-200 transition-colors">
               <ListTodo className="w-3 h-3 text-gray-700 mr-1" />
               <span className="text-xs font-medium text-gray-700">
-                {(project.TaskAperteNonRitardo)}
+                {project.TaskAperteNonRitardo}
               </span>
             </div>
-            
+
             <div className="flex items-center px-2 py-1 rounded-md bg-red-100 hover:bg-red-200 transition-colors">
               <TriangleAlert className="w-3 h-3 text-red-700 mr-1" />
               <span className="text-xs font-medium text-red-700">
-                {(project.TaskAperteInRitardo)}
+                {project.TaskAperteInRitardo}
               </span>
             </div>
           </div>
@@ -116,15 +137,16 @@ export const ProjectCard = ({ project, onViewDetails, tasks }) => (
         {/* Sezione categoria */}
         {project.CategoryDescription && (
           <div className="flex items-center gap-2">
-            <div 
+            <div
               className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: project.CategoryColor || '#CCCCCC' }}
+              style={{ backgroundColor: project.CategoryColor || "#CCCCCC" }}
             />
             <span className="text-sm text-gray-600">
               {project.CategoryDescription}
               {project.SubCategoryDescription && (
                 <span className="text-gray-400">
-                  {' > '}{project.SubCategoryDescription}
+                  {" > "}
+                  {project.SubCategoryDescription}
                 </span>
               )}
             </span>
@@ -148,8 +170,13 @@ export const ProjectCard = ({ project, onViewDetails, tasks }) => (
 );
 
 // Componente per la ricerca e selezione del cliente
-export const CustomerSearchSelect = ({ value, onChange, projectCustomers, loading }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+export const CustomerSearchSelect = ({
+  value,
+  onChange,
+  projectCustomers,
+  loading,
+}) => {
+  const [searchTerm, setSearchTerm] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
 
@@ -158,13 +185,13 @@ export const CustomerSearchSelect = ({ value, onChange, projectCustomers, loadin
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
         setIsOpen(false);
         if (!value) {
-          setSearchTerm('');
+          setSearchTerm("");
         }
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [value]);
 
   // Modified to use Id as the unique identifier and handle the data structure correctly
@@ -174,7 +201,7 @@ export const CustomerSearchSelect = ({ value, onChange, projectCustomers, loadin
     }
     // Use Id as the unique identifier instead of CustSupp
     const unique = new Map();
-    projectCustomers.forEach(customer => {
+    projectCustomers.forEach((customer) => {
       // Only include non-disabled customers
       if (customer && customer.Id && !customer.Disabled) {
         unique.set(customer.Id, customer);
@@ -185,15 +212,18 @@ export const CustomerSearchSelect = ({ value, onChange, projectCustomers, loadin
 
   const filteredCustomers = useMemo(() => {
     if (!searchTerm.trim()) return uniqueCustomers;
-    return uniqueCustomers.filter(customer => 
-      customer.CompanyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.CustomerCode?.toLowerCase().includes(searchTerm.toLowerCase())
+    return uniqueCustomers.filter(
+      (customer) =>
+        customer.CompanyName?.toLowerCase().includes(
+          searchTerm.toLowerCase(),
+        ) ||
+        customer.CustomerCode?.toLowerCase().includes(searchTerm.toLowerCase()),
     );
   }, [uniqueCustomers, searchTerm]);
 
   const handleSelect = (customer) => {
     // Use Id as the value to pass back to the parent
-    onChange(customer.Id); 
+    onChange(customer.Id);
     setSearchTerm(customer.CompanyName);
     setIsOpen(false);
   };
@@ -210,12 +240,12 @@ export const CustomerSearchSelect = ({ value, onChange, projectCustomers, loadin
   useEffect(() => {
     if (value) {
       // Find customer by Id
-      const selectedCustomer = uniqueCustomers.find(c => c.Id === value);
+      const selectedCustomer = uniqueCustomers.find((c) => c.Id === value);
       if (selectedCustomer) {
         setSearchTerm(selectedCustomer.CompanyName);
       }
     } else {
-      setSearchTerm('');
+      setSearchTerm("");
     }
   }, [value, uniqueCustomers]);
 
@@ -242,7 +272,9 @@ export const CustomerSearchSelect = ({ value, onChange, projectCustomers, loadin
               >
                 <div className="font-medium">{customer.CompanyName}</div>
                 {customer.CustomerCode && (
-                  <div className="text-sm text-gray-500">{customer.CustomerCode}</div>
+                  <div className="text-sm text-gray-500">
+                    {customer.CustomerCode}
+                  </div>
                 )}
               </div>
             ))

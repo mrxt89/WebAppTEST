@@ -1,7 +1,7 @@
-import React from 'react';
-import WikiModal from './WikiModal';
-import WikiTour from './WikiTour';
-import { useWikiContext } from './WikiContext';
+import React from "react";
+import WikiModal from "./WikiModal";
+import WikiTour from "./WikiTour";
+import { useWikiContext } from "./WikiContext";
 
 /**
  * Componente principale che gestisce il sistema Wiki
@@ -9,12 +9,12 @@ import { useWikiContext } from './WikiContext';
  */
 const WikiHelper = () => {
   const { isWikiOpen, isTourActive } = useWikiContext();
-  
+
   return (
     <>
       {/* Modale principale della wiki */}
       {isWikiOpen && <WikiModal />}
-      
+
       {/* Tour guidato */}
       {isTourActive && <WikiTour />}
     </>

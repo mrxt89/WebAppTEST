@@ -279,8 +279,6 @@ router.get('/projectArticles/boms/:id', authenticateToken, async (req, res) => {
         const companyId = req.user.CompanyId;
         const bomId = parseInt(req.params.id);
         const action = req.query.action || 'GET_BOM_FULL';
-        
-        console.log('⭐ ROUTE HANDLER: /projectArticles/boms/:id');
 
         // Opzioni aggiuntive
         const options = {};
@@ -304,8 +302,6 @@ router.get('/projectArticles/boms/item/:itemId', authenticateToken, async (req, 
         const itemId = parseInt(req.params.itemId);
         const version = req.query.version ? parseInt(req.query.version) : null;
         const action = req.query.action || 'GET_BOM_FULL';
-        
-        console.log('⭐ ROUTE HANDLER: /projectArticles/boms/item/:itemId');
 
         // Opzioni aggiuntive
         const options = {};
@@ -315,7 +311,6 @@ router.get('/projectArticles/boms/item/:itemId', authenticateToken, async (req, 
         if (req.query.includeRouting) options.IncludeRouting = req.query.includeRouting === 'true';
         
         const result = await getBOMData(action, companyId, null, itemId, version, options);
-        console.log(`Fetched BOM data for itemId ${itemId}:`, result);
         res.json(result);
     } catch (err) {
         console.error(`Error fetching BOM data by itemId:`, err);
@@ -371,10 +366,6 @@ router.post('/projectArticles/boms/:id/reorder', authenticateToken, async (req, 
         const userId = req.user.UserId;
         const bomId = parseInt(req.params.id);
         const { components } = req.body;
-        
-        console.log('API reorderComponents - Parametri:', {
-            companyId, userId, bomId, components
-        });
         
         if (!components || !Array.isArray(components)) {
             return res.status(400).json({
@@ -623,25 +614,14 @@ router.get('/projectArticles/items/:id', authenticateToken, async (req, res) => 
             });
         }
         
-        console.log(`Fetching item details - Company: ${companyId}, Item: ${itemId}`);
-        
         const item = await getItemById(companyId, itemId);
         
         if (!item) {
-            console.log(`Item ${itemId} not found for company ${companyId}`);
             return res.status(404).json({ 
                 success: 0, 
                 msg: 'Articolo non trovato'
             });
         }
-        
-        console.log('Item details found:', {
-            Id: item.Id,
-            Item: item.Item,
-            Description: item.Description && item.Description.substring(0, 20) + '...',
-            ProjectsCount: item.projects?.length || 0,
-            BomsCount: item.boms?.length || 0
-        });
         
         return res.json(item);
     } catch (err) {
@@ -660,13 +640,6 @@ router.post('/projectArticles/boms/:id/replaceComponent', authenticateToken, asy
         const userId = req.user.UserId;
         const bomId = parseInt(req.params.id);
         const { componentLine, newComponentId, newComponentCode } = req.body;
-        
-        console.log('API replaceComponent - Parametri:', {
-            companyId, userId, bomId, 
-            componentLine: parseInt(componentLine),
-            newComponentId: parseInt(newComponentId),
-            newComponentCode: newComponentCode
-        });
         
         if (!bomId || !componentLine) {
             return res.status(400).json({
@@ -807,8 +780,6 @@ router.get('/projectArticles/boms/versions/:itemId', authenticateToken, async (r
           msg: 'ID articolo non valido' 
         });
       }
-      
-      console.log(`Fetching BOM versions for itemId ${itemId}`);
       
       const result = await getBOMVersions(companyId, itemId);
       res.json(result);

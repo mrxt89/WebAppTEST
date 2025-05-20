@@ -1,14 +1,14 @@
 // src/components/chat/ImprovedSearchBar.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, ArrowUp, ArrowDown, Loader } from 'lucide-react';
-import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
+import React, { useState, useEffect, useRef } from "react";
+import { Search, X, ArrowUp, ArrowDown, Loader } from "lucide-react";
+import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 
 const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(-1);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const inputRef = useRef(null);
   const { filterMessages } = useNotifications();
 
@@ -23,24 +23,26 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
   const searchMessages = async (term) => {
     if (!term || term.length < 2) {
       setResults([]);
-      setError('');
+      setError("");
       return;
     }
 
     setLoading(true);
-    setError('');
-    
+    setError("");
+
     try {
-      const filteredMessages = await filterMessages(notificationId, { searchText: term });
-      
+      const filteredMessages = await filterMessages(notificationId, {
+        searchText: term,
+      });
+
       if (!filteredMessages) {
         setResults([]);
-        setError('Nessun risultato trovato');
+        setError("Nessun risultato trovato");
         return;
       }
-      
+
       setResults(filteredMessages);
-      
+
       // Reset dell'indice corrente
       if (filteredMessages.length > 0) {
         setCurrentIndex(0);
@@ -48,11 +50,11 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
         onResultSelected(filteredMessages[0].messageId);
       } else {
         setCurrentIndex(-1);
-        setError('Nessun risultato trovato');
+        setError("Nessun risultato trovato");
       }
     } catch (error) {
-      console.error('Errore durante la ricerca:', error);
-      setError('Errore durante la ricerca');
+      console.error("Errore durante la ricerca:", error);
+      setError("Errore durante la ricerca");
     } finally {
       setLoading(false);
     }
@@ -73,7 +75,7 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
   // Funzioni di navigazione tra i risultati
   const navigateNext = () => {
     if (results.length === 0) return;
-    
+
     const newIndex = (currentIndex + 1) % results.length;
     setCurrentIndex(newIndex);
     onResultSelected(results[newIndex].messageId);
@@ -81,7 +83,7 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
 
   const navigatePrevious = () => {
     if (results.length === 0) return;
-    
+
     const newIndex = (currentIndex - 1 + results.length) % results.length;
     setCurrentIndex(newIndex);
     onResultSelected(results[newIndex].messageId);
@@ -89,9 +91,9 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
 
   // Gestione scorciatoie da tastiera
   const handleKeyDown = (e) => {
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       onClose();
-    } else if (e.key === 'Enter') {
+    } else if (e.key === "Enter") {
       // Se premiamo Enter e stiamo effettuando una nuova ricerca
       if (searchTerm !== results[currentIndex]?.message) {
         searchMessages(searchTerm);
@@ -99,10 +101,10 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
         // Altrimenti navighiamo al prossimo risultato
         navigateNext();
       }
-    } else if (e.key === 'ArrowDown') {
+    } else if (e.key === "ArrowDown") {
       e.preventDefault();
       navigateNext();
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === "ArrowUp") {
       e.preventDefault();
       navigatePrevious();
     }
@@ -129,14 +131,14 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
         />
         {searchTerm && (
           <button
-            onClick={() => setSearchTerm('')}
+            onClick={() => setSearchTerm("")}
             className="absolute inset-y-0 right-10 flex items-center pr-2 text-gray-400 hover:text-gray-600"
           >
             <X className="h-4 w-4" />
           </button>
         )}
       </div>
-      
+
       {/* Indicatore risultati e navigazione */}
       <div className="flex items-center px-2 border-l border-gray-200 h-full">
         {results.length > 0 ? (
@@ -144,16 +146,16 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
             {currentIndex + 1}/{results.length}
           </span>
         ) : error ? (
-          <span className="text-xs text-red-500 mx-2">
-            {error}
-          </span>
+          <span className="text-xs text-red-500 mx-2">{error}</span>
         ) : null}
         <div className="flex">
           <button
             onClick={navigatePrevious}
             disabled={results.length === 0}
             className={`p-1 rounded ${
-              results.length > 0 ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-300 cursor-not-allowed'
+              results.length > 0
+                ? "text-gray-600 hover:bg-gray-100"
+                : "text-gray-300 cursor-not-allowed"
             }`}
           >
             <ArrowUp className="h-4 w-4" />
@@ -162,7 +164,9 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
             onClick={navigateNext}
             disabled={results.length === 0}
             className={`p-1 rounded ${
-              results.length > 0 ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-300 cursor-not-allowed'
+              results.length > 0
+                ? "text-gray-600 hover:bg-gray-100"
+                : "text-gray-300 cursor-not-allowed"
             }`}
           >
             <ArrowDown className="h-4 w-4" />

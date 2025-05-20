@@ -1,20 +1,19 @@
-import React from 'react';
-import { Helmet } from 'react-helmet';
-import { Routes, Route, useNavigate } from 'react-router-dom';
-import ProtectedRoute from '../ProtectedRoute';
-import AdminDashboard from '../../pages/admin/AdminDashboard';
-import ProjectManagementSplitView from '../../pages/progetti/progetti/ProjectManagementSplitView';
-import CategoriesPage from '../../pages/progetti/categorie/ProjectCategories';
-import TemplatesPage from '../../pages/progetti/templates/projectTemplates';
-import ProjectCustomers from '../../pages/progetti/clienti/ProjectCustomers';
-import MyTasksPage from '../../pages/progetti/attivita/MyTasksPage';
-import ChangePassword from '../../pages/user/ChangePassword';
-import UserProfile from '../../pages/user/UserProfile';
-import MainMenu from '../MainMenu';
-
+import React from "react";
+import { Helmet } from "react-helmet";
+import { Routes, Route, useNavigate } from "react-router-dom";
+import ProtectedRoute from "../ProtectedRoute";
+import AdminDashboard from "../../pages/admin/AdminDashboard";
+import ProjectManagementSplitView from "../../pages/progetti/progetti/ProjectManagementSplitView";
+import CategoriesPage from "../../pages/progetti/categorie/ProjectCategories";
+import TemplatesPage from "../../pages/progetti/templates/projectTemplates";
+import ProjectCustomers from "../../pages/progetti/clienti/ProjectCustomers";
+import MyTasksPage from "../../pages/progetti/attivita/MyTasksPage";
+import ChangePassword from "../../pages/user/ChangePassword";
+import UserProfile from "../../pages/user/UserProfile";
+import MainMenu from "../MainMenu";
 
 // Import the NotificationProvider (which is now a placeholder function)
-import { NotificationProvider } from '@/redux/features/notifications/NotificationProvider';
+import { NotificationProvider } from "@/redux/features/notifications/NotificationProvider";
 
 const MainContainer = ({
   menuItems,
@@ -26,34 +25,32 @@ const MainContainer = ({
   pageTitle,
   navigateToPreviousLevel,
   currentLevelItems,
-  children // Aggiungo il supporto per i children
+  children, // Aggiungo il supporto per i children
 }) => {
   const navigate = useNavigate();
-  
+
   return (
     <NotificationProvider>
       <Helmet>
         <title>{pageTitle}</title>
       </Helmet>
-      
+
       <div className="flex-grow w-full main-container relative">
         {/* Mostra il menu principale solo quando NON siamo su una pagina componente */}
-        {!isPageComponent && <MainMenu menuItems={currentLevelItems} onNavigate={handleNavigate} />}
-        
+        {!isPageComponent && (
+          <MainMenu menuItems={currentLevelItems} onNavigate={handleNavigate} />
+        )}
 
-        
         {/* Mostra la navigazione appropriata a seconda del tipo di pagina */}
         {isPageComponent ? (
           <div className="flex items-center justify-between breadcrumb">
             <button
               className="breadcrumb-item mx-4 text-2xl"
-              style={{ width: '100px' }}
+              style={{ width: "100px" }}
               onClick={navigateToPreviousLevel}
             >
               <i className="fas fa-arrow-left p-1 colorSecondary fs-5"></i>
-              <h6 className="colorSecondary m-auto mx-2 fs-5">
-                Menu
-              </h6>
+              <h6 className="colorSecondary m-auto mx-2 fs-5">Menu</h6>
             </button>
             <div className="text-center font-medium fs-5 mx-4">{pageTitle}</div>
           </div>
@@ -62,7 +59,8 @@ const MainContainer = ({
             <ol className="breadcrumb">
               <li className="breadcrumb-item ml-3">
                 <button onClick={handleHomeClick}>
-                  <i className="fas fa-home p-1 colorSecondary "></i><h6 className="m-auto colorSecondary fs-5">  Home</h6>
+                  <i className="fas fa-home p-1 colorSecondary "></i>
+                  <h6 className="m-auto colorSecondary fs-5"> Home</h6>
                 </button>
               </li>
               {breadcrumb.map((item, index) => (
@@ -77,13 +75,12 @@ const MainContainer = ({
             </ol>
           </div>
         )}
-        
+
         <main className="page-content">
-          
           {/* Posiziona Routes in modo che funzioni in entrambi i casi */}
           <Routes>
             <Route path="/" element={<ProtectedRoute />} />
-            
+
             {/* Pagine profilo utente */}
             <Route
               path="/user/change-password"
@@ -101,7 +98,7 @@ const MainContainer = ({
                 </ProtectedRoute>
               }
             />
-            
+
             {/* Rendering condizionale delle altre rotte solo quando isPageComponent è true */}
             {isPageComponent && (
               <>
@@ -117,7 +114,9 @@ const MainContainer = ({
                   path="/progetti/dashboard"
                   element={
                     <ProtectedRoute>
-                      <ProjectManagementSplitView onExit={navigateToPreviousLevel} />
+                      <ProjectManagementSplitView
+                        onExit={navigateToPreviousLevel}
+                      />
                     </ProtectedRoute>
                   }
                 />
@@ -153,7 +152,6 @@ const MainContainer = ({
                     </ProtectedRoute>
                   }
                 />
-
               </>
             )}
           </Routes>

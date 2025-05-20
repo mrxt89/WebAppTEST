@@ -1,45 +1,57 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Download, Trash2, Upload, File } from 'lucide-react';
-import { swal } from '../../../lib/common';
-import useAttachmentsActions from '../../../hooks/useAttachmentsActions';
-import DeleteConfirmationModal from './DeleteConfirmationModal';
-import FileViewer from '@/components/ui/fileViewer';
-import FileDropZone from '@/components/ui/FileDropZone';
+import { Download, Trash2, Upload, File } from "lucide-react";
+import { swal } from "../../../lib/common";
+import useAttachmentsActions from "../../../hooks/useAttachmentsActions";
+import DeleteConfirmationModal from "./DeleteConfirmationModal";
+import FileViewer from "@/components/ui/fileViewer";
+import FileDropZone from "@/components/ui/FileDropZone";
 
 const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
-  const [deleteModal, setDeleteModal] = useState({ open: false, attachmentId: null });
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    attachmentId: null,
+  });
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
-  
-  const { 
-    loading, 
+
+  const {
+    loading,
     getAttachments,
-    uploadAttachment, 
-    deleteAttachment, 
+    uploadAttachment,
+    deleteAttachment,
     downloadAttachment,
-    downloadAllAttachments
+    downloadAllAttachments,
   } = useAttachmentsActions();
 
   const loadAttachments = async () => {
     try {
       if (!project?.ProjectID) {
-        console.log('Nessun progetto selezionato, impossibile caricare allegati');
+        console.log(
+          "Nessun progetto selezionato, impossibile caricare allegati",
+        );
         return;
       }
-      
+
       const data = await getAttachments(project.ProjectID);
       setAttachments(data);
     } catch (error) {
-      console.error('Error loading attachments:', error);
+      console.error("Error loading attachments:", error);
       swal.fire({
-        title: 'Errore',
-        text: 'Errore nel caricamento degli allegati',
-        icon: 'error',
+        title: "Errore",
+        text: "Errore nel caricamento degli allegati",
+        icon: "error",
         timer: 1500,
       });
     }
@@ -55,7 +67,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
 
   const handleFileSelect = async (input) => {
     let file;
-    
+
     // Se viene da input file standard
     if (input?.target?.files) {
       file = input.target.files[0];
@@ -63,61 +75,60 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
       // Se viene da drag & drop
       file = input;
     }
-    
+
     if (!file) {
-      console.log('No file selected');
+      console.log("No file selected");
       return;
     }
-    
+
     // Verifica che project.ProjectID sia definito
     if (!project?.ProjectID) {
-      console.error('Project ID is missing, cannot upload file');
+      console.error("Project ID is missing, cannot upload file");
       swal.fire({
-        title: 'Errore',
-        text: 'ID progetto mancante, impossibile caricare il file',
-        icon: 'error',
+        title: "Errore",
+        text: "ID progetto mancante, impossibile caricare il file",
+        icon: "error",
         timer: 1500,
       });
       return;
     }
-  console.log('File selected:', file);
+    console.log("File selected:", file);
     try {
       setUploading(true);
-      
+
       // Usa la nuova versione con oggetto options
-      const result = await uploadAttachment(file, { 
+      const result = await uploadAttachment(file, {
         projectId: project.ProjectID,
-        taskId: 0 
+        taskId: 0,
       });
-      
+
       if (result.success) {
         await loadAttachments();
         onAttachmentChange && onAttachmentChange();
         swal.fire({
-          title: 'Successo',
-          text: 'Allegato caricato con successo',
-          icon: 'success',
+          title: "Successo",
+          text: "Allegato caricato con successo",
+          icon: "success",
           timer: 1500,
           showProgressBar: true,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
       }
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error("Upload error:", error);
       swal.fire({
-        title: 'Errore',
-        text: 'Errore nel caricamento dell\'allegato',
-        icon: 'error',
+        title: "Errore",
+        text: "Errore nel caricamento dell'allegato",
+        icon: "error",
         timer: 1500,
       });
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
-
 
   const handleConfirmDelete = async () => {
     try {
@@ -125,19 +136,19 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
       await loadAttachments();
       onAttachmentChange && onAttachmentChange();
       swal.fire({
-        title: 'Successo',
-        text: 'Allegato eliminato con successo',
-        icon: 'success',
+        title: "Successo",
+        text: "Allegato eliminato con successo",
+        icon: "success",
         timer: 1500,
         showProgressBar: true,
-        showConfirmButton: false
+        showConfirmButton: false,
       });
     } catch (error) {
-      console.error('Error deleting attachment:', error);
+      console.error("Error deleting attachment:", error);
       swal.fire({
-        title: 'Errore',
-        text: 'Errore nell\'eliminazione dell\'allegato',
-        icon: 'error',
+        title: "Errore",
+        text: "Errore nell'eliminazione dell'allegato",
+        icon: "error",
         timer: 1500,
       });
     } finally {
@@ -149,11 +160,11 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
     try {
       await downloadAttachment(attachment.AttachmentID, attachment.FileName);
     } catch (error) {
-      console.error('Error downloading attachment:', error);
+      console.error("Error downloading attachment:", error);
       swal.fire({
-        title: 'Errore',
-        text: 'Errore nel download dell\'allegato',
-        icon: 'error',
+        title: "Errore",
+        text: "Errore nel download dell'allegato",
+        icon: "error",
         timer: 1500,
       });
     }
@@ -161,27 +172,27 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
 
   const handleDownloadAll = async () => {
     if (!project?.ProjectID) {
-      console.error('Project ID is missing, cannot download all attachments');
+      console.error("Project ID is missing, cannot download all attachments");
       return;
     }
-    
+
     try {
       // Usa la nuova versione con oggetto options
       await downloadAllAttachments({ projectId: project.ProjectID });
     } catch (error) {
-      console.error('Error downloading all attachments:', error);
+      console.error("Error downloading all attachments:", error);
       swal.fire({
-        title: 'Errore',
-        text: 'Errore nel download degli allegati',
-        icon: 'error',
+        title: "Errore",
+        text: "Errore nel download degli allegati",
+        icon: "error",
         timer: 1500,
       });
     }
   };
 
   return (
-    <FileDropZone 
-      onFileSelect={handleFileSelect} 
+    <FileDropZone
+      onFileSelect={handleFileSelect}
       disabled={!canEdit || uploading || !project?.ProjectID}
     >
       <div className="space-y-4">
@@ -212,7 +223,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
               </Button>
             </div>
           )}
-          
+
           {attachments.length > 0 && (
             <Button
               variant="outline"
@@ -271,7 +282,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
                 attachments.map((attachment) => (
                   <TableRow key={attachment.AttachmentID}>
                     <TableCell className="font-medium">
-                      <div 
+                      <div
                         className="flex items-center gap-2 cursor-pointer hover:text-blue-500"
                         onClick={() => setSelectedFile(attachment)}
                       >
@@ -280,11 +291,10 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {Math.round(attachment.FileSizeKB / 1024 * 100) / 100} MB
+                      {Math.round((attachment.FileSizeKB / 1024) * 100) / 100}{" "}
+                      MB
                     </TableCell>
-                    <TableCell>
-                      {attachment.TaskTitle || '-'}
-                    </TableCell>
+                    <TableCell>{attachment.TaskTitle || "-"}</TableCell>
                     <TableCell>{attachment.UploadedByName}</TableCell>
                     <TableCell>
                       {new Date(attachment.UploadedAt).toLocaleString()}
@@ -302,10 +312,12 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setDeleteModal({ 
-                              open: true, 
-                              attachmentId: attachment.AttachmentID 
-                            })}
+                            onClick={() =>
+                              setDeleteModal({
+                                open: true,
+                                attachmentId: attachment.AttachmentID,
+                              })
+                            }
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -320,14 +332,14 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
         </ScrollArea>
       </div>
 
-      <DeleteConfirmationModal 
+      <DeleteConfirmationModal
         isOpen={deleteModal.open}
         onClose={() => setDeleteModal({ open: false, attachmentId: null })}
         onConfirm={handleConfirmDelete}
         title="Elimina allegato"
         message="Sei sicuro di voler eliminare questo allegato? L'operazione non può essere annullata."
       />
-      <FileViewer 
+      <FileViewer
         file={selectedFile}
         isOpen={!!selectedFile}
         onClose={() => setSelectedFile(null)}

@@ -1,8 +1,8 @@
 // Frontend/src/components/itemAttachments/BOMItemAttachments.js
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Box, 
-  Typography, 
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Box,
+  Typography,
   CircularProgress,
   Button,
   IconButton,
@@ -20,8 +20,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
-} from '@mui/material';
+  DialogActions,
+} from "@mui/material";
 import {
   CloudUpload as UploadIcon,
   Download as DownloadIcon,
@@ -36,22 +36,22 @@ import {
   History as HistoryIcon,
   Label as LabelIcon,
   Share as ShareIcon,
-  Restore as RestoreIcon
-} from '@mui/icons-material';
-import { formatDistanceToNow } from 'date-fns';
-import { it } from 'date-fns/locale';
-import useItemAttachmentsActions from '../../hooks/useItemAttachmentsActions';
-import ItemAttachmentUploader from './ItemAttachmentUploader';
-import ItemAttachmentDetails from './ItemAttachmentDetails';
-import ItemAttachmentVersions from './ItemAttachmentVersions';
-import ItemAttachmentSharing from './ItemAttachmentSharing';
-import ItemAttachmentCategories from './ItemAttachmentCategories';
-import FileViewer from '../ui/fileViewer';
-import { useAuth } from '../../context/AuthContext';
+  Restore as RestoreIcon,
+} from "@mui/icons-material";
+import { formatDistanceToNow } from "date-fns";
+import { it } from "date-fns/locale";
+import useItemAttachmentsActions from "../../hooks/useItemAttachmentsActions";
+import ItemAttachmentUploader from "./ItemAttachmentUploader";
+import ItemAttachmentDetails from "./ItemAttachmentDetails";
+import ItemAttachmentVersions from "./ItemAttachmentVersions";
+import ItemAttachmentSharing from "./ItemAttachmentSharing";
+import ItemAttachmentCategories from "./ItemAttachmentCategories";
+import FileViewer from "../ui/fileViewer";
+import { useAuth } from "../../context/AuthContext";
 
 /**
  * BOMItemAttachments - Componente specializzato per mostrare gli allegati nel contesto della distinta base
- * 
+ *
  * @param {string} itemCode - Codice dell'articolo (per articoli da ERP)
  * @param {number} projectItemId - ID dell'articolo progetto (per articoli temporanei)
  * @param {boolean} readOnly - Flag per modalità sola lettura
@@ -59,20 +59,20 @@ import { useAuth } from '../../context/AuthContext';
  * @param {string} componentName - Nome del componente (opzionale)
  * @param {boolean} compact - Flag per modalità compatta (adatta alla visualizzazione in una tab)
  */
-function BOMItemAttachments({ 
+function BOMItemAttachments({
   itemCode = null,
   projectItemId = null,
   readOnly = false,
   isComponentItem = false,
   componentName = null,
-  compact = true
+  compact = true,
 }) {
   // Stati del componente
   const [uploaderOpen, setUploaderOpen] = useState(false);
   const [attachmentToView, setAttachmentToView] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedAttachment, setSelectedAttachment] = useState(null);
-  const [dialogType, setDialogType] = useState(''); // 'details', 'versions', 'sharing', 'categories'
+  const [dialogType, setDialogType] = useState(""); // 'details', 'versions', 'sharing', 'categories'
   const [dialogOpen, setDialogOpen] = useState(false);
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -98,7 +98,7 @@ function BOMItemAttachments({
     getAttachmentCategories,
     setAttachmentCategories,
     getAttachmentVersions,
-    addAttachmentVersion
+    addAttachmentVersion,
   } = useItemAttachmentsActions();
 
   // Caricamento iniziale degli allegati
@@ -108,7 +108,12 @@ function BOMItemAttachments({
     } else if (projectItemId) {
       getAttachmentsByProjectItemId(projectItemId);
     }
-  }, [itemCode, projectItemId, getAttachmentsByItemCode, getAttachmentsByProjectItemId]);
+  }, [
+    itemCode,
+    projectItemId,
+    getAttachmentsByItemCode,
+    getAttachmentsByProjectItemId,
+  ]);
 
   // Gestione apertura uploader
   const handleUploaderOpen = () => {
@@ -131,7 +136,7 @@ function BOMItemAttachments({
   const handleMenuClose = () => {
     setMenuAnchorEl(null);
   };
-  
+
   // Refresh degli allegati
   const refreshAttachments = () => {
     if (itemCode) {
@@ -155,7 +160,7 @@ function BOMItemAttachments({
       downloadAllAttachmentsByProjectItemId(projectItemId);
     }
   };
-  
+
   // Visualizza anteprima dell'allegato
   const handleViewPreview = (attachment) => {
     setSelectedAttachment(attachment);
@@ -166,7 +171,7 @@ function BOMItemAttachments({
   // Visualizza dettagli allegato
   const handleViewDetails = (attachment) => {
     setSelectedAttachment(attachment);
-    setDialogType('details');
+    setDialogType("details");
     setDetailsTabValue(0); // Tab di visualizzazione
     setDialogOpen(true);
     handleMenuClose();
@@ -177,13 +182,13 @@ function BOMItemAttachments({
     // Controlla se l'utente può modificare l'allegato (proprietario dell'allegato)
     if (!readOnly) {
       setSelectedAttachment(attachment);
-      setDialogType('details');
+      setDialogType("details");
       setDetailsTabValue(1); // Tab di modifica
       setDialogOpen(true);
     } else {
       // Se in modalità sola lettura, mostra solo i dettagli
       setSelectedAttachment(attachment);
-      setDialogType('details');
+      setDialogType("details");
       setDetailsTabValue(0); // Tab di visualizzazione
       setDialogOpen(true);
     }
@@ -193,7 +198,7 @@ function BOMItemAttachments({
   // Gestione versioni allegato
   const handleVersions = (attachment) => {
     setSelectedAttachment(attachment);
-    setDialogType('versions');
+    setDialogType("versions");
     setDialogOpen(true);
     handleMenuClose();
   };
@@ -201,7 +206,7 @@ function BOMItemAttachments({
   // Gestione condivisione allegato
   const handleShare = (attachment) => {
     setSelectedAttachment(attachment);
-    setDialogType('sharing');
+    setDialogType("sharing");
     setDialogOpen(true);
     handleMenuClose();
   };
@@ -209,7 +214,7 @@ function BOMItemAttachments({
   // Gestione categorie allegato
   const handleCategories = (attachment) => {
     setSelectedAttachment(attachment);
-    setDialogType('categories');
+    setDialogType("categories");
     setDialogOpen(true);
     handleMenuClose();
   };
@@ -217,31 +222,37 @@ function BOMItemAttachments({
   // Eliminazione dell'allegato
   const handleDelete = (attachment) => {
     if (readOnly) return; // Non permettere eliminazione in modalità sola lettura
-    
+
     setSelectedAttachment(attachment);
-    
+
     // Usiamo sempre SweetAlert
     if (window.swal && window.swal.fire) {
-      window.swal.fire({
-        title: 'Conferma eliminazione',
-        text: `Sei sicuro di voler eliminare l'allegato "${attachment.FileName}"?`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Sì, elimina',
-        cancelButtonText: 'Annulla',
-        confirmButtonColor: '#d33',
-      }).then((result) => {
-        if (result.isConfirmed) {
-          performDelete(attachment);
-        }
-      });
+      window.swal
+        .fire({
+          title: "Conferma eliminazione",
+          text: `Sei sicuro di voler eliminare l'allegato "${attachment.FileName}"?`,
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Sì, elimina",
+          cancelButtonText: "Annulla",
+          confirmButtonColor: "#d33",
+        })
+        .then((result) => {
+          if (result.isConfirmed) {
+            performDelete(attachment);
+          }
+        });
     } else {
       // Fallback su conferma standard se swal non è disponibile
-      if (window.confirm(`Sei sicuro di voler eliminare l'allegato "${attachment.FileName}"?`)) {
+      if (
+        window.confirm(
+          `Sei sicuro di voler eliminare l'allegato "${attachment.FileName}"?`,
+        )
+      ) {
         performDelete(attachment);
       }
     }
-    
+
     handleMenuClose();
   };
 
@@ -251,20 +262,28 @@ function BOMItemAttachments({
       .then(() => {
         // Aggiorna la lista degli allegati dopo l'eliminazione
         refreshAttachments();
-        
+
         // Mostra messaggio di successo
         if (window.swal && window.swal.fire) {
-          window.swal.fire('Eliminato!', 'L\'allegato è stato eliminato con successo.', 'success');
+          window.swal.fire(
+            "Eliminato!",
+            "L'allegato è stato eliminato con successo.",
+            "success",
+          );
         }
       })
-      .catch(error => {
-        console.error('Errore nell\'eliminazione dell\'allegato:', error);
-        
+      .catch((error) => {
+        console.error("Errore nell'eliminazione dell'allegato:", error);
+
         // Mostra messaggio di errore
         if (window.swal && window.swal.fire) {
-          window.swal.fire('Errore', 'Si è verificato un errore durante l\'eliminazione dell\'allegato.', 'error');
+          window.swal.fire(
+            "Errore",
+            "Si è verificato un errore durante l'eliminazione dell'allegato.",
+            "error",
+          );
         } else {
-          alert('Errore nell\'eliminazione dell\'allegato');
+          alert("Errore nell'eliminazione dell'allegato");
         }
       });
   };
@@ -280,31 +299,37 @@ function BOMItemAttachments({
   // Gestione ripristino allegato (da soft delete)
   const handleRestore = (attachment) => {
     if (readOnly) return; // Non permettere ripristino in modalità sola lettura
-    
+
     setSelectedAttachment(attachment);
-    
+
     // Usiamo sempre SweetAlert
     if (window.swal && window.swal.fire) {
-      window.swal.fire({
-        title: 'Conferma ripristino',
-        text: `Sei sicuro di voler ripristinare l'allegato "${attachment.FileName}"?`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Sì, ripristina',
-        cancelButtonText: 'Annulla',
-        confirmButtonColor: '#4caf50',
-      }).then((result) => {
-        if (result.isConfirmed) {
-          performRestore(attachment);
-        }
-      });
+      window.swal
+        .fire({
+          title: "Conferma ripristino",
+          text: `Sei sicuro di voler ripristinare l'allegato "${attachment.FileName}"?`,
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: "Sì, ripristina",
+          cancelButtonText: "Annulla",
+          confirmButtonColor: "#4caf50",
+        })
+        .then((result) => {
+          if (result.isConfirmed) {
+            performRestore(attachment);
+          }
+        });
     } else {
       // Fallback su conferma standard
-      if (window.confirm(`Sei sicuro di voler ripristinare l'allegato "${attachment.FileName}"?`)) {
+      if (
+        window.confirm(
+          `Sei sicuro di voler ripristinare l'allegato "${attachment.FileName}"?`,
+        )
+      ) {
         performRestore(attachment);
       }
     }
-    
+
     handleMenuClose();
   };
 
@@ -314,20 +339,28 @@ function BOMItemAttachments({
       .then(() => {
         // Aggiorna la lista degli allegati dopo il ripristino
         refreshAttachments();
-        
+
         // Mostra messaggio di successo
         if (window.swal && window.swal.fire) {
-          window.swal.fire('Ripristinato!', 'L\'allegato è stato ripristinato con successo.', 'success');
+          window.swal.fire(
+            "Ripristinato!",
+            "L'allegato è stato ripristinato con successo.",
+            "success",
+          );
         }
       })
-      .catch(error => {
-        console.error('Errore nel ripristino dell\'allegato:', error);
-        
+      .catch((error) => {
+        console.error("Errore nel ripristino dell'allegato:", error);
+
         // Mostra messaggio di errore
         if (window.swal && window.swal.fire) {
-          window.swal.fire('Errore', 'Si è verificato un errore durante il ripristino dell\'allegato.', 'error');
+          window.swal.fire(
+            "Errore",
+            "Si è verificato un errore durante il ripristino dell'allegato.",
+            "error",
+          );
         } else {
-          alert('Errore nel ripristino dell\'allegato');
+          alert("Errore nel ripristino dell'allegato");
         }
       });
   };
@@ -348,38 +381,38 @@ function BOMItemAttachments({
 
   // Formatta dimensione file
   const formatBytes = (bytes, decimals = 2) => {
-    if (!bytes) return '0 Bytes';
-    
+    if (!bytes) return "0 Bytes";
+
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
   };
 
   // Icona per tipo di file
   const getFileIcon = (fileType, fileName) => {
-    const extension = fileName.split('.').pop().toLowerCase();
-    
+    const extension = fileName.split(".").pop().toLowerCase();
+
     return <FileIcon />;
   };
 
   // Contenuto principale del componente
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Intestazione con indicazione del componente selezionato */}
       {isComponentItem && componentName && (
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            p: 1.5, 
-            mb: 2, 
-            display: 'flex', 
-            alignItems: 'center',
-            backgroundColor: 'info.light', 
-            color: 'info.contrastText' 
+        <Paper
+          elevation={0}
+          sx={{
+            p: 1.5,
+            mb: 2,
+            display: "flex",
+            alignItems: "center",
+            backgroundColor: "info.light",
+            color: "info.contrastText",
           }}
         >
           <InfoIcon sx={{ mr: 1, fontSize: 18 }} />
@@ -388,17 +421,17 @@ function BOMItemAttachments({
           </Typography>
         </Paper>
       )}
-      
+
       {/* Barra delle azioni */}
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          mb: 1.5 
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 1.5,
         }}
       >
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ display: "flex", gap: 1 }}>
           {!readOnly && (
             <Button
               variant="contained"
@@ -410,7 +443,7 @@ function BOMItemAttachments({
               Carica
             </Button>
           )}
-          
+
           {attachments.length > 0 && (
             <Button
               variant="outlined"
@@ -422,8 +455,8 @@ function BOMItemAttachments({
             </Button>
           )}
         </Box>
-        
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Tooltip title="Aggiorna">
             <IconButton onClick={refreshAttachments} size="small">
               <RefreshIcon fontSize="small" />
@@ -431,37 +464,38 @@ function BOMItemAttachments({
           </Tooltip>
         </Box>
       </Box>
-      
+
       {/* Lista allegati */}
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
           <CircularProgress size={24} />
         </Box>
       ) : attachments.length === 0 ? (
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            p: 3, 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            backgroundColor: 'background.default',
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "background.default",
             borderRadius: 1,
-            border: '1px dashed',
-            borderColor: 'divider',
-            flex: 1
+            border: "1px dashed",
+            borderColor: "divider",
+            flex: 1,
           }}
         >
           <InfoIcon color="disabled" sx={{ fontSize: 48, mb: 2 }} />
           <Typography color="textSecondary">
-            Nessun allegato disponibile per questo {isComponentItem ? 'componente' : 'articolo'}
+            Nessun allegato disponibile per questo{" "}
+            {isComponentItem ? "componente" : "articolo"}
           </Typography>
           {!readOnly && (
-            <Button 
-              variant="outlined" 
-              color="primary" 
-              startIcon={<UploadIcon />} 
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={<UploadIcon />}
               onClick={handleUploaderOpen}
               sx={{ mt: 2 }}
               size="small"
@@ -471,29 +505,29 @@ function BOMItemAttachments({
           )}
         </Paper>
       ) : (
-        <List 
-          sx={{ 
-            maxHeight: compact ? 300 : 'auto', 
-            overflow: 'auto',
-            border: '1px solid',
-            borderColor: 'divider',
+        <List
+          sx={{
+            maxHeight: compact ? 300 : "auto",
+            overflow: "auto",
+            border: "1px solid",
+            borderColor: "divider",
             borderRadius: 1,
-            backgroundColor: 'background.paper',
-            flex: 1
+            backgroundColor: "background.paper",
+            flex: 1,
           }}
         >
           {attachments.map((attachment) => (
             <React.Fragment key={attachment.AttachmentID}>
-              <ListItem 
-                sx={{ 
-                  '&:hover': { 
-                    backgroundColor: 'action.hover' 
+              <ListItem
+                sx={{
+                  "&:hover": {
+                    backgroundColor: "action.hover",
                   },
                   // Aggiunge uno stile visivo se l'allegato è nascosto
                   ...(attachment.IsVisible === false && {
                     opacity: 0.6,
-                    backgroundColor: 'action.disabledBackground'
-                  })
+                    backgroundColor: "action.disabledBackground",
+                  }),
                 }}
               >
                 <ListItemIcon>
@@ -505,26 +539,26 @@ function BOMItemAttachments({
                       variant="body2"
                       component="div"
                       sx={{
-                        fontWeight: 'medium',
-                        display: 'flex',
-                        alignItems: 'center'
+                        fontWeight: "medium",
+                        display: "flex",
+                        alignItems: "center",
                       }}
                     >
                       {attachment.FileName}
                     </Typography>
                   }
                   secondary={
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                    >
-                      {formatBytes(attachment.FileSizeKB * 1024)} • 
-                      {formatDistanceToNow(new Date(attachment.UploadedAt), { addSuffix: true, locale: it })}
+                    <Typography variant="caption" color="text.secondary">
+                      {formatBytes(attachment.FileSizeKB * 1024)} •
+                      {formatDistanceToNow(new Date(attachment.UploadedAt), {
+                        addSuffix: true,
+                        locale: it,
+                      })}
                     </Typography>
                   }
                 />
                 <ListItemSecondaryAction>
-                  <Box sx={{ display: 'flex' }}>
+                  <Box sx={{ display: "flex" }}>
                     {/* Per allegati nascosti (con soft delete), mostra pulsante di ripristino */}
                     {attachment.IsVisible === false && !readOnly ? (
                       <Tooltip title="Ripristina">
@@ -572,7 +606,7 @@ function BOMItemAttachments({
                                 <EditIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
-                            
+
                             <Tooltip title="Elimina">
                               <IconButton
                                 edge="end"
@@ -606,7 +640,7 @@ function BOMItemAttachments({
           ))}
         </List>
       )}
-      
+
       {/* Menu contestuale */}
       <Menu
         anchorEl={menuAnchorEl}
@@ -619,28 +653,28 @@ function BOMItemAttachments({
           </ListItemIcon>
           <ListItemText>Dettagli</ListItemText>
         </MenuItem>
-        
+
         <MenuItem onClick={() => handleDownload(selectedAttachment)}>
           <ListItemIcon>
             <DownloadIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Scarica</ListItemText>
         </MenuItem>
-        
+
         <MenuItem onClick={() => handleViewPreview(selectedAttachment)}>
           <ListItemIcon>
             <ViewIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Visualizza</ListItemText>
         </MenuItem>
-        
+
         <MenuItem onClick={() => handleVersions(selectedAttachment)}>
           <ListItemIcon>
             <HistoryIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Versioni</ListItemText>
         </MenuItem>
-        
+
         {!readOnly && (
           <>
             <MenuItem onClick={() => handleShare(selectedAttachment)}>
@@ -649,28 +683,28 @@ function BOMItemAttachments({
               </ListItemIcon>
               <ListItemText>Condividi</ListItemText>
             </MenuItem>
-            
+
             <MenuItem onClick={() => handleCategories(selectedAttachment)}>
               <ListItemIcon>
                 <LabelIcon fontSize="small" />
               </ListItemIcon>
               <ListItemText>Categorie</ListItemText>
             </MenuItem>
-            
+
             <Divider />
-            
+
             <MenuItem onClick={() => handleEdit(selectedAttachment)}>
               <ListItemIcon>
                 <EditIcon fontSize="small" />
               </ListItemIcon>
               <ListItemText>Modifica</ListItemText>
             </MenuItem>
-            
-            <MenuItem 
+
+            <MenuItem
               onClick={() => handleDelete(selectedAttachment)}
-              sx={{ color: 'error.main' }}
+              sx={{ color: "error.main" }}
             >
-              <ListItemIcon sx={{ color: 'error.main' }}>
+              <ListItemIcon sx={{ color: "error.main" }}>
                 <DeleteIcon fontSize="small" />
               </ListItemIcon>
               <ListItemText>Elimina</ListItemText>
@@ -678,9 +712,9 @@ function BOMItemAttachments({
           </>
         )}
       </Menu>
-      
+
       {/* Rimossi dialog di conferma, utilizziamo SweetAlert */}
-      
+
       {/* Dialog uploader */}
       <ItemAttachmentUploader
         open={uploaderOpen}
@@ -692,9 +726,9 @@ function BOMItemAttachments({
           setUploaderOpen(false);
         }}
       />
-      
+
       {/* Dialog per i dettagli */}
-      {selectedAttachment && dialogOpen && dialogType === 'details' && (
+      {selectedAttachment && dialogOpen && dialogType === "details" && (
         <ItemAttachmentDetails
           open={dialogOpen}
           attachment={selectedAttachment}
@@ -705,9 +739,9 @@ function BOMItemAttachments({
           onUpdate={handleDialogClose}
         />
       )}
-      
+
       {/* Dialog per le versioni */}
-      {selectedAttachment && dialogOpen && dialogType === 'versions' && (
+      {selectedAttachment && dialogOpen && dialogType === "versions" && (
         <ItemAttachmentVersions
           open={dialogOpen}
           attachment={selectedAttachment}
@@ -715,9 +749,9 @@ function BOMItemAttachments({
           readOnly={readOnly}
         />
       )}
-      
+
       {/* Dialog per la condivisione */}
-      {selectedAttachment && dialogOpen && dialogType === 'sharing' && (
+      {selectedAttachment && dialogOpen && dialogType === "sharing" && (
         <ItemAttachmentSharing
           open={dialogOpen}
           attachment={selectedAttachment}
@@ -725,9 +759,9 @@ function BOMItemAttachments({
           readOnly={readOnly}
         />
       )}
-      
+
       {/* Dialog per le categorie */}
-      {selectedAttachment && dialogOpen && dialogType === 'categories' && (
+      {selectedAttachment && dialogOpen && dialogType === "categories" && (
         <ItemAttachmentCategories
           open={dialogOpen}
           attachment={selectedAttachment}
@@ -735,7 +769,7 @@ function BOMItemAttachments({
           readOnly={readOnly}
         />
       )}
-      
+
       {/* FileViewer per la preview dell'allegato */}
       {isPreviewOpen && selectedAttachment && (
         <FileViewer

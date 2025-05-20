@@ -19,7 +19,6 @@ const authenticateToken = require('../authenticateToken');
 
 router.get('/users', authenticateToken, async (req, res) => {
   try {
-    console.log('requesting users : ', req.user);
     const userId = req.user.UserId;
     const users = await getAllUsers(userId);
     res.json(users);

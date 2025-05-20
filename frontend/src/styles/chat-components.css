@@ -124,7 +124,10 @@
 }
 
 .minimized-chat-icon {
-  transition: transform 0.2s ease, opacity 0.2s ease, background-color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .minimized-chat-icon.unread-pulse {
@@ -205,8 +208,12 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .animated-fade-in {
@@ -214,11 +221,17 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .message-text {
   white-space: pre-line;
   word-break: break-word;
-} 
+}

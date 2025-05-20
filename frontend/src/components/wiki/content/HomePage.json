@@ -1,43 +1,43 @@
 {
-    "title": "Visualizzazione principale",
-    "description": "Benvenuto nella documentazione interattiva della piattaforma.",
-    "sections": [
-      {
-        "title": "Panoramica",
-        "content": "<p>Questa sezione ti mostrerà come navigare e utilizzare le funzionalità principali della piattaforma.</p>",
-        "tourId": "panoramica"
-        }
-    ],
-    "tours": {
-        "panoramica": [
-            {
-            "title": "HOME PAGE",
-            "description": "La home page è la prima pagina che vedi quando accedi alla piattaforma. Da qui puoi accedere a tutte le funzionalità principali."
-            },
-            {
-            "title": "Navigazione 1 di 2",
-            "description": "Puoi navigare tra le varie sezioni della piattaforma usando i pulsanti del menu principale.",
-            "selector": ".w-full .max-w-6xl",
-            "position": "bottom"
-            },
-            {
-            "title": "Navigazione 2 di 2",
-            "description": "Per accedere ai livelli precedenti del menu clicc sul percorso che comparirà in questa sezione.",
-            "selector": ".fa-home",
-            "position": "bottom"
-            },
-            {
-            "title": "Pannello messaggistica",
-            "description": "Clicca questa icona per accedere alla messaggistica interna.",
-            "selector": ".fa-message",
-            "position": "bottom"
-            },
-            {
-            "title": "Ritorna alla home",
-            "description": "Clicca questa icona per tornare alla home page in modo veloce.",
-            "selector": "#company-logo",
-            "position": "bottom"
-            }
-        ]
+  "title": "Visualizzazione principale",
+  "description": "Benvenuto nella documentazione interattiva della piattaforma.",
+  "sections": [
+    {
+      "title": "Panoramica",
+      "content": "<p>Questa sezione ti mostrerà come navigare e utilizzare le funzionalità principali della piattaforma.</p>",
+      "tourId": "panoramica"
     }
+  ],
+  "tours": {
+    "panoramica": [
+      {
+        "title": "HOME PAGE",
+        "description": "La home page è la prima pagina che vedi quando accedi alla piattaforma. Da qui puoi accedere a tutte le funzionalità principali."
+      },
+      {
+        "title": "Navigazione 1 di 2",
+        "description": "Puoi navigare tra le varie sezioni della piattaforma usando i pulsanti del menu principale.",
+        "selector": ".w-full .max-w-6xl",
+        "position": "bottom"
+      },
+      {
+        "title": "Navigazione 2 di 2",
+        "description": "Per accedere ai livelli precedenti del menu clicc sul percorso che comparirà in questa sezione.",
+        "selector": ".fa-home",
+        "position": "bottom"
+      },
+      {
+        "title": "Pannello messaggistica",
+        "description": "Clicca questa icona per accedere alla messaggistica interna.",
+        "selector": ".fa-message",
+        "position": "bottom"
+      },
+      {
+        "title": "Ritorna alla home",
+        "description": "Clicca questa icona per tornare alla home page in modo veloce.",
+        "selector": "#company-logo",
+        "position": "bottom"
+      }
+    ]
+  }
 }
