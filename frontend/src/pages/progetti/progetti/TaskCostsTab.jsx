@@ -325,7 +325,6 @@ const TaskCostsTab = ({ task, canEdit, onCostChange }) => {
           fetchUnitsOfMeasure(),
           fetchCostCategories(),
         ]);
-        console.log("Categorie caricate:", categories); // Debug
         setUnitsOfMeasure(uoms);
         setCostCategories(categories);
       } catch (error) {

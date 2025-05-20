@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import ProtectedRoute from "../ProtectedRoute";
@@ -28,6 +28,38 @@ const MainContainer = ({
   children, // Aggiungo il supporto per i children
 }) => {
   const navigate = useNavigate();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  // Monitora l'apertura dei dialog per gestire correttamente l'accessibilità
+  useEffect(() => {
+    const checkDialogState = () => {
+      // Verifica se c'è un elemento dialog[data-state="open"]
+      const openDialogs = document.querySelectorAll('[role="dialog"][data-state="open"]');
+      setIsDialogOpen(openDialogs.length > 0);
+    };
+    
+    // Esegui al mount
+    checkDialogState();
+    
+    // Crea un observer per rilevare le modifiche ai dialog
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'attributes' || mutation.type === 'childList') {
+          checkDialogState();
+        }
+      }
+    });
+    
+    // Osserva le modifiche al DOM
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-state']
+    });
+    
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <NotificationProvider>
@@ -35,7 +67,12 @@ const MainContainer = ({
         <title>{pageTitle}</title>
       </Helmet>
 
-      <div className="flex-grow w-full main-container relative">
+      <div 
+        className="flex-grow w-full main-container relative"
+        // Utilizziamo l'attributo inert invece di aria-hidden per il contenitore principale
+        // quando ci sono dialoghi aperti, perché è più sicuro per l'accessibilità
+        inert={isDialogOpen ? "" : undefined}
+      >
         {/* Mostra il menu principale solo quando NON siamo su una pagina componente */}
         {!isPageComponent && (
           <MainMenu menuItems={currentLevelItems} onNavigate={handleNavigate} />

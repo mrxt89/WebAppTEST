@@ -93,7 +93,6 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
       });
       return;
     }
-    console.log("File selected:", file);
     try {
       setUploading(true);
 

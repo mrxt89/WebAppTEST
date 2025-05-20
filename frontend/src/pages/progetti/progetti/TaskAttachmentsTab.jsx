@@ -84,7 +84,12 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
 
       if (result.success) {
         await loadAttachments();
-        onAttachmentChange && onAttachmentChange();
+        // Chiamiamo onAttachmentChange con un parametro che indica di mantenere la tab attiva
+        if (onAttachmentChange) onAttachmentChange(() => {
+          // Questo callback serve a eseguire operazioni dopo il refresh
+          // ma non cambia la tab attiva
+        });
+        
         // Nascondo il pannello dopo caricamento completato
         setShowUploadPanel(false);
         swal.fire({
@@ -114,7 +119,12 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
     try {
       await deleteAttachment(deleteModal.attachmentId);
       await loadAttachments();
-      onAttachmentChange && onAttachmentChange();
+      // Chiamiamo onAttachmentChange con un parametro che indica di mantenere la tab attiva
+      if (onAttachmentChange) onAttachmentChange(() => {
+        // Questo callback serve a eseguire operazioni dopo il refresh
+        // ma non cambia la tab attiva
+      });
+      
       swal.fire({
         title: "Successo",
         text: "Allegato eliminato con successo",
