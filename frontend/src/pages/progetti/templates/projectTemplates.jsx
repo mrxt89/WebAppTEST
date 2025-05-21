@@ -18,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Plus,
   Pencil,
@@ -27,6 +26,7 @@ import {
   EyeOff,
   ChevronDown,
   ChevronRight,
+  AlertTriangle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,15 +36,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import useTemplateActions from "../../../hooks/useTemplateActions";
 import { swal } from "../../../lib/common";
 import { toast } from "@/components/ui/use-toast";
+import TemplateDialog from "./TemplateDialog";
 
 const TemplatesPage = () => {
   const {
@@ -69,6 +64,7 @@ const TemplatesPage = () => {
   const [currentTask, setCurrentTask] = useState(null);
   const [expandedTemplates, setExpandedTemplates] = useState({});
   const [subcategories, setSubcategories] = useState([]);
+  const [showInlineWarning, setShowInlineWarning] = useState(false);
 
   useEffect(() => {
     console.log("Fetching templates and reference data...");
@@ -122,13 +118,10 @@ const TemplatesPage = () => {
   const handleSaveTemplate = async () => {
     try {
       if (!currentTemplate?.Description) {
-        swal.fire(
-          "Attenzione",
-          "La descrizione del template è obbligatoria",
-          "warning",
-        );
+        setShowInlineWarning(true);
         return;
       }
+      setShowInlineWarning(false);
 
       const result = await addUpdateTemplate({
         TemplateID: currentTemplate.TemplateID,
@@ -288,6 +281,19 @@ const TemplatesPage = () => {
           Nuovo Template
         </Button>
       </div>
+
+      {showInlineWarning && (
+        <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">
+                Attenzione: la descrizione del template è obbligatoria
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Table>
         <TableHeader>
@@ -512,107 +518,16 @@ const TemplatesPage = () => {
       </Table>
 
       {/* Dialog per template */}
-      <Dialog
+      <TemplateDialog
         open={isTemplateDialogOpen}
         onOpenChange={setIsTemplateDialogOpen}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {currentTemplate?.TemplateID
-                ? "Modifica Template"
-                : "Nuovo Template"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div>
-              <Label>Descrizione *</Label>
-              <Input
-                value={currentTemplate?.Description || ""}
-                onChange={(e) =>
-                  setCurrentTemplate({
-                    ...currentTemplate,
-                    Description: e.target.value,
-                  })
-                }
-              />
-            </div>
-            <div>
-              <Label>Note</Label>
-              <Textarea
-                value={currentTemplate?.Notes || ""}
-                onChange={(e) =>
-                  setCurrentTemplate({
-                    ...currentTemplate,
-                    Notes: e.target.value,
-                  })
-                }
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label>Categoria</Label>
-              <Select
-                value={currentTemplate?.ProjectCategoryId?.toString() || "null"}
-                onValueChange={handleCategoryChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="null">- Nessuna categoria -</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem
-                      key={category.ProjectCategoryId}
-                      value={category.ProjectCategoryId.toString()}
-                    >
-                      {category.Description}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {currentTemplate?.ProjectCategoryId && (
-              <div>
-                <Label>Sottocategoria</Label>
-                <Select
-                  value={
-                    currentTemplate?.ProjectCategoryDetailLine?.toString() ||
-                    "null"
-                  }
-                  onValueChange={(value) =>
-                    setCurrentTemplate({
-                      ...currentTemplate,
-                      ProjectCategoryDetailLine:
-                        value === "null" ? null : parseInt(value),
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleziona sottocategoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="null">
-                      - Nessuna sottocategoria -
-                    </SelectItem>
-                    {subcategories.map((subcategory) => (
-                      <SelectItem
-                        key={subcategory.Line}
-                        value={subcategory.Line.toString()}
-                      >
-                        {subcategory.Description}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <Button className="w-full" onClick={handleSaveTemplate}>
-              Salva
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        currentTemplate={currentTemplate}
+        setCurrentTemplate={setCurrentTemplate}
+        categories={categories}
+        subcategories={subcategories}
+        handleCategoryChange={handleCategoryChange}
+        handleSaveTemplate={handleSaveTemplate}
+      />
 
       {/* Dialog per attività */}
       <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
