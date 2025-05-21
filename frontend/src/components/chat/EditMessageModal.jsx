@@ -271,7 +271,7 @@ const EditMessageModal = ({
 
         {message && (
           <div className="flex-1 overflow-y-auto">
-            {message.isEdited && (
+            {message.isEdited == '1' && (
               <div className="mb-4 bg-blue-50 p-2 rounded-md flex items-center">
                 <Clock className="h-4 w-4 mr-2 text-blue-500" />
                 <span className="text-sm text-blue-700">
