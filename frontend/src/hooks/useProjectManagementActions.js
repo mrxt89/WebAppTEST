@@ -116,6 +116,29 @@ const useProjectActions = () => {
     [makeRequest],
   );
 
+  // Carica tutti i progetti (non paginati)
+  const fetchAllProjects = useCallback(
+    async (filters = {}) => {
+      try {
+        setLoading(true);
+        const url = `${config.API_BASE_URL}/projects/all?filters=${encodeURIComponent(JSON.stringify(filters))}`;
+
+        const data = await makeRequest(url);
+
+        if (data) {
+          return data; // Array di progetti
+        }
+        return [];
+      } catch (error) {
+        console.error("Error fetching all projects:", error);
+        return [];
+      } finally {
+        setLoading(false);
+      }
+    },
+    [makeRequest],
+  );
+
   const getProjectById = async (projectId) => {
     try {
       setLoading(true);
@@ -614,6 +637,7 @@ const useProjectActions = () => {
     totalPages,
     totalRecords,
     fetchProjects,
+    fetchAllProjects,
     getProjectById,
     addUpdateProject,
     updateProjectMembers,

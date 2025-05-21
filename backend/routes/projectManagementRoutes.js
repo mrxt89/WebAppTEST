@@ -58,6 +58,21 @@ router.get('/projects/paginated', authenticateToken, async (req, res) => {
     }
 });
 
+// Get all projects (non-paginated)
+router.get('/projects/all', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.UserId;
+        const filters = req.query.filters ? JSON.parse(req.query.filters) : {};
+        
+        // Utilizziamo la stessa funzione di getPaginatedProjects ma con una dimensione pagina molto grande
+        const result = await getPaginatedProjects(0, 1000, filters, userId);
+        res.json(result.items); // Restituiamo solo gli items senza metadati di paginazione
+    } catch (err) {
+        console.error('Error fetching all projects:', err);
+        res.status(500).send('Internal server error');
+    }
+});
+
 // Get project details with tasks and members
 router.get('/projects/:id', authenticateToken, async (req, res) => {
     try {
