@@ -182,6 +182,7 @@ const ModernChatList = ({
   animatedEditId,
   newMessage,
   onScrollToBottom,
+  onEditMessage,
 }) => {
   // Ottieni direttamente l'accesso al context
   const {
@@ -2368,16 +2369,7 @@ const ModernChatList = ({
         message={messageToEdit}
         users={users || []} // Assicurati che users sia un array anche se undefined
         messages={localMessages} // Passa i messaggi al modal
-        onMessageUpdated={(updatedNotificationId) => {
-          // Ricarica la notifica per aggiornare i messaggi
-          const idToUpdate = updatedNotificationId || notificationId;
-          if (idToUpdate) {
-            // Forza high priority update
-            fetchNotificationById(idToUpdate, true).catch((error) => {
-              console.error("Errore nell'aggiornamento della notifica:", error);
-            });
-          }
-        }}
+        onMessageUpdated={onEditMessage}
       />
 
       {/* Modal per visualizzare la cronologia delle versioni */}

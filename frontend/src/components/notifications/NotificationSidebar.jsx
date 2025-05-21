@@ -1647,212 +1647,225 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
         {/* La sezione delle notifiche visibile solo quando non è attiva la ricerca per documenti */}
         {!isDocumentSearchVisible &&
           (filteredNotifications && filteredNotifications.length > 0 ? (
-            filteredNotifications.map((notification) => {
-              const messages = parseMessages(notification.messages);
-              const lastMessage =
-                messages.length > 0 ? messages[messages.length - 1] : null;
-              const categoryColor = notification.hexColor;
-              // Verifica se questa chat è stata abbandonata dall'utente
-              const hasLeftChat =
-                notification.chatLeft === 1 || notification.chatLeft === true;
-              // Verifica se questa chat è stata archiviata dall'utente
-              const isArchived =
-                notification.archived === 1 || notification.archived === true;
+            (() => {
+              // Rimuovi i duplicati usando un Set per tracciare gli ID già visti
+              const uniqueIds = new Set();
+              const uniqueNotifications = filteredNotifications.filter(notification => {
+                if (uniqueIds.has(notification.notificationId)) {
+                  console.error(`Trovata notifica duplicata con ID: ${notification.notificationId}`);
+                  return false;
+                }
+                uniqueIds.add(notification.notificationId);
+                return true;
+              });
+              
+              return uniqueNotifications.map((notification) => {
+                const messages = parseMessages(notification.messages);
+                const lastMessage =
+                  messages.length > 0 ? messages[messages.length - 1] : null;
+                const categoryColor = notification.hexColor;
+                // Verifica se questa chat è stata abbandonata dall'utente
+                const hasLeftChat =
+                  notification.chatLeft === 1 || notification.chatLeft === true;
+                // Verifica se questa chat è stata archiviata dall'utente
+                const isArchived =
+                  notification.archived === 1 || notification.archived === true;
 
-              return (
-                <div
-                  key={`notification-${notification.notificationId}-${lastMessage ? lastMessage.messageId : Date.now()}`}
-                  className={`notification-item ${notification.isReadByUser ? "read" : "unread"} ${notification.isClosed ? "isClosed" : ""} ${hasLeftChat ? "chat-left" : ""} ${isArchived ? "archived" : ""}
-                          ${animatingItemId === notification.notificationId && animationPhase === "exit" ? "pin-exit-active" : ""}
-                          ${animatingItemId === notification.notificationId && animationPhase === "enter" ? "pin-enter-active" : ""}`}
-                  onClick={(e) => handleNotificationClick(notification, e)}
-                  id={`notification-item-${notification.notificationId}`}
-                  data-notification-id={notification.notificationId}
-                  data-is-read={notification.isReadByUser ? "true" : "false"}
-                  data-is-pinned={notification.pinned ? "true" : "false"}
-                  data-is-closed={notification.isClosed ? "true" : "false"}
-                  data-has-left={hasLeftChat ? "true" : "false"}
-                  data-is-archived={isArchived ? "true" : "false"}
-                >
+                return (
                   <div
-                    className="category-vertical-bar"
-                    style={{ backgroundColor: categoryColor }}
-                    title={notification.notificationCategoryName}
-                    id={`notification-category-indicator-${notification.notificationId}`}
-                  ></div>
-                  {/* Div per la prima colonna di icone */}
-                  <div className="notification-content1A">
-                    <i
-                      className={`${notification.pinned ? "bi-pin-fill text-black" : "bi-pin-angle text-gray-600"} pin-icon`}
-                      onClick={(e) => {
-                        e.currentTarget.classList.add("pin-animation");
-                        setTimeout(() => {
-                          e.currentTarget.classList.remove("pin-animation");
-                        }, 600);
-                        handleTogglePin(
-                          notification.notificationId,
-                          notification.pinned,
-                          e,
-                        );
-                      }}
-                      id={`notification-pin-${notification.notificationId}`}
-                      title={
-                        notification.pinned ? "Rimuovi pin" : "Aggiungi pin"
-                      }
-                    ></i>
-                    <i
-                      className={
-                        notification.favorite ? "bi bi-star-fill" : "bi bi-star"
-                      }
-                      onClick={(e) =>
-                        handleToggleFavorite(
-                          notification.notificationId,
-                          notification.favorite,
-                          e,
-                        )
-                      }
-                      id={`notification-favorite-${notification.notificationId}`}
-                      title={
-                        notification.favorite
-                          ? "Rimuovi dai preferiti"
-                          : "Aggiungi ai preferiti"
-                      }
-                    ></i>
-                    <i
-                      className="bi bi-at"
-                      style={{
-                        color: notification.mentionToRead
-                          ? "red"
-                          : notification.isMentioned
-                            ? "black"
-                            : "gray",
-                        opacity:
-                          notification.isMentioned || notification.mentionToRead
-                            ? 1
-                            : 0.5,
-                      }}
-                      id={`notification-mention-${notification.notificationId}`}
-                      title={
-                        notification.isMentioned
-                          ? "Sei stato menzionato in questa notifica"
-                          : ""
-                      }
-                    ></i>
-                  </div>
-                  {/* Div per la seconda colonna di icone */}
-                  <div className="notification-content1B">
-                    {/* Aggiungi bottone di archiviazione */}
-                    <i
-                      className={
-                        isArchived
-                          ? "bi bi-archive-fill text-purple-600"
-                          : "bi bi-archive text-gray-600"
-                      }
-                      onClick={(e) =>
-                        isArchived
-                          ? handleUnarchiveNotification(
-                              notification.notificationId,
-                              e,
-                            )
-                          : handleArchiveNotification(
-                              notification.notificationId,
-                              e,
-                            )
-                      }
-                      id={`notification-archive-${notification.notificationId}`}
-                      title={isArchived ? "Rimuovi dall'archivio" : "Archivia"}
-                      style={{ cursor: "pointer" }}
-                    ></i>
-                    <i
-                      className={
-                        notification.isMuted
-                          ? "bi bi-bell-slash-fill text-gray-600"
-                          : "bi bi-bell text-gray-600"
-                      }
-                      onClick={(e) =>
-                        handleToggleMute(
-                          notification.notificationId,
-                          !notification.isMuted,
-                          e,
-                        )
-                      }
-                      id={`notification-mute-${notification.notificationId}`}
-                      title={
-                        notification.isMuted
-                          ? "Riattiva notifiche"
-                          : "Silenzia notifiche"
-                      }
-                      style={{ cursor: "pointer" }}
-                    ></i>
-                  </div>
-
-                  <div className="notification-content2">
+                    key={`notification-${notification.notificationId}`}
+                    className={`notification-item ${notification.isReadByUser ? "read" : "unread"} ${notification.isClosed ? "isClosed" : ""} ${hasLeftChat ? "chat-left" : ""} ${isArchived ? "archived" : ""}
+                            ${animatingItemId === notification.notificationId && animationPhase === "exit" ? "pin-exit-active" : ""}
+                            ${animatingItemId === notification.notificationId && animationPhase === "enter" ? "pin-enter-active" : ""}`}
+                    onClick={(e) => handleNotificationClick(notification, e)}
+                    id={`notification-item-${notification.notificationId}`}
+                    data-notification-id={notification.notificationId}
+                    data-is-read={notification.isReadByUser ? "true" : "false"}
+                    data-is-pinned={notification.pinned ? "true" : "false"}
+                    data-is-closed={notification.isClosed ? "true" : "false"}
+                    data-has-left={hasLeftChat ? "true" : "false"}
+                    data-is-archived={isArchived ? "true" : "false"}
+                  >
                     <div
-                      className={`notification-header ${notification.isReadByUser ? "" : "unread"}`}
-                    >
-                      <span
-                        className={
-                          "notification-title " +
-                          (notification.isReadByUser ? "" : "unread")
+                      className="category-vertical-bar"
+                      style={{ backgroundColor: categoryColor }}
+                      title={notification.notificationCategoryName}
+                      id={`notification-category-indicator-${notification.notificationId}`}
+                    ></div>
+                    {/* Div per la prima colonna di icone */}
+                    <div className="notification-content1A">
+                      <i
+                        className={`${notification.pinned ? "bi-pin-fill text-black" : "bi-pin-angle text-gray-600"} pin-icon`}
+                        onClick={(e) => {
+                          e.currentTarget.classList.add("pin-animation");
+                          setTimeout(() => {
+                            e.currentTarget.classList.remove("pin-animation");
+                          }, 600);
+                          handleTogglePin(
+                            notification.notificationId,
+                            notification.pinned,
+                            e,
+                          );
+                        }}
+                        id={`notification-pin-${notification.notificationId}`}
+                        title={
+                          notification.pinned ? "Rimuovi pin" : "Aggiungi pin"
                         }
-                        id={`notification-title-${notification.notificationId}`}
+                      ></i>
+                      <i
+                        className={
+                          notification.favorite ? "bi bi-star-fill" : "bi bi-star"
+                        }
+                        onClick={(e) =>
+                          handleToggleFavorite(
+                            notification.notificationId,
+                            notification.favorite,
+                            e,
+                          )
+                        }
+                        id={`notification-favorite-${notification.notificationId}`}
+                        title={
+                          notification.favorite
+                            ? "Rimuovi dai preferiti"
+                            : "Aggiungi ai preferiti"
+                        }
+                      ></i>
+                      <i
+                        className="bi bi-at"
+                        style={{
+                          color: notification.mentionToRead
+                            ? "red"
+                            : notification.isMentioned
+                              ? "black"
+                              : "gray",
+                          opacity:
+                            notification.isMentioned || notification.mentionToRead
+                              ? 1
+                              : 0.5,
+                        }}
+                        id={`notification-mention-${notification.notificationId}`}
+                        title={
+                          notification.isMentioned
+                            ? "Sei stato menzionato in questa notifica"
+                            : ""
+                        }
+                      ></i>
+                    </div>
+                    {/* Div per la seconda colonna di icone */}
+                    <div className="notification-content1B">
+                      {/* Aggiungi bottone di archiviazione */}
+                      <i
+                        className={
+                          isArchived
+                            ? "bi bi-archive-fill text-purple-600"
+                            : "bi bi-archive text-gray-600"
+                        }
+                        onClick={(e) =>
+                          isArchived
+                            ? handleUnarchiveNotification(
+                                notification.notificationId,
+                                e,
+                              )
+                            : handleArchiveNotification(
+                                notification.notificationId,
+                                e,
+                              )
+                        }
+                        id={`notification-archive-${notification.notificationId}`}
+                        title={isArchived ? "Rimuovi dall'archivio" : "Archivia"}
+                        style={{ cursor: "pointer" }}
+                      ></i>
+                      <i
+                        className={
+                          notification.isMuted
+                            ? "bi bi-bell-slash-fill text-gray-600"
+                            : "bi bi-bell text-gray-600"
+                        }
+                        onClick={(e) =>
+                          handleToggleMute(
+                            notification.notificationId,
+                            !notification.isMuted,
+                            e,
+                          )
+                        }
+                        id={`notification-mute-${notification.notificationId}`}
+                        title={
+                          notification.isMuted
+                            ? "Riattiva notifiche"
+                            : "Silenzia notifiche"
+                        }
+                        style={{ cursor: "pointer" }}
+                      ></i>
+                    </div>
+
+                    <div className="notification-content2">
+                      <div
+                        className={`notification-header ${notification.isReadByUser ? "" : "unread"}`}
                       >
-                        {notification.title}
-                        {hasLeftChat && (
-                          <span className="text-yellow-600 text-xs ml-1">
-                            (abbandonata)
-                          </span>
-                        )}
-                        {isArchived && (
-                          <span className="text-purple-600 text-xs ml-1">
-                            (archiviata)
-                          </span>
-                        )}
-                      </span>
+                        <span
+                          className={
+                            "notification-title " +
+                            (notification.isReadByUser ? "" : "unread")
+                          }
+                          id={`notification-title-${notification.notificationId}`}
+                        >
+                          {notification.title}
+                          {hasLeftChat && (
+                            <span className="text-yellow-600 text-xs ml-1">
+                              (abbandonata)
+                            </span>
+                          )}
+                          {isArchived && (
+                            <span className="text-purple-600 text-xs ml-1">
+                              (archiviata)
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={`time`}
+                          id={`notification-time-${notification.notificationId}`}
+                        >
+                          {lastMessage ? timeSince(lastMessage.tbCreated) : ""}
+                        </span>
+                      </div>
                       <span
-                        className={`time`}
-                        id={`notification-time-${notification.notificationId}`}
+                        className="sender"
+                        id={`notification-sender-${notification.notificationId}`}
                       >
-                        {lastMessage ? timeSince(lastMessage.tbCreated) : ""}
+                        {lastMessage ? lastMessage.senderName : ""}
                       </span>
+                      <div
+                        className="last-message-preview"
+                        id={`notification-preview-${notification.notificationId}`}
+                      >
+                        {lastMessage ? lastMessage.message : ""}
+                      </div>
                     </div>
-                    <span
-                      className="sender"
-                      id={`notification-sender-${notification.notificationId}`}
-                    >
-                      {lastMessage ? lastMessage.senderName : ""}
-                    </span>
                     <div
-                      className="last-message-preview"
-                      id={`notification-preview-${notification.notificationId}`}
-                    >
-                      {lastMessage ? lastMessage.message : ""}
-                    </div>
+                      className="read-indicator-wrapper"
+                      style={{
+                        backgroundColor: notification.isReadByUser
+                          ? "#e7e7e7"
+                          : "rgb(224, 42, 42)",
+                      }}
+                      onClick={(e) =>
+                        handleToggleReadUnread(
+                          notification.notificationId,
+                          notification.isReadByUser,
+                          e,
+                        )
+                      }
+                      id={`notification-read-indicator-${notification.notificationId}`}
+                      title={
+                        notification.isReadByUser
+                          ? "Segna come non letto"
+                          : "Segna come letto"
+                      }
+                    ></div>
                   </div>
-                  <div
-                    className="read-indicator-wrapper"
-                    style={{
-                      backgroundColor: notification.isReadByUser
-                        ? "#e7e7e7"
-                        : "rgb(224, 42, 42)",
-                    }}
-                    onClick={(e) =>
-                      handleToggleReadUnread(
-                        notification.notificationId,
-                        notification.isReadByUser,
-                        e,
-                      )
-                    }
-                    id={`notification-read-indicator-${notification.notificationId}`}
-                    title={
-                      notification.isReadByUser
-                        ? "Segna come non letto"
-                        : "Segna come letto"
-                    }
-                  ></div>
-                </div>
-              );
-            })
+                );
+              })
+            })()
           ) : (
             <div
               className="flex flex-col items-center justify-center p-6 text-center text-gray-500"
