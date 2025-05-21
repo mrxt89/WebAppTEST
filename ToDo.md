@@ -2,7 +2,7 @@
 
 - [] Problema sulla topbar di una chat, tasto "Info", scheda "Aggiungi" --> Non va il campo di ricerca testuale
 
-
+- [] Quando tolgo un partecipante di una chat poi non posso più reinserirlo
 
 - [x] Da verificare se template attività vengono caricati in base alla categoria inserita [si -> guarda ProjectEditModalWithTemplate riga 392 -> filteredTemplates(riga 203) ]
 
