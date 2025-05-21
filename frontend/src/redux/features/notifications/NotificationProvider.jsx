@@ -1,5 +1,5 @@
 // src/redux/features/notifications/NotificationProvider.jsx
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { useNotifications } from "./notificationsHooks";
 import notificationService from "../../../services/notifications/NotificationService";
@@ -10,8 +10,17 @@ import { store } from "../../../redux/store";
  */
 export const NotificationProvider = ({ children }) => {
   const dispatch = useDispatch();
-  const { initializeWorker, reloadNotifications, forceLoadNotifications } =
-    useNotifications();
+  const { 
+    initializeWorker, 
+    reloadNotifications, 
+    forceLoadNotifications,
+    stopNotificationWorker  // Ottieni lo stopNotificationWorker da useNotifications
+  } = useNotifications();
+  
+  // Riferimenti per timeout e interval
+  const timeoutIdRef = useRef(null);
+  const refreshIntervalRef = useRef(null);
+  const audioInitializedRef = useRef(false);
 
   // Inizializza il contesto delle notifiche prima di tutto
   useEffect(() => {
@@ -35,26 +44,80 @@ export const NotificationProvider = ({ children }) => {
     }
   }, []); // Esegui solo al mount
 
+  // Initialize audio system through user interaction - dichiarato fuori dagli useEffect
+  const initAudioOnInteraction = () => {
+    if (audioInitializedRef.current) return;
+    
+    notificationService.initAudio().then((success) => {
+      if (success) {
+        audioInitializedRef.current = true;
+        // Remove event listeners after successful initialization
+        document.removeEventListener("click", initAudioOnInteraction);
+        document.removeEventListener("keydown", initAudioOnInteraction);
+        document.removeEventListener("touchstart", initAudioOnInteraction);
+      }
+    });
+  };
+
+  // Handler for new messages - dichiarato fuori dagli useEffect
+  const handleNewMessage = (event) => {
+    const { notificationId, newMessageCount } = event.detail || {};
+
+    if (notificationId && newMessageCount > 0) {
+      forceLoadNotifications();
+    }
+  };
+
+  // Cleanup function - dichiarata fuori dagli useEffect
+  const handleCleanup = () => {
+    // Pulisci contesto globale
+    if (window.notificationsContext) {
+      window.notificationsContext = null;
+    }
+    
+    // Ferma i worker
+    if (stopNotificationWorker) {
+      stopNotificationWorker();
+    }
+    
+    // Pulisci eventuali interval o timeout
+    if (timeoutIdRef.current) {
+      clearTimeout(timeoutIdRef.current);
+      timeoutIdRef.current = null;
+    }
+    
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
+    }
+    
+    // Rimuovi tutti gli event listener
+    document.removeEventListener("click", initAudioOnInteraction);
+    document.removeEventListener("keydown", initAudioOnInteraction);
+    document.removeEventListener("touchstart", initAudioOnInteraction);
+    document.removeEventListener("new-message-received", handleNewMessage);
+    
+    // Reset dello stato
+    audioInitializedRef.current = false;
+  };
+
+  // Listen for cleanup events
+  useEffect(() => {
+    document.addEventListener("notifications-cleanup", handleCleanup);
+    
+    return () => {
+      document.removeEventListener("notifications-cleanup", handleCleanup);
+    };
+  }, []);
+
   // Initialize the notification worker on component mount
   useEffect(() => {
     initializeWorker();
 
     // Force reload notifications after a short delay to ensure initial data
-    const timeoutId = setTimeout(() => {
+    timeoutIdRef.current = setTimeout(() => {
       reloadNotifications(true); // high priority
     }, 1000);
-
-    // Initialize audio system through user interaction
-    const initAudioOnInteraction = () => {
-      notificationService.initAudio().then((success) => {
-        if (success) {
-          // Remove event listeners after successful initialization
-          document.removeEventListener("click", initAudioOnInteraction);
-          document.removeEventListener("keydown", initAudioOnInteraction);
-          document.removeEventListener("touchstart", initAudioOnInteraction);
-        }
-      });
-    };
 
     // Add event listeners for audio initialization
     document.addEventListener("click", initAudioOnInteraction, { once: false });
@@ -66,14 +129,18 @@ export const NotificationProvider = ({ children }) => {
     });
 
     // Setup periodic notification refresh
-    const refreshInterval = setInterval(() => {
+    refreshIntervalRef.current = setInterval(() => {
       forceLoadNotifications();
     }, 30000); // Every 30 seconds
 
     // Cleanup on unmount
     return () => {
-      clearTimeout(timeoutId);
-      clearInterval(refreshInterval);
+      if (timeoutIdRef.current) {
+        clearTimeout(timeoutIdRef.current);
+      }
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
       document.removeEventListener("click", initAudioOnInteraction);
       document.removeEventListener("keydown", initAudioOnInteraction);
       document.removeEventListener("touchstart", initAudioOnInteraction);
@@ -82,14 +149,6 @@ export const NotificationProvider = ({ children }) => {
 
   // Listen for new-message-received events
   useEffect(() => {
-    const handleNewMessage = (event) => {
-      const { notificationId, newMessageCount } = event.detail || {};
-
-      if (notificationId && newMessageCount > 0) {
-        forceLoadNotifications();
-      }
-    };
-
     document.addEventListener("new-message-received", handleNewMessage);
 
     return () => {

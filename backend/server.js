@@ -374,6 +374,26 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// Route per il logout
+app.post('/api/logout', authenticateToken, async (req, res) => {
+  const userId = req.user.UserId;
+  try {
+    // Aggiorna lastOnline e traccia il logout
+    let pool = await sql.connect(config.database);
+    await pool.request()
+      .input('userId', sql.Int, userId)
+      .query('UPDATE AR_Users SET lastLogout = GETDATE() WHERE userId = @userId');
+    
+    // In un sistema più complesso potresti anche voler invalidare il token
+    // inserendolo in una blacklist fino alla scadenza
+    
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('Logout error:', err);
+    res.status(500).json({ success: false });
+  }
+});
+
 // Route per informazioni sul database
 app.get('/api/dbinfo', async (req, res) => {
   try {

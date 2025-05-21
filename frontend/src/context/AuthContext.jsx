@@ -105,12 +105,103 @@ export const AuthProvider = ({ children }) => {
     if (sessionTimeoutRef.current) {
       clearTimeout(sessionTimeoutRef.current);
     }
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("companyId"); // Also remove companyId from localStorage
-    setUser(null);
-    setIsDBNotificationsViewExecuted(false);
-    navigate("/login");
+    
+    try {
+      // 1. Chiudi tutte le chat aperte prima di stoppare i worker
+      if (typeof window.closeAllChats === 'function') {
+        window.closeAllChats();
+      }
+      
+      // 2. Ferma il worker delle notifiche inviando l'evento specifico
+      document.dispatchEvent(new CustomEvent("stop-notification-worker"));
+      
+      // 3. Termina esplicitamente il worker se accessibile
+      if (window.notificationWorker) {
+        try {
+          window.notificationWorker.terminate();
+          delete window.notificationWorker;
+        } catch (e) {
+          console.error("Error terminating notification worker:", e);
+        }
+      }
+      
+      // 4. Pulisci il contesto delle notifiche globale
+      if (window.notificationsContext) {
+        window.notificationsContext = null;
+      }
+      
+      // 5. Pulisci il servizio notifiche, se è stato inizializzato
+      if (window.notificationService) {
+        if (typeof window.notificationService.cleanup === 'function') {
+          window.notificationService.cleanup();
+        }
+        delete window.notificationService;
+      }
+      
+      // 6. Emetti evento per la pulizia completa delle notifiche
+      document.dispatchEvent(new CustomEvent("notifications-cleanup"));
+      
+      // 7. Emetti evento per resettare lo store Redux
+      document.dispatchEvent(new CustomEvent("reset-redux-store"));
+      
+      // 8. Opzionale: Notifica al backend del logout
+      const token = localStorage.getItem("token");
+      if (token) {
+        try {
+          // Chiamata asincrona al backend per registrare il logout, ma non aspettiamo la risposta
+          fetch(`${config.API_BASE_URL}/update-last-online`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ action: 'logout' })
+          }).catch(err => console.error("Errore durante il logout sul server:", err));
+        } catch (e) {
+          console.error("Error during server logout notification:", e);
+        }
+      }
+      
+      // 9. Pulisci tutti i dati di localStorage relativi all'utente
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("companyId");
+      localStorage.removeItem("userGroups");
+      localStorage.removeItem("standalone_chats");
+      localStorage.removeItem("mutedChats");
+      localStorage.removeItem("chat_master_window");
+      localStorage.removeItem("chat_master_heartbeat");
+      localStorage.removeItem("notification_settings");
+      
+      // 10. Pulisci anche altri dati specifici delle notifiche
+      try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (
+            key.startsWith('notification_') || 
+            key.startsWith('chat_') || 
+            key.startsWith('attachment_') ||
+            key.includes('notif')
+          )) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+      } catch (e) {
+        console.error("Error cleaning notification data from localStorage:", e);
+      }
+    } catch (error) {
+      console.error("Error during logout cleanup:", error);
+    } finally {
+      // 11. Aggiorna lo stato del contesto
+      setUser(null);
+      setUserGroups([]);
+      setIsDBNotificationsViewExecuted(false);
+      
+      // 12. Naviga alla pagina di login
+      navigate("/login");
+    }
   };
 
   // Updated login function to accept optional companyId parameter
@@ -140,6 +231,9 @@ export const AuthProvider = ({ children }) => {
       const groups =
         typeof user.groups === "string" ? JSON.parse(user.groups) : user.groups;
       setUserGroups(groups);
+      
+      // Salva anche i gruppi utente nel localStorage per persistenza
+      localStorage.setItem("userGroups", JSON.stringify(groups));
 
       // Separately store CompanyId for easier access
       if (user.CompanyId) {
@@ -152,6 +246,10 @@ export const AuthProvider = ({ children }) => {
 
       axiosInstance.defaults.headers.common["Authorization"] =
         `Bearer ${accessToken}`;
+
+      // Notifica l'app che c'è stato un login completato con successo
+      // Questo può essere intercettato per inizializzare il worker delle notifiche
+      document.dispatchEvent(new CustomEvent("user-login-success"));
 
       return true;
     } catch (error) {
