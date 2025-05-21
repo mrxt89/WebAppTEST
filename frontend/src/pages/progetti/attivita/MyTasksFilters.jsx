@@ -31,7 +31,7 @@ const MyTasksFilters = ({
               onChange={(e) => onFilterChange({ searchText: e.target.value })}
               className={`pl-8 ${filters.searchText ? "border-blue-500" : ""}`}
             />
-            <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-gray-400" />
+            <Search className="h-4 w-4 absolute right-2.5 top-2.5 text-gray-400" />
           </div>
 
           {/* Filtri di stato e priorità sulla stessa riga in schermi medi */}
