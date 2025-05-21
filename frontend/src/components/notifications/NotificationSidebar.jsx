@@ -1164,12 +1164,16 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                       type="checkbox"
                       id="notification-unread-switch"
                       checked={showUnreadOnly}
-                      onChange={(e) => setShowUnreadOnly(e.target.checked)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setShowUnreadOnly(e.target.checked);
+                      }}
                       className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                     />
                     <label
                       htmlFor="notification-unread-switch"
                       className="text-sm cursor-pointer"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       Solo non lette
                     </label>

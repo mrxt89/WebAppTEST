@@ -128,11 +128,6 @@ export const NotificationProvider = ({ children }) => {
       once: false,
     });
 
-    // Setup periodic notification refresh
-    refreshIntervalRef.current = setInterval(() => {
-      forceLoadNotifications();
-    }, 30000); // Every 30 seconds
-
     // Cleanup on unmount
     return () => {
       if (timeoutIdRef.current) {
