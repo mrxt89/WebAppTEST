@@ -1,3 +1,9 @@
+- [] Problema sulla modifica di un messaggio, ripropone sulla NotificationSideBar la notifica più volte
+
+- [] Problema sulla topbar di una chat, tasto "Info", scheda "Aggiungi" --> Non va il campo di ricerca testuale
+
+
+
 - [x] Da verificare se template attività vengono caricati in base alla categoria inserita [si -> guarda ProjectEditModalWithTemplate riga 392 -> filteredTemplates(riga 203) ]
 
 - re-render di TaskDetailsDialog
