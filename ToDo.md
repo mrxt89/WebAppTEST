@@ -20,3 +20,7 @@
 - fare una cosa simile alle chat per progetti e attività per i ticket
 
 ---
+
+- sistema annullamento modifica attività in gantt chart
+
+
