@@ -1591,9 +1591,7 @@ const ChatBottomBar = ({
                   }}
                   onClick={() =>
                     message.trim() || attachments.length > 0
-                      ? attachments.length > 0
-                        ? handleSendWithAttachments()
-                        : handleSend()
+                      ? handleSend()
                       : handleThumbsUp()
                   }
                   disabled={loading || disabled}

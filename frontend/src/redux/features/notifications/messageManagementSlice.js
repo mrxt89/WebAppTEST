@@ -2,7 +2,7 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 import { config } from "../../../config";
-import { fetchNotificationById } from "./notificationsSlice";
+import { fetchNotificationById, toggleReadUnread } from "./notificationsSlice";
 
 // Async thunk for editing a message
 export const editMessage = createAsyncThunk(
@@ -33,7 +33,17 @@ export const editMessage = createAsyncThunk(
       if (response.data && response.data.Success) {
         // If operation succeeded, update the notification to show changes
         if (response.data.NotificationId) {
-          dispatch(fetchNotificationById(response.data.NotificationId));
+          // Aggiungi un piccolo ritardo prima di aggiornare la notifica
+          // per dare tempo al backend di processare completamente la modifica
+          setTimeout(() => {
+            dispatch(fetchNotificationById(response.data.NotificationId));
+            
+            // Segna la notifica come letta
+            dispatch(toggleReadUnread({
+              notificationId: response.data.NotificationId,
+              isReadByUser: true
+            }));
+          }, 50);
 
           // Emit an event for other components
           const event = new CustomEvent("message-edited", {
