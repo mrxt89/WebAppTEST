@@ -932,6 +932,20 @@ class NotificationService {
     this.notifiedChatIds.add(notificationId);
     this.unreadCount++;
 
+    // Riproduci il suono se abilitato
+    if (this.soundEnabled && this.audioInitialized && this.decodedAudioData) {
+      try {
+        const source = this.audioContext.createBufferSource();
+        source.buffer = this.decodedAudioData;
+        source.connect(this.audioContext.destination);
+        source.start(0);
+      } catch (error) {
+        console.error("Errore nella riproduzione del suono:", error);
+        // Prova a reinizializzare l'audio
+        this.initAudio();
+      }
+    }
+
     if (!this.isWindowFocused) {
       this.startTitleNotification();
     }
