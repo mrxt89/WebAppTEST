@@ -1,7 +1,7 @@
 // /src/services/notifications/NotificationService.js
 class NotificationService {
   constructor() {
-    this.audioUrl = "/audio/notificationReceived.wav";
+    this.audioUrl = "/audio/notificationReceived.mp3";
     this.audioBuffer = null;
     this.audioContext = null;
     this.decodedAudioData = null;
