@@ -1420,7 +1420,7 @@ const ProjectManagementSplitView = () => {
   return (
     <div className="flex" style={{ height: "calc(100vh - 150px)" }}>
       {/* Sezione sinistra (1/3) - Dashboard */}
-      <div className="w-1/3 border-r h-full flex flex-col p-4 overflow-hidden">
+      <div className="w-1/3 border-r h-full flex flex-col p-4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Progetti</h2>
           <Dialog
@@ -1660,118 +1660,119 @@ const ProjectManagementSplitView = () => {
                 </AlertDescription>
               </Alert>
             ) : (
-              <Table>
-                <TableHeader className="sticky top-0 bg-gray-100">
-                  <TableRow>
-                    <TableHead className="w-10 text-center"></TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSort("Name")}
-                    >
-                      Nome
-                      {sortConfig.key === "Name" && (
-                        <span className="ml-1">
-                          {sortConfig.direction === "ascending" ? "↑" : "↓"}
-                        </span>
-                      )}
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-gray-200"
-                      onClick={() => handleSort("CompanyName")}
-                    >
-                      Cliente
-                      {sortConfig.key === "CompanyName" && (
-                        <span className="ml-1">
-                          {sortConfig.direction === "ascending" ? "↑" : "↓"}
-                        </span>
-                      )}
-                    </TableHead>
-                    <TableHead className="w-24">Stato</TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-gray-200 w-28"
-                      onClick={() => handleSort("EndDate")}
-                    >
-                      Scadenza
-                      {sortConfig.key === "EndDate" && (
-                        <span className="ml-1">
-                          {sortConfig.direction === "ascending" ? "↑" : "↓"}
-                        </span>
-                      )}
-                    </TableHead>
-                    <TableHead className="w-20 text-right">Attività</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {getFilteredAndSortedProjects().map((project) => (
-                    <TableRow
-                      key={project.ProjectID}
-                      className={
-                        selectedProjectId === project.ProjectID
-                          ? "bg-blue-50 hover:bg-blue-100"
-                          : "hover:bg-gray-50"
-                      }
-                      onClick={() => selectProject(project.ProjectID)}
-                    >
-                      <TableCell className="font-medium py-1">
-                        <div className="flex items-start gap-1">
-                          <span className="truncate max-w-[120px]">
-                            {project.Name}
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-gray-100">
+                    <TableRow>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSort("Name")}
+                      >
+                        Nome
+                        {sortConfig.key === "Name" && (
+                          <span className="ml-1">
+                            {sortConfig.direction === "ascending" ? "↑" : "↓"}
                           </span>
-                          {project.ProjectErpID && (
-                            <Badge
-                              variant="outline"
-                              className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
-                            >
-                              {project.ProjectErpID}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px]">
-                        {project.CompanyName || "-"}
-                      </TableCell>
-                      <TableCell className="py-1">
-                        <div className="flex items-center gap-1">
-                          <div
-                            className="w-2 h-2 rounded-full"
-                            style={{
-                              backgroundColor: project.StatusColor || "#CCCCCC",
-                            }}
-                          />
-                          <span className="text-xs truncate max-w-[80px]">
-                            {project.StatusDescription}
+                        )}
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-200"
+                        onClick={() => handleSort("CompanyName")}
+                      >
+                        Cliente
+                        {sortConfig.key === "CompanyName" && (
+                          <span className="ml-1">
+                            {sortConfig.direction === "ascending" ? "↑" : "↓"}
                           </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-1 text-xs">
-                        {new Date(project.EndDate).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="py-1 text-right">
-                        <div className="flex justify-end gap-1 items-center">
-                          <div className="flex items-center px-1.5 py-0.5 rounded-md bg-green-100 text-green-700">
-                            <CheckCircle2 className="w-3 h-3 mr-1" />
-                            <span className="text-xs font-medium">
-                              {project.TaskCompletate || 0}
-                            </span>
-                          </div>
-                          <div className="flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700">
-                            <ListTodo className="w-3 h-3 mr-1" />
-                            <span className="text-xs font-medium">
-                              {project.TaskAperteNonRitardo || 0}
-                            </span>
-                          </div>
-                          <div className="flex items-center px-1.5 py-0.5 rounded-md bg-red-100 text-red-700">
-                            <TriangleAlert className="w-3 h-3 mr-1" />
-                            <span className="text-xs font-medium">
-                              {project.TaskAperteInRitardo || 0}
-                            </span>
-                          </div>
-                        </div>
-                      </TableCell>
+                        )}
+                      </TableHead>
+                      <TableHead className="w-24">Stato</TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-200 w-28"
+                        onClick={() => handleSort("EndDate")}
+                      >
+                        Scadenza
+                        {sortConfig.key === "EndDate" && (
+                          <span className="ml-1">
+                            {sortConfig.direction === "ascending" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </TableHead>
+                      <TableHead className="w-20 text-right">Attività</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {getFilteredAndSortedProjects().map((project) => (
+                      <TableRow
+                        key={project.ProjectID}
+                        className={
+                          selectedProjectId === project.ProjectID
+                            ? "bg-blue-50 hover:bg-blue-100"
+                            : "hover:bg-gray-50"
+                        }
+                        onClick={() => selectProject(project.ProjectID)}
+                      >
+                        <TableCell className="font-medium py-1">
+                          <div className="flex items-start gap-1">
+                            <span className="truncate max-w-[120px]">
+                              {project.Name}
+                            </span>
+                            {project.ProjectErpID && (
+                              <Badge
+                                variant="outline"
+                                className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
+                              >
+                                {project.ProjectErpID}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px]">
+                          {project.CompanyName || "-"}
+                        </TableCell>
+                        <TableCell className="py-1">
+                          <div className="flex items-center gap-1">
+                            <div
+                              className="w-2 h-2 rounded-full"
+                              style={{
+                                backgroundColor: project.StatusColor || "#CCCCCC",
+                              }}
+                            />
+                            <span className="text-xs truncate max-w-[80px]">
+                              {project.StatusDescription}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-1 text-xs">
+                          {project.EndDate ? new Date(project.EndDate).toLocaleDateString() : "-"}
+                        </TableCell>
+                        <TableCell className="py-1 text-right">
+                          <div className="flex justify-end gap-1 items-center">
+                            <div className="flex items-center px-1.5 py-0.5 rounded-md bg-green-100 text-green-700">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              <span className="text-xs font-medium">
+                                {project.TaskCompletate || 0}
+                              </span>
+                            </div>
+                            <div className="flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700">
+                              <ListTodo className="w-3 h-3 mr-1" />
+                              <span className="text-xs font-medium">
+                                {project.TaskAperteNonRitardo || 0}
+                              </span>
+                            </div>
+                            <div className="flex items-center px-1.5 py-0.5 rounded-md bg-red-100 text-red-700">
+                              <TriangleAlert className="w-3 h-3 mr-1" />
+                              <span className="text-xs font-medium">
+                                {project.TaskAperteInRitardo || 0}
+                              </span>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </ScrollArea>
         </Card>
