@@ -28,7 +28,7 @@ import {
   Loader2,
 } from "lucide-react";
 import TaskInformationTab from "./TaskInformationTab";
-import TaskCommentsTab from "./TaskCommentsTab";
+import TaskChatsTab from "./TaskChatsTab";
 import TaskCostsTab from "./TaskCostsTab";
 import TaskHistoryTab from "./TaskHistoryTab";
 import TaskAttachmentsTab from "./TaskAttachmentsTab";
@@ -315,7 +315,11 @@ const TaskDetailsDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleCloseDialog}>
-      <DialogContent className="max-w-2xl h-[800px] flex flex-col p-0 rounded-xl">
+      <DialogContent 
+        className="max-w-2xl h-[800px] flex flex-col p-0 rounded-xl"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader className="p-2 pb-2 border-b shrink-0 bg-white rounded-t-xl">
           <DialogTitle className="sr-only">
             Dettagli Attività: {editedTask?.Title}
@@ -553,8 +557,9 @@ const TaskDetailsDialog = ({
                 value="comments"
                 className="p-2 m-0 absolute inset-0"
               >
-                <TaskCommentsTab
+                <TaskChatsTab
                   task={editedTask}
+                  project={project}
                   onAddComment={onAddComment}
                 />
               </TabsContent>

@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { swal } from "../../../lib/common";
 import axios from "axios";
 import { config } from "../../../config";
+import { callOpenChatModal } from "./notificationsSlice";
 
 // Importa le azioni e i selettori dal notificationsSlice
 import {
@@ -169,6 +170,10 @@ export const useNotifications = () => {
     },
     [dispatch],
   );
+
+  const openChat = useCallback((notificationId) => {
+    callOpenChatModal(notificationId);
+  }, []);
 
   // Basic notification actions
   const loadNotifications = useCallback(() => {
@@ -1017,6 +1022,11 @@ export const useNotifications = () => {
 
   const handleLinkDocument = useCallback(
     (notificationId, documentId, documentType) => {
+      // Se documentId è numero, converti in stringa
+      if (!isNaN(documentId)) {
+        documentId = documentId.toString();
+      }
+      console.log(notificationId, documentId, documentType)
       return dispatch(
         linkDocument({ notificationId, documentId, documentType }),
       ).unwrap();
@@ -1125,6 +1135,7 @@ export const useNotifications = () => {
     attachmentsLoading,
     notificationAttachments,
     standaloneChats: Array.from(standaloneChats), // Convert Set to Array
+    openChat,
 
     // Worker management
     initializeWorker,

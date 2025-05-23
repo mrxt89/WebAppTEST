@@ -86,11 +86,11 @@ export const searchDocuments = createAsyncThunk(
 export const linkDocument = createAsyncThunk(
   "documentLinks/linkDocument",
   async (
-    { notificationId, documentId, documentType },
+    { notificationId, documentId, documentType},
     { rejectWithValue, dispatch },
   ) => {
     try {
-      if (!notificationId || !documentId || !documentType) {
+      if (!notificationId || !documentType) {
         return rejectWithValue("Missing required parameters");
       }
 
@@ -103,13 +103,13 @@ export const linkDocument = createAsyncThunk(
         `${config.API_BASE_URL}/notifications/${notificationId}/documents`,
         {
           documentType,
+          projectId: documentType === "Project" ? documentId : undefined,
+          taskId: documentType === "Task" ? documentId : undefined,
           moId: documentType === "MO" ? documentId : undefined,
           saleOrdId: documentType === "SaleOrd" ? documentId : undefined,
-          purchaseOrdId:
-            documentType === "PurchaseOrd" ? documentId : undefined,
+          purchaseOrdId: documentType === "PurchaseOrd" ? documentId : undefined,
           saleDocId: documentType === "SaleDoc" ? documentId : undefined,
-          purchaseDocId:
-            documentType === "PurchaseDoc" ? documentId : undefined,
+          purchaseDocId: documentType === "PurchaseDoc" ? documentId : undefined,
           itemCode: documentType === "Item" ? documentId : undefined,
           custSuppCode: documentType === "CustSupp" ? documentId : undefined,
           custSuppType: documentType === "CustSupp" ? 3211264 : undefined,
@@ -123,16 +123,6 @@ export const linkDocument = createAsyncThunk(
       if (response.data && response.data.success) {
         // Update linked documents list
         dispatch(getLinkedDocuments(notificationId));
-
-        // Emit an event for other components
-        const event = new CustomEvent("document-linked", {
-          detail: {
-            notificationId,
-            documentId,
-            document: response.data.document,
-          },
-        });
-        document.dispatchEvent(event);
 
         return {
           success: true,
@@ -216,9 +206,26 @@ export const searchChatsByDocument = createAsyncThunk(
       if (!token) {
         return rejectWithValue("No authentication token available");
       }
+      console.log("searchChatsByDocument. parameters: ", searchType, searchValue);
 
-      const url = `${config.API_BASE_URL}/chats/by-document?searchType=${encodeURIComponent(searchType)}${searchValue ? `&searchValue=${encodeURIComponent(searchValue)}` : ""}`;
-
+      let url = `${config.API_BASE_URL}/chats/by-document?searchType=${encodeURIComponent(searchType)}`;
+      
+      // Per Task, possiamo passare solo taskId o l'oggetto completo
+      if (searchType === 'Task') {
+        if (typeof searchValue === 'object' && searchValue.taskId) {
+          // Se è un oggetto con taskId, usa solo il taskId
+          url += `&searchValue=${searchValue.taskId}`;
+        } else if (typeof searchValue === 'string' || typeof searchValue === 'number') {
+          // Se è già un valore semplice (string o number), usalo direttamente
+          url += `&searchValue=${searchValue}`;
+        }
+      } else {
+        // Per altri tipi, usa searchValue normalmente
+        url += `&searchValue=${encodeURIComponent(searchValue)}`;
+      }
+      
+      console.log("searchChatsByDocument. Url: ", url);
+      
       const response = await axios.get(url, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -228,7 +235,7 @@ export const searchChatsByDocument = createAsyncThunk(
       if (response.data && response.data.success) {
         return {
           searchType,
-          searchValue,
+          searchValue: searchValue,
           results: response.data.data || [],
         };
       } else {
@@ -244,7 +251,6 @@ export const searchChatsByDocument = createAsyncThunk(
     }
   },
 );
-
 // Async thunk for accessing a chat in read-only mode
 export const openChatInReadOnlyMode = createAsyncThunk(
   "documentLinks/openChatInReadOnlyMode",

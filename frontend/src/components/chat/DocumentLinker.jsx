@@ -31,6 +31,8 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
     { id: "Item", label: "Articoli", icon: <Package /> },
     { id: "CustSupp", label: "Clienti/Fornitori", icon: <Users /> },
     { id: "BillOfMaterials", label: "Distinte base", icon: <Clipboard /> },
+    { id: "Task", label: "Attività", icon: <Clipboard /> },
+    { id: "Project", label: "Progetto", icon: <Clipboard /> },
   ];
 
   // Reset alla chiusura
@@ -60,6 +62,7 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
   // Collega un documento
   const handleLinkDocument = async (document) => {
     try {
+      console.log(document)
       await linkDocument(
         notificationId,
         document.DocumentId,

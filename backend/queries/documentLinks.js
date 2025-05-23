@@ -133,6 +133,8 @@ async function searchDocuments(companyId, documentType, searchTerm) {
 async function searchChatsByDocument(companyId, searchType, searchValue, userId) {
   try {
     const pool = await sql.connect(config.database);
+    
+    // Per Task, searchValue può essere già il taskId direttamente
     const result = await pool.request()
       .input('CompanyId', sql.Int, companyId)
       .input('SearchType', sql.VarChar(50), searchType)
@@ -142,7 +144,7 @@ async function searchChatsByDocument(companyId, searchType, searchValue, userId)
     
     return { success: true, data: result.recordset };
   } catch (error) {
-    console.error('Errore nella ricerca delle chat per documenti:', error);
+    console.error('Error searching chats by document:', error);
     return { success: false, error: error.message };
   }
 }
