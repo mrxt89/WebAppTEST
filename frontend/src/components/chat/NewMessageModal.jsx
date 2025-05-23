@@ -3,9 +3,7 @@ import Modal from "react-modal";
 import ChatTopBar from "./ChatTopBar";
 import ChatBottomBar from "./ChatBottomBar";
 import ChatLayout from "./ChatLayout";
-// Utilizziamo AttachmentsList al posto di AttachmentsPanel per evitare problemi di importazione
-import AttachmentsList from "./AttachmentsList";
-import AttachmentUploader from "./AttachmentUploader";
+
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import { swal } from "../../lib/common";
 import { Paperclip, X, ChevronRight, ChevronLeft } from "lucide-react";

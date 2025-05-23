@@ -27,7 +27,7 @@ const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef(
-  ({ className, children, ...props }, ref) => (
+  ({ className, children, onPointerDownOutside, onInteractOutside, ...props }, ref) => (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
@@ -37,13 +37,10 @@ const DialogContent = React.forwardRef(
           className,
         )}
         onOpenAutoFocus={(e) => {
-          // Previene il focus automatico che può causare conflitti con aria-hidden
           e.preventDefault();
         }}
-        onPointerDownOutside={(e) => {
-          // Gestisce i click fuori dal dialogo in modo più accessibile
-          // e.preventDefault(); // Non sempre necessario, può essere rimosso se causa problemi
-        }}
+        onPointerDownOutside={onPointerDownOutside}
+        onInteractOutside={onInteractOutside}
         {...props}
       >
         {children}
@@ -55,6 +52,7 @@ const DialogContent = React.forwardRef(
     </DialogPortal>
   ),
 );
+
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({ className, ...props }) => (

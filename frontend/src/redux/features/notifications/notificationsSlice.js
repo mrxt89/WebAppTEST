@@ -7,6 +7,7 @@ import { removeUserFromChat } from "./notificationsActions";
 // Abilita il supporto per Map e Set in Immer
 enableMapSet();
 
+let openChatModalRef = null;
 // Funzione helper per il parsing dei messaggi
 const parseMessages = (messages) => {
   if (!messages) return [];
@@ -33,6 +34,21 @@ const getUserId = () => {
   }
   return null;
 };
+
+// Funzione per registrare la callback per l'apertura della chat
+export const registerOpenChatModal = (callback) => {
+  openChatModalRef = callback;
+};
+
+// Funzione per chiamare openChatModal
+export const callOpenChatModal = (notificationId) => {
+  if (openChatModalRef && typeof openChatModalRef === 'function') {
+    openChatModalRef(notificationId);
+  } else {
+    console.error('openChatModal non è stato registrato');
+  }
+};
+
 
 // Async thunks per le operazioni asincrone
 export const fetchNotifications = createAsyncThunk(

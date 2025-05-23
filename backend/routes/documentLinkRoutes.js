@@ -71,9 +71,15 @@ router.post('/notifications/:notificationId/documents', authenticateToken, async
     }
 
     // Verifica che almeno un identificatore di documento sia specificato
-    const hasDocumentId = bom || moId || saleOrdId || purchaseOrdId || 
-                      saleDocId || purchaseDocId || itemCode || 
-                      (custSuppCode && custSuppType);
+    const hasDocumentId = bom 
+                      || moId 
+                      || saleOrdId 
+                      || purchaseOrdId 
+                      || saleDocId 
+                      || purchaseDocId 
+                      || itemCode 
+                      || (custSuppCode && custSuppType) 
+                      || taskId
                           
     if (!hasDocumentId) {
       return res.status(400).json({ 
@@ -200,16 +206,16 @@ router.get('/chats/by-document', authenticateToken, async (req, res) => {
     } else {
       res.status(500).json({ 
         success: false, 
-        message: 'Errore nella ricerca delle chat',
-        error: result.error
+        message: 'Errore nella ricerca delle chat', 
+        error: result.error 
       });
     }
   } catch (error) {
-    console.error('Errore nella gestione della richiesta:', error);
+    console.error('Error nella gestione della richiesta:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Errore nella ricerca delle chat',
-      error: error.message
+      message: 'Errore nella ricerca delle chat', 
+      error: error.message 
     });
   }
 });

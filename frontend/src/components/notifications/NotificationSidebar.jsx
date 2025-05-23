@@ -116,6 +116,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     { id: "MO", label: "Ordini Produzione", icon: <Clipboard size={16} /> },
     { id: "BOM", label: "Distinte Base", icon: <Link size={16} /> },
     { id: "Item", label: "Articoli", icon: <Tag size={16} /> },
+    { id: "Task", label: "Attività", icon: <Clipboard size={16} /> },
   ];
 
   // Aggiungi un effetto per forzare il caricamento quando la sidebar diventa visibile

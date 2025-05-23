@@ -1,3 +1,4 @@
+// src/components/main/MainPage.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
@@ -9,7 +10,6 @@ import MinimizedChatsDock from "../chat/MinimizedChatsDock";
 import WindowManagerMenu from "../chat/WindowManagerMenu";
 import { useToast } from "../ui/use-toast";
 import { Toaster } from "../ui/toaster";
-// Importiamo il nostro hook Redux invece del Context
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import NewMessageModal from "../chat/NewMessageModal";
 import { config } from "../../config";
@@ -19,8 +19,7 @@ import DoNotDisturbIndicator from "../chat/DoNotDisturbIndicator";
 import useWindowManager from "../../hooks/useWindowManager";
 import { useDispatch } from "react-redux";
 import { fetchNotificationAttachments } from "@/redux/features/notifications/notificationsActions";
-
-// Import dei componenti Wiki
+import { registerOpenChatModal } from "@/redux/features/notifications/notificationsSlice";
 import { WikiProvider, WikiHelper } from "../wiki";
 
 const MainPage = () => {
@@ -34,7 +33,6 @@ const MainPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Utilizziamo il nostro hook Redux per accedere alle azioni e allo stato
   const {
     notifications,
     unreadCount,
@@ -79,7 +77,7 @@ const MainPage = () => {
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const menuRef = useRef(null);
-  const dropdownRef = useRef(null); // Ref for dropdown menu
+  const dropdownRef = useRef(null);
   const [menuItems, setMenuItems] = useState([]);
   const [breadcrumb, setBreadcrumb] = useState([]);
   const [isPageComponent, setIsPageComponent] = useState(false);
@@ -93,14 +91,12 @@ const MainPage = () => {
   // Inizializza il worker Redux all'avvio
   useEffect(() => {
     initializeWorker();
-
-    // Forza il ricaricamento delle notifiche dopo un breve ritardo
     setTimeout(() => {
-      reloadNotifications(true); // Imposta highPriority a true
+      reloadNotifications(true);
     }, 1000);
   }, [initializeWorker, reloadNotifications]);
 
-  // useEffect per richiedere esplicitamente i permessi di notifica
+  // Richiedi permessi di notifica
   useEffect(() => {
     if (
       window.Notification &&
@@ -111,21 +107,17 @@ const MainPage = () => {
     }
   }, []);
 
-  // Aggiungi - esponi notificationService alla window
+  // Inizializza il servizio di notifica
   useEffect(() => {
-    // Inizializza il servizio di notifica
     import("@/services/notifications/NotificationService")
       .then((module) => {
         window.notificationService = module.default;
 
-        // Inizializza esplicitamente il servizio
         if (window.notificationService) {
-          // Forza l'inizializzazione dell'audio alla prima interazione
           const initAudioOnce = () => {
             window.notificationService.initAudio().then((success) => {
               if (success) {
                 notificationServiceInitialized.current = true;
-                // Rimuovi gli event listener se l'inizializzazione ha successo
                 document.removeEventListener("click", initAudioOnce);
                 document.removeEventListener("keydown", initAudioOnce);
                 document.removeEventListener("touchstart", initAudioOnce);
@@ -133,14 +125,12 @@ const MainPage = () => {
             });
           };
 
-          // Aggiungi listener per eventi che possono sbloccare l'audio
           document.addEventListener("click", initAudioOnce, { once: false });
           document.addEventListener("keydown", initAudioOnce, { once: false });
           document.addEventListener("touchstart", initAudioOnce, {
             once: false,
           });
 
-          // Richiedi permessi per le notifiche (solo se non già negati)
           if (Notification.permission !== "denied") {
             window.notificationService.requestNotificationPermission();
           }
@@ -154,7 +144,6 @@ const MainPage = () => {
       });
 
     return () => {
-      // Pulizia: rimuovi il riferimento globale e chiama cleanup
       if (window.notificationService) {
         window.notificationService.cleanup
           ? window.notificationService.cleanup()
@@ -198,18 +187,15 @@ const MainPage = () => {
 
   // Enhanced open chat modal function
   const openChatModal = async (notificationId) => {
-    // Validazione dell'input
     if (!notificationId) {
       console.error("openChatModal chiamato senza un ID notifica valido");
       return;
     }
 
     try {
-      // Uso direttamente fetchNotificationById per assicurarmi di avere dati aggiornati
       const notification = await fetchNotificationById(notificationId);
 
       if (notification) {
-        // Carica gli allegati della notifica
         try {
           await dispatch(fetchNotificationAttachments(notificationId)).unwrap();
         } catch (error) {
@@ -222,22 +208,16 @@ const MainPage = () => {
           });
         }
 
-        // Mark as read immediately
         toggleReadUnread(notificationId, true);
-
-        // Registra la chat come aperta nello store Redux
         registerOpenChat(notificationId);
 
-        // Check if this chat is already in minimized state
         const isMinimized = minimizedChats.some(
           (chat) => chat.notificationId === notification.notificationId,
         );
 
-        // Se la chat è già nel window manager, attivala
         if (windowManager?.windowStates?.[notification.notificationId]) {
           windowManager.activateWindow(notification.notificationId);
         } else {
-          // Altrimenti, crea una nuova finestra nel window manager
           const defaultPos = {
             x: Math.max(0, (window.innerWidth - 900) / 2),
             y: 0,
@@ -245,7 +225,6 @@ const MainPage = () => {
             height: 700,
           };
 
-          // Crea la finestra nel window manager
           if (windowManager?.createWindow) {
             windowManager.createWindow(
               notification.notificationId,
@@ -255,14 +234,11 @@ const MainPage = () => {
           }
         }
 
-        // If the chat is minimized, we need to restore it properly
         if (isMinimized) {
-          // Restore it (toggle minimized state to false in window manager)
           if (toggleMinimize) {
             toggleMinimize(notification.notificationId);
           }
 
-          // Remove from minimized chats
           setMinimizedChats((prevMinimized) =>
             prevMinimized.filter(
               (chat) => chat.notificationId !== notification.notificationId,
@@ -270,7 +246,6 @@ const MainPage = () => {
           );
         }
 
-        // Make sure it's in the open chats list
         setOpenChats((prevChats) => {
           if (
             !prevChats.some(
@@ -286,7 +261,6 @@ const MainPage = () => {
           );
         });
 
-        // Activate this window (bring to front)
         if (windowManager?.activateWindow) {
           windowManager.activateWindow(notification.notificationId);
         }
@@ -296,18 +270,25 @@ const MainPage = () => {
     }
   };
 
+  // Registra openChatModal in Redux quando il componente è montato
+  useEffect(() => {
+    registerOpenChatModal(openChatModal);
+    
+    return () => {
+      registerOpenChatModal(null);
+    };
+  }, [openChatModal]);
+
   // Gestisci l'evento di nuovo messaggio
   useEffect(() => {
     const handleNewMessage = (event) => {
       const { notificationId, newMessageCount } = event.detail || {};
 
       if (notificationId && newMessageCount) {
-        // Trova la notifica corrispondente
         const notification = notifications.find(
           (n) => n.notificationId === parseInt(notificationId),
         );
 
-        // Bypass NotificationService per garantire la notifica
         if ("Notification" in window && Notification.permission === "granted") {
           try {
             const title = notification?.title || "Nuovo messaggio";
@@ -324,14 +305,12 @@ const MainPage = () => {
               webNotification.close();
             };
 
-            // Auto-chiusura dopo 8 secondi
             setTimeout(() => webNotification.close(), 120000);
           } catch (e) {
             console.error("Error showing direct notification:", e);
           }
         }
 
-        // Comunque tenta anche l'aggiornamento normale
         fetchNotificationById(notificationId);
       }
     };
@@ -341,26 +320,14 @@ const MainPage = () => {
     return () => {
       document.removeEventListener("new-message-received", handleNewMessage);
     };
-  }, [notifications, fetchNotificationById, openChatModal]);
+  }, [notifications, fetchNotificationById]);
 
-  // Esponi openChatModal globalmente per le notifiche
-  useEffect(() => {
-    // Rendi la funzione disponibile globalmente
-    window.openChatModal = openChatModal;
-
-    return () => {
-      // Pulizia quando il componente viene smontato
-      delete window.openChatModal;
-    };
-  }, [openChatModal]);
-
-  // Ascolta specificamente eventuali errori di notifica per debug
+  // Ascolta eventuali errori di notifica per debug
   useEffect(() => {
     const handleNotificationError = (error) => {
       console.error("Notification error:", error);
     };
 
-    // Intercetta eventuali errori globali relativi alle notifiche
     window.addEventListener("error", (event) => {
       if (
         event.message &&
@@ -377,10 +344,9 @@ const MainPage = () => {
     };
   }, []);
 
-  // Ascolta specificamente l'evento unread-count-changed per aggiornare il contatore
+  // Ascolta l'evento unread-count-changed per aggiornare il contatore
   useEffect(() => {
     const handleUnreadCountChanged = () => {
-      // Forza il ricaricamento delle notifiche immediatamente
       forceLoadNotifications();
     };
 
@@ -393,29 +359,25 @@ const MainPage = () => {
     };
   }, [forceLoadNotifications]);
 
+  // Handler per gestire gli aggiornamenti di stato delle chat
   useEffect(() => {
-    // Handler per gestire gli aggiornamenti di stato delle chat (archiviate, abbandonate, ecc.)
     const handleChatStatusChange = async (event) => {
       const { notificationId, action, timestamp } = event.detail || {};
 
       if (!notificationId) return;
 
       try {
-        // Forza l'aggiornamento della notifica dal server per essere sicuri di avere dati freschi
         await fetchNotificationById(notificationId);
 
-        // Se la chat è aperta, forzane l'aggiornamento
         const openChat = openChats.find(
           (chat) => chat.notificationId === notificationId,
         );
         if (openChat) {
-          // Questo forzerà un re-render della finestra di chat
           setOpenChats((prevChats) => {
             return prevChats.map((chat) =>
               chat.notificationId === notificationId
                 ? {
                     ...chat,
-                    // Aggiorna gli stati in base all'azione
                     archived:
                       action === "archived"
                         ? 1
@@ -423,7 +385,6 @@ const MainPage = () => {
                           ? 0
                           : chat.archived,
                     chatLeft: action === "left" ? 1 : chat.chatLeft,
-                    // Aggiungi un timestamp per forzare il rerendering anche se altri valori non cambiano
                     _lastUpdate: timestamp || Date.now(),
                   }
                 : chat,
@@ -435,10 +396,8 @@ const MainPage = () => {
       }
     };
 
-    // Aggiungi il listener per l'evento
     document.addEventListener("chat-status-changed", handleChatStatusChange);
 
-    // Cleanup
     return () => {
       document.removeEventListener(
         "chat-status-changed",
@@ -449,7 +408,6 @@ const MainPage = () => {
 
   // Minimize chat function
   const minimizeChat = (notification) => {
-    // Validazione dell'input
     if (!notification || !notification.notificationId) {
       console.error(
         "minimizeChat chiamato con parametri non validi:",
@@ -458,14 +416,11 @@ const MainPage = () => {
       return;
     }
 
-    // Aggiorna lo stato nel window manager
     if (windowManager?.toggleMinimize) {
       windowManager.toggleMinimize(notification.notificationId);
     }
 
-    // Aggiorna lo stato delle chat minimizzate
     setMinimizedChats((prevMinimized) => {
-      // Se la chat non è già minimizzata, aggiungila
       if (
         !prevMinimized.some(
           (chat) => chat.notificationId === notification.notificationId,
@@ -476,7 +431,6 @@ const MainPage = () => {
       return prevMinimized;
     });
 
-    // Assicurati che la chat rimanga in openChats
     setOpenChats((prevChats) => {
       if (
         !prevChats.some(
@@ -491,7 +445,6 @@ const MainPage = () => {
 
   // Restore chat from minimized state
   const restoreChat = (notification) => {
-    // Validazione dell'input
     if (!notification || !notification.notificationId) {
       console.error(
         "restoreChat chiamato con parametri non validi:",
@@ -500,19 +453,16 @@ const MainPage = () => {
       return;
     }
 
-    // Aggiorna lo stato nel window manager
     if (windowManager?.toggleMinimize) {
       windowManager.toggleMinimize(notification.notificationId);
     }
 
-    // Rimuovi la chat dalle chat minimizzate
     setMinimizedChats((prevMinimized) => {
       return prevMinimized.filter(
         (chat) => chat.notificationId !== notification.notificationId,
       );
     });
 
-    // Assicurati che la chat sia in openChats
     setOpenChats((prevChats) => {
       if (
         !prevChats.some(
@@ -528,7 +478,6 @@ const MainPage = () => {
       );
     });
 
-    // Attiva la finestra (porta in primo piano)
     if (windowManager?.activateWindow) {
       windowManager.activateWindow(notification.notificationId);
     }
@@ -536,23 +485,19 @@ const MainPage = () => {
 
   // Close chat function
   const closeChatModal = (notificationId) => {
-    // Validazione dell'input
     if (!notificationId) {
       console.error("closeChatModal chiamato senza un ID notifica valido");
       return;
     }
 
-    // Chiudi la finestra nel window manager
     if (windowManager?.closeWindow) {
       windowManager.closeWindow(notificationId);
     }
 
-    // Rimuovi la chat dallo store Redux
     if (unregisterOpenChat) {
       unregisterOpenChat(notificationId);
     }
 
-    // Rimuovi la chat da openChats
     setOpenChats((prevChats) => {
       const newChats = prevChats.filter(
         (chat) => chat.notificationId !== notificationId,
@@ -560,7 +505,6 @@ const MainPage = () => {
       return newChats;
     });
 
-    // Rimuovi la chat da minimizedChats se presente
     setMinimizedChats((prevMinimized) => {
       const newMinimized = prevMinimized.filter(
         (chat) => chat.notificationId !== notificationId,
@@ -571,7 +515,6 @@ const MainPage = () => {
 
   // Close all chats function
   const closeAllChats = () => {
-    // Close each open chat
     openChats.forEach((chat) => {
       closeChatModal(chat.notificationId);
     });
@@ -585,27 +528,22 @@ const MainPage = () => {
   // Funzione aggiornata per gestire la visibilità della sidebar
   const toggleSidebar = (showSidebar) => {
     if (showSidebar === true) {
-      // Se stiamo esplicitamente mostrando la sidebar, nascondiamo il dropdown
       if (dropdownVisible) {
         setDropdownVisible(false);
       }
       setSidebarVisible(true);
     } else if (showSidebar === false) {
-      // Se stiamo esplicitamente nascondendo la sidebar
       setSidebarVisible(false);
     } else {
-      // Se non è specificato, alterna lo stato
       setSidebarVisible(!sidebarVisible);
     }
   };
 
   // Funzione aggiornata per gestire la visibilità del dropdown
   const toggleDropdown = () => {
-    // Se stiamo aprendo il dropdown, chiudiamo la sidebar
     if (!dropdownVisible && sidebarVisible) {
       setSidebarVisible(false);
     }
-    // Alterna lo stato del dropdown
     setDropdownVisible(!dropdownVisible);
   };
 
@@ -613,7 +551,6 @@ const MainPage = () => {
     const sidebarElement = document.querySelector(".notification-sidebar");
     const userDropdownButton = document.querySelector(".user-dropdown-button");
 
-    // Verifica se il click è sul pulsante wiki o un suo elemento figlio
     const isWikiButtonClick = (() => {
       let target = event.target;
       while (target) {
@@ -628,7 +565,6 @@ const MainPage = () => {
       return false;
     })();
 
-    // Verifica se il click è in un elemento del modal Wiki
     const isWikiModalClick = (() => {
       let target = event.target;
       while (target) {
@@ -648,7 +584,6 @@ const MainPage = () => {
       return false;
     })();
 
-    // Verifica se il click è in un elemento di una chat aperta o nella sidebar stessa
     const isMessageClick = (() => {
       let target = event.target;
       while (target) {
@@ -660,8 +595,8 @@ const MainPage = () => {
             target.classList.contains("chat-message") ||
             target.classList.contains("notification-item") ||
             target.id === "notification-sidebar" ||
-            target.closest("#notification-sidebar") || // Controlla se è un discendente di notification-sidebar
-            target.closest(".chat-window")) // Include le nuove chat windows
+            target.closest("#notification-sidebar") ||
+            target.closest(".chat-window"))
         ) {
           return true;
         }
@@ -670,7 +605,6 @@ const MainPage = () => {
       return false;
     })();
 
-    // Verifica se il click è nel menu di organizzazione finestre
     const isWindowManagerClick = (() => {
       let target = event.target;
       while (target) {
@@ -685,7 +619,6 @@ const MainPage = () => {
       return false;
     })();
 
-    // Gestione dropdown username
     if (
       dropdownVisible &&
       dropdownRef.current &&
@@ -695,7 +628,6 @@ const MainPage = () => {
       setDropdownVisible(false);
     }
 
-    // Gestione sidebar delle notifiche
     if (
       sidebarVisible &&
       sidebarElement &&
@@ -703,10 +635,6 @@ const MainPage = () => {
     ) {
       const notificationButton = document.querySelector("#notification-button");
 
-      // Non chiudere la sidebar nei seguenti casi:
-      // 1. Se il click è sul pulsante wiki o nel modal wiki
-      // 2. Se il click è su un messaggio o elementi correlati
-      // 3. Se il click è all'interno della sidebar stessa
       if (
         isWikiButtonClick ||
         isWikiModalClick ||
@@ -735,7 +663,6 @@ const MainPage = () => {
       }
     }
 
-    // Gestione menu organizzazione finestre
     if (windowManagerMenuOpen && !isWindowManagerClick) {
       setWindowManagerMenuOpen(false);
     }
@@ -746,15 +673,12 @@ const MainPage = () => {
     let timeout;
 
     if (dropdownVisible) {
-      // Set timeout to close dropdown after 5 seconds
       timeout = setTimeout(() => {
         setDropdownVisible(false);
       }, 5000);
 
-      // Add event listener for clicks outside
       document.addEventListener("mousedown", handleClickOutside);
 
-      // Clean up timeout and event listener on unmount
       return () => {
         clearTimeout(timeout);
         document.removeEventListener("mousedown", handleClickOutside);
@@ -811,7 +735,6 @@ const MainPage = () => {
     setPageTitle(item.pageName);
     setIsPageComponent(!!item.pageComponent);
 
-    // Log the filtered items
     const filteredItems = menuItems.filter(
       (menuItem) => menuItem.pageParent === item.pageId,
     );
@@ -878,12 +801,10 @@ const MainPage = () => {
   };
 
   const handleOpenChat = async (notificationId) => {
-    // Chiudi il modale del nuovo messaggio se è aperto
     if (isModalOpen) {
       setIsModalOpen(false);
     }
 
-    // Piccolo timeout per assicurarsi che il modale del nuovo messaggio sia chiuso
     setTimeout(async () => {
       try {
         openChatModal(notificationId);
@@ -922,21 +843,17 @@ const MainPage = () => {
     setSeenMessageIds(newSeenMessageIds);
   }, [unreadMessages, toast, seenMessageIds, markMessageAsReceived]);
 
-  // Toggle window manager menu
   const toggleWindowManagerMenu = () => {
     setWindowManagerMenuOpen(!windowManagerMenuOpen);
   };
 
-  // Gestisci la chiusura del modale dei nuovi messaggi
   const closeNewMessageModal = () => {
     setIsModalOpen(false);
-    // Forza il reset dopo un breve timeout
     setTimeout(() => {
       document.dispatchEvent(new CustomEvent("reset-new-message-modal"));
     }, 100);
   };
 
-  // Only show window management UI if there are open chats
   const showWindowControls = openChats.length > 0;
 
   return (
@@ -973,10 +890,8 @@ const MainPage = () => {
           navigateToPreviousLevel={navigateToPreviousLevel}
           currentLevelItems={currentLevelItems}
         >
-          {/* Chat Windows - rendered using Window Manager */}
           {Array.isArray(openChats) && openChats.length > 0 ? (
             openChats.map((chat) => {
-              // Controllo aggiuntivo per assicurarsi che chat e notificationId esistano
               if (!chat || !chat.notificationId) {
                 console.error("Chat mancante o senza notificationId:", chat);
                 return null;
@@ -993,12 +908,10 @@ const MainPage = () => {
               );
             })
           ) : (
-            // Per debug, mostra un messaggio se non ci sono chat aperte
             <div style={{ display: "none" }}>No open chats</div>
           )}
         </MainContainer>
 
-        {/* Window arrangement menu button - only shown when there are open chats */}
         {showWindowControls && (
           <div className="fixed top-20 right-10 z-[10049]">
             <button
@@ -1024,7 +937,6 @@ const MainPage = () => {
               </svg>
             </button>
 
-            {/* Render the Window Manager Menu component with higher z-index */}
             <WindowManagerMenu
               isOpen={windowManagerMenuOpen}
               onClose={() => setWindowManagerMenuOpen(false)}
@@ -1038,7 +950,6 @@ const MainPage = () => {
           </div>
         )}
 
-        {/* Minimized Chats Dock */}
         <MinimizedChatsDock
           minimizedChats={minimizedChats}
           onRestoreChat={restoreChat}
@@ -1053,10 +964,7 @@ const MainPage = () => {
           openChatModal={handleOpenChat}
         />
 
-        {/* Componente Wiki Helper */}
         <WikiHelper />
-
-        {/* Aggiungi il modale di consenso alle notifiche */}
         <NotificationConsentModal />
         <DoNotDisturbIndicator />
         <Toaster />
