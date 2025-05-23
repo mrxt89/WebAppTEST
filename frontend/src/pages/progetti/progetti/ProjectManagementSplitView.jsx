@@ -44,6 +44,11 @@ import {
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Calendar,
   Users,
   AlertCircle,
@@ -63,6 +68,7 @@ import {
   Package,
   ArrowLeft,
   Circle,
+  MoreVertical,
 } from "lucide-react";
 import ProjectEditModalWithTemplate from "./ProjectEditModalWithTemplate";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
@@ -87,22 +93,6 @@ import ProjectTeamSection from "./ProjectTeamSection";
 import ProjectAnalyticsTab from "./analytics/ProjectAnalyticsTab";
 import useUsers from "../../../hooks/useUsersActions";
 import { swal } from "../../../lib/common";
-
-// Mini-componente per le statistiche in dashboard
-const StatisticCard = ({
-  title,
-  value,
-  color = "text-gray-900",
-  icon: Icon,
-}) => (
-  <div className="bg-gray-100 p-3 rounded-md flex items-center justify-between">
-    <div className="flex items-center gap-2">
-      {Icon && <Icon className="h-4 w-4 text-gray-600" />}
-      <span className="text-xs text-gray-600">{title}</span>
-    </div>
-    <span className={`text-base font-semibold ${color}`}>{value}</span>
-  </div>
-);
 
 // TeamMember component (unchanged)
 const TeamMember = ({ member, onRemove, checkAdminPermission, project }) => (
@@ -136,6 +126,99 @@ const TeamMember = ({ member, onRemove, checkAdminPermission, project }) => (
     )}
   </div>
 );
+
+// Componente per il filtro delle colonne
+const ColumnFilter = ({ column, value, onChange, options = [] }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [localValue, setLocalValue] = useState(value || "");
+
+  const handleApply = () => {
+    onChange(localValue);
+    setIsOpen(false);
+  };
+
+  const handleClear = () => {
+    setLocalValue("all");
+    onChange("");
+    setIsOpen(false);
+  };
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-4 w-4 p-0 ml-1 hover:bg-gray-200"
+        >
+          <Filter className={`h-3 w-3 ${value ? "text-blue-600" : "text-gray-400"}`} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-2" align="start">
+        {column === "text" ? (
+          <div className="space-y-2">
+            <Input
+              placeholder="Filtra..."
+              value={localValue}
+              onChange={(e) => setLocalValue(e.target.value)}
+              className="h-8"
+              onKeyDown={(e) => e.key === "Enter" && handleApply()}
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleApply} className="h-7 flex-1">
+                Applica
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleClear} className="h-7 flex-1">
+                Cancella
+              </Button>
+            </div>
+          </div>
+        ) : column === "select" ? (
+          <div className="space-y-2">
+            <Select value={localValue} onValueChange={setLocalValue}>
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Seleziona..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti</SelectItem>
+                {options.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleApply} className="h-7 flex-1">
+                Applica
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleClear} className="h-7 flex-1">
+                Cancella
+              </Button>
+            </div>
+          </div>
+        ) : column === "date" ? (
+          <div className="space-y-2">
+            <Input
+              type="date"
+              value={localValue}
+              onChange={(e) => setLocalValue(e.target.value)}
+              className="h-8"
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleApply} className="h-7 flex-1">
+                Applica
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleClear} className="h-7 flex-1">
+                Cancella
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 // Componente per la panoramica del progetto
 const ProjectOverview = ({ project }) => (
@@ -797,6 +880,20 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     }
   };
 
+  // Funzione per aggiornare i dati del progetto (per il gruppo)
+  const refreshProjectData = async () => {
+    try {
+      const updatedProject = await getProjectById(parseInt(projectId));
+      setProject(updatedProject);
+      setActiveTab("team");
+    } catch (error) {
+      console.error("Error refreshing project data:", error);
+    }
+  };
+
+  // Aggiungi la funzione refresh alla handleAddMember
+  handleAddMember.refresh = refreshProjectData;
+
   const handleRemoveMember = async (memberId) => {
     try {
       // Swal di conferma
@@ -847,25 +944,14 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     }
   };
 
-  // Funzione per filtrare gli utenti in base alla ricerca
+  // Funzione per filtrare gli utenti (esclusi quelli già nel progetto)
   const getFilteredUsers = useCallback(() => {
     if (!project || !users) return [];
 
     return users
       .filter((user) => !project.members?.some((m) => m.UserID === user.userId))
-      .filter((user) => {
-        if (!userSearchQuery) return true;
-        const searchLower = userSearchQuery.toLowerCase();
-        return (
-          user.firstName?.toLowerCase().includes(searchLower) ||
-          user.lastName?.toLowerCase().includes(searchLower) ||
-          `${user.firstName} ${user.lastName}`
-            .toLowerCase()
-            .includes(searchLower)
-        );
-      })
       .sort((a, b) => a.firstName.localeCompare(b.firstName));
-  }, [users, project, userSearchQuery]);
+  }, [users, project]);
 
   if (loading || !project) {
     return (
@@ -1046,8 +1132,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
                   handleRemoveMember={handleRemoveMember}
                   updateMemberRole={updateMemberRole}
                   currentUserId={currentUserId}
-                  userSearchQuery={userSearchQuery}
-                  setUserSearchQuery={setUserSearchQuery}
                   getFilteredUsers={getFilteredUsers}
                 />
               </CardHeader>
@@ -1173,6 +1257,13 @@ const ProjectManagementSplitView = () => {
     key: "Name",
     direction: "ascending",
   });
+  const [columnFilters, setColumnFilters] = useState({
+    name: "",
+    company: "",
+    status: "",
+    endDate: "",
+    erpId: "",
+  });
 
   // Caricamento iniziale
   useEffect(() => {
@@ -1235,7 +1326,7 @@ const ProjectManagementSplitView = () => {
     // Filtra i progetti
     let filteredProjects = [...projects];
 
-    // Applica filtri
+    // Applica filtri generali
     if (filters.status && filters.status !== "all") {
       filteredProjects = filteredProjects.filter(
         (p) => p.Status === filters.status,
@@ -1275,6 +1366,39 @@ const ProjectManagementSplitView = () => {
       );
     }
 
+    // Applica filtri delle colonne
+    if (columnFilters.name) {
+      filteredProjects = filteredProjects.filter((p) =>
+        p.Name?.toLowerCase().includes(columnFilters.name.toLowerCase())
+      );
+    }
+
+    if (columnFilters.company) {
+      filteredProjects = filteredProjects.filter((p) =>
+        p.CompanyName?.toLowerCase().includes(columnFilters.company.toLowerCase())
+      );
+    }
+
+    if (columnFilters.status && columnFilters.status !== "all") {
+      filteredProjects = filteredProjects.filter(
+        (p) => p.Status === columnFilters.status
+      );
+    }
+
+    if (columnFilters.endDate) {
+      filteredProjects = filteredProjects.filter((p) => {
+        if (!p.EndDate) return false;
+        const projectDate = new Date(p.EndDate).toISOString().split('T')[0];
+        return projectDate === columnFilters.endDate;
+      });
+    }
+
+    if (columnFilters.erpId) {
+      filteredProjects = filteredProjects.filter((p) =>
+        p.ProjectErpID?.toLowerCase().includes(columnFilters.erpId.toLowerCase())
+      );
+    }
+
     // Ordina i progetti
     if (sortConfig.key) {
       filteredProjects.sort((a, b) => {
@@ -1289,7 +1413,7 @@ const ProjectManagementSplitView = () => {
     }
 
     return filteredProjects;
-  }, [projects, filters, sortConfig]);
+  }, [projects, filters, sortConfig, columnFilters]);
 
   // Gestisce il clic sull'intestazione per l'ordinamento
   const handleSort = (key) => {
@@ -1298,6 +1422,14 @@ const ProjectManagementSplitView = () => {
       direction = "descending";
     }
     setSortConfig({ key, direction });
+  };
+
+  // Gestisce i filtri delle colonne
+  const handleColumnFilter = (column, value) => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [column]: value
+    }));
   };
 
   // Effetto per i filtri
@@ -1396,6 +1528,13 @@ const ProjectManagementSplitView = () => {
       projectErpId: "",
       taskAssignedTo: null,
     });
+    setColumnFilters({
+      name: "",
+      company: "",
+      status: "",
+      endDate: "",
+      erpId: "",
+    });
   };
 
   // Funzione per forzare un refresh completo dei progetti
@@ -1415,6 +1554,11 @@ const ProjectManagementSplitView = () => {
   const resetSelectedProject = useCallback(() => {
     setSelectedProjectId(null);
   }, []);
+
+  const statusOptions = projectStatuses?.map(status => ({
+    value: status.Id,
+    label: status.StatusDescription
+  })) || [];
 
   // Rendering
   return (
@@ -1458,7 +1602,8 @@ const ProjectManagementSplitView = () => {
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4" />
                 <span>Filtri</span>
-                {Object.values(filters).some((v) => v && v !== "all") && (
+                {(Object.values(filters).some((v) => v && v !== "all") ||
+                  Object.values(columnFilters).some((v) => v)) && (
                   <Badge
                     variant="outline"
                     className="bg-blue-50 text-blue-600 border-blue-200"
@@ -1620,162 +1765,170 @@ const ProjectManagementSplitView = () => {
           </CollapsibleContent>
         </Collapsible>
 
-        {/* Statistiche */}
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          <StatisticCard
-            title="Progetti Attivi"
-            value={statistics.activeProjects}
-            icon={Users}
-          />
-          <StatisticCard
-            title="Progetti in Ritardo"
-            value={statistics.delayedProjects}
-            color="text-red-600"
-            icon={AlertCircle}
-          />
-          <StatisticCard
-            title="Attività in Corso"
-            value={statistics.activeTasks}
-            icon={Calendar}
-          />
-          <StatisticCard
-            title="Attività in Ritardo"
-            value={statistics.delayedTasks}
-            color="text-red-600"
-            icon={AlertCircle}
-          />
-        </div>
-
-        {/* Tabella stile Excel */}
-        <Card className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full">
-            {loading ? (
-              <div className="flex items-center justify-center h-32">
-                <span className="text-gray-500">Caricamento...</span>
-              </div>
-            ) : getFilteredAndSortedProjects().length === 0 ? (
-              <Alert className="m-4">
-                <AlertDescription>
-                  Nessun progetto trovato con i filtri selezionati.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-gray-100">
-                    <TableRow>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-200"
-                        onClick={() => handleSort("Name")}
-                      >
-                        Nome
-                        {sortConfig.key === "Name" && (
-                          <span className="ml-1">
-                            {sortConfig.direction === "ascending" ? "↑" : "↓"}
-                          </span>
-                        )}
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-200"
-                        onClick={() => handleSort("CompanyName")}
-                      >
-                        Cliente
-                        {sortConfig.key === "CompanyName" && (
-                          <span className="ml-1">
-                            {sortConfig.direction === "ascending" ? "↑" : "↓"}
-                          </span>
-                        )}
-                      </TableHead>
-                      <TableHead className="w-24">Stato</TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-gray-200 w-28"
-                        onClick={() => handleSort("EndDate")}
-                      >
-                        Scadenza
-                        {sortConfig.key === "EndDate" && (
-                          <span className="ml-1">
-                            {sortConfig.direction === "ascending" ? "↑" : "↓"}
-                          </span>
-                        )}
-                      </TableHead>
-                      <TableHead className="w-20 text-right">Attività</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {getFilteredAndSortedProjects().map((project) => (
-                      <TableRow
-                        key={project.ProjectID}
-                        className={
-                          selectedProjectId === project.ProjectID
-                            ? "bg-blue-50 hover:bg-blue-100"
-                            : "hover:bg-gray-50"
-                        }
-                        onClick={() => selectProject(project.ProjectID)}
-                      >
-                        <TableCell className="font-medium py-1">
-                          <div className="flex items-start gap-1">
-                            <span className="truncate max-w-[120px]">
-                              {project.Name}
-                            </span>
-                            {project.ProjectErpID && (
-                              <Badge
-                                variant="outline"
-                                className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
-                              >
-                                {project.ProjectErpID}
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px]">
-                          {project.CompanyName || "-"}
-                        </TableCell>
-                        <TableCell className="py-1">
-                          <div className="flex items-center gap-1">
-                            <div
-                              className="w-2 h-2 rounded-full"
-                              style={{
-                                backgroundColor: project.StatusColor || "#CCCCCC",
-                              }}
-                            />
-                            <span className="text-xs truncate max-w-[80px]">
-                              {project.StatusDescription}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-1 text-xs">
-                          {project.EndDate ? new Date(project.EndDate).toLocaleDateString() : "-"}
-                        </TableCell>
-                        <TableCell className="py-1 text-right">
-                          <div className="flex justify-end gap-1 items-center">
-                            <div className="flex items-center px-1.5 py-0.5 rounded-md bg-green-100 text-green-700">
-                              <CheckCircle2 className="w-3 h-3 mr-1" />
-                              <span className="text-xs font-medium">
-                                {project.TaskCompletate || 0}
-                              </span>
-                            </div>
-                            <div className="flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700">
-                              <ListTodo className="w-3 h-3 mr-1" />
-                              <span className="text-xs font-medium">
-                                {project.TaskAperteNonRitardo || 0}
-                              </span>
-                            </div>
-                            <div className="flex items-center px-1.5 py-0.5 rounded-md bg-red-100 text-red-700">
-                              <TriangleAlert className="w-3 h-3 mr-1" />
-                              <span className="text-xs font-medium">
-                                {project.TaskAperteInRitardo || 0}
-                              </span>
-                            </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </ScrollArea>
-        </Card>
+{/* Tabella stile Excel */}
+<Card className="flex-1 overflow-hidden flex flex-col">
+  {loading ? (
+    <div className="flex items-center justify-center h-32">
+      <span className="text-gray-500">Caricamento...</span>
+    </div>
+  ) : getFilteredAndSortedProjects().length === 0 ? (
+    <Alert className="m-4">
+      <AlertDescription className="flex items-center justify-between">
+        <span>Nessun progetto trovato con i filtri selezionati.</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={resetFilters}
+          className="ml-3 flex items-center gap-1"
+        >
+          <X className="h-3 w-3" />
+          Reset filtri
+        </Button>
+      </AlertDescription>
+    </Alert>
+  ) : (
+    <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 overflow-auto">
+        <Table>
+          <TableHeader className="sticky top-0 bg-gray-100 z-10">
+            <TableRow>
+              <TableHead
+                className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
+                onClick={() => handleSort("Name")}
+              >
+                <div className="flex items-center">
+                  Nome
+                  {sortConfig.key === "Name" && (
+                    <span className="ml-1">
+                      {sortConfig.direction === "ascending" ? "↑" : "↓"}
+                    </span>
+                  )}
+                  <ColumnFilter
+                    column="text"
+                    value={columnFilters.name}
+                    onChange={(value) => handleColumnFilter("name", value)}
+                  />
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
+                onClick={() => handleSort("CompanyName")}
+              >
+                <div className="flex items-center">
+                  Cliente
+                  {sortConfig.key === "CompanyName" && (
+                    <span className="ml-1">
+                      {sortConfig.direction === "ascending" ? "↑" : "↓"}
+                    </span>
+                  )}
+                  <ColumnFilter
+                    column="text"
+                    value={columnFilters.company}
+                    onChange={(value) => handleColumnFilter("company", value)}
+                  />
+                </div>
+              </TableHead>
+              <TableHead className="w-24 whitespace-nowrap">
+                <div className="flex items-center">
+                  Stato
+                  <ColumnFilter
+                    column="select"
+                    value={columnFilters.status}
+                    onChange={(value) => handleColumnFilter("status", value)}
+                    options={statusOptions}
+                  />
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-gray-200 w-28 whitespace-nowrap"
+                onClick={() => handleSort("EndDate")}
+              >
+                <div className="flex items-center">
+                  Scadenza
+                  {sortConfig.key === "EndDate" && (
+                    <span className="ml-1">
+                      {sortConfig.direction === "ascending" ? "↑" : "↓"}
+                    </span>
+                  )}
+                  <ColumnFilter
+                    column="date"
+                    value={columnFilters.endDate}
+                    onChange={(value) => handleColumnFilter("endDate", value)}
+                  />
+                </div>
+              </TableHead>
+              <TableHead className="w-20 text-right whitespace-nowrap">Attività</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {getFilteredAndSortedProjects().map((project) => (
+              <TableRow
+                key={project.ProjectID}
+                className={
+                  selectedProjectId === project.ProjectID
+                    ? "bg-blue-50 hover:bg-blue-100 cursor-pointer"
+                    : "hover:bg-gray-50 cursor-pointer"
+                }
+                onClick={() => selectProject(project.ProjectID)}
+              >
+                <TableCell className="font-medium py-1 whitespace-nowrap">
+                  <div className="flex items-start gap-1">
+                    <span className="truncate max-w-[120px]">
+                      {project.Name}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px] whitespace-nowrap">
+                  {project.CompanyName || "-"}
+                </TableCell>
+                <TableCell className="py-1 whitespace-nowrap">
+                  <div className="flex items-center gap-1">
+                    <div
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{
+                        backgroundColor: project.StatusColor || "#CCCCCC",
+                      }}
+                    />
+                    <span className="text-xs truncate max-w-[80px]">
+                      {project.StatusDescription}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell className="py-1 text-xs whitespace-nowrap">
+                  {project.EndDate ? new Date(project.EndDate).toLocaleDateString() : "-"}
+                </TableCell>
+                <TableCell className="py-1 text-right whitespace-nowrap">
+                  <div className="flex justify-end gap-1 items-center">
+                    <div className="flex items-center px-1.5 py-0.5 rounded-md bg-green-100 text-green-700">
+                      <CheckCircle2 className="w-3 h-3 mr-1" />
+                      <span className="text-xs font-medium">
+                        {project.TaskCompletate || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700">
+                      <ListTodo className="w-3 h-3 mr-1" />
+                      <span className="text-xs font-medium">
+                        {project.TaskAperteNonRitardo || 0}
+                      </span>
+                    </div>
+                    {project.TaskAperteInRitardo > 0 && (
+                      <div className="flex items-center px-1.5 py-0.5 rounded-md bg-red-100 text-red-700">
+                        <TriangleAlert className="w-3 h-3 mr-1" />
+                        <span className="text-xs font-medium">
+                          {project.TaskAperteInRitardo}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  )}
+</Card>
       </div>
 
       {/* Sezione destra (2/3) - Dettaglio progetto */}

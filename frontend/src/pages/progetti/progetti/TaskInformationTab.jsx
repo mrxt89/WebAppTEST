@@ -14,7 +14,19 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Calendar, UserPlus, Users } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { 
+  Calendar, 
+  UserPlus, 
+  Users, 
+  User, 
+  Link2, 
+  FileText,
+  CalendarDays,
+  UserCheck,
+  Info
+} from "lucide-react";
 import { config } from "../../../config";
 
 const TaskInformationTab = ({
@@ -39,6 +51,7 @@ const TaskInformationTab = ({
   const [availableGroups, setAvailableGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [participantSearch, setParticipantSearch] = useState("");
 
   // Funzione per normalizzare i partecipanti in un formato consistente
   const normalizeParticipants = (participants) => {
@@ -187,12 +200,20 @@ const TaskInformationTab = ({
   // Filtra gli utenti disponibili per i partecipanti
   const filteredAssignableUsers = assignableUsers.filter((user) => {
     const isNotLeader = user.userId.toString() !== editedData.AssignedTo;
+    const matchesSearch = participantSearch
+      ? `${user.firstName} ${user.lastName}`
+          .toLowerCase()
+          .includes(participantSearch.toLowerCase())
+      : true;
+    
     if (showSelectedOnly) {
       return (
-        isNotLeader && selectedParticipants.includes(user.userId.toString())
+        isNotLeader && 
+        matchesSearch &&
+        selectedParticipants.includes(user.userId.toString())
       );
     }
-    return isNotLeader;
+    return isNotLeader && matchesSearch;
   });
 
   // Ottiene i dati completi dei partecipanti per la visualizzazione
@@ -215,337 +236,474 @@ const TaskInformationTab = ({
       .filter(Boolean);
   };
 
+  // Calcola la durata in giorni
+  const calculateDuration = () => {
+    if (editedData.StartDate && editedData.DueDate) {
+      const start = new Date(editedData.StartDate);
+      const end = new Date(editedData.DueDate);
+      const diff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+      return diff >= 0 ? `${diff + 1} giorni` : "Date non valide";
+    }
+    return "-";
+  };
+
   if (!task) return null;
 
   return (
-    <form id="taskInformationTab" onSubmit={handleSubmit} className="space-y-6">
-      {/* Dates Section */}
-      <div className="flex gap-6">
-        <div className="flex items-center gap-4 text-sm text-gray-500">
-          <div className="flex items-center gap-1">
-            <Calendar className="h-4 w-4" />
-            <span>Inizio:</span>
-            {isEditing ? (
-              <Input
-                type="date"
-                value={editedData.StartDate}
-                onChange={(e) =>
-                  setEditedData((prev) => ({
-                    ...prev,
-                    StartDate: e.target.value,
-                  }))
-                }
-                className="w-40"
-              />
-            ) : task?.StartDate ? (
-              new Date(task.StartDate).toLocaleDateString()
-            ) : (
-              ""
-            )}
+    <form id="taskInformationTab" onSubmit={handleSubmit} className="space-y-2">
+      {/* Date Section con Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <CalendarDays className="h-5 w-5 text-gray-600" />
+            <h3 className="text-lg font-semibold">Date e Scadenze</h3>
           </div>
-          <div className="flex items-center gap-1">
-            <Calendar className="h-4 w-4" />
-            <span>Scadenza:</span>
-            {isEditing ? (
-              <Input
-                type="date"
-                value={editedData.DueDate}
-                min={editedData.StartDate}
-                onChange={(e) =>
-                  setEditedData((prev) => ({
-                    ...prev,
-                    DueDate: e.target.value,
-                  }))
-                }
-                className="w-40"
-              />
-            ) : task?.DueDate ? (
-              new Date(task.DueDate).toLocaleDateString()
-            ) : (
-              ""
-            )}
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                Data Inizio
+              </Label>
+              {isEditing ? (
+                <Input
+                  type="date"
+                  value={editedData.StartDate}
+                  onChange={(e) =>
+                    setEditedData((prev) => ({
+                      ...prev,
+                      StartDate: e.target.value,
+                    }))
+                  }
+                  className="w-full"
+                />
+              ) : (
+                <div className="text-sm font-medium text-gray-700">
+                  {task?.StartDate
+                    ? new Date(task.StartDate).toLocaleDateString("it-IT", {
+                        weekday: "short",
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : "-"}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                Data Scadenza
+              </Label>
+              {isEditing ? (
+                <Input
+                  type="date"
+                  value={editedData.DueDate}
+                  min={editedData.StartDate}
+                  onChange={(e) =>
+                    setEditedData((prev) => ({
+                      ...prev,
+                      DueDate: e.target.value,
+                    }))
+                  }
+                  className="w-full"
+                />
+              ) : (
+                <div className="text-sm font-medium text-gray-700">
+                  {task?.DueDate
+                    ? new Date(task.DueDate).toLocaleDateString("it-IT", {
+                        weekday: "short",
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : "-"}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Durata</Label>
+              <div className="text-sm font-medium text-gray-700">
+                {calculateDuration()}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Description Section */}
-      <div className="space-y-2">
-        <Label>Descrizione</Label>
-        {isEditing ? (
-          <Textarea
-            value={editedData.Description}
-            onChange={(e) =>
-              setEditedData((prev) => ({
-                ...prev,
-                Description: e.target.value,
-              }))
-            }
-            className="min-h-[100px]"
-          />
-        ) : (
-          <p className="text-gray-600 whitespace-pre-wrap">
-            {task?.Description}
-          </p>
-        )}
-      </div>
-
-      <div className="d-flex justify-content-between gap-6">
-        {/* Assigned To Section */}
-        <div className="space-y-2 w-50">
-          <Label>Responsabile</Label>
+      {/* Description Section con Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <FileText className="h-5 w-5 text-gray-600" />
+            <h3 className="text-lg font-semibold">Descrizione</h3>
+          </div>
+          
           {isEditing ? (
-            <Select
-              value={editedData.AssignedTo}
-              onValueChange={(value) =>
-                setEditedData((prev) => ({ ...prev, AssignedTo: value }))
+            <Textarea
+              value={editedData.Description}
+              onChange={(e) =>
+                setEditedData((prev) => ({
+                  ...prev,
+                  Description: e.target.value,
+                }))
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleziona responsabile" />
-              </SelectTrigger>
-              <SelectContent>
-                {assignableUsers.map((user) => (
-                  <SelectItem key={user.userId} value={user.userId.toString()}>
-                    {user.firstName} {user.lastName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Inserisci una descrizione dettagliata dell'attività..."
+              className="min-h-[120px] resize-none"
+            />
           ) : (
-            <div className="flex items-center gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback>
-                  {getInitials(
-                    task?.AssignedToFirstName,
-                    task?.AssignedToLastName,
-                  )}
-                </AvatarFallback>
-              </Avatar>
-              <span>{task?.AssignedToName}</span>
+            <div className="prose prose-sm max-w-none">
+              <p className="text-gray-700 whitespace-pre-wrap">
+                {task?.Description || (
+                  <span className="text-gray-400 italic">
+                    Nessuna descrizione disponibile
+                  </span>
+                )}
+              </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+    {/* Assignments Section con Card */}
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center gap-2 mb-3">
+          <UserCheck className="h-5 w-5 text-gray-600" />
+          <h3 className="text-lg font-semibold">Assegnazioni</h3>
         </div>
 
-        {/* Group Section - solo in modalità modifica */}
-        {isEditing && (
-          <div className="space-y-2 w-50">
-            <Label>Gruppo</Label>
-            <Select
-              value={selectedGroupId?.toString() || "null"}
-              onValueChange={handleGroupChange}
-              disabled={isLoadingGroups}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue
-                  placeholder={
-                    isLoadingGroups
-                      ? "Caricamento gruppi..."
-                      : "Seleziona gruppo"
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Colonna sinistra - Partecipanti */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center mb-2">
+              <Label className="text-sm font-medium flex items-center gap-1">
+                <UserPlus className="h-3 w-3" />
+                Partecipanti ({selectedParticipants.length})
+              </Label>
+              {isEditing && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="showSelected"
+                    checked={showSelectedOnly}
+                    onCheckedChange={setShowSelectedOnly}
+                    className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                  />
+                  <Label htmlFor="showSelected" className="text-sm text-gray-600 cursor-pointer">
+                    Solo selezionati
+                  </Label>
+                </div>
+              )}
+            </div>
+
+            {isEditing && (
+              <Input
+                placeholder="Cerca partecipante..."
+                value={participantSearch}
+                onChange={(e) => setParticipantSearch(e.target.value)}
+                className="w-full mb-2"
+              />
+            )}
+
+            {isEditing ? (
+              <Card className="border-dashed">
+                <ScrollArea className="h-[280px]">
+                  <div className="p-2 space-y-1">
+                    {filteredAssignableUsers.length > 0 ? (
+                      filteredAssignableUsers.map((user) => {
+                        const isChecked = selectedParticipants.includes(user.userId.toString());
+                        return (
+                          <div
+                            key={user.userId}
+                            className="flex items-center space-x-3 hover:bg-gray-50 p-2 rounded-md transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              id={`user-${user.userId}`}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                setSelectedParticipants((prev) => {
+                                  const userId = user.userId.toString();
+                                  if (prev.includes(userId)) {
+                                    return prev.filter((id) => id !== userId);
+                                  }
+                                  return [...prev, userId];
+                                });
+                              }}
+                            />
+                            <label
+                              htmlFor={`user-${user.userId}`}
+                              className="flex-grow cursor-pointer font-normal"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                const checkbox = document.getElementById(`user-${user.userId}`);
+                                if (checkbox) {
+                                  checkbox.click();
+                                }
+                              }}
+                            >
+                              {user.firstName} {user.lastName}
+                            </label>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-8 text-sm text-gray-500">
+                        {participantSearch
+                          ? "Nessun partecipante trovato"
+                          : "Nessun partecipante disponibile"}
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </Card>
+            ) : (
+              <div className="bg-gray-50 rounded-lg p-4 min-h-[280px]">
+                <div className="flex flex-wrap gap-2">
+                  {getParticipantDetails().length > 0 ? (
+                    getParticipantDetails().map((participant, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 bg-white px-3 py-2 rounded-md border border-gray-200"
+                      >
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="text-xs">
+                            {getInitials(participant.firstName, participant.lastName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">
+                          {participant.firstName} {participant.lastName}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-sm text-gray-500 italic">
+                      Nessun partecipante aggiuntivo
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Colonna destra - Responsabile e Gruppo */}
+          <div className="space-y-1">
+            {/* Responsabile */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1">
+                <User className="h-3 w-3" />
+                Responsabile
+              </Label>
+              {isEditing ? (
+                <Select
+                  value={editedData.AssignedTo}
+                  onValueChange={(value) =>
+                    setEditedData((prev) => ({ ...prev, AssignedTo: value }))
                   }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="null">Nessun gruppo</SelectItem>
-                {availableGroups.map((group) => (
-                  <SelectItem
-                    key={group.groupId}
-                    value={group.groupId.toString()}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleziona il responsabile dell'attività" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignableUsers.map((user) => (
+                      <SelectItem key={user.userId} value={user.userId.toString()}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs">
+                              {getInitials(user.firstName, user.lastName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{user.firstName} {user.lastName}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                  <div>
+                    <p className="font-medium">{task?.AssignedToName}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="w-full border-t border-gray-200" />
+
+            {/* Gruppo */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                Gruppo
+              </Label>
+              {isEditing ? (
+                <div className="space-y-2">
+                  <Select
+                    value={selectedGroupId?.toString() || "null"}
+                    onValueChange={handleGroupChange}
+                    disabled={isLoadingGroups}
                   >
-                    <div className="flex items-center">
-                      <Users className="w-4 h-4 mr-2" />
-                      <span>
-                        {group.groupName} - {group.description}
-                      </span>
+                    <SelectTrigger className="w-full">
+                      <SelectValue
+                        placeholder={
+                          isLoadingGroups
+                            ? "Caricamento gruppi..."
+                            : "Seleziona un gruppo di lavoro"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="null">
+                        <span className="text-gray-500">Nessun gruppo</span>
+                      </SelectItem>
+                      {availableGroups.map((group) => (
+                        <SelectItem
+                          key={group.groupId}
+                          value={group.groupId.toString()}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Users className="w-4 h-4 text-gray-500" />
+                            <div>
+                              <p className="font-medium">{group.groupName}</p>
+                              <p className="text-xs text-gray-500">{group.description}</p>
+                            </div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedGroupId && (
+                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md">
+                      <Info className="h-4 w-4 text-blue-600" />
+                      <p className="text-xs text-blue-700">
+                        Selezionando un gruppo, l'attività sarà automaticamente assegnata a tutti i membri
+                      </p>
                     </div>
+                  )}
+                </div>
+              ) : task?.GroupName ? (
+                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <Users className="h-4 w-4 text-gray-600" />
+                  <div>
+                    <p className="font-medium">{task.GroupName}</p>
+                    <p className="text-xs text-gray-500">Gruppo assegnato</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-500 italic">Nessun gruppo assegnato</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+
+      {/* Collegamenti Section con Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Link2 className="h-5 w-5 text-gray-600" />
+            <h3 className="text-lg font-semibold">Collegamenti</h3>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Attività precedente</Label>
+            {isEditing ? (
+              <Select
+                value={editedData.PredecessorTaskID?.toString() || "0"}
+                onValueChange={(value) =>
+                  setEditedData((prev) => ({
+                    ...prev,
+                    PredecessorTaskID: value === "0" ? null : parseInt(value),
+                  }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleziona un'attività collegata" />
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  <SelectItem value="0">
+                    <span className="text-gray-500">Nessuna attività collegata</span>
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedGroupId && (
-              <p className="text-xs text-gray-500">
-                L'attività sarà assegnata a tutti i membri del gruppo
+                  {tasks
+                    .filter((t) => t.TaskID !== task.TaskID)
+                    .map((t) => (
+                      <SelectItem key={t.TaskID} value={t.TaskID.toString()}>
+                        <div className="flex flex-col gap-1 py-1">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${
+                                t.Status === "COMPLETATA"
+                                  ? "bg-green-50 text-green-700 border-green-200"
+                                  : t.Status === "IN ESECUZIONE"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                    : t.Status === "BLOCCATA"
+                                      ? "bg-red-50 text-red-700 border-red-200"
+                                      : t.Status === "SOSPESA"
+                                        ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                        : "bg-gray-50 text-gray-700 border-gray-200"
+                              }`}
+                            >
+                              {t.Status}
+                            </Badge>
+                            <span className="font-medium truncate max-w-[300px]">
+                              {t.Title}
+                            </span>
+                          </div>
+                          <div className="flex gap-3 text-xs text-gray-500 ml-2">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(t.StartDate).toLocaleDateString("it-IT")}
+                            </span>
+                            <span>→</span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(t.DueDate).toLocaleDateString("it-IT")}
+                            </span>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            ) : predecessorTask ? (
+              <div className="p-3 bg-gray-50 rounded-md">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className={`text-xs ${
+                        predecessorTask.Status === "COMPLETATA"
+                          ? "bg-green-50 text-green-700 border-green-200"
+                          : predecessorTask.Status === "IN ESECUZIONE"
+                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                            : "bg-gray-50 text-gray-700 border-gray-200"
+                      }`}
+                    >
+                      {predecessorTask.Status}
+                    </Badge>
+                    <span className="font-medium">{predecessorTask.Title}</span>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {new Date(predecessorTask.StartDate).toLocaleDateString("it-IT")}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 italic">
+                Nessuna attività collegata
               </p>
             )}
           </div>
-        )}
-
-        {/* Group display in view mode */}
-        {!isEditing && task?.GroupName && (
-          <div className="space-y-2 w-50">
-            <Label>Gruppo</Label>
-            <div className="flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className="bg-blue-50 text-blue-600 border-blue-200 flex items-center"
-              >
-                <Users className="w-4 h-4 mr-2" />
-                {task.GroupName}
-              </Badge>
-            </div>
-          </div>
-        )}
-
-        {/* Participants Section */}
-        <div className="space-y-2 w-50 flex-grow">
-          <div className="flex justify-between items-center">
-            <Label>Partecipanti</Label>
-            {isEditing && (
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="showSelected"
-                  checked={showSelectedOnly}
-                  onCheckedChange={setShowSelectedOnly}
-                  className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
-                />
-                <Label htmlFor="showSelected" className="text-sm text-gray-500">
-                  Mostra solo selezionati
-                </Label>
-              </div>
-            )}
-          </div>
-
-          {isEditing ? (
-            <ScrollArea className="h-[120px] border rounded-md">
-              <div className="p-2">
-                {filteredAssignableUsers.map((user) => (
-                  <div
-                    key={user.userId}
-                    className="flex items-center space-x-2 hover:bg-gray-100 p-2 rounded"
-                  >
-                    <Checkbox
-                      checked={selectedParticipants.includes(
-                        user.userId.toString(),
-                      )}
-                      onCheckedChange={(checked) => {
-                        setSelectedParticipants((prev) => {
-                          if (checked) {
-                            return [...prev, user.userId.toString()];
-                          }
-                          return prev.filter(
-                            (id) => id !== user.userId.toString(),
-                          );
-                        });
-                      }}
-                      id={`user-${user.userId}`}
-                      className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
-                    />
-                    <Label
-                      htmlFor={`user-${user.userId}`}
-                      className="flex-grow cursor-pointer text-sm"
-                    >
-                      {user.firstName} {user.lastName}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {getParticipantDetails().length > 0 ? (
-                getParticipantDetails().map((participant, index) => (
-                  <Badge
-                    key={index}
-                    variant=""
-                    className="flex items-center gap-2 bg-gray-100 text-black"
-                  >
-                    <span>
-                      {participant.firstName} {participant.lastName}
-                    </span>
-                  </Badge>
-                ))
-              ) : (
-                <span className="text-sm text-gray-500">
-                  Nessun partecipante
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Predecessor Section */}
-      <div className="space-y-2">
-        <Label>Attività precedente</Label>
-        {isEditing ? (
-          <Select
-            value={editedData.PredecessorTaskID?.toString() || "0"}
-            onValueChange={(value) =>
-              setEditedData((prev) => ({
-                ...prev,
-                PredecessorTaskID: value === "0" ? null : parseInt(value),
-              }))
-            }
-          >
-            <SelectTrigger className="h-auto py-1">
-              <SelectValue placeholder="Seleziona predecessore" />
-            </SelectTrigger>
-            <SelectContent className="max-h-80">
-              <SelectItem value="0"> Nessuna attività collegata</SelectItem>
-              {tasks
-                .filter((t) => t.TaskID !== task.TaskID)
-                .map((t) => (
-                  <SelectItem key={t.TaskID} value={t.TaskID.toString()}>
-                    <div className="flex flex-col gap-1 py-1">
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className={
-                            t.Status === "COMPLETATA"
-                              ? "bg-green-100 text-green-700"
-                              : t.Status === "IN ESECUZIONE"
-                                ? "bg-blue-100 text-blue-700"
-                                : t.Status === "BLOCCATA"
-                                  ? "bg-red-100 text-red-700"
-                                  : t.Status === "SOSPESA"
-                                    ? "bg-yellow-100 text-yellow-700"
-                                    : "bg-gray-100 text-gray-700"
-                          }
-                        >
-                          {t.Status}
-                        </Badge>
-                        <span className="font-medium truncate">{t.Title}</span>
-                      </div>
-                      <div className="flex gap-2 text-xs text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          Inizio: {new Date(t.StartDate).toLocaleDateString()}
-                        </span>
-                        <span>→</span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          Fine: {new Date(t.DueDate).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        ) : predecessorTask ? (
-          <div className="flex items-center gap-2">
-            <Badge
-              variant="outline"
-              className={
-                predecessorTask.Status === "COMPLETATA"
-                  ? "bg-green-100"
-                  : predecessorTask.Status === "IN ESECUZIONE"
-                    ? "bg-blue-100"
-                    : "bg-gray-100"
-              }
-            >
-              {predecessorTask.Title}
-            </Badge>
-            <span className="text-sm text-gray-500">
-              ({new Date(predecessorTask.StartDate).toLocaleDateString()})
-            </span>
-          </div>
-        ) : (
-          <span className="text-sm text-gray-500">
-            {" "}
-            Nessuna attività collegata
-          </span>
-        )}
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Hidden submit button to handle form submission */}
       <button type="submit" className="hidden">

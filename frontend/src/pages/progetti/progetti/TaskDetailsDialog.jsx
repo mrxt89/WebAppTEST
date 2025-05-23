@@ -316,7 +316,7 @@ const TaskDetailsDialog = ({
   return (
     <Dialog open={isOpen} onOpenChange={handleCloseDialog}>
       <DialogContent className="max-w-2xl h-[800px] flex flex-col p-0 rounded-xl">
-        <DialogHeader className="p-6 pb-2 border-b shrink-0 bg-white rounded-t-xl">
+        <DialogHeader className="p-2 pb-2 border-b shrink-0 bg-white rounded-t-xl">
           <DialogTitle className="sr-only">
             Dettagli Attività: {editedTask?.Title}
           </DialogTitle>
@@ -491,7 +491,7 @@ const TaskDetailsDialog = ({
             <div className="flex-1 overflow-y-auto relative">
               <TabsContent
                 value="information"
-                className="p-6 m-0 absolute inset-0"
+                className="p-2 m-0 absolute inset-0"
               >
                 <div className="h-full flex flex-col">
                   <div className="flex-1">
@@ -551,7 +551,7 @@ const TaskDetailsDialog = ({
 
               <TabsContent
                 value="comments"
-                className="p-6 m-0 absolute inset-0"
+                className="p-2 m-0 absolute inset-0"
               >
                 <TaskCommentsTab
                   task={editedTask}
@@ -559,7 +559,7 @@ const TaskDetailsDialog = ({
                 />
               </TabsContent>
 
-              <TabsContent value="costs" className="p-6 m-0 absolute inset-0">
+              <TabsContent value="costs" className="p-2 m-0 absolute inset-0">
                 <TaskCostsTab
                   task={editedTask}
                   canEdit={canEdit}
@@ -569,7 +569,7 @@ const TaskDetailsDialog = ({
 
               <TabsContent
                 value="attachments"
-                className="p-6 m-0 absolute inset-0"
+                className="p-2 m-0 absolute inset-0"
               >
                 <TaskAttachmentsTab
                   task={editedTask}
@@ -581,13 +581,13 @@ const TaskDetailsDialog = ({
                 />
               </TabsContent>
 
-              <TabsContent value="history" className="p-6 m-0 absolute inset-0">
+              <TabsContent value="history" className="p-2 m-0 absolute inset-0">
                 <TaskHistoryTab task={editedTask} />
               </TabsContent>
 
               <TabsContent
                 value="calendar"
-                className="p-6 m-0 absolute inset-0"
+                className="p-2 m-0 absolute inset-0"
               >
                 <div className="h-full flex flex-col">
                   <CalendarIntegration

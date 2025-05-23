@@ -204,7 +204,7 @@ router.get('/DBNotificationsView', authenticateToken, async (req, res) => {
 const upload = multer({
   dest: 'temp/uploads/',
   limits: {
-      fileSize: 20 * 1024 * 1024 // 20MB
+      fileSize: 50 * 1024 * 1024 // 50MB
   },
   fileFilter: (req, file, cb) => {
       // Usa lo stesso filtro per i tipi MIME definito in attachmentRoutes.js
@@ -248,6 +248,102 @@ const upload = multer({
         'text/x-eml',
         'message/partial',
         'application/x-emlx',
+
+        // === FORMATI MICROSOFT OFFICE COMPLETI ===
+        
+        // Word - Formati principali e alternativi
+        'application/msword',                                                           // .doc
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',     // .docx
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.template',     // .dotx
+        'application/vnd.ms-word.document.macroEnabled.12',                            // .docm
+        'application/vnd.ms-word.template.macroEnabled.12',                            // .dotm
+        'application/rtf',                                                             // .rtf
+        'text/rtf',                                                                    // .rtf (alternativo)
+        
+        // Excel - Formati principali e alternativi
+        'application/vnd.ms-excel',                                                    // .xls
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',          // .xlsx
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.template',       // .xltx
+        'application/vnd.ms-excel.sheet.macroEnabled.12',                             // .xlsm
+        'application/vnd.ms-excel.template.macroEnabled.12',                          // .xltm
+        'application/vnd.ms-excel.addin.macroEnabled.12',                             // .xlam
+        'application/vnd.ms-excel.sheet.binary.macroEnabled.12',                      // .xlsb
+        'application/excel',                                                          // .xls (alternativo)
+        'application/x-msexcel',                                                      // .xls (alternativo)
+        'application/x-ms-excel',                                                     // .xls (alternativo)
+        'application/x-excel',                                                        // .xls (alternativo)
+        
+        // PowerPoint - Formati principali
+        'application/vnd.ms-powerpoint',                                              // .ppt
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+        'application/vnd.openxmlformats-officedocument.presentationml.template',     // .potx
+        'application/vnd.openxmlformats-officedocument.presentationml.slideshow',    // .ppsx
+        'application/vnd.ms-powerpoint.addin.macroEnabled.12',                       // .ppam
+        'application/vnd.ms-powerpoint.presentation.macroEnabled.12',                // .pptm
+        'application/vnd.ms-powerpoint.template.macroEnabled.12',                    // .potm
+        'application/vnd.ms-powerpoint.slideshow.macroEnabled.12',                   // .ppsm
+        
+        // Access
+        'application/msaccess',                                                       // .mdb
+        'application/vnd.ms-access',                                                  // .mdb, .accdb
+        'application/x-msaccess',                                                     // .mdb (alternativo)
+        
+        // Visio
+        'application/vnd.visio',                                                      // .vsd
+        'application/vnd.ms-visio.drawing',                                           // .vsdx
+        'application/vnd.ms-visio.template',                                          // .vstx
+        'application/vnd.ms-visio.stencil',                                           // .vssx
+        
+        // Project
+        'application/vnd.ms-project',                                                 // .mpp
+        
+        // Publisher
+        'application/x-mspublisher',                                                  // .pub
+        
+        // OneNote
+        'application/onenote',                                                        // .one
+        
+        // Office generico
+        'application/vnd.ms-office',                                                  // Generico MS Office
+        'application/x-ole-storage',                                                  // File compound OLE
+        
+        // === FORMATI LIBREOFFICE/OPENOFFICE ===
+        
+        // Writer (equivalente Word)
+        'application/vnd.oasis.opendocument.text',                                    // .odt
+        'application/vnd.oasis.opendocument.text-template',                           // .ott
+        'application/vnd.oasis.opendocument.text-master',                             // .odm
+        
+        // Calc (equivalente Excel)
+        'application/vnd.oasis.opendocument.spreadsheet',                             // .ods
+        'application/vnd.oasis.opendocument.spreadsheet-template',                    // .ots
+        
+        // Impress (equivalente PowerPoint)
+        'application/vnd.oasis.opendocument.presentation',                            // .odp
+        'application/vnd.oasis.opendocument.presentation-template',                   // .otp
+        
+        // Draw
+        'application/vnd.oasis.opendocument.graphics',                                // .odg
+        'application/vnd.oasis.opendocument.graphics-template',                       // .otg
+        
+        // Base (equivalente Access)
+        'application/vnd.oasis.opendocument.database',                                // .odb
+        
+        // Math
+        'application/vnd.oasis.opendocument.formula',                                 // .odf
+        
+        // === ALTRI FORMATI DOCUMENTALI ===
+        
+        // Apple iWork
+        'application/x-iwork-pages-sffpages',                                         // Pages
+        'application/x-iwork-numbers-sffnumbers',                                     // Numbers
+        'application/x-iwork-keynote-sffkey',                                         // Keynote
+        
+        // Google Docs (quando scaricati)
+        'application/vnd.google-apps.document',                                       // Google Docs
+        'application/vnd.google-apps.spreadsheet',                                    // Google Sheets
+        'application/vnd.google-apps.presentation',                                   // Google Slides
+        
         
         // Formati MIME specifici per CAD e 3D (quelli noti)
         'application/dxf',
@@ -353,6 +449,27 @@ const upload = multer({
         '.3mf'         // 3D Manufacturing Format
       ];
 
+      // === ESTENSIONI OFFICE COMPLETE ===
+      const officeExtensions = [
+        // Microsoft Word
+        '.doc', '.docx', '.docm', '.dotx', '.dotm', '.rtf',
+        
+        // Microsoft Excel  
+        '.xls', '.xlsx', '.xlsm', '.xlsb', '.xltx', '.xltm', '.xlam',
+        
+        // Microsoft PowerPoint
+        '.ppt', '.pptx', '.pptm', '.ppsx', '.ppsm', '.potx', '.potm', '.ppam',
+        
+        // Altri Microsoft Office
+        '.mdb', '.accdb', '.vsd', '.vsdx', '.vstx', '.vssx', '.mpp', '.pub', '.one',
+        
+        // LibreOffice/OpenOffice
+        '.odt', '.ott', '.odm', '.ods', '.ots', '.odp', '.otp', '.odg', '.otg', '.odb', '.odf',
+        
+        // Apple iWork
+        '.pages', '.numbers', '.key'
+      ];
+
       // Controllo estensioni email come in attachmentRoutes.js
       const emailExtensions = ['.eml', '.msg', '.mbox', '.pst', '.emlx'];
       const ext = path.extname(file.originalname).toLowerCase();
@@ -363,7 +480,8 @@ const upload = multer({
         return;
       }
       
-      if (cadExtensions.includes(ext) || emailExtensions.includes(ext)) {
+      // CONTROLLO ESTENSIONI AGGIORNATO
+      if (cadExtensions.includes(ext) || emailExtensions.includes(ext) || officeExtensions.includes(ext)) {
           cb(null, true);
           return;
       }
@@ -1045,13 +1163,32 @@ router.post('/messages/:messageId/reactions', authenticateToken, async (req, res
     // Chiama la funzione dal file delle query
     const result = await addMessageReaction(parseInt(messageId), userId, reactionType);
     
-    // Recupera l'ID della notifica per includerlo nella risposta
-    const notification = await getNotificationIdForMessage(parseInt(messageId));
-    const notificationId = notification ? notification.notificationId : null;
+    // Se una reazione è stata aggiunta e c'è un mittente diverso da chi ha reagito,
+    // invia una notifica push/email se necessario
+    if (result.action === 'added' && result.originalSender !== result.userWhoReacted) {
+      // Qui potresti aggiungere logica per notifiche push/email
+      // Ad esempio:
+      // await sendPushNotification(result.originalSender, `Qualcuno ha reagito al tuo messaggio con ${reactionType}`);
+      
+      // Emetti un evento per il sistema di notifiche
+      const event = new CustomEvent('message-reaction-added', {
+        detail: {
+          messageId: parseInt(messageId),
+          notificationId: result.notificationId,
+          originalSender: result.originalSender,
+          userWhoReacted: result.userWhoReacted,
+          reactionType: reactionType,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      // Nota: Questo evento potrebbe essere gestito da un sistema di notifiche real-time
+      console.log('Reazione aggiunta:', event.detail);
+    }
     
     res.json({
       ...result,
-      notificationId
+      messageId: parseInt(messageId)
     });
   } catch (error) {
     console.error('Errore nella gestione della reazione:', error);
@@ -1062,6 +1199,8 @@ router.post('/messages/:messageId/reactions', authenticateToken, async (req, res
     });
   }
 });
+
+
 
 // 3. Route per ottenere l'ID notifica di un messaggio
 router.get('/messages/:messageId/notification', authenticateToken, async (req, res) => {

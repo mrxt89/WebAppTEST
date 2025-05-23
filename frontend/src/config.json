@@ -1,9 +1,9 @@
 {
   "development": {
-    "API_BASE_URL": "https://10.0.0.129:3443/api",
-    "API_BASE_HTTP_URL": "http://10.0.0.129:3001/api",
-    "FRONTEND_URL": "https://10.0.0.129:5173",
-    "FRONTEND_HTTP_URL": "http://10.0.0.129:5174",
+    "API_BASE_URL": "https://localhost:3443/api",
+    "API_BASE_HTTP_URL": "http://localhost:3001/api",
+    "FRONTEND_URL": "https://localhost:5173",
+    "FRONTEND_HTTP_URL": "http://localhost:5174",
     "SWEET_ALERT_COLORS": {
       "cancelButtonColor": "rgb(155, 33, 33)",
       "confirmButtonColor": "rgb(30, 97, 155)",
@@ -12,10 +12,10 @@
     }
   },
   "production": {
-    "API_BASE_URL": "https://10.0.0.129:3443/api",
-    "API_BASE_HTTP_URL": "http://10.0.0.129:3000/api",
-    "FRONTEND_URL": "https://10.0.0.129",
-    "FRONTEND_HTTP_URL": "http://10.0.0.129",
+    "API_BASE_URL": "https://localhost:3443/api",
+    "API_BASE_HTTP_URL": "http://localhost:3000/api",
+    "FRONTEND_URL": "https://localhost",
+    "FRONTEND_HTTP_URL": "http://localhost",
     "SWEET_ALERT_COLORS": {
       "cancelButtonColor": "rgb(155, 33, 33)",
       "confirmButtonColor": "rgb(30, 97, 155)",

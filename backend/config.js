@@ -8,7 +8,7 @@ function replaceEnvVars(str) {
 }
 
 // Host configuration
-const hostIp = process.env.HOST_IP || '10.0.0.129';
+const hostIp = process.env.HOST_IP || 'localhost';
 const hostDomain = process.env.HOST_DOMAIN || 'localhost';
 
 const config = {
