@@ -3,7 +3,7 @@
 # Script di configurazione per Nginx che sostituisce le variabili nel template
 
 # Variabili di default
-HOST_IP=${HOST_IP:-10.0.0.129}
+HOST_IP=${HOST_IP:-localhost}
 HOST_DOMAIN=${HOST_DOMAIN:-localhost}
 API_HTTPS_PORT=${API_HTTPS_PORT:-3443}
 

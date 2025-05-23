@@ -7,7 +7,7 @@ import fs from "fs";
 function loadHostConfig(env) {
   // Valori predefiniti se non disponibili nell'ambiente
   const defaults = {
-    HOST_IP: "10.0.0.129",
+    HOST_IP: "localhost",
     HOST_DOMAIN: "localhost",
     USE_HTTPS: true,
     HTTPS_PORT: 5173,

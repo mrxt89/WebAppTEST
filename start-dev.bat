@@ -81,10 +81,10 @@ docker-compose up -d
 
 echo.
 echo === AMBIENTE DI TEST AVVIATO ===
-echo Frontend: https://10.0.0.129:5173 (HTTPS)
-echo Frontend: http://10.0.0.129:5174 (HTTP - solo per compatibilità)
-echo Backend:  https://10.0.0.129:3443 (HTTPS)
-echo Backend:  http://10.0.0.129:3001 (HTTP - solo per compatibilità)
+echo Frontend: https://localhost:5173 (HTTPS)
+echo Frontend: http://localhost:5174 (HTTP - solo per compatibilità)
+echo Backend:  https://localhost:3443 (HTTPS)
+echo Backend:  http://localhost:3001 (HTTP - solo per compatibilità)
 echo Database: WebAppTEST
 echo.
 echo NOTA: Al primo accesso ai servizi HTTPS, potresti dover accettare il certificato

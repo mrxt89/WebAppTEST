@@ -7,7 +7,7 @@
  */
 
 // Configurazione base dell'host
-export const HOST_IP = import.meta.env.VITE_HOST_IP || "10.0.0.129";
+export const HOST_IP = import.meta.env.VITE_HOST_IP || "localhost";
 export const HOST_DOMAIN = import.meta.env.VITE_HOST_DOMAIN || "localhost";
 
 // Configurazione HTTPS

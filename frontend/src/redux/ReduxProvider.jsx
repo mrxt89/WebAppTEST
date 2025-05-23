@@ -9,8 +9,10 @@ const ReduxInitializer = ({ children }) => {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    // Initialize the notifications worker
-    dispatch(initializeNotificationsWorker());
+    // Inizializza il worker solo se non è già presente
+    if (!window.notificationWorker) {
+      dispatch(initializeNotificationsWorker());
+    }
 
     // Clean up on unmount
     return () => {

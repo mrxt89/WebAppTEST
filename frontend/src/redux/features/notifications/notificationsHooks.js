@@ -151,6 +151,10 @@ export const useNotifications = () => {
 
   // Worker management
   const initializeWorker = useCallback(() => {
+    // Verifica se il worker è già inizializzato
+    if (window.notificationWorker) {
+      return;
+    }
     dispatch(stopNotificationsWorker());
     dispatch(initializeNotificationsWorker());
     dispatch(reloadNotifications(true));
