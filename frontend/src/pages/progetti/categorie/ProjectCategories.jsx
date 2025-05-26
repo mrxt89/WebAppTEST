@@ -171,7 +171,7 @@ const CategoriesPage = () => {
           </Button>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[600px]">
+          <ScrollArea className="h-[600px] overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
