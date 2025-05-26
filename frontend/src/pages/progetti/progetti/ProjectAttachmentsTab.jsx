@@ -66,21 +66,39 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
     }
   }, [project?.ProjectID]);
 
-  const handleFileSelect = async (input) => {
+  const handleFileSelect = async (fileOrFiles) => {
+    console.log("handleFileSelect called with:", fileOrFiles);
+    
     let file;
-
-    // Se viene da input file standard
-    if (input?.target?.files) {
-      file = input.target.files[0];
+    
+    // Gestione differenziata per FileDropZone e input standard
+    if (Array.isArray(fileOrFiles)) {
+      // Se è un array, prendi il primo file
+      file = fileOrFiles[0];
+    } else if (fileOrFiles?.target?.files) {
+      // Se viene da un evento input file standard
+      file = fileOrFiles.target.files[0];
+    } else if (typeof fileOrFiles === 'object' && fileOrFiles !== null && fileOrFiles.name) {
+      // Se è direttamente un oggetto File (verificato tramite proprietà)
+      file = fileOrFiles;
     } else {
-      // Se viene da drag & drop
-      file = input;
+      console.error("Formato file non riconosciuto:", fileOrFiles);
+      return;
     }
 
     if (!file) {
       console.log("No file selected");
       return;
     }
+
+    // Log dettagliato del file per debug
+    console.log("File details:", {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      lastModified: file.lastModified,
+      constructor: file.constructor?.name
+    });
 
     // Verifica che project.ProjectID sia definito
     if (!project?.ProjectID) {
@@ -93,6 +111,19 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
       });
       return;
     }
+
+    // Verifica che il file sia valido (usando proprietà invece di instanceof)
+    if (!file || typeof file !== 'object' || !file.name || file.size === 0) {
+      console.error("File non valido o vuoto");
+      swal.fire({
+        title: "Errore",
+        text: "File non valido o vuoto",
+        icon: "error",
+        timer: 1500,
+      });
+      return;
+    }
+
     try {
       setUploading(true);
 
@@ -113,12 +144,14 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
           icon: "success",
           timer: 1500
         });
+      } else {
+        throw new Error(result.message || "Upload fallito");
       }
     } catch (error) {
       console.error("Upload error:", error);
       swal.fire({
         title: "Errore",
-        text: "Errore nel caricamento dell'allegato",
+        text: error.message || "Errore nel caricamento dell'allegato",
         icon: "error",
         timer: 1500,
       });
@@ -192,6 +225,16 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
     setShowUploadPanel(!showUploadPanel);
   };
 
+  // Handler per il click sull'area di upload
+  const handleDropZoneClick = (e) => {
+    // Previeni la propagazione dell'evento click
+    e.stopPropagation();
+    // Apri il file picker
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Azioni e tabella */}
@@ -204,6 +247,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
                 ref={fileInputRef}
                 onChange={handleFileSelect}
                 className="hidden"
+                accept="*/*"
               />
               <Button
                 onClick={toggleUploadPanel}
@@ -260,8 +304,13 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
               onFileSelect={handleFileSelect}
               disabled={uploading || !project?.ProjectID}
               multiple={false}
-              sx={{ minHeight: "200px", border: "2px dashed", borderColor: "primary.light" }}
-              onClick={() => fileInputRef.current?.click()}
+              sx={{ 
+                minHeight: "200px", 
+                border: "2px dashed", 
+                borderColor: "primary.light",
+                cursor: uploading || !project?.ProjectID ? "not-allowed" : "pointer"
+              }}
+              onClick={handleDropZoneClick}
             >
               {uploading ? (
                 <div className="flex flex-col items-center py-12">

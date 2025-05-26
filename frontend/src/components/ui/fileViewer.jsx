@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from "react";
+import React, { useState, useEffect, lazy, Suspense, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,11 @@ const FileViewer = ({ file, isOpen, onClose }) => {
   const [previewError, setPreviewError] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  
+  // Ref per evitare chiamate multiple
+  const loadingRef = useRef(false);
+  const currentFileIdRef = useRef(null);
 
   useEffect(() => {
     // Cleanup quando il componente si chiude o cambia file
@@ -35,20 +40,30 @@ const FileViewer = ({ file, isOpen, onClose }) => {
     setPreviewError(false);
     setPreviewUrl("");
     setIsLoading(false);
+    setErrorMessage("");
+    loadingRef.current = false;
 
     // Ottieni un URL temporaneo per la preview quando il file cambia
-    if (file && isOpen) {
-      getPreviewUrl();
+    if (file && isOpen && file.AttachmentID) {
+      // Evita di ricaricare se è lo stesso file
+      if (currentFileIdRef.current !== file.AttachmentID) {
+        currentFileIdRef.current = file.AttachmentID;
+        getPreviewUrl();
+      }
     }
   }, [file?.AttachmentID, isOpen]);
 
   // Ottieni un URL tramite l'endpoint di download
   const getPreviewUrl = async () => {
-    if (!file) return;
+    if (!file || loadingRef.current) return;
+    
+    // Previeni chiamate multiple
+    loadingRef.current = true;
 
     try {
       setIsLoading(true);
       setPreviewError(false);
+      setErrorMessage("");
       
       let url;
       console.log("Fetching preview URL for file:", file);
@@ -67,19 +82,30 @@ const FileViewer = ({ file, isOpen, onClose }) => {
 
       console.log("Fetching from URL:", url);
 
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Token di autenticazione non trovato");
+      }
+
       const response = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
       if (!response.ok) {
         console.error("Response not OK:", response.status, response.statusText);
-        throw new Error(`Download failed: ${response.status}`);
+        const errorText = await response.text().catch(() => "");
+        throw new Error(`Download failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ""}`);
       }
 
       const blob = await response.blob();
       console.log("Blob received:", blob.type, blob.size);
+      
+      // Verifica che il blob non sia vuoto
+      if (blob.size === 0) {
+        throw new Error("File vuoto ricevuto dal server");
+      }
       
       const objectUrl = window.URL.createObjectURL(blob);
       console.log("Object URL created:", objectUrl);
@@ -88,8 +114,11 @@ const FileViewer = ({ file, isOpen, onClose }) => {
       setIsLoading(false);
     } catch (error) {
       console.error("Error creating preview URL:", error);
+      setErrorMessage(error.message || "Errore durante il caricamento dell'anteprima");
       setPreviewError(true);
       setIsLoading(false);
+    } finally {
+      loadingRef.current = false;
     }
   };
 
@@ -138,6 +167,11 @@ const FileViewer = ({ file, isOpen, onClose }) => {
           <p className="text-gray-600 mb-4">
             Impossibile visualizzare l'anteprima del file
           </p>
+          {errorMessage && (
+            <p className="text-sm text-red-600 mb-4 text-center max-w-md">
+              {errorMessage}
+            </p>
+          )}
           <Button onClick={() => handleDownload(file)}>
             <Download className="h-4 w-4 mr-2" />
             Scarica File
@@ -190,6 +224,7 @@ const FileViewer = ({ file, isOpen, onClose }) => {
             onError={(e) => {
               console.error("PDF iframe error:", e);
               setPreviewError(true);
+              setErrorMessage("Errore nel caricamento del PDF");
             }}
           />
         </div>
@@ -207,6 +242,7 @@ const FileViewer = ({ file, isOpen, onClose }) => {
             onError={(e) => {
               console.error("Image load error:", e);
               setPreviewError(true);
+              setErrorMessage("Errore nel caricamento dell'immagine");
             }}
             onLoad={() => console.log("Image loaded successfully")}
           />
@@ -220,6 +256,10 @@ const FileViewer = ({ file, isOpen, onClose }) => {
         <OfficePreview
           file={{ ...file, previewUrl }}
           onDownload={() => handleDownload(file)}
+          onError={(error) => {
+            setPreviewError(true);
+            setErrorMessage(error.message || "Errore nel caricamento del file Office");
+          }}
         />
       );
     }
@@ -227,7 +267,14 @@ const FileViewer = ({ file, isOpen, onClose }) => {
     // Email
     if (isEmailFile(file)) {
       return (
-        <EmailPreview file={file} onDownload={() => handleDownload(file)} />
+        <EmailPreview 
+          file={file} 
+          onDownload={() => handleDownload(file)}
+          onError={(error) => {
+            setPreviewError(true);
+            setErrorMessage(error.message || "Errore nel caricamento dell'email");
+          }}
+        />
       );
     }
 
@@ -304,13 +351,22 @@ const FileViewer = ({ file, isOpen, onClose }) => {
         url = `${config.API_BASE_URL}/attachments/${attachment.AttachmentID}/download`;
       }
 
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error("Token di autenticazione non trovato");
+        alert("Errore: Token di autenticazione non trovato");
+        return;
+      }
+
       const response = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
-      if (!response.ok) throw new Error("Download failed");
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status}`);
+      }
 
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
@@ -323,6 +379,7 @@ const FileViewer = ({ file, isOpen, onClose }) => {
       document.body.removeChild(a);
     } catch (error) {
       console.error("Error downloading file:", error);
+      alert(`Errore durante il download: ${error.message}`);
     }
   };
 
