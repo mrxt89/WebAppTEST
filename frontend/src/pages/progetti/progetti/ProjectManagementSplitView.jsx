@@ -1333,15 +1333,7 @@ const ProjectManagementSplitView = () => {
       );
     }
 
-    if (filters.searchText) {
-      const search = filters.searchText.toLowerCase();
-      filteredProjects = filteredProjects.filter(
-        (p) =>
-          p.Name?.toLowerCase().includes(search) ||
-          p.Description?.toLowerCase().includes(search),
-      );
-    }
-
+    // Altri filtri che non influenzano la ricerca testuale
     if (filters.categoryId && filters.categoryId !== "0") {
       filteredProjects = filteredProjects.filter(
         (p) => p.ProjectCategoryId === parseInt(filters.categoryId),
@@ -1767,191 +1759,197 @@ const ProjectManagementSplitView = () => {
 
 {/* Tabella stile Excel */}
 <Card className="flex-1 overflow-hidden flex flex-col">
-  {loading ? (
-    <div className="flex items-center justify-center h-32">
-      <span className="text-gray-500">Caricamento...</span>
-    </div>
-  ) : getFilteredAndSortedProjects().length === 0 ? (
-    <Alert className="m-4">
-      <AlertDescription className="flex items-center justify-between">
-        <span>Nessun progetto trovato con i filtri selezionati.</span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={resetFilters}
-          className="ml-3 flex items-center gap-1"
-        >
-          <X className="h-3 w-3" />
-          Reset filtri
-        </Button>
-      </AlertDescription>
-    </Alert>
-  ) : (
-    <div className="flex-1 flex flex-col min-h-0" id="project-table-div">
-      <div className="flex-1 overflow-auto" id="project-table-div2">
-        <Table
-         id="project-table"
-        >
-          <TableHeader className="sticky top-0 bg-gray-100 z-10">
-            <TableRow>
-              <TableHead
-                className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
-                onClick={() => handleSort("Name")}
-              >
-                <div className="flex items-center">
-                  Nome
-                  {sortConfig.key === "Name" && (
-                    <span className="ml-1">
-                      {sortConfig.direction === "ascending" ? "↑" : "↓"}
-                    </span>
-                  )}
-                  <ColumnFilter
-                    column="text"
-                    value={columnFilters.name}
-                    onChange={(value) => handleColumnFilter("name", value)}
-                  />
-                </div>
-              </TableHead>
-              <TableHead
-                className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
-                onClick={() => handleSort("Description")}
-              >
-                <div className="flex items-center">
-                  Descrizione
-                  {sortConfig.key === "Description" && (
-                    <span className="ml-1">
-                      {sortConfig.direction === "ascending" ? "↑" : "↓"}
-                    </span>
-                  )}
-                  <ColumnFilter
-                    column="text"
-                    value={columnFilters.description}
-                    onChange={(value) => handleColumnFilter("description", value)}
-                  />
-                </div>
-              </TableHead>
-              <TableHead
-                className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
-                onClick={() => handleSort("CompanyName")}
-              >
-                <div className="flex items-center">
-                  Cliente
-                  {sortConfig.key === "CompanyName" && (
-                    <span className="ml-1">
-                      {sortConfig.direction === "ascending" ? "↑" : "↓"}
-                    </span>
-                  )}
-                  <ColumnFilter
-                    column="text"
-                    value={columnFilters.company}
-                    onChange={(value) => handleColumnFilter("company", value)}
-                  />
-                </div>
-              </TableHead>
-              <TableHead className="w-24 whitespace-nowrap">
-                <div className="flex items-center">
-                  Stato
-                  <ColumnFilter
-                    column="select"
-                    value={columnFilters.status}
-                    onChange={(value) => handleColumnFilter("status", value)}
-                    options={statusOptions}
-                  />
-                </div>
-              </TableHead>
-              <TableHead
-                className="cursor-pointer hover:bg-gray-200 w-28 whitespace-nowrap"
-                onClick={() => handleSort("EndDate")}
-              >
-                <div className="flex items-center">
-                  Scadenza
-                  {sortConfig.key === "EndDate" && (
-                    <span className="ml-1">
-                      {sortConfig.direction === "ascending" ? "↑" : "↓"}
-                    </span>
-                  )}
-                  <ColumnFilter
-                    column="date"
-                    value={columnFilters.endDate}
-                    onChange={(value) => handleColumnFilter("endDate", value)}
-                  />
-                </div>
-              </TableHead>
-              <TableHead className="w-20 text-right whitespace-nowrap">Attività</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {getFilteredAndSortedProjects().map((project) => (
-              <TableRow
-                key={project.ProjectID}
-                className={
-                  selectedProjectId === project.ProjectID
-                    ? "bg-blue-50 hover:bg-blue-100 cursor-pointer"
-                    : "hover:bg-gray-50 cursor-pointer"
-                }
-                onClick={() => selectProject(project.ProjectID)}
-              >
-                <TableCell className="font-medium py-1 whitespace-nowrap">
-                  <div className="flex items-start gap-1">
-                    <span className="truncate max-w-[120px]">
-                      {project.Name}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px] whitespace-nowrap">
-                  {project.Description || "-"}
-                </TableCell>
-                <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px] whitespace-nowrap">
-                  {project.CompanyName || "-"}
-                </TableCell>
-                <TableCell className="py-1 whitespace-nowrap">
-                  <div className="flex items-center gap-1">
-                    <div
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{
-                        backgroundColor: project.StatusColor || "#CCCCCC",
-                      }}
-                    />
-                    <span className="text-xs truncate max-w-[80px]">
-                      {project.StatusDescription}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="py-1 text-xs whitespace-nowrap">
-                  {project.EndDate ? new Date(project.EndDate).toLocaleDateString() : "-"}
-                </TableCell>
-                <TableCell className="py-1 text-right whitespace-nowrap">
-                  <div className="flex justify-end gap-1 items-center">
-                    <div className="flex items-center px-1.5 py-0.5 rounded-md bg-green-100 text-green-700">
-                      <CheckCircle2 className="w-3 h-3 mr-1" />
-                      <span className="text-xs font-medium">
-                        {project.TaskCompletate || 0}
-                      </span>
-                    </div>
-                    <div className="flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700">
-                      <ListTodo className="w-3 h-3 mr-1" />
-                      <span className="text-xs font-medium">
-                        {project.TaskAperteNonRitardo || 0}
-                      </span>
-                    </div>
-                    {project.TaskAperteInRitardo > 0 && (
-                      <div className="flex items-center px-1.5 py-0.5 rounded-md bg-red-100 text-red-700">
-                        <TriangleAlert className="w-3 h-3 mr-1" />
-                        <span className="text-xs font-medium">
-                          {project.TaskAperteInRitardo}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
-  )}
-</Card>
+          {loading ? (
+            <div className="flex items-center justify-center h-32">
+              <span className="text-gray-500">Caricamento...</span>
+            </div>
+          ) : projects.length === 0 ? (
+            <Alert className="m-4">
+              <AlertDescription className="flex items-center justify-center">
+                <span>Nessun progetto disponibile.</span>
+              </AlertDescription>
+            </Alert>
+          ) : getFilteredAndSortedProjects().length === 0 ? (
+            <Alert className="m-4">
+              <AlertDescription className="flex items-center justify-between">
+                <span>Nessun progetto trovato con i filtri selezionati.</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="ml-3 flex items-center gap-1"
+                >
+                  <X className="h-3 w-3" />
+                  Reset filtri
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="flex-1 flex flex-col min-h-0" id="project-table-div">
+              <div className="flex-1 overflow-auto" id="project-table-div2">
+                <Table
+                 id="project-table"
+                >
+                  <TableHeader className="sticky top-0 bg-gray-100 z-10">
+                    <TableRow>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
+                        onClick={() => handleSort("Name")}
+                      >
+                        <div className="flex items-center">
+                          Nome
+                          {sortConfig.key === "Name" && (
+                            <span className="ml-1">
+                              {sortConfig.direction === "ascending" ? "↑" : "↓"}
+                            </span>
+                          )}
+                          <ColumnFilter
+                            column="text"
+                            value={columnFilters.name}
+                            onChange={(value) => handleColumnFilter("name", value)}
+                          />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
+                        onClick={() => handleSort("Description")}
+                      >
+                        <div className="flex items-center">
+                          Descrizione
+                          {sortConfig.key === "Description" && (
+                            <span className="ml-1">
+                              {sortConfig.direction === "ascending" ? "↑" : "↓"}
+                            </span>
+                          )}
+                          <ColumnFilter
+                            column="text"
+                            value={columnFilters.description}
+                            onChange={(value) => handleColumnFilter("description", value)}
+                          />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
+                        onClick={() => handleSort("CompanyName")}
+                      >
+                        <div className="flex items-center">
+                          Cliente
+                          {sortConfig.key === "CompanyName" && (
+                            <span className="ml-1">
+                              {sortConfig.direction === "ascending" ? "↑" : "↓"}
+                            </span>
+                          )}
+                          <ColumnFilter
+                            column="text"
+                            value={columnFilters.company}
+                            onChange={(value) => handleColumnFilter("company", value)}
+                          />
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-24 whitespace-nowrap">
+                        <div className="flex items-center">
+                          Stato
+                          <ColumnFilter
+                            column="select"
+                            value={columnFilters.status}
+                            onChange={(value) => handleColumnFilter("status", value)}
+                            options={statusOptions}
+                          />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-gray-200 w-28 whitespace-nowrap"
+                        onClick={() => handleSort("EndDate")}
+                      >
+                        <div className="flex items-center">
+                          Scadenza
+                          {sortConfig.key === "EndDate" && (
+                            <span className="ml-1">
+                              {sortConfig.direction === "ascending" ? "↑" : "↓"}
+                            </span>
+                          )}
+                          <ColumnFilter
+                            column="date"
+                            value={columnFilters.endDate}
+                            onChange={(value) => handleColumnFilter("endDate", value)}
+                          />
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-20 text-right whitespace-nowrap">Attività</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getFilteredAndSortedProjects().map((project) => (
+                      <TableRow
+                        key={project.ProjectID}
+                        className={
+                          selectedProjectId === project.ProjectID
+                            ? "bg-blue-50 hover:bg-blue-100 cursor-pointer"
+                            : "hover:bg-gray-50 cursor-pointer"
+                        }
+                        onClick={() => selectProject(project.ProjectID)}
+                      >
+                        <TableCell className="font-medium py-1 whitespace-nowrap">
+                          <div className="flex items-start gap-1">
+                            <span className="truncate max-w-[120px]">
+                              {project.Name}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px] whitespace-nowrap">
+                          {project.Description || "-"}
+                        </TableCell>
+                        <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px] whitespace-nowrap">
+                          {project.CompanyName || "-"}
+                        </TableCell>
+                        <TableCell className="py-1 whitespace-nowrap">
+                          <div className="flex items-center gap-1">
+                            <div
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{
+                                backgroundColor: project.StatusColor || "#CCCCCC",
+                              }}
+                            />
+                            <span className="text-xs truncate max-w-[80px]">
+                              {project.StatusDescription}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-1 text-xs whitespace-nowrap">
+                          {project.EndDate ? new Date(project.EndDate).toLocaleDateString() : "-"}
+                        </TableCell>
+                        <TableCell className="py-1 text-right whitespace-nowrap">
+                          <div className="flex justify-end gap-1 items-center">
+                            <div className="flex items-center px-1.5 py-0.5 rounded-md bg-green-100 text-green-700">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              <span className="text-xs font-medium">
+                                {project.TaskCompletate || 0}
+                              </span>
+                            </div>
+                            <div className="flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700">
+                              <ListTodo className="w-3 h-3 mr-1" />
+                              <span className="text-xs font-medium">
+                                {project.TaskAperteNonRitardo || 0}
+                              </span>
+                            </div>
+                            {project.TaskAperteInRitardo > 0 && (
+                              <div className="flex items-center px-1.5 py-0.5 rounded-md bg-red-100 text-red-700">
+                                <TriangleAlert className="w-3 h-3 mr-1" />
+                                <span className="text-xs font-medium">
+                                  {project.TaskAperteInRitardo}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </Card>
       </div>
 
       {/* Sezione destra (2/3) - Dettaglio progetto */}
