@@ -11,58 +11,14 @@ const {
   exportTimeReport
 } = require('../queries/timeTrackingManagement');
 
-/**
- * Middleware per verificare i permessi di amministrazione
- */
-const checkAdminPermission = (req, res, next) => {
-  
-  // Nel tuo sistema, sembra che gli utenti con ruolo 'IT' abbiano permessi di amministrazione
-  const adminRoles = ['ADMIN', 'IT', 'RESPONSABILI PROGETTI'];
-  const userRole = req.user.role ? req.user.role.toUpperCase() : '';
-  
-  // Controlla se l'utente ha un ruolo amministrativo
-  const isAdmin = adminRoles.includes(userRole);
-  
-  // Imposta req.isAdmin per usarlo in altri middleware o handler
-  req.isAdmin = isAdmin;
-  
-  // Passa sempre al prossimo middleware
-  next();
-};
-
-/**
- * Middleware per verificare i permessi di visualizzazione per un utente specifico
- */
-const checkUserViewPermission = (req, res, next) => {
-  const targetUserId = parseInt(req.params.userId);
-  const currentUserId = req.user.UserId;
-  
-  // Se l'utente sta cercando di vedere i propri dati, procedi
-  if (targetUserId === currentUserId) {
-    next();
-    return;
-  }
-  
-  // Se l'utente è admin basato sul controllo precedente, procedi
-  if (req.isAdmin === true) {
-    next();
-    return;
-  }
-  
-  // Se siamo qui, l'utente non ha i permessi necessari
-  return res.status(403).json({ 
-    success: 0, 
-    msg: 'Non hai i permessi per visualizzare i dati di questo utente'
-  });
-};
-
 // Ottieni le registrazioni di ore settimanali per un utente
-router.get('/timetracking/weekly/:userId', authenticateToken, checkAdminPermission, checkUserViewPermission, async (req, res) => {
+router.get('/timetracking/weekly/:userId', authenticateToken, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     const weekStartDate = req.query.weekStartDate || null;
+    const currentUserId = req.user.UserId;
     
-    const result = await getUserTimeWeekly(userId, weekStartDate);
+    const result = await getUserTimeWeekly(userId, weekStartDate, currentUserId);
     res.json(result);
   } catch (err) {
     console.error('Error getting weekly time entries:', err);
@@ -71,11 +27,12 @@ router.get('/timetracking/weekly/:userId', authenticateToken, checkAdminPermissi
 });
 
 // Ottieni le attività disponibili per un utente
-router.get('/timetracking/tasks/:userId', authenticateToken, checkAdminPermission, checkUserViewPermission, async (req, res) => {
+router.get('/timetracking/tasks/:userId', authenticateToken, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
+    const currentUserId = req.user.UserId;
     
-    const tasks = await getUserAvailableTasks(userId);
+    const tasks = await getUserAvailableTasks(userId, currentUserId);
     res.json(tasks);
   } catch (err) {
     console.error('Error getting available tasks:', err);
@@ -84,19 +41,10 @@ router.get('/timetracking/tasks/:userId', authenticateToken, checkAdminPermissio
 });
 
 // Aggiungi una nuova registrazione di ore
-router.post('/timetracking/entries', authenticateToken, checkAdminPermission, async (req, res) => {
+router.post('/timetracking/entries', authenticateToken, async (req, res) => {
   try {
     const timeEntry = req.body;
     const loggedInUserId = req.user.UserId;
-    
-    // Verifica che l'utente possa registrare ore per questo utente
-    // Solo l'utente stesso o un admin può aggiungere ore
-    if (timeEntry.UserID !== loggedInUserId && !req.isAdmin) {
-      return res.status(403).json({ 
-        success: 0, 
-        msg: 'Non hai i permessi per registrare ore per questo utente' 
-      });
-    }
     
     const result = await manageTimeEntry('INSERT', null, timeEntry, loggedInUserId);
     res.json(result);
@@ -107,29 +55,11 @@ router.post('/timetracking/entries', authenticateToken, checkAdminPermission, as
 });
 
 // Aggiorna una registrazione esistente
-router.put('/timetracking/entries/:entryId', authenticateToken, checkAdminPermission, async (req, res) => {
+router.put('/timetracking/entries/:entryId', authenticateToken, async (req, res) => {
   try {
     const entryId = parseInt(req.params.entryId);
     const timeEntry = req.body;
     const loggedInUserId = req.user.UserId;
-    
-    // Ottieni i dettagli dell'entry per verificare i permessi
-    const existingEntry = await manageTimeEntry('GET', entryId, null, loggedInUserId);
-    
-    if (!existingEntry || existingEntry.length === 0) {
-      return res.status(404).json({ 
-        success: 0, 
-        msg: 'Registrazione non trovata' 
-      });
-    }
-    
-    // Verifica che l'utente possa modificare questa registrazione
-    if (existingEntry[0].UserID !== loggedInUserId && !req.isAdmin) {
-      return res.status(403).json({ 
-        success: 0, 
-        msg: 'Non hai i permessi per modificare questa registrazione' 
-      });
-    }
     
     const result = await manageTimeEntry('UPDATE', entryId, timeEntry, loggedInUserId);
     res.json(result);
@@ -140,28 +70,10 @@ router.put('/timetracking/entries/:entryId', authenticateToken, checkAdminPermis
 });
 
 // Elimina una registrazione
-router.delete('/timetracking/entries/:entryId', authenticateToken, checkAdminPermission, async (req, res) => {
+router.delete('/timetracking/entries/:entryId', authenticateToken, async (req, res) => {
   try {
     const entryId = parseInt(req.params.entryId);
     const loggedInUserId = req.user.UserId;
-    
-    // Ottieni i dettagli dell'entry per verificare i permessi
-    const existingEntry = await manageTimeEntry('GET', entryId, null, loggedInUserId);
-    
-    if (!existingEntry || existingEntry.length === 0) {
-      return res.status(404).json({ 
-        success: 0, 
-        msg: 'Registrazione non trovata' 
-      });
-    }
-    
-    // Verifica che l'utente possa eliminare questa registrazione
-    if (existingEntry[0].UserID !== loggedInUserId && !req.isAdmin) {
-      return res.status(403).json({ 
-        success: 0, 
-        msg: 'Non hai i permessi per eliminare questa registrazione' 
-      });
-    }
     
     const result = await manageTimeEntry('DELETE', entryId, null, loggedInUserId);
     res.json(result);
@@ -172,7 +84,7 @@ router.delete('/timetracking/entries/:entryId', authenticateToken, checkAdminPer
 });
 
 // Ottieni il riepilogo delle ore per un progetto
-router.get('/timetracking/projects/:projectId/summary', authenticateToken, checkAdminPermission, async (req, res) => {
+router.get('/timetracking/projects/:projectId/summary', authenticateToken, async (req, res) => {
   try {
     const projectId = parseInt(req.params.projectId);
     const loggedInUserId = req.user.UserId;
@@ -186,7 +98,7 @@ router.get('/timetracking/projects/:projectId/summary', authenticateToken, check
 });
 
 // Ottieni il riepilogo delle ore per un'attività
-router.get('/timetracking/tasks/:taskId/summary', authenticateToken, checkAdminPermission, async (req, res) => {
+router.get('/timetracking/tasks/:taskId/summary', authenticateToken, async (req, res) => {
   try {
     const taskId = parseInt(req.params.taskId);
     const loggedInUserId = req.user.UserId;
@@ -208,7 +120,7 @@ router.get('/timetracking/tasks/:taskId/summary', authenticateToken, checkAdminP
  * @param {string} endDate - Data di fine (opzionale)
  * @param {boolean} includeDetails - Se includere dettagli delle registrazioni
  */
-router.get('/timetracking/reports/:userId', authenticateToken, checkAdminPermission, checkUserViewPermission, async (req, res) => {
+router.get('/timetracking/reports/:userId', authenticateToken, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     const { 
@@ -289,7 +201,7 @@ router.get('/timetracking/reports/:userId', authenticateToken, checkAdminPermiss
  * @param {string} period - Valore dell'intervallo (es. '2023-05' per maggio 2023)
  * @param {string} format - Formato di esportazione ('csv', 'xlsx')
  */
-router.get('/timetracking/reports/export/:userId', authenticateToken, checkAdminPermission, checkUserViewPermission, async (req, res) => {
+router.get('/timetracking/reports/export/:userId', authenticateToken, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     const { 

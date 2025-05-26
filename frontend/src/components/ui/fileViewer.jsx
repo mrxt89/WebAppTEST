@@ -17,36 +17,55 @@ const CADViewer = lazy(() => import("./CADViewer"));
 const FileViewer = ({ file, isOpen, onClose }) => {
   const [previewError, setPreviewError] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Resetta lo stato dell'errore quando cambia il file
+    // Cleanup quando il componente si chiude o cambia file
+    return () => {
+      if (previewUrl) {
+        console.log("Revoking URL:", previewUrl);
+        window.URL.revokeObjectURL(previewUrl);
+        setPreviewUrl("");
+      }
+    };
+  }, [previewUrl]);
+
+  useEffect(() => {
+    // Resetta lo stato quando cambia il file
     setPreviewError(false);
+    setPreviewUrl("");
+    setIsLoading(false);
 
     // Ottieni un URL temporaneo per la preview quando il file cambia
     if (file && isOpen) {
       getPreviewUrl();
     }
-  }, [file, isOpen]);
+  }, [file?.AttachmentID, isOpen]);
 
   // Ottieni un URL tramite l'endpoint di download
   const getPreviewUrl = async () => {
     if (!file) return;
 
     try {
+      setIsLoading(true);
+      setPreviewError(false);
+      
       let url;
       console.log("Fetching preview URL for file:", file);
+      
       // Determina l'URL di download in base al tipo di allegato
       if (file.NotificationID) {
         url = `${config.API_BASE_URL}/notifications/attachments/${file.AttachmentID}/download`;
       } else if (file.TaskID) {
         url = `${config.API_BASE_URL}/tasks/${file.TaskID}/attachments/${file.AttachmentID}/download`;
       } else if (file.ProjectItemId || file.ItemCode) {
-        // Aggiungi gestione per allegati articoli/progetti
         console.log("File is an article or project item attachment:", file);
         url = `${config.API_BASE_URL}/item-attachments/${file.AttachmentID}/download`;
       } else {
         url = `${config.API_BASE_URL}/attachments/${file.AttachmentID}/download`;
       }
+
+      console.log("Fetching from URL:", url);
 
       const response = await fetch(url, {
         headers: {
@@ -54,25 +73,25 @@ const FileViewer = ({ file, isOpen, onClose }) => {
         },
       });
 
-      if (!response.ok) throw new Error("Download failed");
+      if (!response.ok) {
+        console.error("Response not OK:", response.status, response.statusText);
+        throw new Error(`Download failed: ${response.status}`);
+      }
 
       const blob = await response.blob();
+      console.log("Blob received:", blob.type, blob.size);
+      
       const objectUrl = window.URL.createObjectURL(blob);
+      console.log("Object URL created:", objectUrl);
+      
       setPreviewUrl(objectUrl);
+      setIsLoading(false);
     } catch (error) {
       console.error("Error creating preview URL:", error);
       setPreviewError(true);
+      setIsLoading(false);
     }
   };
-
-  // Cleanup quando il componente si chiude
-  useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        window.URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
 
   // Verifica se il file è un file CAD o 3D
   const isCADFile = (file) => {
@@ -80,43 +99,11 @@ const FileViewer = ({ file, isOpen, onClose }) => {
 
     const fileName = file.FileName.toLowerCase();
     const cadExtensions = [
-      ".stl",
-      ".obj",
-      ".dxf",
-      ".dwg",
-      ".step",
-      ".stp",
-      ".iges",
-      ".igs",
-      ".3dm",
-      ".3ds",
-      ".fbx",
-      ".gltf",
-      ".glb",
-      ".ply",
-      ".dae",
-      ".ipt",
-      ".iam",
-      ".idw",
-      ".sldprt",
-      ".sldasm",
-      ".slddrw",
-      ".x_t",
-      ".x_b",
-      ".par",
-      ".asm",
-      ".psm",
-      ".pwd",
-      ".dft",
-      ".CATPart",
-      ".CATProduct",
-      ".wrl",
-      ".jt",
-      ".skp",
-      ".blend",
-      ".f3d",
-      ".f3z",
-      // ... aggiungere altre estensioni se necessario
+      ".stl", ".obj", ".dxf", ".dwg", ".step", ".stp", ".iges", ".igs",
+      ".3dm", ".3ds", ".fbx", ".gltf", ".glb", ".ply", ".dae", ".ipt",
+      ".iam", ".idw", ".sldprt", ".sldasm", ".slddrw", ".x_t", ".x_b",
+      ".par", ".asm", ".psm", ".pwd", ".dft", ".CATPart", ".CATProduct",
+      ".wrl", ".jt", ".skp", ".blend", ".f3d", ".f3z",
     ];
 
     for (const ext of cadExtensions) {
@@ -132,16 +119,19 @@ const FileViewer = ({ file, isOpen, onClose }) => {
   const getFileContent = () => {
     if (!file) return null;
 
-    // Se c'è un errore o stiamo ancora caricando l'URL
-    if (
-      previewError ||
-      (!previewUrl &&
-        file.FileType !== "message/rfc822" &&
-        file.FileType !== "application/vnd.ms-outlook" &&
-        file.FileType !== "text/x-eml" &&
-        file.FileType !== "application/x-emlx")
-    ) {
-      console.log("Preview error or loading URL:", previewError, previewUrl);
+    // Mostra il loader mentre carica
+    if (isLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center p-8">
+          <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
+          <p className="text-gray-600">Caricamento anteprima...</p>
+        </div>
+      );
+    }
+
+    // Se c'è un errore nel caricamento
+    if (previewError) {
+      console.log("Preview error detected");
       return (
         <div className="flex flex-col items-center justify-center p-8 bg-gray-50">
           <FileText className="w-16 h-16 text-gray-500 mb-4" />
@@ -152,6 +142,16 @@ const FileViewer = ({ file, isOpen, onClose }) => {
             <Download className="h-4 w-4 mr-2" />
             Scarica File
           </Button>
+        </div>
+      );
+    }
+
+    // Se non abbiamo ancora l'URL per file che necessitano preview
+    if (!previewUrl && !isEmailFile(file)) {
+      return (
+        <div className="flex flex-col items-center justify-center p-8">
+          <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
+          <p className="text-gray-600">Preparazione anteprima...</p>
         </div>
       );
     }
@@ -176,96 +176,117 @@ const FileViewer = ({ file, isOpen, onClose }) => {
     }
 
     // Gestione degli altri tipi di file
-    switch (file.FileType) {
-      case "application/pdf":
-        return (
-          <div className="w-full h-[75vh]">
-            <iframe
-              src={previewUrl}
-              className="w-full h-full"
-              title={file.FileName}
-              style={{ zIndex: 9999 }}
-              onError={() => setPreviewError(true)}
-            />
-          </div>
-        );
+    const fileType = file.FileType?.toLowerCase() || "";
+    const fileName = file.FileName?.toLowerCase() || "";
 
-      // Supporto per file Office
-      case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-      case "application/msword":
-      case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-      case "application/vnd.ms-excel":
-      case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
-      case "application/vnd.ms-powerpoint":
-        return (
-          <OfficePreview
-            file={{ ...file, previewUrl }}
-            onDownload={() => handleDownload(file)}
+    // PDF
+    if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
+      return (
+        <div className="w-full h-[75vh]">
+          <iframe
+            src={previewUrl}
+            className="w-full h-full border-0"
+            title={file.FileName}
+            onError={(e) => {
+              console.error("PDF iframe error:", e);
+              setPreviewError(true);
+            }}
           />
-        );
-
-      // Supporto per email
-      case "message/rfc822":
-      case "application/vnd.ms-outlook":
-      case "text/x-eml":
-      case "application/x-emlx":
-        return (
-          <EmailPreview file={file} onDownload={() => handleDownload(file)} />
-        );
-
-      case "image/jpeg":
-      case "image/png":
-      case "image/gif":
-      case "image/bmp":
-      case "image/svg+xml":
-      case "image/tiff":
-      case "image/webp":
-        return (
-          <div className="flex flex-col items-center">
-            <img
-              src={previewUrl}
-              alt={file.FileName}
-              className="max-w-full h-auto"
-              onError={() => setPreviewError(true)}
-            />
-          </div>
-        );
-
-      default:
-        // Controllo basato sull'estensione del file se il MIME type non è riconosciuto
-        if (isCADFile(file)) {
-          return (
-            <Suspense
-              fallback={
-                <div className="flex flex-col items-center justify-center p-8">
-                  <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
-                  <p className="text-gray-600">
-                    Caricamento visualizzatore 3D...
-                  </p>
-                </div>
-              }
-            >
-              <CADViewer
-                file={{ ...file, previewUrl }}
-                onDownload={() => handleDownload(file)}
-              />
-            </Suspense>
-          );
-        }
-
-        return (
-          <div className="flex flex-col items-center justify-center p-8 bg-gray-50">
-            <FileText className="w-16 h-16 text-gray-500 mb-4" />
-            <p className="text-gray-600">
-              Anteprima non disponibile per questo tipo di file
-            </p>
-            <Button onClick={() => handleDownload(file)} className="mt-4">
-              <Download className="h-4 w-4 mr-2" />
-              Scarica File
-            </Button>
-          </div>
-        );
+        </div>
+      );
     }
+
+    // Immagini
+    if (isImageFile(file)) {
+      return (
+        <div className="flex flex-col items-center p-4">
+          <img
+            src={previewUrl}
+            alt={file.FileName}
+            className="max-w-full h-auto max-h-[70vh] object-contain"
+            onError={(e) => {
+              console.error("Image load error:", e);
+              setPreviewError(true);
+            }}
+            onLoad={() => console.log("Image loaded successfully")}
+          />
+        </div>
+      );
+    }
+
+    // File Office
+    if (isOfficeFile(file)) {
+      return (
+        <OfficePreview
+          file={{ ...file, previewUrl }}
+          onDownload={() => handleDownload(file)}
+        />
+      );
+    }
+
+    // Email
+    if (isEmailFile(file)) {
+      return (
+        <EmailPreview file={file} onDownload={() => handleDownload(file)} />
+      );
+    }
+
+    // Default: file non supportato
+    return (
+      <div className="flex flex-col items-center justify-center p-8 bg-gray-50">
+        <FileText className="w-16 h-16 text-gray-500 mb-4" />
+        <p className="text-gray-600">
+          Anteprima non disponibile per questo tipo di file
+        </p>
+        <Button onClick={() => handleDownload(file)} className="mt-4">
+          <Download className="h-4 w-4 mr-2" />
+          Scarica File
+        </Button>
+      </div>
+    );
+  };
+
+  // Helper functions
+  const isImageFile = (file) => {
+    const imageTypes = [
+      "image/jpeg", "image/png", "image/gif", "image/bmp", 
+      "image/svg+xml", "image/tiff", "image/webp"
+    ];
+    const imageExtensions = [
+      ".jpg", ".jpeg", ".png", ".gif", ".bmp", 
+      ".svg", ".tiff", ".tif", ".webp"
+    ];
+    
+    return imageTypes.includes(file.FileType?.toLowerCase()) ||
+           imageExtensions.some(ext => file.FileName?.toLowerCase().endsWith(ext));
+  };
+
+  const isOfficeFile = (file) => {
+    const officeTypes = [
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "application/vnd.ms-powerpoint"
+    ];
+    const officeExtensions = [
+      ".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt"
+    ];
+    
+    return officeTypes.includes(file.FileType) ||
+           officeExtensions.some(ext => file.FileName?.toLowerCase().endsWith(ext));
+  };
+
+  const isEmailFile = (file) => {
+    const emailTypes = [
+      "message/rfc822", "application/vnd.ms-outlook", 
+      "text/x-eml", "application/x-emlx"
+    ];
+    const emailExtensions = [".eml", ".msg", ".emlx"];
+    
+    return emailTypes.includes(file.FileType) ||
+           emailExtensions.some(ext => file.FileName?.toLowerCase().endsWith(ext));
   };
 
   const handleDownload = async (attachment) => {
@@ -314,7 +335,9 @@ const FileViewer = ({ file, isOpen, onClose }) => {
         <DialogHeader>
           <DialogTitle>{file?.FileName}</DialogTitle>
         </DialogHeader>
-        <div className="flex-1 overflow-auto">{getFileContent()}</div>
+        <div className="flex-1 overflow-auto">
+          {getFileContent()}
+        </div>
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={onClose}>
             Chiudi

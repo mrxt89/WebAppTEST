@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { format, parseISO } from "date-fns";
-import { it, se } from "date-fns/locale";
+import { it } from "date-fns/locale";
 import {
   Dialog,
   DialogContent,
@@ -24,9 +24,133 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Info, User, Calendar, Check } from "lucide-react";
+import { Clock, Info, User, Calendar, Check, Search, X } from "lucide-react";
+import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+// Componente personalizzato per il select con ricerca
+const TaskSelectWithSearch = ({ value, onValueChange, tasksByProject }) => {
+  const [open, setOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+
+  // Filtra i progetti e le attività in base alla ricerca
+  const filteredProjects = useMemo(() => {
+    if (!searchValue) return tasksByProject;
+
+    const searchLower = searchValue.toLowerCase();
+
+    const filtered = tasksByProject
+      .map((project) => {
+        const filteredTasks = project.tasks.filter((task) => {
+          const taskTitle = String(task.Title || '').toLowerCase();
+          const projectName = String(project.projectName || '').toLowerCase();
+          const matches = taskTitle.includes(searchLower) || projectName.includes(searchLower);
+            return matches;
+        });
+
+        return {
+          ...project,
+          tasks: filteredTasks
+        };
+      })
+      .filter((project) => project.tasks.length > 0);
+
+    return filtered;
+  }, [tasksByProject, searchValue]);
+
+  // Trova l'attività selezionata per mostrare il suo titolo
+  const selectedTaskTitle = useMemo(() => {
+    if (!value) return null;
+    for (const project of tasksByProject) {
+      const task = project.tasks.find((t) => t.TaskID.toString() === value);
+      if (task) return String(task.Title || '');
+    }
+    return null;
+  }, [value, tasksByProject]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          {selectedTaskTitle || "Seleziona un'attività"}
+          <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0" align="start">
+        <Command>
+          <CommandInput 
+            placeholder="Cerca attività..." 
+            value={searchValue}
+            onValueChange={setSearchValue}
+          />
+          <CommandList className="max-h-[300px] overflow-y-auto">
+            {!filteredProjects || filteredProjects.length === 0 ? (
+              <CommandEmpty>
+                {searchValue ? "Nessuna attività trovata." : "Nessuna attività disponibile."}
+              </CommandEmpty>
+            ) : (
+              <>
+                {filteredProjects.map((project) => {
+                  if (!project || !project.tasks) {
+                    return null;
+                  }
+                  return (
+                    <CommandGroup 
+                      key={project.projectId} 
+                      heading={project.projectName || `Progetto ${project.projectId}`}
+                    >
+                      {project.tasks.map((task) => {
+                        if (!task || !task.TaskID) {
+                          return null;
+                        }
+                        return (
+                          <CommandItem
+                            key={task.TaskID}
+                            value={task.TaskID.toString()}
+                            onSelect={(currentValue) => {
+                              onValueChange(currentValue);
+                              setOpen(false);
+                              setSearchValue("");
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                value === task.TaskID.toString() ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {task.Title || 'Attività senza titolo'}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  );
+                })}
+              </>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 const TimeEntryDialog = ({
   isOpen,
@@ -37,7 +161,6 @@ const TimeEntryDialog = ({
   tasks = [],
   userId,
   isAdmin = false,
-  users = [],
   dialogConfig = {}, // Nuovo parametro per ricevere la configurazione del dialog
 }) => {
   // Stato del form
@@ -54,6 +177,35 @@ const TimeEntryDialog = ({
 
   // Stati per la UI
   const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+
+  const { fetchUsers } = useNotifications();
+
+  // Carica gli utenti quando il dialog viene aperto (solo se admin)
+  useEffect(() => {
+    if (isOpen && isAdmin && users.length === 0) {
+      loadUsers();
+    }
+  }, [isOpen, isAdmin]);
+
+  const loadUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const fetchedUsers = await fetchUsers();
+      setUsers(fetchedUsers || []);
+    } catch (error) {
+      console.error("Error loading users:", error);
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare gli utenti",
+        variant: "destructive",
+      });
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
 
   // Filtra solo le attività presenti nella griglia
   const gridTasks = useMemo(() => {
@@ -65,7 +217,6 @@ const TimeEntryDialog = ({
     // Altrimenti usa tutte le attività disponibili
     const uniqueTasks = [];
     const uniqueTaskIds = new Set();
-
     tasks.forEach((task) => {
       if (!uniqueTaskIds.has(task.TaskID)) {
         uniqueTaskIds.add(task.TaskID);
@@ -79,20 +230,20 @@ const TimeEntryDialog = ({
   // Organizza le attività per progetto
   const tasksByProject = useMemo(() => {
     const projectMap = {};
-
     gridTasks.forEach((task) => {
       const projectId = task.ProjectID;
       if (!projectMap[projectId]) {
         projectMap[projectId] = {
           projectId,
-          projectName: task.ProjectName,
+          projectName: task.ProjectName || task.projectName || `Progetto ${projectId}`,
           tasks: [],
         };
       }
       projectMap[projectId].tasks.push(task);
     });
 
-    return Object.values(projectMap);
+    const result = Object.values(projectMap);
+    return result;
   }, [gridTasks]);
 
   // Popola il form con i dati dell'entry o setta la data se fornita
@@ -238,70 +389,58 @@ const TimeEntryDialog = ({
                   Utente:
                   <User className="h-4 w-4 ml-1 text-gray-400" />
                 </label>
-                <Select
-                  value={formData.userId.toString()}
-                  onValueChange={(value) => handleSelectChange("userId", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleziona utente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.map((user) => (
-                      <SelectItem
-                        key={user.userId}
-                        value={user.userId.toString()}
-                      >
-                        {user.username}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {usersLoading ? (
+                  <div className="flex items-center justify-center p-2">
+                    <Clock className="h-4 w-4 animate-spin mr-2" />
+                    Caricamento utenti...
+                  </div>
+                ) : (
+                  <Select
+                    value={formData.userId.toString()}
+                    onValueChange={(value) => handleSelectChange("userId", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleziona utente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map((user) => (
+                        <SelectItem
+                          key={user.userId}
+                          value={user.userId.toString()}
+                        >
+                          {user.username}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
           </div>
 
-          {/* Selezione Attività - Semplificata */}
+          {/* Selezione Attività con Ricerca */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Attività:</label>
             {tasksByProject.length === 0 ? (
               <div className="text-sm text-gray-500 border rounded-md p-4 text-center">
                 Nessuna attività disponibile nel timesheet
               </div>
-            ) : // Se selectedTask non è null, aggiungi una classe per nascondere
-            selectedTask ? (
+            ) : selectedTask ? (
               <div></div>
             ) : (
-              <Select
+              <TaskSelectWithSearch
                 value={formData.taskId}
                 onValueChange={(value) => handleSelectChange("taskId", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona un'attività" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tasksByProject.map((project) => (
-                    <SelectGroup key={project.projectId}>
-                      <SelectLabel>{project.projectName}</SelectLabel>
-                      {project.tasks.map((task) => (
-                        <SelectItem
-                          key={task.TaskID}
-                          value={task.TaskID.toString()}
-                        >
-                          {task.TaskTitle}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
+                tasksByProject={tasksByProject}
+              />
             )}
 
             {/* Mostra dettaglio attività selezionata */}
             {selectedTask && (
               <div className="text-sm p-2 bg-blue-50 border border-blue-200 rounded-md">
-                <div className="font-medium">{selectedTask.TaskTitle}</div>
+                <div className="font-medium">{selectedTask.Title}</div>
                 <div className="text-xs text-gray-600">
-                  Progetto: {selectedTask.ProjectName}
+                  Progetto: {selectedTask.ProjectName || selectedTask.projectName}
                 </div>
               </div>
             )}

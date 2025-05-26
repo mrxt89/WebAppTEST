@@ -459,13 +459,24 @@ const getUserMemberProjects = async (userId) => {
     const result = await pool.request()
       .input('UserId', sql.Int, userId)
       .query(`
-        SELECT p.ProjectID, p.Name, p.Description, p.Status, 
-              pm.Role, pm.ProjectMemberID
-        FROM MA_Projects p
-        JOIN MA_ProjectMembers pm ON p.ProjectID = pm.ProjectID
-        WHERE pm.UserID = @UserId
-          AND p.Disabled = 0
-        ORDER BY p.Name
+SELECT		p.ProjectID
+			, p.Name
+			, p.Description
+			, p.Status
+			, ps.StatusDescription
+			, ps.HexColor 
+			, pm.Role
+			, pm.ProjectMemberID
+			, ISNULL(pc.Description,'') AS Category
+			, ISNULL(pcd.Description,'') AS CategoryDetail
+FROM		MA_Projects p
+JOIN		MA_ProjectMembers pm ON p.ProjectID = pm.ProjectID
+JOIN		MA_ProjectStatus ps ON ps.Id = p.Status
+LEFT JOIN	MA_ProjectCategories pc ON pc.CompanyId = p.CompanyId AND pc.ProjectCategoryId = p.ProjectCategoryId
+LEFT JOIN	MA_ProjectCategoriesDetail pcd ON pcd.ProjectCategoryId = pc.ProjectCategoryId AND pcd.Line = p.ProjectCategoryDetailLine
+WHERE pm.UserID = @UserId
+    AND p.Disabled = 0
+ORDER BY p.Name
       `);
     
     return result.recordset;

@@ -4,8 +4,9 @@ const ExcelJS = require('exceljs');
 
 /**
  * Ottieni le registrazioni di ore settimanali per un utente
- * @param {number} userId - ID dell'utente
+ * @param {number} userId - ID dell'utente target
  * @param {string} weekStartDate - Data di inizio settimana (formato YYYY-MM-DD)
+ * @param {number} currentUserId - ID dell'utente che fa la richiesta
  * @returns {Promise<Array>} - Array con i tre recordset (daily entries, weekly totals, daily totals)
  */
 const getUserTimeWeekly = async (userId, weekStartDate) => {
@@ -14,7 +15,7 @@ const getUserTimeWeekly = async (userId, weekStartDate) => {
     
     const request = pool.request()
       .input('UserID', sql.Int, userId)
-      .input('WeekStartDate', sql.Date, weekStartDate);
+      .input('WeekStartDate', sql.Date, weekStartDate)
     
     const result = await request.execute('MA_GetUserTimeWeekly');
     return result.recordsets;
@@ -236,44 +237,20 @@ const generateExcelReport = async (reportData, user, timeBucket, period) => {
   }
 };
 
-
-
 /**
  * Ottieni le attività disponibili per un utente
- * @param {number} userId - ID dell'utente
+ * @param {number} userId - ID dell'utente target
+ * @param {number} currentUserId - ID dell'utente che fa la richiesta
  * @returns {Promise<Array>} - Array di attività disponibili
  */
-const getUserAvailableTasks = async (userId) => {
+const getUserAvailableTasks = async (userId, currentUserId) => {
   try {
     let pool = await sql.connect(config.dbConfig);
     
     const result = await pool.request()
       .input('UserID', sql.Int, userId)
-      .query(`
-        SELECT DISTINCT
-          t.TaskID,
-          t.Title AS TaskTitle,
-          p.ProjectID,
-          p.Name AS ProjectName
-        FROM MA_ProjectTasks t
-        JOIN MA_Projects p ON t.ProjectID = p.ProjectID
-        WHERE 
-          (
-            -- L'utente è assegnato all'attività
-            t.AssignedTo = @UserID
-            
-            -- L'utente è un assegnatario aggiuntivo dell'attività
-            OR EXISTS (SELECT 1 FROM MA_ProjectTaskAssignees a WHERE a.TaskID = t.TaskID AND a.UserID = @UserID)
-            
-            -- L'utente è un membro del progetto
-            OR EXISTS (SELECT 1 FROM MA_ProjectMembers m WHERE m.ProjectID = p.ProjectID AND m.UserID = @UserID)
-          )
-          -- Solo progetti attivi
-          AND p.Status = 'ATTIVO'
-          -- Solo attività che non sono state completate
-          AND t.Status <> 'COMPLETATA'
-        ORDER BY p.Name, t.Title
-      `);
+      .input('CurrentUserID', sql.Int, currentUserId)
+      .execute('MA_GetUserAvailableTasks');
     
     return result.recordset;
   } catch (err) {
@@ -287,17 +264,17 @@ const getUserAvailableTasks = async (userId) => {
  * @param {string} action - Azione da eseguire ('INSERT', 'UPDATE', 'DELETE', 'GET')
  * @param {number} entryId - ID della registrazione (per UPDATE, DELETE, GET)
  * @param {Object} entryData - Dati della registrazione (per INSERT, UPDATE)
- * @param {number} createdBy - ID dell'utente che esegue l'azione
+ * @param {number} currentUserId - ID dell'utente che esegue l'azione
  * @returns {Promise<Object|Array>} - Risultato dell'operazione
  */
-const manageTimeEntry = async (action, entryId = null, entryData = null, createdBy) => {
+const manageTimeEntry = async (action, entryId = null, entryData = null, currentUserId) => {
   try {
     let pool = await sql.connect(config.dbConfig);
     
     const request = pool.request()
       .input('Action', sql.VarChar(10), action)
       .input('EntryID', sql.Int, entryId)
-      .input('CreatedBy', sql.Int, createdBy);
+      .input('CurrentUserID', sql.Int, currentUserId);
     
     // Aggiungi parametri solo se necessari per le azioni che li richiedono
     if (action === 'INSERT' || action === 'UPDATE') {
@@ -327,36 +304,16 @@ const manageTimeEntry = async (action, entryId = null, entryData = null, created
 /**
  * Ottieni il riepilogo delle ore per un progetto
  * @param {number} projectId - ID del progetto
- * @param {number} userId - ID dell'utente che fa la richiesta (per controllo permessi)
+ * @param {number} currentUserId - ID dell'utente che fa la richiesta (per controllo permessi)
  * @returns {Promise<Object>} - Riepilogo delle ore del progetto
  */
-const getProjectTimeSummary = async (projectId, userId) => {
+const getProjectTimeSummary = async (projectId, currentUserId) => {
   try {
     let pool = await sql.connect(config.dbConfig);
     
-    // Prima verifica che l'utente abbia accesso a questo progetto
-    const permissionCheck = await pool.request()
-      .input('ProjectID', sql.Int, projectId)
-      .input('UserID', sql.Int, userId)
-      .query(`
-        -- Verifica se l'utente è admin
-        IF EXISTS (SELECT 1 FROM AR_Users WHERE userId = @UserID AND Role = 'ADMIN')
-          SELECT 1 AS HasAccess
-        -- Verifica se l'utente è membro del progetto
-        ELSE IF EXISTS (SELECT 1 FROM MA_ProjectMembers WHERE ProjectID = @ProjectID AND UserID = @UserID)
-          SELECT 1 AS HasAccess
-        ELSE
-          SELECT 0 AS HasAccess
-      `);
-    
-    if (permissionCheck.recordset[0]?.HasAccess !== 1) {
-      throw new Error('Non hai i permessi per visualizzare questo progetto');
-    }
-    
-    // Ottieni riepilogo per progetto (ore totali, ripartizione per utente, ecc.)
     const result = await pool.request()
       .input('ProjectID', sql.Int, projectId)
-      .input('UserId', sql.Int, userId)
+      .input('UserId', sql.Int, currentUserId)
       .execute('MA_GetProjectTimeSummary');
     
     return {
@@ -373,44 +330,16 @@ const getProjectTimeSummary = async (projectId, userId) => {
 /**
  * Ottieni il riepilogo delle ore per un'attività
  * @param {number} taskId - ID dell'attività
- * @param {number} userId - ID dell'utente che fa la richiesta (per controllo permessi)
+ * @param {number} currentUserId - ID dell'utente che fa la richiesta (per controllo permessi)
  * @returns {Promise<Object>} - Riepilogo delle ore dell'attività
  */
-const getTaskTimeSummary = async (taskId, userId) => {
+const getTaskTimeSummary = async (taskId, currentUserId) => {
   try {
     let pool = await sql.connect(config.dbConfig);
     
-    // Prima verifica che l'utente abbia accesso a questa attività
-    const permissionCheck = await pool.request()
-      .input('TaskID', sql.Int, taskId)
-      .input('UserID', sql.Int, userId)
-      .query(`
-        -- Verifica se l'utente è admin
-        IF EXISTS (SELECT 1 FROM AR_Users WHERE userId = @UserID AND Role = 'ADMIN')
-          SELECT 1 AS HasAccess
-        -- Verifica se l'utente è assegnato all'attività
-        ELSE IF EXISTS (SELECT 1 FROM MA_ProjectTasks WHERE TaskID = @TaskID AND AssignedTo = @UserID)
-          SELECT 1 AS HasAccess
-        -- Verifica se l'utente è membro del progetto
-        ELSE IF EXISTS (
-          SELECT 1 
-          FROM MA_ProjectTasks t
-          JOIN MA_ProjectMembers m ON t.ProjectID = m.ProjectID
-          WHERE t.TaskID = @TaskID AND m.UserID = @UserID
-        )
-          SELECT 1 AS HasAccess
-        ELSE
-          SELECT 0 AS HasAccess
-      `);
-    
-    if (permissionCheck.recordset[0]?.HasAccess !== 1) {
-      throw new Error('Non hai i permessi per visualizzare questa attività');
-    }
-    
-    // Ottieni riepilogo per attività
     const result = await pool.request()
       .input('TaskID', sql.Int, taskId)
-      .input('UserId', sql.Int, userId)
+      .input('CurrentUserID', sql.Int, currentUserId)
       .execute('MA_GetTaskTimeSummary');
     
     return {
@@ -426,13 +355,14 @@ const getTaskTimeSummary = async (taskId, userId) => {
 
 /**
  * Ottieni un report periodico delle ore lavorate
- * @param {number} userId - ID dell'utente
+ * @param {number} userId - ID dell'utente target
  * @param {string} timeBucket - Tipo di intervallo ('day', 'week', 'month', 'quarter', 'year')
  * @param {Object} options - Opzioni aggiuntive
  * @param {string} options.startDate - Data di inizio (formato YYYY-MM-DD)
  * @param {string} options.endDate - Data di fine (formato YYYY-MM-DD)
  * @param {boolean} options.includeDetails - Se includere dettagli delle registrazioni
  * @param {boolean} options.includeProjectDetails - Se includere dettagli dei progetti
+ * @param {number} currentUserId - ID dell'utente che fa la richiesta
  * @returns {Promise<Object>} - Report completo con vari set di dati
  */
 const getUserTimeReport = async (userId, timeBucket = 'month', options = {}) => {
@@ -452,7 +382,8 @@ const getUserTimeReport = async (userId, timeBucket = 'month', options = {}) => 
       .input('StartDate', sql.Date, startDate)
       .input('EndDate', sql.Date, endDate)
       .input('IncludeDetails', sql.Bit, includeDetails ? 1 : 0)
-      .input('IncludeProjectDetails', sql.Bit, includeProjectDetails ? 1 : 0);
+      .input('IncludeProjectDetails', sql.Bit, includeProjectDetails ? 1 : 0)
+    
       
     const result = await request.execute('MA_GetUserTimeReport');
     
@@ -503,10 +434,11 @@ const getUserTimeReport = async (userId, timeBucket = 'month', options = {}) => 
 
 /**
  * Genera ed esporta un report nel formato specificato
- * @param {number} userId - ID dell'utente
+ * @param {number} userId - ID dell'utente target
  * @param {string} timeBucket - Tipo di intervallo ('day', 'week', 'month', 'quarter', 'year')
  * @param {string} period - Valore dell'intervallo (es. '2023-05' per maggio 2023)
  * @param {string} format - Formato di esportazione ('csv', 'xlsx')
+ * @param {number} currentUserId - ID dell'utente che fa la richiesta
  * @returns {Promise<Buffer>} - Buffer contenente il file esportato
  */
 const exportTimeReport = async (userId, timeBucket = 'month', period = null, format = 'csv') => {
