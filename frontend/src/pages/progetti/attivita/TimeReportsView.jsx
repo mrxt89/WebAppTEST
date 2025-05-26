@@ -52,6 +52,7 @@ import {
   User,
   Users,
   Calendar as CalendarIconSolid,
+  Clock,
 } from "lucide-react";
 import {
   format,
@@ -67,6 +68,7 @@ import {
 import { it } from "date-fns/locale";
 import { config } from "../../../config";
 import useTimeTracking from "../../../hooks/useTimeTracking";
+import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 
 // Definisci i colori per i grafici
 const COLORS = [
@@ -79,9 +81,12 @@ const COLORS = [
   "#ffc658",
 ];
 
-const TimeReportsView = ({ currentUserId, isAdmin = false, users = [] }) => {
+const TimeReportsView = ({ currentUserId, isAdmin = false }) => {
   const { currentUserId: loggedInUser } = useTimeTracking();
+  const { fetchUsers } = useNotifications();
   const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
 
   // Selezione periodi
   const [timeBucket, setTimeBucket] = useState("month");
@@ -89,6 +94,31 @@ const TimeReportsView = ({ currentUserId, isAdmin = false, users = [] }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [reportData, setReportData] = useState(null);
   const [viewMode, setViewMode] = useState("charts"); // 'charts', 'details', 'table'
+
+  // Carica gli utenti all'avvio se l'utente è admin
+  useEffect(() => {
+    if (isAdmin) {
+      loadUsers();
+    }
+  }, [isAdmin]);
+
+  const loadUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const fetchedUsers = await fetchUsers();
+      setUsers(fetchedUsers || []);
+    } catch (error) {
+      console.error("Error loading users:", error);
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare gli utenti",
+        variant: "destructive",
+      });
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
 
   // Calcola il periodo selezionato in base al tipo e alla data
   const periodSelector = useMemo(() => {
@@ -341,24 +371,31 @@ const TimeReportsView = ({ currentUserId, isAdmin = false, users = [] }) => {
                 <label className="text-sm font-medium mb-2 block">
                   Utente:
                 </label>
-                <Select
-                  value={selectedUserId.toString()}
-                  onValueChange={(value) => setSelectedUserId(parseInt(value))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleziona utente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.map((user) => (
-                      <SelectItem
-                        key={user.userId}
-                        value={user.userId.toString()}
-                      >
-                        {user.username || `${user.firstName} ${user.lastName}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {usersLoading ? (
+                  <div className="flex items-center justify-center p-2">
+                    <Clock className="h-4 w-4 animate-spin mr-2" />
+                    Caricamento utenti...
+                  </div>
+                ) : (
+                  <Select
+                    value={selectedUserId.toString()}
+                    onValueChange={(value) => setSelectedUserId(parseInt(value))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Seleziona utente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map((user) => (
+                        <SelectItem
+                          key={user.userId}
+                          value={user.userId.toString()}
+                        >
+                          {user.username}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
 

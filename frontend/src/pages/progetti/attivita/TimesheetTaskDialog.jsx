@@ -8,14 +8,17 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Filter, X } from "lucide-react";
 import NewTaskForm from "@/pages/progetti/progetti/NewTaskForm";
 import useProjectActions from "@/hooks/useProjectManagementActions";
+import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 
 const TimesheetTaskDialog = ({
   isOpen,
   onClose,
   onTaskCreated,
-  users = [],
 }) => {
   const [loading, setLoading] = useState(false);
   const [userProjects, setUserProjects] = useState([]);
@@ -23,9 +26,68 @@ const TimesheetTaskDialog = ({
   const [projectTasks, setProjectTasks] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedCategoryDetail, setSelectedCategoryDetail] = useState("all");
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
 
   const { user } = useAuth();
   const projectActions = useProjectActions();
+  const { fetchUsers } = useNotifications();
+
+  // Carica gli utenti quando il dialog viene aperto
+  useEffect(() => {
+    if (isOpen && users.length === 0) {
+      loadUsers();
+    }
+  }, [isOpen]);
+
+  const loadUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const fetchedUsers = await fetchUsers();
+      console.log(fetchedUsers);  
+      setUsers(fetchedUsers || []);
+    } catch (error) {
+      console.error("Error loading users:", error);
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare gli utenti",
+        variant: "destructive",
+      });
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  // Estrai valori unici per i filtri
+  const uniqueStatuses = [...new Set(userProjects.map(p => p.StatusDescription))];
+  const uniqueCategories = [...new Set(userProjects.map(p => p.Category).filter(Boolean))];
+  const uniqueCategoryDetails = [...new Set(userProjects.map(p => p.CategoryDetail).filter(Boolean))];
+
+  // Filtra i progetti in base ai criteri di ricerca
+  const filteredProjects = userProjects.filter(project => {
+    const matchesSearch = searchText === "" || 
+      project.Description?.toLowerCase().includes(searchText.toLowerCase()) ||
+      project.Name?.toLowerCase().includes(searchText.toLowerCase());
+    
+    const matchesStatus = selectedStatus === "all" || project.StatusDescription === selectedStatus;
+    const matchesCategory = selectedCategory === "all" || project.Category === selectedCategory;
+    const matchesCategoryDetail = selectedCategoryDetail === "all" || project.CategoryDetail === selectedCategoryDetail;
+
+    return matchesSearch && matchesStatus && matchesCategory && matchesCategoryDetail;
+  });
+
+  // Reset dei filtri
+  const resetFilters = () => {
+    setSearchText("");
+    setSelectedStatus("all");
+    setSelectedCategory("all");
+    setSelectedCategoryDetail("all");
+  };
 
   // Effetto per reset dello stato quando il dialog viene chiuso
   useEffect(() => {
@@ -176,37 +238,121 @@ const TimesheetTaskDialog = ({
             </p>
           </div>
         ) : !showForm ? (
-          // Mostra solo il selettore di progetti
           <div className="p-6">
             <h3 className="text-lg font-medium mb-4">
               Seleziona un progetto per iniziare
             </h3>
-            <div className="space-y-4">
-              {userProjects.map((project) => (
+
+            {/* Filtri */}
+            <div className="space-y-4 mb-6">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                  <Input
+                    placeholder="Cerca per nome o descrizione..."
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
                 <Button
-                  key={project.ProjectID}
                   variant="outline"
-                  className="w-full justify-start text-left h-auto py-3 px-4"
-                  onClick={() => handleProjectSelect(project.ProjectID)}
+                  size="icon"
+                  onClick={resetFilters}
+                  title="Reset filtri"
                 >
-                  <div>
-                    <div className="font-medium">{project.Name}</div>
-                    <div className="text-sm text-gray-500 mt-1">
-                      {project.Description && project.Description.length > 100
-                        ? `${project.Description.substring(0, 100)}...`
-                        : project.Description}
-                    </div>
-                    <div className="flex items-center mt-2">
-                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                        {project.Role}
-                      </span>
-                      <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-800 ml-2">
-                        {project.Status}
-                      </span>
-                    </div>
-                  </div>
+                  <X className="h-4 w-4" />
                 </Button>
-              ))}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Stato" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutti gli stati</SelectItem>
+                    {uniqueStatuses.map(status => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutte le categorie</SelectItem>
+                    {uniqueCategories.map(category => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedCategoryDetail} onValueChange={setSelectedCategoryDetail}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sottocategoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutte le sottocategorie</SelectItem>
+                    {uniqueCategoryDetails.map(detail => (
+                      <SelectItem key={detail} value={detail}>
+                        {detail}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Lista progetti filtrata */}
+            <div className="space-y-4 h-[400px] overflow-y-auto pr-2">
+              {filteredProjects.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">
+                  Nessun progetto trovato con i filtri selezionati
+                </div>
+              ) : (
+                filteredProjects.map((project) => (
+                  <Button
+                    key={project.ProjectID}
+                    variant="outline"
+                    className="w-full justify-start text-left h-auto py-3 px-4"
+                    onClick={() => handleProjectSelect(project.ProjectID)}
+                  >
+                    <div>
+                      <div className="font-medium">{project.Name}</div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        {project.Description && project.Description.length > 100
+                          ? `${project.Description.substring(0, 100)}...`
+                          : project.Description}
+                      </div>
+                      <div className="flex items-center mt-2 gap-2">
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                          {project.Role}
+                        </span>
+                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-800">
+                          {project.Status}
+                        </span>
+                        {project.Category && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                            {project.Category}
+                          </span>
+                        )}
+                        {project.CategoryDetail && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800">
+                            {project.CategoryDetail}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Button>
+                ))
+              )}
             </div>
           </div>
         ) : (
@@ -237,6 +383,8 @@ const TimesheetTaskDialog = ({
               onCancel={onClose}
               projectTasks={projectTasks}
               projectId={selectedProject?.ProjectID}
+              users={users}
+              usersLoading={usersLoading}
             />
           </div>
         )}

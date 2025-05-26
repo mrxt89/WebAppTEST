@@ -53,7 +53,7 @@ import TimesheetTaskDialog from "../attivita/TimesheetTaskDialog";
 import useTimeTracking from "../../../hooks/useTimeTracking";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 
-const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
+const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
   const {
     loading: apiLoading,
     getUserTimeWeekly,
@@ -64,7 +64,7 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
     canViewUserData,
   } = useTimeTracking();
 
-  const { fetchUsers, users: allUsers } = useNotifications();
+  const { fetchUsers } = useNotifications();
 
   const [loading, setLoading] = useState(true);
   const [weekStartDate, setWeekStartDate] = useState(() => {
@@ -88,11 +88,33 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
   });
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
 
-  // Carica gli utenti all'avvio
+  // Carica gli utenti all'avvio se l'utente è admin
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    if (isAdmin) {
+      loadUsers();
+    }
+  }, [isAdmin]);
+
+  const loadUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const fetchedUsers = await fetchUsers();
+      setUsers(fetchedUsers || []);
+    } catch (error) {
+      console.error("Error loading users:", error);
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare gli utenti",
+        variant: "destructive",
+      });
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
 
   // Funzione per caricare i dati della settimana corrente
   const loadWeekData = async () => {
@@ -119,6 +141,8 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
 
       // Carica anche le attività disponibili per l'utente
       const tasks = await getUserAvailableTasks(selectedUserId);
+      console.log('selectedUserId', selectedUserId);
+      console.log('tasks', tasks);
       setAvailableTasks(tasks);
     } catch (error) {
       console.error("Errore nel caricamento dei dati settimanali:", error);
@@ -364,34 +388,43 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
         <div className="flex items-center gap-2">
           {isAdmin && (
             <div className="relative border rounded-md bg-white">
-              <select
-                value={selectedUserId.toString()}
-                onChange={(e) => setSelectedUserId(parseInt(e.target.value))}
-                className="appearance-none w-[200px] pl-8 pr-8 py-2 rounded-md text-sm"
-              >
-                {users.map((user) => (
-                  <option key={user.userId} value={user.userId.toString()}>
-                    {user.username}
-                  </option>
-                ))}
-              </select>
-              <User className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                <svg
-                  className="h-4 w-4 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </div>
+              {usersLoading ? (
+                <div className="flex items-center justify-center p-2 w-[200px]">
+                  <Clock className="h-4 w-4 animate-spin mr-2" />
+                  Caricamento...
+                </div>
+              ) : (
+                <>
+                  <select
+                    value={selectedUserId.toString()}
+                    onChange={(e) => setSelectedUserId(parseInt(e.target.value))}
+                    className="appearance-none w-[200px] pl-8 pr-8 py-2 rounded-md text-sm"
+                  >
+                    {users.map((user) => (
+                      <option key={user.userId} value={user.userId.toString()}>
+                        {user.username}
+                      </option>
+                    ))}
+                  </select>
+                  <User className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg
+                      className="h-4 w-4 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -787,7 +820,6 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
         tasks={availableTasks}
         userId={selectedUserId}
         isAdmin={isAdmin}
-        users={users}
         dialogConfig={dialogConfig}
       />
 
@@ -796,7 +828,6 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false, users = [] }) => {
         isOpen={isTaskDialogOpen}
         onClose={() => setIsTaskDialogOpen(false)}
         onTaskCreated={loadWeekData}
-        users={allUsers || []}
       />
 
       {/* Stile CSS per la tabella fixed */}

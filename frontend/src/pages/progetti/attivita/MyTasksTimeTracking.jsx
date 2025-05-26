@@ -9,7 +9,6 @@ import useTimeTracking from "../../../hooks/useTimeTracking";
 const MyTasksTimeTracking = ({
   currentUserId,
   isAdmin = false,
-  users = [],
 }) => {
   const [activeView, setActiveView] = useState("timesheet");
   const { isUserAdmin } = useTimeTracking();
@@ -60,7 +59,6 @@ const MyTasksTimeTracking = ({
           <EnhancedTimesheet
             currentUserId={currentUserId}
             isAdmin={userHasAdminRights}
-            users={users}
           />
         )}
 
@@ -68,7 +66,6 @@ const MyTasksTimeTracking = ({
           <TimeReportsView
             currentUserId={currentUserId}
             isAdmin={userHasAdminRights}
-            users={users}
           />
         )}
       </div>

@@ -27,8 +27,11 @@ const useTimeTracking = () => {
     const isAdmin = userGroups.some(
       (g) =>
         g.groupName.toUpperCase() === "ADMIN" ||
-        g.groupName.toUpperCase() === "RESPONSABILI PROGETTI",
+        g.groupName.toUpperCase() === "RESPONSABILI PROGETTI" ||
+        g.groupName.toUpperCase() === "AMMINISTRATORI" ||
+        g.groupName.toUpperCase() === "MANAGERS"
     );
+
     return isAdmin;
   }, [userGroups]);
 
