@@ -162,7 +162,7 @@ const MyTasksList = ({
   // Funzione per navigare alla pagina del progetto
   const navigateToProject = (e, projectId) => {
     e.stopPropagation();
-    navigate(`/progetti/detail/${projectId}`);
+    navigate(`/progetti/dashboard?projectId=${projectId}`);
   };
 
   // Funzione per gestire il filtro delle colonne
@@ -607,12 +607,24 @@ const MyTasksList = ({
                           variant="outline"
                           size="sm"
                           className="bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 border-green-200"
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            onTaskUpdate({
-                              ...task,
-                              Status: "COMPLETATA",
+                            const result = await swal.fire({
+                              title: "Conferma completamento",
+                              text: "Sei sicuro di voler completare questa attività?",
+                              icon: "question",
+                              showCancelButton: true,
+                              confirmButtonText: "Sì, completa",
+                              cancelButtonText: "Annulla",
+                              confirmButtonColor: "#22c55e",
                             });
+                            
+                            if (result.isConfirmed) {
+                              onTaskUpdate({
+                                ...task,
+                                Status: "COMPLETATA",
+                              });
+                            }
                           }}
                         >
                           <CheckCircle2
