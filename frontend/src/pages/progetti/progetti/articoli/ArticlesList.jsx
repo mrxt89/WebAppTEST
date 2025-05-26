@@ -129,7 +129,7 @@ const ArticlesList = ({
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4">
+      <div className="p-4 overflow-auto">
         <Table>
           <TableHeader className="bg-slate-50 sticky top-0">
             <TableRow>

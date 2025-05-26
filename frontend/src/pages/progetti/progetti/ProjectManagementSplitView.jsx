@@ -1787,9 +1787,11 @@ const ProjectManagementSplitView = () => {
       </AlertDescription>
     </Alert>
   ) : (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex-1 overflow-auto">
-        <Table>
+    <div className="flex-1 flex flex-col min-h-0" id="project-table-div">
+      <div className="flex-1 overflow-auto" id="project-table-div2">
+        <Table
+         id="project-table"
+        >
           <TableHeader className="sticky top-0 bg-gray-100 z-10">
             <TableRow>
               <TableHead
@@ -1807,6 +1809,24 @@ const ProjectManagementSplitView = () => {
                     column="text"
                     value={columnFilters.name}
                     onChange={(value) => handleColumnFilter("name", value)}
+                  />
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
+                onClick={() => handleSort("Description")}
+              >
+                <div className="flex items-center">
+                  Descrizione
+                  {sortConfig.key === "Description" && (
+                    <span className="ml-1">
+                      {sortConfig.direction === "ascending" ? "↑" : "↓"}
+                    </span>
+                  )}
+                  <ColumnFilter
+                    column="text"
+                    value={columnFilters.description}
+                    onChange={(value) => handleColumnFilter("description", value)}
                   />
                 </div>
               </TableHead>
@@ -1877,6 +1897,9 @@ const ProjectManagementSplitView = () => {
                       {project.Name}
                     </span>
                   </div>
+                </TableCell>
+                <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px] whitespace-nowrap">
+                  {project.Description || "-"}
                 </TableCell>
                 <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px] whitespace-nowrap">
                   {project.CompanyName || "-"}

@@ -387,7 +387,7 @@ const ArticleReferences = ({ item, canEdit, onRefresh }) => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
             </div>
           ) : references.length > 0 ? (
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-[400px] overflow-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>

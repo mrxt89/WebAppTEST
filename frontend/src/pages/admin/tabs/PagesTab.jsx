@@ -512,7 +512,7 @@ const PagesTab = ({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[calc(100vh-230px)]">
+          <ScrollArea className="h-[calc(100vh-230px)] overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>

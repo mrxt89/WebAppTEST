@@ -454,7 +454,7 @@ const TaskCostsTab = ({ task, canEdit, onCostChange }) => {
         </div>
 
         <Card className="p-4">
-          <ScrollArea className="h-[450px]">
+          <ScrollArea className="h-[450px] overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>

@@ -253,7 +253,7 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
           </div>
         )}
 
-        <ScrollArea className="h-[400px] rounded-md border">
+        <ScrollArea className="h-[400px] rounded-md border overflow-auto">
           <Table>
             <TableHeader>
               <TableRow>

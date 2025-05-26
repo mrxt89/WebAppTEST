@@ -584,7 +584,7 @@ const UsersTab = ({
           <CardTitle>Utenti</CardTitle>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[calc(100vh-230px)]">
+          <div className="h-[calc(100vh-230px)] overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -627,7 +627,7 @@ const UsersTab = ({
                   })}
               </TableBody>
             </Table>
-          </ScrollArea>
+          </div>
         </CardContent>
       </Card>
 

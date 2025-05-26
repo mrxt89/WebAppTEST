@@ -438,7 +438,7 @@ const ArticleSelectionModal = ({
           {/* Tab Articoli Temporanei */}
           <TabsContent
             value="temporary"
-            className="flex-1 flex flex-col m-0 border-none p-0 overflow-hidden"
+            className="flex-1 flex flex-col m-0 border-none p-0 overflow-auto"
           >
             <div className="flex-1 overflow-auto">
               {loading ? (
@@ -515,7 +515,7 @@ const ArticleSelectionModal = ({
           {/* Tab Articoli da Gestionale */}
           <TabsContent
             value="defined"
-            className="flex-1 flex flex-col m-0 border-none p-0 overflow-hidden"
+            className="flex-1 flex flex-col m-0 border-none p-0 overflow-auto"
           >
             <div className="flex-1 overflow-auto">
               {loading ? (

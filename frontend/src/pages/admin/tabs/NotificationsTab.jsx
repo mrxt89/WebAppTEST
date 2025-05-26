@@ -593,7 +593,7 @@ const NotificationsTab = ({
         </CardHeader>
         <CardContent>
           <ScrollArea
-            className="h-[calc(100vh-230px)]"
+            className="h-[calc(100vh-230px)] overflow-auto"
             id="notification-channels-list"
           >
             <Table>

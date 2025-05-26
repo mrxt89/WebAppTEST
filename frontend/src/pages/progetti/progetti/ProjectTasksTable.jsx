@@ -245,7 +245,7 @@ const UpdatedProjectTasksTable = ({
       )}
 
       {/* Tabella */}
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-auto">
         <Table>
           <TableHeader className="bg-gray-50">
             <TableRow>
