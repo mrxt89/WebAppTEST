@@ -83,11 +83,8 @@ const NewMessageModal = ({
       const isMobileDevice = screenWidth <= 768;
       setIsMobile(isMobileDevice);
 
-      // Controlla se siamo dentro un altro modal
-      const isInsideModal = document.querySelector('[role="dialog"][data-state="open"]');
-      const baseZIndex = isInsideModal ? 10000 : 2000;
-
       if (isVeryNarrow || isMobileDevice) {
+        // Stile per dispositivi mobili e molto stretti
         setModalStyle({
           overlay: {
             position: "fixed",
@@ -96,7 +93,7 @@ const NewMessageModal = ({
             right: 0,
             bottom: 0,
             backgroundColor: "rgba(0, 0, 0, 0.75)",
-            zIndex: baseZIndex,
+            zIndex: 2000,
           },
           content: {
             position: "fixed",
@@ -116,13 +113,14 @@ const NewMessageModal = ({
           },
         });
       } else {
+        // Stile per desktop
         const sidebarOffset = sidebarVisible ? 350 : 0;
         const horizontalPadding = Math.min(150, screenWidth * 0.1);
 
         setModalStyle({
           overlay: {
             backgroundColor: "rgba(0, 0, 0, 0.75)",
-            zIndex: baseZIndex,
+            zIndex: 1000,
           },
           content: {
             position: "absolute",
@@ -131,7 +129,7 @@ const NewMessageModal = ({
             right: `${sidebarOffset + horizontalPadding}px`,
             transform: "translateY(-50%)",
             height: "80%",
-            width: `calc(100% - ${horizontalPadding * 2 + sidebarOffset}px)`,
+            width: "calc(100% - ${horizontalPadding * 2 + sidebarOffset}px)",
             padding: "0",
             borderRadius: "10px",
             background: "rgba(255, 255, 255, 0.5)",
