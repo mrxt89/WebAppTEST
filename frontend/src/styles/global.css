@@ -2198,3 +2198,23 @@ button:disabled {
 .dialog-above-polls {
   z-index: 11000 !important;
 }
+
+/* Stili per swal quando è dentro un modal */
+[role="dialog"][data-state="open"] ~ .swal2-container,
+#chat-portal-root ~ .swal2-container {
+  z-index: 1000005 !important;
+}
+
+/* Assicurati che il backdrop di swal sia sopra tutto */
+.swal2-container.swal2-backdrop-show {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+/* Chat portal styles */
+#chat-portal-root {
+  isolation: isolate;
+}
+
+#chat-portal-root .chat-window {
+  z-index: 1000000;
+}

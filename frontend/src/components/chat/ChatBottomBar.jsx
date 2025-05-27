@@ -549,6 +549,31 @@ const ChatBottomBar = ({
     };
   }, [disabled, inputRef.current]); // Dipendenze per rieseguire l'effect
 
+  // Fix per il focus quando siamo in un portal
+  useEffect(() => {
+    const handleFocusClick = (e) => {
+    if (containerRef.current && containerRef.current.contains(e.target)) {
+      if (inputRef.current && !disabled && !isFocused) {
+        // Usa requestAnimationFrame per assicurarsi che il DOM sia pronto
+        requestAnimationFrame(() => {
+          if (inputRef.current) {
+            inputRef.current.focus();
+            // Forza il contentEditable se necessario
+            inputRef.current.contentEditable = true;
+          }
+        });
+      }
+    }
+  };
+
+  // Aggiungi listener con capture phase per intercettare prima
+  document.addEventListener('click', handleFocusClick, true);
+  
+  return () => {
+    document.removeEventListener('click', handleFocusClick, true);
+  };
+}, [disabled, isFocused]);
+
   const currentResponseOptions = Array.isArray(responseOptions)
     ? responseOptions.find(
         (option) => option.notificationCategoryId == notificationCategoryId,
