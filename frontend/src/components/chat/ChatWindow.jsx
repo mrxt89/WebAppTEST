@@ -5,7 +5,6 @@ import ChatLayout from "./ChatLayout";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import { debounce } from "lodash";
 import { swal } from "../../lib/common";
-import ChatPortal from './ChatPortal';
 // Variabile globale per tenere traccia dell'ultimo aggiornamento
 let lastUpdateTime = 0;
 
@@ -1768,14 +1767,6 @@ const ChatWindow = ({
   }
 
   // Window content - same for maximized and normal mode
-  // ... tutto il codice precedente del componente ChatWindow ...
-
-  // Don't render anything if component is unmounted or window is minimized
-  if (!notification || isMinimized) {
-    return null;
-  }
-
-  // Window content - same for maximized and normal mode
   const windowContent = (
     <div className="flex flex-col w-full h-full bg-white overflow-hidden">
       {/* Use the drag handle on the top bar */}
@@ -1897,113 +1888,103 @@ const ChatWindow = ({
     </div>
   );
 
-  // Contenuto della chat per le diverse modalità
-  const chatWindowElement = (() => {
+  // Render window based on isStandalone mode
+  if (isStandalone) {
     // Standalone mode - full screen without Resizable
-    if (isStandalone) {
-      return (
-        <div
-          ref={nodeRef}
-          className="chat-window standalone-chat"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            zIndex: 9999,
-            boxShadow: "none",
-            border: "none",
-            borderRadius: 0,
-          }}
-        >
-          {windowContent}
-        </div>
-      );
-    }
-
-    // Maximized window
-    if (isMaximized) {
-      return (
-        <div
-          className="fixed inset-0 z-[1100] bg-white"
-          ref={windowRef}
-          onClick={handleActivate}
-        >
-          {windowContent}
-        </div>
-      );
-    }
-
-    // Normal draggable and resizable window
     return (
       <div
         ref={nodeRef}
-        className="chat-window"
+        className="chat-window standalone-chat"
         style={{
-          position: "absolute",
-          top: position.y,
-          left: position.x,
-          width: size.width,
-          height: size.height,
-          zIndex: zIndex,
-          cursor: isDragging ? "grabbing" : "auto",
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          zIndex: 9999,
+          boxShadow: "none",
+          border: "none",
+          borderRadius: 0,
         }}
       >
-        <Resizable
-          size={size}
-          onResizeStart={handleResizeStart}
-          onResize={handleResize}
-          onResizeStop={handleResizeStop}
-          minWidth={400}
-          minHeight={350}
-          maxWidth="95vw"
-          maxHeight="95vh"
-          enable={{
-            top: true,
-            right: true,
-            bottom: true,
-            left: true,
-            topRight: true,
-            bottomRight: true,
-            bottomLeft: true,
-            topLeft: true,
-          }}
-          handleStyles={{
-            topRight: { cursor: "ne-resize" },
-            bottomRight: { cursor: "se-resize" },
-            bottomLeft: { cursor: "sw-resize" },
-            topLeft: { cursor: "nw-resize" },
-          }}
-          handleWrapperStyle={{ opacity: 1 }}
-          resizeRatio={1}
-        >
-          <div
-            className="absolute overflow-hidden rounded-lg"
-            onClick={handleActivate}
-            style={{
-              width: "100%",
-              height: "100%",
-              zIndex: zIndex,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-              border: "1px solid #e5e7eb",
-              transition: "box-shadow 0.2s ease, border-color 0.2s ease",
-            }}
-          >
-            {windowContent}
-          </div>
-        </Resizable>
+        {windowContent}
       </div>
     );
-  })();
-
-  // Se siamo in modalità standalone, non usiamo il portal
-  if (isStandalone) {
-    return chatWindowElement;
   }
 
-  // Altrimenti usiamo il portal per evitare conflitti con altri modal
-  return <ChatPortal isOpen={true}>{chatWindowElement}</ChatPortal>;
+  // Render maximized window
+  if (isMaximized) {
+    return (
+      <div
+        className="fixed inset-0 z-[1100] bg-white"
+        ref={windowRef}
+        onClick={handleActivate}
+      >
+        {windowContent}
+      </div>
+    );
+  }
+
+  // Render normal draggable and resizable window
+  return (
+    <div
+      ref={nodeRef}
+      className="chat-window"
+      style={{
+        position: "absolute",
+        top: position.y,
+        left: position.x,
+        width: size.width,
+        height: size.height,
+        zIndex: zIndex,
+        cursor: isDragging ? "grabbing" : "auto",
+      }}
+    >
+      <Resizable
+        size={size}
+        onResizeStart={handleResizeStart}
+        onResize={handleResize}
+        onResizeStop={handleResizeStop}
+        minWidth={400}
+        minHeight={350}
+        maxWidth="95vw"
+        maxHeight="95vh"
+        enable={{
+          top: true,
+          right: true,
+          bottom: true,
+          left: true,
+          topRight: true,
+          bottomRight: true,
+          bottomLeft: true,
+          topLeft: true,
+        }}
+        handleStyles={{
+          topRight: { cursor: "ne-resize" },
+          bottomRight: { cursor: "se-resize" },
+          bottomLeft: { cursor: "sw-resize" },
+          topLeft: { cursor: "nw-resize" },
+        }}
+        handleWrapperStyle={{ opacity: 1 }}
+        resizeRatio={1}
+      >
+        <div
+          className="absolute overflow-hidden rounded-lg"
+          onClick={handleActivate}
+          style={{
+            width: "100%",
+            height: "100%",
+            zIndex: zIndex,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+            border: "1px solid #e5e7eb",
+            transition: "box-shadow 0.2s ease, border-color 0.2s ease",
+          }}
+        >
+          {windowContent}
+        </div>
+      </Resizable>
+    </div>
+  );
 };
 
 export default ChatWindow;
