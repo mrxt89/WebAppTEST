@@ -1220,7 +1220,7 @@ const getERPItems = async (companyId, search = '') => {
         
         // Query di base per articoli dal gestionale
         let query = `
-            SELECT TOP	300
+            SELECT TOP	*
                         T0.Item
                         , T0.Description
                         , T0.Nature
@@ -2206,6 +2206,311 @@ const updateItemDetails = async (itemId, itemData) => {
     }
   };
 
+// Importa un articolo dal gestionale con selezione dei componenti
+const importERPItemWithSelection = async (companyId, userId, projectId, importData) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+        
+        // Estrai il codice articolo dal sourceItem
+        const sourceItemCode = importData.sourceItem.Item || importData.sourceItem.BOM || '';
+        const sourceItemDescription = importData.sourceItem.Description || '';
+        
+        console.log('Import data received:', {
+            sourceItemCode,
+            sourceItemDescription,
+            createNewBOM: importData.createNewBOM,
+            componentsCount: importData.components.length
+        });
+        
+        // Parametri di input
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('UserId', sql.Int, userId);
+        request.input('ProjectId', sql.Int, projectId);
+        request.input('SourceItem', sql.NVarChar(64), sourceItemCode);
+        request.input('SourceItemDescription', sql.NVarChar(128), sourceItemDescription);
+        request.input('CreateNewBOM', sql.Bit, importData.createNewBOM ? 1 : 0);
+        
+        // Prepara la tabella dei componenti selezionati
+        const componentsTable = new sql.Table();
+        componentsTable.columns.add('ComponentItemCode', sql.VarChar(64));
+        componentsTable.columns.add('Level', sql.Int);
+        componentsTable.columns.add('Path', sql.NVarChar(sql.MAX));
+        componentsTable.columns.add('UseOriginalCode', sql.Bit);
+        componentsTable.columns.add('Quantity', sql.Decimal(18, 5));
+        componentsTable.columns.add('ComponentType', sql.Int);
+        componentsTable.columns.add('Nature', sql.Int);
+        componentsTable.columns.add('UoM', sql.VarChar(10));
+        
+        // Aggiungi i componenti alla tabella
+        importData.components.forEach(comp => {
+            componentsTable.rows.add(
+                comp.ComponentItemCode || comp.Component,
+                comp.Level || 0,
+                comp.Path || '',
+                comp.UseOriginalCode || 0,
+                comp.Quantity || 1,
+                comp.ComponentType || 7798784,
+                comp.Nature || 22413312,
+                comp.UoM || 'PZ'
+            );
+        });
+        
+        request.input('SelectedComponents', componentsTable);
+        
+        // Parametri di output
+        request.output('ReturnItemId', sql.BigInt);
+        request.output('ReturnBOMId', sql.BigInt);
+        request.output('ImportedComponents', sql.Int);
+        request.output('ErrorCode', sql.Int);
+        request.output('ErrorMessage', sql.NVarChar(4000));
+        
+        // Esegui la stored procedure
+        await request.execute('MA_ProjectArticles_ImportWithSelection');
+        
+        // Controllo errori
+        const errorCode = request.parameters.ErrorCode.value || 0;
+        if (errorCode !== 0) {
+            console.error('SP Error:', {
+                errorCode,
+                errorMessage: request.parameters.ErrorMessage.value
+            });
+            return {
+                success: 0,
+                msg: request.parameters.ErrorMessage.value || `Errore codice: ${errorCode}`
+            };
+        }
+        
+        // Estrai i valori di output
+        const returnItemId = request.parameters.ReturnItemId.value;
+        const returnBOMId = request.parameters.ReturnBOMId.value;
+        const importedComponents = request.parameters.ImportedComponents.value || 0;
+        
+        console.log('SP Output:', {
+            returnItemId,
+            returnBOMId,
+            importedComponents
+        });
+        
+        // Se non abbiamo un ID articolo valido, c'è stato un problema
+        if (!returnItemId) {
+            return {
+                success: 0,
+                msg: 'Errore durante l\'importazione: nessun articolo creato'
+            };
+        }
+        
+        // Ottieni i dettagli dell'articolo importato
+        const itemDetails = await getItemById(companyId, returnItemId);
+        
+        // Risultato
+        return {
+            success: 1,
+            item: itemDetails || { Id: returnItemId },
+            bomId: returnBOMId,
+            importedComponents: importedComponents,
+            msg: `Articolo ${sourceItemCode} e ${importedComponents} componenti importati con successo`
+        };
+        
+    } catch (err) {
+        console.error('Error in importERPItemWithSelection:', err);
+        return {
+            success: 0,
+            msg: err.message || 'Errore durante l\'importazione con selezione'
+        };
+    }
+};
+
+// Ottieni la struttura BOM multilivello per un articolo ERP
+const getERPBOMStructure = async (companyId, itemCode) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        // Query ricorsiva per ottenere la struttura completa della distinta dall'ERP
+        const query = `
+            WITH BOMHierarchy AS (
+                -- Ancoraggio: articolo root
+                SELECT 
+                    0 as Level,
+                    @ItemCode as ParentItem,
+                    @ItemCode as Component,
+                    CAST(@ItemCode AS NVARCHAR(MAX)) as Path,
+                    CAST(1 AS DECIMAL(18,5)) as Quantity,
+                    i.Nature,
+                    i.Description,
+                    i.BaseUoM as UoM,
+                    7798784 as ComponentType,
+                    0 as Line
+                FROM MA_Items i
+                WHERE i.Item = @ItemCode AND i.CompanyId = @CompanyId
+                
+                UNION ALL
+                
+                -- Ricorsione: componenti
+                SELECT 
+                    bh.Level + 1,
+                    bc.BOM as ParentItem,
+                    bc.Component,
+                    bh.Path + '.' + CAST(bc.Component AS NVARCHAR(MAX)),
+                    bc.Qty * bh.Quantity,
+                    ISNULL(ci.Nature, 22413312),
+                    ISNULL(ci.Description, bc.Description),
+                    ISNULL(bc.UoM, 'PZ'),
+                    bc.ComponentType,
+                    bc.Line
+                FROM BOMHierarchy bh
+                JOIN MA_BillOfMaterialsComp bc ON bc.BOM = bh.Component AND bc.CompanyId = @CompanyId
+                LEFT JOIN MA_Items ci ON bc.Component = ci.Item AND ci.CompanyId = @CompanyId
+                WHERE bh.Level < 10 -- Limite di sicurezza
+            )
+            SELECT 
+                Level,
+                ParentItem,
+                Component as ComponentItemCode,
+                Component as Item,
+                Path,
+                Quantity,
+                Nature as ComponentNature,
+                Description as ComponentItemDescription,
+                UoM,
+                ComponentType,
+                Line,
+                -- Aggiungi un ID univoco per il frontend
+                ROW_NUMBER() OVER (ORDER BY Path) as ComponentId
+            FROM BOMHierarchy
+            WHERE Level > 0 -- Escludi il root
+            ORDER BY Path`;
+        
+        const request = pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('ItemCode', sql.VarChar(64), itemCode);
+            
+        const result = await request.query(query);
+        
+        // Ottieni anche i cicli per tutti i componenti
+        const routingQuery = `
+            SELECT 
+                br.BOM,
+                br.RtgStep,
+                br.Operation,
+                br.WC,
+                br.ProcessingTime,
+                br.SetupTime,
+                br.Notes
+            FROM MA_BillOfMaterialsRouting br
+            WHERE br.CompanyId = @CompanyId
+            AND br.BOM IN (
+                SELECT DISTINCT Component 
+                FROM MA_BillOfMaterialsComp 
+                WHERE BOM = @ItemCode AND CompanyId = @CompanyId
+            )`;
+            
+        const routingRequest = pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('ItemCode', sql.VarChar(64), itemCode);
+            
+        const routingResult = await routingRequest.query(routingQuery);
+        
+        return {
+            components: result.recordset || [],
+            routing: routingResult.recordset || []
+        };
+    } catch (err) {
+        console.error('Error getting ERP BOM structure:', err);
+        throw err;
+    }
+};
+
+// Verifica se un articolo ERP ha una distinta base
+const checkERPItemHasBOM = async (companyId, itemCode) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        const result = await pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('ItemCode', sql.VarChar(64), itemCode)
+            .query(`
+                SELECT COUNT(*) as HasBOM
+                FROM MA_BillOfMaterials
+                WHERE BOM = @ItemCode 
+                AND CompanyId = @CompanyId 
+                AND Disabled = 0
+            `);
+            
+        return result.recordset[0].HasBOM > 0;
+    } catch (err) {
+        console.error('Error checking ERP item BOM:', err);
+        return false;
+    }
+};
+
+// Ottiene gli articoli dal gestionale con paginazione
+const getERPItemsPaginated = async (companyId, page = 0, pageSize = 50, search = '') => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        // Query per il conteggio totale
+        let countQuery = `
+            SELECT COUNT(*) as total
+            FROM dbo.MA_Items T0
+            WHERE T0.CompanyId = @CompanyId
+            AND T0.Disabled = 0
+        `;
+        
+        // Query principale per gli articoli
+        let query = `
+            SELECT 
+                T0.Item,
+                T0.Description,
+                T0.Nature,
+                T0.BaseUoM,
+                T0.Department,
+                T1.Id AS ItemId
+            FROM dbo.MA_Items T0
+            LEFT JOIN MA_ProjectArticles_Items T1 
+                ON T1.Item = T0.Item 
+                AND T1.CompanyId = T0.CompanyId 
+            WHERE T0.CompanyId = @CompanyId
+            AND T0.Disabled = 0
+        `;
+        
+        const request = pool.request()
+            .input('CompanyId', sql.Int, companyId);
+            
+        // Aggiungi filtro di ricerca se specificato
+        if (search) {
+            const searchParam = `%${search}%`;
+            countQuery += ` AND (T0.Item LIKE @Search OR T0.Description LIKE @Search)`;
+            query += ` AND (T0.Item LIKE @Search OR T0.Description LIKE @Search)`;
+            request.input('Search', sql.VarChar(100), searchParam);
+        }
+        
+        // Esegui query per il conteggio
+        const countResult = await request.query(countQuery);
+        const total = countResult.recordset[0].total;
+        
+        // Aggiungi paginazione alla query principale
+        query += ` ORDER BY Item
+                  OFFSET @Offset ROWS
+                  FETCH NEXT @PageSize ROWS ONLY`;
+                  
+        request.input('Offset', sql.Int, page * pageSize)
+               .input('PageSize', sql.Int, pageSize);
+        
+        // Esegui query principale
+        const result = await request.query(query);
+        
+        return {
+            items: result.recordset,
+            total: total,
+            totalPages: Math.ceil(total / pageSize)
+        };
+    } catch (err) {
+        console.error('Error getting paginated ERP items:', err);
+        throw err;
+    }
+};
+
 // Esporta tutte le funzioni
 module.exports = {
     addUpdateItem,
@@ -2234,5 +2539,9 @@ module.exports = {
     getBOMVersions,
     reorderBOMRoutings,
     getUnitsOfMeasure,
-    updateItemDetails
+    updateItemDetails,
+    importERPItemWithSelection,
+    getERPBOMStructure,
+    checkERPItemHasBOM,
+    getERPItemsPaginated
 };

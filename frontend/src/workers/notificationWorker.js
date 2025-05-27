@@ -16,10 +16,10 @@ let recentNotifications = new Set();
 let notificationsWithNewMessages = new Set();
 
 // Constants
-const POLLING_INTERVAL = 10000; // 10 seconds
-const FORCED_REFRESH_INTERVAL = 300; // 300ms for forced refresh
+const POLLING_INTERVAL = 15000; // 15 seconds
+const FORCED_REFRESH_INTERVAL = 500; // 500ms for forced refresh
 const REQUEST_TIMEOUT = 30000; // 30 seconds timeout for requests
-const THROTTLE_INTERVAL = 2000; // Minimo tempo tra richieste consecutive
+const THROTTLE_INTERVAL = 4000; // Minimo tempo tra richieste consecutive
 
 // Tracking per limitare le richieste troppo frequenti
 let lastRequestTime = 0;

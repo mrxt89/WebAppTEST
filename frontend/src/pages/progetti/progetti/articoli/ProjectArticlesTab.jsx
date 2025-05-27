@@ -275,7 +275,7 @@ const ProjectArticlesTab = ({ project, canEdit }) => {
   };
 
   return (
-    <Card className="border h-full flex flex-col">
+    <Card className="border h-full flex flex-col project-articles-tab">
       <CardContent className="p-0 flex-1 flex flex-col">
         <Tabs
           value={selectedTab}

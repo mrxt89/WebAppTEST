@@ -1,14 +1,33 @@
 const jwt = require('jsonwebtoken');
 
-// Middleware per autenticare il token
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (token == null) return res.sendStatus(401);
+  if (token == null) {
+    return res.status(401).json({ 
+      error: 'NO_TOKEN',
+      message: 'Authentication required' 
+    });
+  }
 
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
+    if (err) {
+      // Distingui tra token scaduto e token invalido
+      if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({ 
+          error: 'TOKEN_EXPIRED',
+          message: 'Token expired',
+          expiredAt: err.expiredAt 
+        });
+      }
+      
+      return res.status(403).json({ 
+        error: 'INVALID_TOKEN',
+        message: 'Invalid token' 
+      });
+    }
+    
     req.user = user;
     next();
   });

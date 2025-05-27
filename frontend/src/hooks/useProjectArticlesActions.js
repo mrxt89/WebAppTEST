@@ -1239,7 +1239,142 @@ const useProjectArticlesActions = () => {
     [makeRequest],
   );
 
-  // Assicurati di aggiungerla all'oggetto ritornato dalla funzione
+  // Importa un articolo dal gestionale con selezione dei componenti
+const importERPItemWithSelection = useCallback(
+  async (projectId, importData) => {
+    try {
+      setLoading(true);
+      
+      // Validazione dati di input
+      if (!projectId || !importData || !importData.sourceItem) {
+        throw new Error("Dati insufficienti per l'importazione");
+      }
+
+      // Prepara il payload per l'API
+      const payload = {
+        action: "IMPORT_WITH_SELECTION",
+        projectId: parseInt(projectId),
+        sourceItem: importData.sourceItem,
+        createNewBOM: importData.createNewBOM || false,
+        components: importData.components || [],
+      };
+
+      // Chiama l'endpoint
+      const data = await makeRequest(
+        `${config.API_BASE_URL}/projectArticles/items/import-with-selection`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (data && data.success) {
+        return {
+          success: true,
+          item: data.item,
+          bomId: data.bomId,
+          importedComponents: data.importedComponents || [],
+          msg: data.msg || "Importazione completata con successo"
+        };
+      } else {
+        throw new Error(data?.msg || "Errore durante l'importazione");
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error("Error importing ERP item with selection:", err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  },
+  [makeRequest]
+);
+
+// Aggiungi anche questa funzione helper per ottenere la struttura BOM multilivello per il wizard
+const getBOMStructureForWizard = useCallback(
+  async (itemId, itemCode = null) => {
+    try {
+      setLoading(true);
+      
+      // Se abbiamo un itemId (articolo temporaneo), usa quello
+      if (itemId) {
+        const data = await getBOMData(
+          "GET_BOM_MULTILEVEL",
+          null,
+          itemId,
+          null,
+          {
+            maxLevel: 10,
+            includeRouting: true,
+            expandPhantoms: true,
+          }
+        );
+        return data;
+      } 
+      // Altrimenti, se abbiamo un itemCode (articolo ERP), usa un endpoint specifico
+      else if (itemCode) {
+        const data = await makeRequest(
+          `${config.API_BASE_URL}/projectArticles/erp-items/${encodeURIComponent(itemCode)}/bom-structure`
+        );
+        return data;
+      }
+      
+      throw new Error("Né itemId né itemCode forniti per getBOMStructureForWizard");
+    } catch (err) {
+      setError(err.message);
+      console.error("Error fetching BOM structure for wizard:", err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  },
+  [makeRequest, getBOMData]
+);
+
+// Aggiungi questa funzione per validare se un articolo ERP ha una distinta
+const checkERPItemHasBOM = useCallback(
+  async (itemCode) => {
+    try {
+      setLoading(true);
+      
+      const data = await makeRequest(
+        `${config.API_BASE_URL}/projectArticles/erp-items/${encodeURIComponent(itemCode)}/has-bom`
+      );
+      
+      return data?.hasBOM || false;
+    } catch (err) {
+      console.error("Error checking ERP item BOM:", err);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  },
+  [makeRequest]
+);
+
+  // Ottiene gli articoli dal gestionale con paginazione
+  const getERPItemsPaginated = useCallback(
+    async (search = "", page = 0, pageSize = 50) => {
+      try {
+        setLoading(true);
+        let url = `${config.API_BASE_URL}/projectArticles/erp-items/paginated?page=${page}&pageSize=${pageSize}`;
+
+        if (search) {
+          url += `&search=${encodeURIComponent(search)}`;
+        }
+
+        const data = await makeRequest(url);
+        return data || { items: [], total: 0, totalPages: 0 };
+      } catch (err) {
+        setError(err.message);
+        console.error("Error fetching ERP items:", err);
+        return { items: [], total: 0, totalPages: 0 };
+      } finally {
+        setLoading(false);
+      }
+    },
+    [makeRequest],
+  );
 
   return {
     // Stati
@@ -1307,6 +1442,12 @@ const useProjectArticlesActions = () => {
 
     getUnitsOfMeasure,
     updateItemDetails,
+
+    importERPItemWithSelection,
+    getBOMStructureForWizard,
+    checkERPItemHasBOM,
+
+    getERPItemsPaginated,
   };
 };
 
