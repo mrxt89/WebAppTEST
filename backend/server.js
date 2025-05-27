@@ -484,13 +484,58 @@ app.get('/api/menu', authenticateToken, async (req, res) => {
   }
 });
 
-// Serve frontend in production
-if (isProduction) {
-  app.use(express.static(path.join(__dirname, '../frontend/dist')));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
-  });
-}
+
+// 1. BACKEND - Nuovo endpoint per refresh token 
+app.post('/api/refresh-token', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.UserId;
+    
+    // Verifica che l'utente esista ancora e sia attivo
+    let pool = await sql.connect(config.database);
+    let result = await pool.request()
+      .input('userId', sql.Int, userId)
+      .query(`
+        SELECT userId, username, role, CompanyId, sessionDurationMinutes
+        FROM AR_Users 
+        WHERE userId = @userId 
+        AND userDisabled = 0
+        AND (LicenseExpiration = '1799-12-31' OR LicenseExpiration >= CAST(GETDATE() AS DATE))
+      `);
+    
+    const user = result.recordset[0];
+    if (!user) {
+      return res.status(401).json({ message: 'User not found or disabled' });
+    }
+    
+    // Genera nuovo token
+    const newToken = jwt.sign(
+      { 
+        UserId: user.userId,
+        username: user.username,
+        role: user.role,
+        CompanyId: user.CompanyId
+      },
+      config.jwt.secret,
+      { 
+        expiresIn: user.sessionDurationMinutes ? 
+          `${user.sessionDurationMinutes}m` : '8h' 
+      }
+    );
+    
+    // Aggiorna lastOnline
+    await pool.request()
+      .input('userId', sql.Int, userId)
+      .query('UPDATE AR_Users SET lastOnline = GETDATE() WHERE userId = @userId');
+    
+    res.json({ 
+      accessToken: newToken,
+      expiresIn: user.sessionDurationMinutes || 480 // minuti
+    });
+  } catch (err) {
+    console.error('Refresh token error:', err);
+    res.status(500).json({ message: 'Error refreshing token' });
+  }
+});
 
 // Inizializza il servizio di storage
 const FileService = require('./services/fileService');

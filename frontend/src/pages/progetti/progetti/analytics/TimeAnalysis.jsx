@@ -261,8 +261,9 @@ const TimeAnalysis = ({ project, loading, workHoursData = [] }) => {
 
   // Calculate total work hours
   const totalWorkHours = useMemo(() => {
-    if (!workHoursByTask || workHoursByTask.length === 0)
+    if (!workHoursByTask || !Array.isArray(workHoursByTask) || workHoursByTask.length === 0) {
       return { total: 0, internal: 0, external: 0 };
+    }
 
     return workHoursByTask.reduce(
       (acc, task) => ({
@@ -270,13 +271,17 @@ const TimeAnalysis = ({ project, loading, workHoursData = [] }) => {
         internal: acc.internal + task.internalHours,
         external: acc.external + task.externalHours,
       }),
-      { total: 0, internal: 0, external: 0 },
+      { total: 0, internal: 0, external: 0 }
     );
   }, [workHoursByTask]);
 
   // Data for task hours chart
   const taskHoursChartData = useMemo(() => {
-    return [...workHoursByTask]
+    if (!workHoursByTask || !Array.isArray(workHoursByTask) || workHoursByTask.length === 0) {
+      return [];
+    }
+
+    return workHoursByTask
       .slice(0, 8) // Limit for readability
       .map((task) => ({
         name: task.taskTitle,
@@ -854,12 +859,14 @@ const TimeAnalysis = ({ project, loading, workHoursData = [] }) => {
                 tasks.length > 0 ? Math.round((count / tasks.length) * 100) : 0;
 
               // Calculate hours for this status
-              const hoursForStatus = workHoursByTask
-                .filter((t) => {
-                  const task = tasks.find((task) => task.TaskID === t.taskId);
-                  return task && task.Status === status;
-                })
-                .reduce((sum, t) => sum + t.totalHours, 0);
+              const hoursForStatus = Array.isArray(workHoursByTask) 
+                ? workHoursByTask
+                    .filter((t) => {
+                      const task = tasks.find((task) => task.TaskID === t.taskId);
+                      return task && task.Status === status;
+                    })
+                    .reduce((sum, t) => sum + t.totalHours, 0)
+                : 0;
 
               return (
                 <div

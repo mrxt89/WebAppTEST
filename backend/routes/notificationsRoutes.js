@@ -490,6 +490,8 @@ const upload = multer({
   }
 });
 
+
+
 // Ottieni allegati di una notifica
 router.get('/notifications/:notificationId/attachments', authenticateToken, async (req, res) => {
   try {

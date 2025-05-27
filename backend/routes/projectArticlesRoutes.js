@@ -28,7 +28,9 @@ const {
     getBOMVersions,
     reorderBOMRoutings,
     getUnitsOfMeasure,
-    updateItemDetails
+    updateItemDetails,
+    importERPItemWithSelection,
+    getERPItemsPaginated
 } = require('../queries/projectArticlesManagement');
 
 // Ottieni stati degli articoli di progetto
@@ -845,5 +847,84 @@ router.get('/projectArticles/unitsOfMeasure', authenticateToken, async (req, res
       res.status(500).json({ success: 0, msg: err.message });
     }
   });
+
+// Importa articolo ERP con selezione componenti
+router.post('/projectArticles/items/import-with-selection', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const userId = req.user.UserId;
+        const { action, projectId, sourceItem, createNewBOM, components } = req.body;
+        
+        // Validazione input
+        if (!action || action !== 'IMPORT_WITH_SELECTION') {
+            return res.status(400).json({ 
+                success: 0, 
+                msg: 'Azione non valida. Utilizzare IMPORT_WITH_SELECTION.' 
+            });
+        }
+        
+        if (!projectId || isNaN(parseInt(projectId))) {
+            return res.status(400).json({ 
+                success: 0, 
+                msg: 'ProjectId non valido o mancante' 
+            });
+        }
+        
+        if (!sourceItem || !sourceItem.Item) {
+            return res.status(400).json({ 
+                success: 0, 
+                msg: 'Articolo sorgente non specificato' 
+            });
+        }
+        
+        if (!components || !Array.isArray(components)) {
+            return res.status(400).json({ 
+                success: 0, 
+                msg: 'Lista componenti non valida' 
+            });
+        }
+        
+        // Prepara i dati per l'importazione
+        const importData = {
+            sourceItem,
+            createNewBOM: createNewBOM === true,
+            components
+        };
+        
+        // Chiama la funzione di importazione con selezione
+        const result = await importERPItemWithSelection(
+            companyId,
+            userId,
+            parseInt(projectId),
+            importData
+        );
+        
+        res.json(result);
+    } catch (err) {
+        console.error('Error importing ERP item with selection:', err);
+        res.status(500).json({ 
+            success: 0, 
+            msg: err.message || 'Errore durante l\'importazione con selezione' 
+        });
+    }
+});
+
+router.get('/projectArticles/erp-items/paginated', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const page = parseInt(req.query.page) || 0;
+        const pageSize = parseInt(req.query.pageSize) || 50;
+        const search = req.query.search || '';
+        
+        const result = await getERPItemsPaginated(companyId, page, pageSize, search);
+        res.json(result);
+    } catch (err) {
+        console.error('Error fetching paginated ERP items:', err);
+        res.status(500).json({ 
+            success: 0, 
+            msg: err.message || 'Errore durante il recupero degli articoli ERP' 
+        });
+    }
+});
 
 module.exports = router;
