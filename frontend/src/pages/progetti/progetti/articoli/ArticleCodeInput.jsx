@@ -42,7 +42,7 @@ const ArticleCodeInput = ({
     isWarning: false
   });
   
-  const { validateItemCodeRealTime, clearValidationCache } = useProjectArticlesActions();
+  const { validateItemCodeRealTime } = useProjectArticlesActions();
 
   // Effect per la validazione in tempo reale
   useEffect(() => {
@@ -56,36 +56,42 @@ const ArticleCodeInput = ({
 
     setValidationState({ status: 'validating', message: 'Validazione in corso...', isWarning: false });
 
-    validateItemCodeRealTime(
-      value.trim(),
-      excludeItemId,
-      (result) => {
-        const newState = {
-          status: result.isValid ? (result.isWarning ? 'warning' : 'valid') : 'invalid',
-          message: result.message,
-          isWarning: result.isWarning
-        };
-        
-        setValidationState(newState);
-        
-        if (onValidation) {
-          onValidation({
-            isValid: result.isValid,
+    // Timer per debounce
+    const timer = setTimeout(() => {
+      validateItemCodeRealTime(
+        value.trim(),
+        excludeItemId,
+        (result) => {
+          const newState = {
+            status: result.isValid ? (result.isWarning ? 'warning' : 'valid') : 'invalid',
             message: result.message,
             isWarning: result.isWarning
-          });
-        }
-      },
-      300 // Debounce di 300ms
-    );
-  }, [value, excludeItemId, validateItemCodeRealTime, onValidation, required]);
+          };
+          
+          setValidationState(newState);
+          
+          if (onValidation) {
+            onValidation({
+              isValid: result.isValid,
+              message: result.message,
+              isWarning: result.isWarning
+            });
+          }
+        },
+        0 // Nessun debounce aggiuntivo, lo gestiamo qui
+      );
+    }, 500); // Debounce di 500ms
+
+    // Cleanup del timer
+    return () => clearTimeout(timer);
+  }, [value, excludeItemId]); // Rimuovi validateItemCodeRealTime e onValidation dalle dipendenze
 
   // Cleanup quando il componente viene smontato
   useEffect(() => {
     return () => {
-      clearValidationCache();
+      // Non serve più cleanup della cache
     };
-  }, [clearValidationCache]);
+  }, []);
 
   // Gestione cambio valore
   const handleChange = (e) => {

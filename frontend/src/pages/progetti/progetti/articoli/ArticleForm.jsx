@@ -1,17 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -19,30 +10,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { swal } from "@/lib/common";
-import { config } from "@/config";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
+  Save,
   Package,
   ShoppingCart,
-  Save,
-  ArrowLeft,
-  Copy,
   AlertTriangle,
+  Loader2,
+  X,
   Info,
-  Ruler,
-  ScanBarcode,
-  Database,
 } from "lucide-react";
+import { swal } from "@/lib/common";
+import ArticleCodeInput from "./ArticleCodeInput";
+import useProjectArticlesActions from "@/hooks/useProjectArticlesActions";
 
 /**
- * ArticleForm - Componente per la creazione/modifica di un articolo di progetto
- * Supporta tre modalità:
- * - new: creazione di un nuovo articolo
- * - edit: modifica di un articolo esistente
- * - copy: copia di un articolo esistente
+ * ArticleForm - Componente per la creazione, modifica e copia di articoli
+ * @param {string} mode - Modalità del form: 'new', 'edit', 'copy'
+ * @param {number} projectId - ID del progetto (obbligatorio per new e copy)
+ * @param {number} itemId - ID dell'articolo (per edit e copy)
+ * @param {Function} onCancel - Callback per annullare l'operazione
+ * @param {Function} onSave - Callback chiamata dopo il salvataggio
  */
 const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
   // Stati del form
@@ -52,75 +41,105 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
     Description: "",
     CustomerItemReference: "",
     CustomerDescription: "",
-    Nature: 22413312, // Semilavorato di default
-    StatusId: 1, // Bozza di default
-    BaseUoM: "PZ",
     Diameter: null,
     Bxh: "",
     Depth: null,
     Length: null,
     MediumRadius: null,
     Notes: "",
-    fscodice: "",
-    CategoryId: 0,
+    CategoryId: null,
     FamilyId: null,
     MacrofamilyId: null,
     ItemTypeId: null,
-    offset_acquisto: null,
-    offset_autoconsumo: null,
-    offset_vendita: null,
-    stato_erp: 0, // 0 = non dall'ERP, 1 = dall'ERP
-    data_sync_erp: null,
+    Nature: null,
+    StatusId: 1, // Default: BOZZA
+    fscodice: "",
+    DescriptionExtension: "",
+    BaseUoM: "PZ",
+    offset_acquisto: "",
+    offset_autoconsumo: "",
+    offset_vendita: "",
   });
 
-  // Stati per i dati correlati
-  const [project, setProject] = useState(null);
-  const [itemStatuses, setItemStatuses] = useState([]);
-  const [sourceItem, setSourceItem] = useState(null);
-  const [selectedTab, setSelectedTab] = useState("info");
+  // Stati per validazione
+  const [codeValidation, setCodeValidation] = useState({
+    isValid: false,
+    message: '',
+    isWarning: false
+  });
 
-  // Opzioni per la natura dell'articolo
-  const NATURE_OPTIONS = [
-    {
-      id: 22413312,
-      label: "Semilavorato",
-      icon: <Package className="h-4 w-4" />,
-    },
-    {
-      id: 22413313,
-      label: "Prodotto Finito",
-      icon: <Package className="h-4 w-4" />,
-    },
-    {
-      id: 22413314,
-      label: "Acquisto",
-      icon: <ShoppingCart className="h-4 w-4" />,
-    },
-  ];
+  // Stati per opzioni select
+  const [statusOptions, setStatusOptions] = useState([]);
 
-  // Caricamento iniziale dei dati
+  // Hook per le API
+  const {
+    getItemById,
+    fetchItemStatuses,
+    addItem,
+    updateItem,
+    copyItem,
+    loading: hookLoading,
+  } = useProjectArticlesActions();
+
+  // Loading combinato
+  const isLoading = loading || hookLoading;
+
+  // Caricamento dati iniziali
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         setLoading(true);
 
-        // Carica stati degli articoli
-        await loadItemStatuses();
-
-        // Carica dati del progetto
-        if (projectId) {
-          await loadProject(projectId);
+        // Carica gli stati degli articoli
+        const statuses = await fetchItemStatuses();
+        if (statuses) {
+          setStatusOptions(statuses);
         }
 
-        // Per modalità modifica o copia, carica l'articolo esistente
+        // Se in modalità edit o copy, carica i dati dell'articolo
         if ((mode === "edit" || mode === "copy") && itemId) {
-          await loadItem(itemId);
+          const itemData = await getItemById(itemId);
+          if (itemData) {
+            setFormData({
+              Item: mode === "copy" ? "" : itemData.Item || "",
+              Description: itemData.Description || "",
+              CustomerItemReference: itemData.CustomerItemReference || "",
+              CustomerDescription: itemData.CustomerDescription || "",
+              Diameter: itemData.Diameter,
+              Bxh: itemData.Bxh || "",
+              Depth: itemData.Depth,
+              Length: itemData.Length,
+              MediumRadius: itemData.MediumRadius,
+              Notes: itemData.Notes || "",
+              CategoryId: itemData.CategoryId,
+              FamilyId: itemData.FamilyId,
+              MacrofamilyId: itemData.MacrofamilyId,
+              ItemTypeId: itemData.ItemTypeId,
+              Nature: itemData.Nature,
+              StatusId: itemData.StatusId || 1,
+              fscodice: itemData.fscodice || "",
+              DescriptionExtension: itemData.DescriptionExtension || "",
+              BaseUoM: itemData.BaseUoM || "PZ",
+              offset_acquisto: itemData.offset_acquisto || "",
+              offset_autoconsumo: itemData.offset_autoconsumo || "",
+              offset_vendita: itemData.offset_vendita || "",
+            });
+
+            // Se in modalità copy, resetta la validazione del codice
+            if (mode === "copy") {
+              setCodeValidation({
+                isValid: false,
+                message: '',
+                isWarning: false
+              });
+            }
+          }
         }
       } catch (error) {
         console.error("Error loading initial data:", error);
         swal.fire({
           title: "Errore",
-          text: "Si è verificato un errore nel caricamento dei dati",
+          text: "Errore nel caricamento dei dati iniziali",
           icon: "error",
         });
       } finally {
@@ -129,185 +148,102 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
     };
 
     loadInitialData();
-  }, [mode, projectId, itemId]);
+  }, [mode, itemId, getItemById, fetchItemStatuses]);
 
-  // Caricamento del progetto
-  const loadProject = async (id) => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${config.API_BASE_URL}/projects/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) throw new Error("Errore nel caricamento del progetto");
-
-      const data = await response.json();
-      setProject(data);
-    } catch (error) {
-      console.error("Error loading project:", error);
-      throw error;
-    }
+  // Validazione form
+  const isFormValid = () => {
+    return (
+      codeValidation.isValid &&
+      formData.Description.trim() !== '' &&
+      formData.Nature !== null &&
+      formData.StatusId !== null
+    );
   };
 
-  // Caricamento degli stati articolo
-  const loadItemStatuses = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        `${config.API_BASE_URL}/projectArticles/statuses`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (!response.ok) throw new Error("Errore nel caricamento degli stati");
-
-      const data = await response.json();
-      setItemStatuses(data);
-    } catch (error) {
-      console.error("Error loading item statuses:", error);
-      throw error;
-    }
-  };
-
-  // Caricamento dell'articolo per modifica o copia
-  const loadItem = async (id) => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        `${config.API_BASE_URL}/projectArticles/items/${id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (!response.ok) throw new Error("Errore nel caricamento dell'articolo");
-
-      const data = await response.json();
-
-      // Se in modalità copy, conserviamo l'articolo originale per riferimento
-      if (mode === "copy") {
-        setSourceItem(data);
-
-        // Per la copia, impostiamo tutti i campi ma rimuoviamo l'Id e resettiamo stato_erp
-        // perché la copia sarà un nuovo articolo che non proviene dall'ERP
-        setFormData({
-          ...data,
-          Item: `COPY_${data.Item}`,
-          CustomerItemReference: data.CustomerItemReference || "",
-          stato_erp: 0, // Reset stato_erp perché è una nuova copia
-          data_sync_erp: null, // Reset data_sync_erp perché è una nuova copia
-        });
-      } else {
-        // Per la modalità edit, impostiamo tutti i campi incluso l'Id
-        setFormData(data);
-      }
-    } catch (error) {
-      console.error("Error loading item:", error);
-      throw error;
-    }
-  };
-
-  // Gestione delle modifiche ai campi
+  // Gestione cambio valori
   const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
-  // Funzione per tornare alla pagina precedente
-  const handleGoBack = () => {
-    if (onCancel) onCancel();
-  };
+  // Gestione submit
+  const handleSubmit = async () => {
+    
+    // Verifica validazione del codice
+    if (!codeValidation.isValid) {
+      swal.fire({
+        title: "Errore di Validazione",
+        text: codeValidation.message || "Il codice articolo non è valido",
+        icon: "error",
+      });
+      return;
+    }
 
-  // Funzione per salvare l'articolo
-  const handleSave = async () => {
+    // Verifica altri campi obbligatori
+    if (!formData.Description.trim()) {
+      swal.fire({
+        title: "Campo Obbligatorio",
+        text: "La descrizione è obbligatoria",
+        icon: "error",
+      });
+      return;
+    }
+
+    if (!formData.Nature) {
+      swal.fire({
+        title: "Campo Obbligatorio", 
+        text: "La natura dell'articolo è obbligatoria",
+        icon: "error",
+      });
+      return;
+    }
+
     try {
-      // Validazione dei campi obbligatori
-      if (!formData.Item?.trim()) {
-        swal.fire({
-          title: "Errore",
-          text: "Il codice articolo è obbligatorio",
-          icon: "error",
-        });
-        return;
-      }
-
-      if (!formData.Description?.trim()) {
-        swal.fire({
-          title: "Errore",
-          text: "La descrizione è obbligatoria",
-          icon: "error",
-        });
-        return;
-      }
-
       setLoading(true);
 
-      const token = localStorage.getItem("token");
-      const action =
-        mode === "edit" ? "UPDATE" : mode === "copy" ? "COPY" : "ADD";
-
-      // Preparazione del payload con stato_erp e data_sync_erp
-      const payload = {
-        action,
-        itemData: {
-          ...formData,
-          stato_erp: formData.stato_erp || 0, // Assicuriamo che stato_erp sia sempre presente
-          data_sync_erp: formData.data_sync_erp, // Includiamo data_sync_erp se presente
-        },
-        projectId: parseInt(projectId),
+      let result;
+      const itemData = {
+        ...formData,
+        Code: formData.Item, // Usa 'Code' per la nuova API con validazione
       };
 
-      // Se è una copia, aggiungi l'ID sorgente
-      if (mode === "copy" && sourceItem) {
-        payload.sourceItemId = sourceItem.Id;
+      if (mode === 'new') {
+        result = await addItem(itemData, projectId);
+      } else if (mode === 'edit') {
+        result = await updateItem({ ...itemData, Id: itemId });
+      } else if (mode === 'copy') {
+        result = await copyItem(itemData, projectId, itemId);
       }
 
-      const response = await fetch(
-        `${config.API_BASE_URL}/projectArticles/items`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        },
-      );
+      if (result && result.success) {
+        let successMessage = `Articolo ${mode === 'new' ? 'creato' : mode === 'edit' ? 'aggiornato' : 'copiato'} con successo`;
+        
+        // Se c'è un warning dal codice, mostralo
+        if (codeValidation.isWarning) {
+          successMessage += `\n\nAvviso: ${codeValidation.message}`;
+        }
 
-      if (!response.ok) throw new Error("Errore nel salvataggio dell'articolo");
-
-      const result = await response.json();
-
-      if (result.success) {
-        swal.fire({
+        await swal.fire({
           title: "Successo",
-          text:
-            mode === "new"
-              ? "Articolo creato con successo"
-              : mode === "copy"
-                ? "Articolo copiato con successo"
-                : "Articolo aggiornato con successo",
-          icon: "success",
-          timer: 1500,
-          showConfirmButton: false,
+          text: successMessage,
+          icon: codeValidation.isWarning ? "warning" : "success",
+          timer: codeValidation.isWarning ? 3000 : 1500,
+          showConfirmButton: codeValidation.isWarning,
         });
 
-        if (onSave) onSave(result.itemId);
+        if (onSave) {
+          onSave(result);
+        }
       } else {
-        throw new Error(result.msg || "Errore durante il salvataggio");
+        throw new Error(result?.msg || 'Errore durante il salvataggio');
       }
     } catch (error) {
-      console.error("Error saving item:", error);
+      console.error(`Error ${mode}ing article:`, error);
       swal.fire({
         title: "Errore",
-        text:
-          error.message || "Si è verificato un errore durante il salvataggio",
+        text: error.message || `Errore durante ${mode === 'new' ? 'la creazione' : mode === 'edit' ? 'l\'aggiornamento' : 'la copia'} dell'articolo`,
         icon: "error",
       });
     } finally {
@@ -315,318 +251,203 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
     }
   };
 
-  // Genera il titolo appropriato in base alla modalità
-  const getTitle = () => {
-    if (mode === "new") return "Nuovo Articolo";
-    if (mode === "edit") return "Modifica Articolo";
-    if (mode === "copy") return "Copia Articolo";
-    return "Gestione Articolo";
+  // Opzioni natura
+  const natureOptions = [
+    { id: 22413312, description: "Semilavorato", icon: <Package className="h-4 w-4" /> },
+    { id: 22413313, description: "Prodotto Finito", icon: <Package className="h-4 w-4" /> },
+    { id: 22413314, description: "Acquisto", icon: <ShoppingCart className="h-4 w-4" /> },
+  ];
+
+  // Ottieni dettagli natura selezionata
+  const getSelectedNatureDetails = () => {
+    const selected = natureOptions.find(n => n.id === formData.Nature);
+    return selected || { id: null, description: "Seleziona natura", icon: null };
   };
 
-  // Natura dell'articolo
-  const getNatureDetails = (nature) => {
-    switch (nature) {
-      case 22413312: // Semilavorato
-        return {
-          label: "Semilavorato",
-          icon: <Package className="h-4 w-4" />,
-          color: "bg-blue-100 text-blue-700 border-blue-200",
-        };
-      case 22413313: // Prodotto Finito
-        return {
-          label: "Prodotto Finito",
-          icon: <Package className="h-4 w-4" />,
-          color: "bg-green-100 text-green-700 border-green-200",
-        };
-      case 22413314: // Acquisto
-        return {
-          label: "Acquisto",
-          icon: <ShoppingCart className="h-4 w-4" />,
-          color: "bg-amber-100 text-amber-700 border-amber-200",
-        };
-      default:
-        return {
-          label: "Altro",
-          icon: <Package className="h-4 w-4" />,
-          color: "bg-gray-100 text-gray-700 border-gray-200",
-        };
-    }
-  };
-
-  // Verifica se l'articolo è dall'ERP
-  const isFromERP = formData.stato_erp === 1;
+  const selectedNature = getSelectedNatureDetails();
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-5xl">
-      <div className="flex justify-between items-center mb-6">
-        <Button
-          variant="outline"
-          onClick={handleGoBack}
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Indietro
-        </Button>
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            <span>
+              {mode === 'new' && 'Nuovo Articolo'}
+              {mode === 'edit' && 'Modifica Articolo'}
+              {mode === 'copy' && 'Copia Articolo'}
+            </span>
+          </h2>
+          
+          {selectedNature.id && (
+            <Badge className="bg-blue-100 text-blue-700 border-blue-200 flex items-center gap-1">
+              {selectedNature.icon}
+              <span>{selectedNature.description}</span>
+            </Badge>
+          )}
+        </div>
 
-        <h1 className="text-2xl font-bold">{getTitle()}</h1>
-
         <Button
-          onClick={handleSave}
-          disabled={loading}
-          className="flex items-center gap-2"
+          variant="ghost"
+          size="icon"
+          onClick={onCancel}
+          disabled={isLoading}
         >
-          <Save className="h-4 w-4" />
-          {loading ? "Salvataggio..." : "Salva"}
+          <X className="h-4 w-4" />
         </Button>
       </div>
 
-      {project && (
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-600">Progetto:</span>
-              <span className="font-medium">{project.Name}</span>
-              <Badge variant="outline" className="ml-2">
-                {project.StatusDescription}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {sourceItem && mode === "copy" && (
-        <Card className="mb-6 border-blue-200 bg-blue-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Copy className="h-4 w-4 text-blue-600" />
-              <span className="text-blue-600">Copia da:</span>
-              <span className="font-medium">
-                {sourceItem.Item} - {sourceItem.Description}
-              </span>
-              {sourceItem.Nature && (
-                <Badge className={getNatureDetails(sourceItem.Nature).color}>
-                  {getNatureDetails(sourceItem.Nature).label}
-                </Badge>
-              )}
-              {sourceItem.stato_erp === 1 && (
-                <Badge className="bg-blue-100 text-blue-700 border-blue-200 flex items-center gap-1">
-                  <Database className="h-3 w-3" />
-                  <span>Articolo ERP</span>
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Mostra un avviso se l'articolo è dall'ERP */}
-      {isFromERP && mode === "edit" && (
-        <Card className="mb-6 border-blue-200 bg-blue-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Info className="h-5 w-5 text-blue-600" />
-              <span className="text-blue-600">
-                Questo articolo è stato importato dall'ERP. Alcuni campi non
-                possono essere modificati.
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="mt-6">
-        <TabsList className="grid grid-cols-3 mb-6">
-          <TabsTrigger value="info">
-            <Info className="h-4 w-4 mr-2" />
-            Informazioni Generali
-          </TabsTrigger>
-          <TabsTrigger value="dimensions">
-            <Ruler className="h-4 w-4 mr-2" />
-            Dimensioni
-          </TabsTrigger>
-          <TabsTrigger value="additional">
-            <ScanBarcode className="h-4 w-4 mr-2" />
-            Informazioni Aggiuntive
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Scheda Informazioni Generali */}
-        <TabsContent value="info">
+      {/* Form Content */}
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Informazioni di base */}
           <Card>
             <CardHeader>
-              <CardTitle>Informazioni Articolo</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Informazioni Generali
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Codice e Natura */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="item-code">
-                    Codice Articolo <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="item-code"
-                    value={formData.Item || ""}
-                    onChange={(e) => handleChange("Item", e.target.value)}
-                    placeholder="Codice univoco dell'articolo"
-                    disabled={loading || mode === "edit" || isFromERP} // Disabilitato in edit o se è dall'ERP
-                  />
-                </div>
+                <ArticleCodeInput
+                  value={formData.Item}
+                  onChange={(value) => setFormData(prev => ({ ...prev, Item: value }))}
+                  onValidation={setCodeValidation}
+                  excludeItemId={mode === 'edit' ? itemId : null}
+                  disabled={isLoading}
+                  required={true}
+                  placeholder="Es: ART001, COMP-001, etc."
+                />
 
                 <div className="space-y-2">
-                  <Label htmlFor="item-nature">
+                  <Label htmlFor="nature">
                     Natura <span className="text-red-500">*</span>
                   </Label>
                   <Select
-                    value={formData.Nature?.toString()}
-                    onValueChange={(value) =>
-                      handleChange("Nature", parseInt(value))
+                    value={formData.Nature?.toString() || ""}
+                    onValueChange={(value) => 
+                      setFormData(prev => ({ ...prev, Nature: parseInt(value) }))
                     }
-                    disabled={loading || isFromERP} // Disabilitato se l'articolo è dall'ERP
+                    disabled={isLoading}
                   >
-                    <SelectTrigger id="item-nature">
-                      <SelectValue placeholder="Seleziona natura" />
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleziona natura articolo" />
                     </SelectTrigger>
                     <SelectContent>
-                      {NATURE_OPTIONS.map((option) => (
-                        <SelectItem
-                          key={option.id}
-                          value={option.id.toString()}
-                        >
+                      {natureOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id.toString()}>
                           <div className="flex items-center gap-2">
                             {option.icon}
-                            <span>{option.label}</span>
+                            <span>{option.description}</span>
                           </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
 
+              {/* Descrizione */}
+              <div className="space-y-2">
+                <Label htmlFor="description">
+                  Descrizione <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="description"
+                  value={formData.Description}
+                  onChange={(e) => handleChange("Description", e.target.value)}
+                  placeholder="Inserisci una descrizione dettagliata dell'articolo"
+                  rows={3}
+                  disabled={isLoading}
+                />
+              </div>
+
+              {/* Riferimento Cliente e Stato */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="item-description">
-                    Descrizione <span className="text-red-500">*</span>
-                  </Label>
+                  <Label htmlFor="customerRef">Riferimento Cliente</Label>
                   <Input
-                    id="item-description"
-                    value={formData.Description || ""}
-                    onChange={(e) =>
-                      handleChange("Description", e.target.value)
-                    }
-                    placeholder="Descrizione dell'articolo"
-                    disabled={loading || isFromERP} // Disabilitato se l'articolo è dall'ERP
+                    id="customerRef"
+                    value={formData.CustomerItemReference}
+                    onChange={(e) => handleChange("CustomerItemReference", e.target.value)}
+                    placeholder="Codice riferimento del cliente"
+                    disabled={isLoading}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="item-status">Stato</Label>
+                  <Label htmlFor="status">
+                    Stato <span className="text-red-500">*</span>
+                  </Label>
                   <Select
-                    value={formData.StatusId?.toString()}
-                    onValueChange={(value) =>
-                      handleChange("StatusId", parseInt(value))
+                    value={formData.StatusId?.toString() || ""}
+                    onValueChange={(value) => 
+                      setFormData(prev => ({ ...prev, StatusId: parseInt(value) }))
                     }
-                    disabled={loading}
+                    disabled={isLoading}
                   >
-                    <SelectTrigger id="item-status">
+                    <SelectTrigger>
                       <SelectValue placeholder="Seleziona stato" />
                     </SelectTrigger>
                     <SelectContent>
-                      {itemStatuses.map((status) => (
-                        <SelectItem
-                          key={status.Id}
-                          value={status.Id.toString()}
-                        >
-                          {status.Description}
+                      {statusOptions.map((option) => (
+                        <SelectItem key={option.Id} value={option.Id.toString()}>
+                          {option.Description}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="item-uom">Unità di Misura</Label>
-                  <Select
-                    value={formData.BaseUoM || "PZ"}
-                    onValueChange={(value) => handleChange("BaseUoM", value)}
-                    disabled={loading || isFromERP} // Disabilitato se l'articolo è dall'ERP
-                  >
-                    <SelectTrigger id="item-uom">
-                      <SelectValue placeholder="Seleziona UoM" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="PZ">Pezzi (PZ)</SelectItem>
-                      <SelectItem value="MT">Metri (MT)</SelectItem>
-                      <SelectItem value="KG">Kilogrammi (KG)</SelectItem>
-                      <SelectItem value="LT">Litri (LT)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="item-customer-ref">Riferimento Cliente</Label>
-                  <Input
-                    id="item-customer-ref"
-                    value={formData.CustomerItemReference || ""}
-                    onChange={(e) =>
-                      handleChange("CustomerItemReference", e.target.value)
-                    }
-                    placeholder="Codice di riferimento del cliente"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className="space-y-2 col-span-2">
-                  <Label htmlFor="item-customer-desc">
-                    Descrizione Cliente
-                  </Label>
-                  <Input
-                    id="item-customer-desc"
-                    value={formData.CustomerDescription || ""}
-                    onChange={(e) =>
-                      handleChange("CustomerDescription", e.target.value)
-                    }
-                    placeholder="Descrizione dell'articolo secondo il cliente"
-                    disabled={loading}
-                  />
-                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="item-notes">Note</Label>
-                <Textarea
-                  id="item-notes"
-                  value={formData.Notes || ""}
-                  onChange={(e) => handleChange("Notes", e.target.value)}
-                  placeholder="Note aggiuntive sull'articolo"
-                  rows={4}
-                  disabled={loading}
-                />
+              {/* UM Base e Codice FS */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="uom">Unità di Misura Base</Label>
+                  <Input
+                    id="uom"
+                    value={formData.BaseUoM}
+                    onChange={(e) => handleChange("BaseUoM", e.target.value)}
+                    placeholder="PZ"
+                    maxLength={3}
+                    disabled={isLoading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="fscodice">Codice FS</Label>
+                  <Input
+                    id="fscodice"
+                    value={formData.fscodice}
+                    onChange={(e) => handleChange("fscodice", e.target.value)}
+                    placeholder="Codice FS opzionale"
+                    maxLength={10}
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
             </CardContent>
-
-            <CardFooter className="bg-gray-50 p-4 border-t">
-              <div className="flex items-center p-3 bg-amber-50 text-amber-800 rounded-md">
-                <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0" />
-                <p className="text-sm">
-                  I campi contrassegnati con{" "}
-                  <span className="text-red-500">*</span> sono obbligatori.
-                </p>
-              </div>
-            </CardFooter>
           </Card>
-        </TabsContent>
 
-        {/* Scheda Dimensioni */}
-        <TabsContent value="dimensions">
+          {/* Dimensioni */}
           <Card>
             <CardHeader>
-              <CardTitle>Dimensioni</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Dimensioni
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="item-diameter">Diametro (mm)</Label>
+                  <Label htmlFor="diameter">Diametro</Label>
                   <Input
-                    id="item-diameter"
+                    id="diameter"
                     type="number"
+                    step="0.01"
                     value={formData.Diameter || ""}
                     onChange={(e) =>
                       handleChange(
@@ -634,27 +455,28 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
                         e.target.value ? parseFloat(e.target.value) : null,
                       )
                     }
-                    placeholder="Diametro in mm"
-                    disabled={loading}
+                    placeholder="0.00"
+                    disabled={isLoading}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="item-bxh">Base x Altezza</Label>
+                  <Label htmlFor="bxh">Base x Altezza</Label>
                   <Input
-                    id="item-bxh"
-                    value={formData.Bxh || ""}
+                    id="bxh"
+                    value={formData.Bxh}
                     onChange={(e) => handleChange("Bxh", e.target.value)}
-                    placeholder="Es: 100x200"
-                    disabled={loading}
+                    placeholder="100x100"
+                    disabled={isLoading}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="item-depth">Profondità (mm)</Label>
+                  <Label htmlFor="depth">Profondità</Label>
                   <Input
-                    id="item-depth"
+                    id="depth"
                     type="number"
+                    step="0.01"
                     value={formData.Depth || ""}
                     onChange={(e) =>
                       handleChange(
@@ -662,16 +484,17 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
                         e.target.value ? parseFloat(e.target.value) : null,
                       )
                     }
-                    placeholder="Profondità in mm"
-                    disabled={loading}
+                    placeholder="0.00"
+                    disabled={isLoading}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="item-length">Lunghezza (mm)</Label>
+                  <Label htmlFor="length">Lunghezza</Label>
                   <Input
-                    id="item-length"
+                    id="length"
                     type="number"
+                    step="0.01"
                     value={formData.Length || ""}
                     onChange={(e) =>
                       handleChange(
@@ -679,16 +502,17 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
                         e.target.value ? parseFloat(e.target.value) : null,
                       )
                     }
-                    placeholder="Lunghezza in mm"
-                    disabled={loading}
+                    placeholder="0.00"
+                    disabled={isLoading}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="item-radius">Raggio Medio (mm)</Label>
+                  <Label htmlFor="mediumRadius">Raggio Medio</Label>
                   <Input
-                    id="item-radius"
+                    id="mediumRadius"
                     type="number"
+                    step="0.01"
                     value={formData.MediumRadius || ""}
                     onChange={(e) =>
                       handleChange(
@@ -696,176 +520,123 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
                         e.target.value ? parseFloat(e.target.value) : null,
                       )
                     }
-                    placeholder="Raggio medio in mm"
-                    disabled={loading}
+                    placeholder="0.00"
+                    disabled={isLoading}
                   />
                 </div>
               </div>
-
-              <div className="flex items-center p-3 bg-blue-50 text-blue-800 rounded-md">
-                <Info className="h-5 w-5 mr-2 flex-shrink-0" />
-                <p className="text-sm">
-                  Specifica solo le dimensioni applicabili all'articolo. Ad
-                  esempio, per un tubo indicare diametro e lunghezza.
-                </p>
-              </div>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* Scheda Informazioni Aggiuntive */}
-        <TabsContent value="additional">
+          {/* Note e informazioni aggiuntive */}
           <Card>
             <CardHeader>
-              <CardTitle>Informazioni Aggiuntive</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Note e Informazioni Aggiuntive
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="item-fscode">Codice FS</Label>
-                  <Input
-                    id="item-fscode"
-                    value={formData.fscodice || ""}
-                    onChange={(e) => handleChange("fscodice", e.target.value)}
-                    placeholder="Codice FS"
-                    disabled={loading}
-                    maxLength={10}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="item-description-ext">
-                    Estensione Descrizione
-                  </Label>
-                  <Input
-                    id="item-description-ext"
-                    value={formData.DescriptionExtension || ""}
-                    onChange={(e) =>
-                      handleChange("DescriptionExtension", e.target.value)
-                    }
-                    placeholder="Estensione descrizione"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="item-offset-acquisto">Offset Acquisto</Label>
-                  <Input
-                    id="item-offset-acquisto"
-                    value={formData.offset_acquisto || ""}
-                    onChange={(e) =>
-                      handleChange("offset_acquisto", e.target.value)
-                    }
-                    placeholder="Offset acquisto"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="item-offset-autoconsumo">
-                    Offset Autoconsumo
-                  </Label>
-                  <Input
-                    id="item-offset-autoconsumo"
-                    value={formData.offset_autoconsumo || ""}
-                    onChange={(e) =>
-                      handleChange("offset_autoconsumo", e.target.value)
-                    }
-                    placeholder="Offset autoconsumo"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="item-offset-vendita">Offset Vendita</Label>
-                  <Input
-                    id="item-offset-vendita"
-                    value={formData.offset_vendita || ""}
-                    onChange={(e) =>
-                      handleChange("offset_vendita", e.target.value)
-                    }
-                    placeholder="Offset vendita"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="item-category">Categoria</Label>
-                  <Input
-                    id="item-category"
-                    type="number"
-                    value={formData.CategoryId || ""}
-                    onChange={(e) =>
-                      handleChange(
-                        "CategoryId",
-                        e.target.value ? parseInt(e.target.value) : 0,
-                      )
-                    }
-                    placeholder="ID Categoria"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="item-family">Famiglia</Label>
-                  <Input
-                    id="item-family"
-                    type="number"
-                    value={formData.FamilyId || ""}
-                    onChange={(e) =>
-                      handleChange(
-                        "FamilyId",
-                        e.target.value ? parseInt(e.target.value) : null,
-                      )
-                    }
-                    placeholder="ID Famiglia"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="item-macrofamily">Macrofamiglia</Label>
-                  <Input
-                    id="item-macrofamily"
-                    type="number"
-                    value={formData.MacrofamilyId || ""}
-                    onChange={(e) =>
-                      handleChange(
-                        "MacrofamilyId",
-                        e.target.value ? parseInt(e.target.value) : null,
-                      )
-                    }
-                    placeholder="ID Macrofamiglia"
-                    disabled={loading}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Note</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.Notes}
+                  onChange={(e) => handleChange("Notes", e.target.value)}
+                  placeholder="Note aggiuntive sull'articolo"
+                  rows={4}
+                  disabled={isLoading}
+                />
               </div>
 
-              <div className="flex items-center p-3 bg-blue-50 text-blue-800 rounded-md">
-                <Info className="h-5 w-5 mr-2 flex-shrink-0" />
-                <p className="text-sm">
-                  Questi campi sono opzionali e vengono utilizzati
-                  principalmente per la sincronizzazione con il sistema ERP.
-                </p>
+              <div className="space-y-2">
+                <Label htmlFor="descriptionExtension">Descrizione Estesa</Label>
+                <Textarea
+                  id="descriptionExtension"
+                  value={formData.DescriptionExtension}
+                  onChange={(e) => handleChange("DescriptionExtension", e.target.value)}
+                  placeholder="Descrizione dettagliata aggiuntiva"
+                  rows={3}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="customerDescription">Descrizione Cliente</Label>
+                <Textarea
+                  id="customerDescription"
+                  value={formData.CustomerDescription}
+                  onChange={(e) => handleChange("CustomerDescription", e.target.value)}
+                  placeholder="Descrizione fornita dal cliente"
+                  rows={2}
+                  disabled={isLoading}
+                />
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
 
-      <div className="flex justify-end mt-6 space-x-2">
-        <Button variant="outline" onClick={handleGoBack} disabled={loading}>
-          Annulla
-        </Button>
+          {/* Indicatore di stato del form */}
+          {!isFormValid() && (
+            <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+              <div className="flex items-center gap-2 text-amber-700 mb-2">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-sm font-medium">Campi da completare:</span>
+              </div>
+              <ul className="text-sm text-amber-600 list-disc list-inside space-y-1">
+                {!codeValidation.isValid && <li>Codice articolo valido</li>}
+                {!formData.Description.trim() && <li>Descrizione articolo</li>}
+                {!formData.Nature && <li>Natura articolo</li>}
+                {!formData.StatusId && <li>Stato articolo</li>}
+              </ul>
+            </div>
+          )}
 
-        <Button
-          onClick={handleSave}
-          disabled={loading}
-          className="flex items-center gap-2"
-        >
-          <Save className="h-4 w-4" />
-          {loading ? "Salvataggio..." : "Salva"}
-        </Button>
+          {/* Warning per codice esistente in Mago */}
+          {codeValidation.isValid && codeValidation.isWarning && (
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <div className="flex items-center gap-2 text-blue-700">
+                <Info className="h-4 w-4" />
+                <span className="text-sm font-medium">Informazione:</span>
+              </div>
+              <p className="text-sm text-blue-600 mt-1">
+                {codeValidation.message}
+              </p>
+            </div>
+          )}
+
+          {/* Bottoni di azione */}
+          <div className="flex justify-end gap-3 pt-6 border-t bg-white sticky bottom-0 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              disabled={isLoading}
+            >
+              Annulla
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isLoading || !isFormValid()}
+              className="min-w-[120px]"
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Salvataggio...</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Save className="h-4 w-4" />
+                  <span>
+                    {mode === 'new' ? 'Crea Articolo' : 
+                     mode === 'edit' ? 'Aggiorna Articolo' : 
+                     'Copia Articolo'}
+                  </span>
+                </div>
+              )}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

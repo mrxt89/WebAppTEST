@@ -2536,7 +2536,7 @@ const validateItemCode = async (companyId, itemCode, excludeItemId = null) => {
         const errorMessage = request.parameters.ErrorMessage.value || '';
         
         return {
-            isValid: isValid === 1,
+            isValid: isValid == 1,
             message: errorMessage,
             isWarning: errorMessage.startsWith('AVVISO:')
         };
