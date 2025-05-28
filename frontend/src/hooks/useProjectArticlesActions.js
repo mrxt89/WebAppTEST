@@ -1399,7 +1399,7 @@ const checkERPItemHasBOM = useCallback(
         );
   
         return {
-          isValid: data.isValid || false,
+          isValid: data.isValid == 1 || false,
           message: data.message || '',
           isWarning: data.isWarning || false
         };
@@ -1516,7 +1516,7 @@ const checkERPItemHasBOM = useCallback(
     },
     [makeRequest, validateItemCode, clearValidationCache]
   );
-  
+
   return {
     // Stati
     items,

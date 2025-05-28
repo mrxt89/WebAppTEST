@@ -2536,7 +2536,7 @@ const validateItemCode = async (companyId, itemCode, excludeItemId = null) => {
         const errorMessage = request.parameters.ErrorMessage.value || '';
         
         return {
-            isValid: isValid == 1,
+            isValid: isValid === 1,
             message: errorMessage,
             isWarning: errorMessage.startsWith('AVVISO:')
         };
@@ -2614,6 +2614,9 @@ const updateItemDetailsWithValidation = async (itemId, itemData) => {
     try {
         let pool = await sql.connect(config.dbConfig);
         
+        // Variabile per memorizzare il risultato della validazione
+        let validationResult = null;
+        
         // Se viene modificato il codice, prima validalo
         if (itemData.Code !== undefined) {
             // Ottieni CompanyId dell'articolo
@@ -2628,20 +2631,20 @@ const updateItemDetailsWithValidation = async (itemId, itemData) => {
             const companyId = itemQuery.recordset[0].CompanyId;
             
             // Valida il nuovo codice
-            const validation = await validateItemCode(companyId, itemData.Code, itemId);
+            validationResult = await validateItemCode(companyId, itemData.Code, itemId);
             
-            if (!validation.isValid) {
+            if (!validationResult.isValid) {
                 return { 
                     success: 0, 
-                    msg: validation.message,
+                    msg: validationResult.message,
                     field: 'Code'
                 };
             }
             
             // Se c'è un avviso, includilo nella risposta
-            if (validation.isWarning) {
+            if (validationResult.isWarning) {
                 // Log dell'avviso ma continua
-                console.warn(`Code validation warning for item ${itemId}: ${validation.message}`);
+                console.warn(`Code validation warning for item ${itemId}: ${validationResult.message}`);
             }
         }
         
@@ -2694,7 +2697,7 @@ const updateItemDetailsWithValidation = async (itemId, itemData) => {
             success: 1, 
             rowsAffected: result.rowsAffected[0], 
             msg: `Dettagli articolo aggiornati con successo`,
-            warning: validation && validation.isWarning ? validation.message : null
+            warning: validationResult && validationResult.isWarning ? validationResult.message : null
         };
     } catch (err) {
         console.error('Error updating item details with validation:', err);
