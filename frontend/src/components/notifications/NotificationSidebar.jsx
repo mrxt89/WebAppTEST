@@ -1459,7 +1459,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               <p className="mb-2">Nessuna notifica corrisponde ai filtri selezionati</p>
               <button
                 className="mt-2 text-sm text-blue-600 hover:underline"
-                onClick={resetFilters}
+                onClick={resetAllFilters}
                 id="notification-reset-filters"
               >
                 Reimposta tutti i filtri

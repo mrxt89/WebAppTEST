@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { swal } from "@/lib/common";
 import ArticleReferences from "./ArticleReferences";
+import ArticleCodeInput from "./ArticleCodeInput";
 import useProjectArticlesActions from "@/hooks/useProjectArticlesActions";
 import ArticleActionsDropdown from "./ArticleActionsDropdown";
 
@@ -55,11 +56,18 @@ const ArticleDetails = ({
   const [statusOptions, setStatusOptions] = useState([]);
   const [activeTab, setActiveTab] = useState("general");
 
+  // Stato per validazione codice articolo
+  const [codeValidation, setCodeValidation] = useState({
+    isValid: true,
+    message: '',
+    isWarning: false
+  });
+
   // Otteniamo gli hook necessari
   const {
     getItemById,
     fetchItemStatuses,
-    updateItem,
+    updateItemDetails,
     loading: hookLoading,
     unlinkItemFromProject,
     disableTemporaryItem,
@@ -138,46 +146,50 @@ const ArticleDetails = ({
   // Salvataggio modifiche
   const handleSave = async () => {
     try {
+      // Verifica la validazione del codice prima di salvare
+      if (!codeValidation.isValid) {
+        swal.fire({
+          title: "Errore di Validazione",
+          text: codeValidation.message || "Il codice articolo non è valido",
+          icon: "error",
+        });
+        return;
+      }
+
       setLoading(true);
 
       // Preparazione dati per l'API
       const itemData = {
-        Id: articleData.Id,
-        Item: articleData.Item,
+        Code: articleData.Item, // Usa 'Code' per la nuova API con validazione
         Description: articleData.Description,
         CustomerItemReference: articleData.CustomerItemReference || "",
-        CustomerDescription: articleData.CustomerDescription || "",
         Diameter: articleData.Diameter,
         Bxh: articleData.Bxh || "",
         Depth: articleData.Depth,
         Length: articleData.Length,
         MediumRadius: articleData.MediumRadius,
         Notes: articleData.Notes || "",
-        CategoryId: articleData.CategoryId,
-        FamilyId: articleData.FamilyId,
-        MacrofamilyId: articleData.MacrofamilyId,
-        ItemTypeId: articleData.ItemTypeId,
         Nature: articleData.Nature,
         StatusId: articleData.StatusId,
-        fscodice: articleData.fscodice || "",
-        DescriptionExtension: articleData.DescriptionExtension || "",
-        BaseUoM: articleData.BaseUoM || "PZ",
-        offset_acquisto: articleData.offset_acquisto || "",
-        offset_autoconsumo: articleData.offset_autoconsumo || "",
-        offset_vendita: articleData.offset_vendita || "",
-        stato_erp: articleData.stato_erp || 0, // Manteniamo il valore stato_erp
       };
 
-      // Utilizziamo l'hook per l'aggiornamento
-      const result = await updateItem(itemData);
+      // Utilizza la funzione con validazione integrata
+      const result = await updateItemDetails(articleData.Id, itemData);
 
       if (result && result.success) {
+        let successMessage = "Articolo aggiornato con successo";
+        
+        // Se c'è un warning dal codice, mostralo
+        if (result.warning || codeValidation.isWarning) {
+          successMessage += `\n\nAvviso: ${result.warning || codeValidation.message}`;
+        }
+
         swal.fire({
           title: "Successo",
-          text: "Articolo aggiornato con successo",
-          icon: "success",
-          timer: 1500,
-          showConfirmButton: false,
+          text: successMessage,
+          icon: result.warning || codeValidation.isWarning ? "warning" : "success",
+          timer: result.warning || codeValidation.isWarning ? 3000 : 1500,
+          showConfirmButton: result.warning || codeValidation.isWarning,
         });
 
         // Aggiornamento dati articolo usando l'hook
@@ -212,6 +224,12 @@ const ArticleDetails = ({
   const handleCancel = () => {
     setArticleData(originalData);
     setIsEditing(false);
+    // Reset validazione codice
+    setCodeValidation({
+      isValid: true,
+      message: '',
+      isWarning: false
+    });
   };
 
   // Gestione rimozione dal progetto
@@ -348,7 +366,7 @@ const ArticleDetails = ({
   const isFromERP = articleData.stato_erp === 1;
 
   return (
-    <div className="h-full flex flex-col " id="article-details-container">
+    <div className="h-full flex flex-col" id="article-details-container">
       {/* Header con bottoni azione */}
       <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center sticky top-0 z-10" id="article-details-header">
         <div className="flex items-center gap-3">
@@ -399,7 +417,7 @@ const ArticleDetails = ({
               </Button>
               <Button
                 onClick={handleSave}
-                disabled={isLoading}
+                disabled={isLoading || !codeValidation.isValid}
                 className="gap-1"
               >
                 {isLoading ? (
@@ -471,378 +489,390 @@ const ArticleDetails = ({
           </TabsList>
         </div>
 
-       
-          {/* Tab Informazioni Generali */}
-          <TabsContent
-            value="general"
-            className="pt-1 px-6 h-full " id="article-details-general-content"
-          >
-           
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 " id="article-details-general-content-grid">
-                <div className="space-y-2" id="article-details-general-content-grid-item">
-                  <Label htmlFor="item">Codice Articolo</Label>
-                  {isEditing ? (
-                    <Input
-                      id="item"
-                      value={articleData.Item || ""}
-                      onChange={(e) => handleChange("Item", e.target.value)}
-                      disabled={isFromERP} // Disabilita se è un articolo ERP
-                    />
-                  ) : (
-                    <div className="border rounded-md p-2 bg-slate-50">
-                      {articleData.Item}
+        {/* Tab Informazioni Generali */}
+        <TabsContent
+          value="general"
+          className="pt-1 px-6 h-full overflow-auto" 
+          id="article-details-general-content"
+        >
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="article-details-general-content-grid">
+              <div className="space-y-2" id="article-details-general-content-grid-item">
+                {isEditing ? (
+                  <ArticleCodeInput
+                    value={articleData.Item || ""}
+                    onChange={(value) => handleChange("Item", value)}
+                    onValidation={setCodeValidation}
+                    excludeItemId={articleData.Id}
+                    disabled={isFromERP}
+                    isFromERP={isFromERP}
+                    required={true}
+                    className="w-full"
+                  />
+                ) : (
+                  <>
+                    <Label htmlFor="item">Codice Articolo</Label>
+                    <div className="border rounded-md p-2 bg-slate-50 flex items-center justify-between">
+                      <span>{articleData.Item}</span>
+                      {isFromERP && (
+                        <Badge className="bg-blue-100 text-blue-700 border-blue-200 flex items-center gap-1">
+                          <Database className="h-4 w-4" />
+                          <span>Da Mago</span>
+                        </Badge>
+                      )}
                     </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="nature">Natura</Label>
-                  {isEditing ? (
-                    <Select
-                      value={articleData.Nature?.toString()}
-                      onValueChange={(value) =>
-                        handleChange("Nature", parseInt(value))
-                      }
-                      disabled={isFromERP} // Disabilita se è un articolo ERP
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleziona natura" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {natureOptions.map((option) => (
-                          <SelectItem
-                            key={option.id}
-                            value={option.id.toString()}
-                          >
-                            {option.description}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="border rounded-md p-2 bg-slate-50">
-                      <Badge className={`${natureDetails.color}`}>
-                        {natureDetails.label}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Descrizione</Label>
+                <Label htmlFor="nature">Natura</Label>
                 {isEditing ? (
-                  <Textarea
-                    id="description"
-                    value={articleData.Description || ""}
-                    onChange={(e) =>
-                      handleChange("Description", e.target.value)
+                  <Select
+                    value={articleData.Nature?.toString()}
+                    onValueChange={(value) =>
+                      handleChange("Nature", parseInt(value))
                     }
-                    rows={3}
+                    disabled={isFromERP} // Disabilita se è un articolo ERP
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleziona natura" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {natureOptions.map((option) => (
+                        <SelectItem
+                          key={option.id}
+                          value={option.id.toString()}
+                        >
+                          {option.description}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="border rounded-md p-2 bg-slate-50">
+                    <Badge className={`${natureDetails.color}`}>
+                      {natureDetails.label}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Descrizione</Label>
+              {isEditing ? (
+                <Textarea
+                  id="description"
+                  value={articleData.Description || ""}
+                  onChange={(e) =>
+                    handleChange("Description", e.target.value)
+                  }
+                  rows={3}
+                  disabled={isFromERP} // Disabilita se è un articolo ERP
+                />
+              ) : (
+                <div className="border rounded-md p-2 bg-slate-50 min-h-[70px] whitespace-pre-wrap">
+                  {articleData.Description || "Nessuna descrizione"}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="customerItemReference">
+                  Riferimento Cliente
+                </Label>
+                {isEditing ? (
+                  <Input
+                    id="customerItemReference"
+                    value={articleData.CustomerItemReference || ""}
+                    onChange={(e) =>
+                      handleChange("CustomerItemReference", e.target.value)
+                    }
+                  />
+                ) : (
+                  <div className="border rounded-md p-2 bg-slate-50">
+                    {articleData.CustomerItemReference || "-"}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status">Stato</Label>
+                {isEditing ? (
+                  <Select
+                    value={articleData.StatusId?.toString()}
+                    onValueChange={(value) =>
+                      handleChange("StatusId", parseInt(value))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleziona stato" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusOptions.map((option) => (
+                        <SelectItem
+                          key={option.Id}
+                          value={option.Id.toString()}
+                        >
+                          {option.Description}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="border rounded-md p-2 bg-slate-50">
+                    {articleData.StatusDescription || "-"}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Note</Label>
+              {isEditing ? (
+                <Textarea
+                  id="notes"
+                  value={articleData.Notes || ""}
+                  onChange={(e) => handleChange("Notes", e.target.value)}
+                  rows={4}
+                />
+              ) : (
+                <div className="border rounded-md p-2 bg-slate-50 min-h-[100px] whitespace-pre-wrap">
+                  {articleData.Notes || "Nessuna nota"}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="uom">UM Base</Label>
+                {isEditing ? (
+                  <Input
+                    id="uom"
+                    value={articleData.BaseUoM || "PZ"}
+                    onChange={(e) => handleChange("BaseUoM", e.target.value)}
+                    maxLength={3}
                     disabled={isFromERP} // Disabilita se è un articolo ERP
                   />
                 ) : (
-                  <div className="border rounded-md p-2 bg-slate-50 min-h-[70px] whitespace-pre-wrap">
-                    {articleData.Description || "Nessuna descrizione"}
+                  <div className="border rounded-md p-2 bg-slate-50">
+                    {articleData.BaseUoM || "PZ"}
                   </div>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="customerItemReference">
-                    Riferimento Cliente
-                  </Label>
-                  {isEditing ? (
-                    <Input
-                      id="customerItemReference"
-                      value={articleData.CustomerItemReference || ""}
-                      onChange={(e) =>
-                        handleChange("CustomerItemReference", e.target.value)
-                      }
-                    />
-                  ) : (
-                    <div className="border rounded-md p-2 bg-slate-50">
-                      {articleData.CustomerItemReference || "-"}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="status">Stato</Label>
-                  {isEditing ? (
-                    <Select
-                      value={articleData.StatusId?.toString()}
-                      onValueChange={(value) =>
-                        handleChange("StatusId", parseInt(value))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleziona stato" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {statusOptions.map((option) => (
-                          <SelectItem
-                            key={option.Id}
-                            value={option.Id.toString()}
-                          >
-                            {option.Description}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="border rounded-md p-2 bg-slate-50">
-                      {articleData.StatusDescription || "-"}
-                    </div>
-                  )}
-                </div>
-              </div>
-
               <div className="space-y-2">
-                <Label htmlFor="notes">Note</Label>
+                <Label htmlFor="projectERPId">Codice FS</Label>
                 {isEditing ? (
-                  <Textarea
-                    id="notes"
-                    value={articleData.Notes || ""}
-                    onChange={(e) => handleChange("Notes", e.target.value)}
-                    rows={4}
+                  <Input
+                    id="projectERPId"
+                    value={articleData.fscodice || ""}
+                    onChange={(e) => handleChange("fscodice", e.target.value)}
+                    maxLength={10}
                   />
                 ) : (
-                  <div className="border rounded-md p-2 bg-slate-50 min-h-[100px] whitespace-pre-wrap">
-                    {articleData.Notes || "Nessuna nota"}
+                  <div className="border rounded-md p-2 bg-slate-50">
+                    {articleData.fscodice || "-"}
+                  </div>
+                )}
+                {/* Avviso se l'articolo è sincronizzato con Mago */}
+                {isFromERP && (
+                  <div className="flex items-center gap-2 text-red-500 mt-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Articolo creato in Mago</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Tab Dimensioni */}
+        <TabsContent
+          value="dimensions"
+          className="pt-2 px-6 h-full overflow-auto"
+        >
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="diameter">Diametro</Label>
+                {isEditing ? (
+                  <Input
+                    id="diameter"
+                    type="number"
+                    step="0.01"
+                    value={articleData.Diameter || ""}
+                    onChange={(e) =>
+                      handleChange(
+                        "Diameter",
+                        e.target.value ? parseFloat(e.target.value) : null,
+                      )
+                    }
+                  />
+                ) : (
+                  <div className="border rounded-md p-2 bg-slate-50">
+                    {articleData.Diameter || "-"}
                   </div>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="uom">UM Base</Label>
-                  {isEditing ? (
-                    <Input
-                      id="uom"
-                      value={articleData.BaseUoM || "PZ"}
-                      onChange={(e) => handleChange("BaseUoM", e.target.value)}
-                      maxLength={3}
-                      disabled={isFromERP} // Disabilita se è un articolo ERP
-                    />
-                  ) : (
-                    <div className="border rounded-md p-2 bg-slate-50">
-                      {articleData.BaseUoM || "PZ"}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="projectERPId">Codice FS</Label>
-                  {isEditing ? (
-                    <Input
-                      id="projectERPId"
-                      value={articleData.fscodice || ""}
-                      onChange={(e) => handleChange("fscodice", e.target.value)}
-                      maxLength={10}
-                    />
-                  ) : (
-                    <div className="border rounded-md p-2 bg-slate-50">
-                      {articleData.fscodice || "-"}
-                    </div>
-                  )}
-                  {/* Avviso se l'articolo è sincronizzato con Mago */}
-                  {isFromERP && (
-                    <div className="flex items-center gap-2 text-red-500 mt-2">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>Articolo creato in Mago</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            
-          </TabsContent>
-
-          {/* Tab Dimensioni */}
-          <TabsContent
-            value="dimensions"
-            className="pt-2 px-6 h-full overflow-auto"
-          >
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="diameter">Diametro</Label>
-                  {isEditing ? (
-                    <Input
-                      id="diameter"
-                      type="number"
-                      step="0.01"
-                      value={articleData.Diameter || ""}
-                      onChange={(e) =>
-                        handleChange(
-                          "Diameter",
-                          e.target.value ? parseFloat(e.target.value) : null,
-                        )
-                      }
-                    />
-                  ) : (
-                    <div className="border rounded-md p-2 bg-slate-50">
-                      {articleData.Diameter || "-"}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="bxh">Base x Altezza</Label>
-                  {isEditing ? (
-                    <Input
-                      id="bxh"
-                      value={articleData.Bxh || ""}
-                      onChange={(e) => handleChange("Bxh", e.target.value)}
-                      placeholder="100x100"
-                    />
-                  ) : (
-                    <div className="border rounded-md p-2 bg-slate-50">
-                      {articleData.Bxh || "-"}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="depth">Profondità</Label>
-                  {isEditing ? (
-                    <Input
-                      id="depth"
-                      type="number"
-                      step="0.01"
-                      value={articleData.Depth || ""}
-                      onChange={(e) =>
-                        handleChange(
-                          "Depth",
-                          e.target.value ? parseFloat(e.target.value) : null,
-                        )
-                      }
-                    />
-                  ) : (
-                    <div className="border rounded-md p-2 bg-slate-50">
-                      {articleData.Depth || "-"}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="length">Lunghezza</Label>
-                  {isEditing ? (
-                    <Input
-                      id="length"
-                      type="number"
-                      step="0.01"
-                      value={articleData.Length || ""}
-                      onChange={(e) =>
-                        handleChange(
-                          "Length",
-                          e.target.value ? parseFloat(e.target.value) : null,
-                        )
-                      }
-                    />
-                  ) : (
-                    <div className="border rounded-md p-2 bg-slate-50">
-                      {articleData.Length || "-"}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="mediumRadius">Raggio Medio</Label>
-                  {isEditing ? (
-                    <Input
-                      id="mediumRadius"
-                      type="number"
-                      step="0.01"
-                      value={articleData.MediumRadius || ""}
-                      onChange={(e) =>
-                        handleChange(
-                          "MediumRadius",
-                          e.target.value ? parseFloat(e.target.value) : null,
-                        )
-                      }
-                    />
-                  ) : (
-                    <div className="border rounded-md p-2 bg-slate-50">
-                      {articleData.MediumRadius || "-"}
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="bxh">Base x Altezza</Label>
+                {isEditing ? (
+                  <Input
+                    id="bxh"
+                    value={articleData.Bxh || ""}
+                    onChange={(e) => handleChange("Bxh", e.target.value)}
+                    placeholder="100x100"
+                  />
+                ) : (
+                  <div className="border rounded-md p-2 bg-slate-50">
+                    {articleData.Bxh || "-"}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label>Dimensioni complessive</Label>
-                <div className="border rounded-md p-4 bg-slate-50">
-                  <div className="flex flex-wrap gap-3">
-                    {articleData.Diameter ? (
-                      <Badge className="bg-gray-200 text-gray-700">
-                        Ø {articleData.Diameter}
-                      </Badge>
-                    ) : null}
-                    {articleData.Bxh ? (
-                      <Badge className="bg-gray-200 text-gray-700">
-                        {articleData.Bxh}
-                      </Badge>
-                    ) : null}
-                    {articleData.Depth ? (
-                      <Badge className="bg-gray-200 text-gray-700">
-                        P {articleData.Depth}
-                      </Badge>
-                    ) : null}
-                    {articleData.Length ? (
-                      <Badge className="bg-gray-200 text-gray-700">
-                        L {articleData.Length}
-                      </Badge>
-                    ) : null}
-                    {articleData.MediumRadius ? (
-                      <Badge className="bg-gray-200 text-gray-700">
-                        R {articleData.MediumRadius}
-                      </Badge>
-                    ) : null}
-                    {!articleData.Diameter &&
-                      !articleData.Bxh &&
-                      !articleData.Depth &&
-                      !articleData.Length &&
-                      !articleData.MediumRadius && (
-                        <span className="text-gray-400 text-sm">
-                          Nessuna dimensione specificata
-                        </span>
-                      )}
+                <Label htmlFor="depth">Profondità</Label>
+                {isEditing ? (
+                  <Input
+                    id="depth"
+                    type="number"
+                    step="0.01"
+                    value={articleData.Depth || ""}
+                    onChange={(e) =>
+                      handleChange(
+                        "Depth",
+                        e.target.value ? parseFloat(e.target.value) : null,
+                      )
+                    }
+                  />
+                ) : (
+                  <div className="border rounded-md p-2 bg-slate-50">
+                    {articleData.Depth || "-"}
                   </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="length">Lunghezza</Label>
+                {isEditing ? (
+                  <Input
+                    id="length"
+                    type="number"
+                    step="0.01"
+                    value={articleData.Length || ""}
+                    onChange={(e) =>
+                      handleChange(
+                        "Length",
+                        e.target.value ? parseFloat(e.target.value) : null,
+                      )
+                    }
+                  />
+                ) : (
+                  <div className="border rounded-md p-2 bg-slate-50">
+                    {articleData.Length || "-"}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="mediumRadius">Raggio Medio</Label>
+                {isEditing ? (
+                  <Input
+                    id="mediumRadius"
+                    type="number"
+                    step="0.01"
+                    value={articleData.MediumRadius || ""}
+                    onChange={(e) =>
+                      handleChange(
+                        "MediumRadius",
+                        e.target.value ? parseFloat(e.target.value) : null,
+                      )
+                    }
+                  />
+                ) : (
+                  <div className="border rounded-md p-2 bg-slate-50">
+                    {articleData.MediumRadius || "-"}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Dimensioni complessive</Label>
+              <div className="border rounded-md p-4 bg-slate-50">
+                <div className="flex flex-wrap gap-3">
+                  {articleData.Diameter ? (
+                    <Badge className="bg-gray-200 text-gray-700">
+                      Ø {articleData.Diameter}
+                    </Badge>
+                  ) : null}
+                  {articleData.Bxh ? (
+                    <Badge className="bg-gray-200 text-gray-700">
+                      {articleData.Bxh}
+                    </Badge>
+                  ) : null}
+                  {articleData.Depth ? (
+                    <Badge className="bg-gray-200 text-gray-700">
+                      P {articleData.Depth}
+                    </Badge>
+                  ) : null}
+                  {articleData.Length ? (
+                    <Badge className="bg-gray-200 text-gray-700">
+                      L {articleData.Length}
+                    </Badge>
+                  ) : null}
+                  {articleData.MediumRadius ? (
+                    <Badge className="bg-gray-200 text-gray-700">
+                      R {articleData.MediumRadius}
+                    </Badge>
+                  ) : null}
+                  {!articleData.Diameter &&
+                    !articleData.Bxh &&
+                    !articleData.Depth &&
+                    !articleData.Length &&
+                    !articleData.MediumRadius && (
+                      <span className="text-gray-400 text-sm">
+                        Nessuna dimensione specificata
+                      </span>
+                    )}
                 </div>
               </div>
             </div>
-          </TabsContent>
+          </div>
+        </TabsContent>
 
-          {/* Tab Progetti associati */}
-          <TabsContent
-            value="projects"
-            className="pt-2 px-6 h-full overflow-auto"
-          >
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Progetti associati</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {articleData.projects && articleData.projects.length > 0 ? (
-                    <div className="space-y-4">
-                      {articleData.projects.map((proj) => (
-                        <div
-                          key={proj.ProjectID}
-                          className="border rounded-md p-3 hover:bg-slate-50"
-                        >
-                          <div className="font-medium">{proj.ProjectName}</div>
-                          <div className="flex items-center gap-3 mt-1">
-                            <Badge className="bg-gray-100 text-gray-700">
-                              {proj.ProjectStatus}
-                            </Badge>
-                            {proj.CustomerItemReference && (
-                              <div className="text-sm text-gray-500">
-                                Rif. Cliente: {proj.CustomerItemReference}
-                              </div>
-                            )}
+        {/* Tab Progetti associati */}
+        <TabsContent
+          value="projects"
+          className="pt-2 px-6 h-full overflow-auto"
+        >
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Progetti associati</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {articleData.projects && articleData.projects.length > 0 ? (
+                  <div className="space-y-4">
+                    {articleData.projects.map((proj) => (
+                      <div
+                        key={proj.ProjectID}
+                        className="border rounded-md p-3 hover:bg-slate-50"
+                      >
+                        <div className="font-medium">{proj.ProjectName}</div>
+                        <div className="flex items-center gap-3 mt-1">
+                          <Badge className="bg-gray-100 text-gray-700">
+                            {proj.ProjectStatus}
+                          </Badge>
+                          {proj.CustomerItemReference && (
+                            <div className="text-sm text-gray-500">
+                              Rif. Cliente: {proj.CustomerItemReference}
+                            </div>
+                          )}
                           </div>
                           {proj.CustomerDescription && (
                             <div className="text-sm text-gray-500 mt-1">

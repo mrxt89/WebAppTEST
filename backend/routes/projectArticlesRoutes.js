@@ -30,7 +30,10 @@ const {
     getUnitsOfMeasure,
     updateItemDetails,
     importERPItemWithSelection,
-    getERPItemsPaginated
+    getERPItemsPaginated,
+    validateItemCode,
+    checkItemCodeExists,
+    updateItemDetailsWithValidation
 } = require('../queries/projectArticlesManagement');
 
 // Ottieni stati degli articoli di progetto
@@ -830,23 +833,30 @@ router.get('/projectArticles/unitsOfMeasure', authenticateToken, async (req, res
   // Aggiorna dettagli articolo
   router.put('/projectArticles/items/:itemId/details', authenticateToken, async (req, res) => {
     try {
-      const itemId = parseInt(req.params.itemId);
-      const itemData = req.body;
-      
-      if (!itemId || isNaN(itemId)) {
-        return res.status(400).json({ 
-          success: 0, 
-          msg: 'ID articolo non valido' 
-        });
-      }
-      
-      const result = await updateItemDetails(itemId, itemData);
-      res.json(result);
+        const itemId = parseInt(req.params.itemId);
+        const itemData = req.body;
+        
+        if (!itemId || isNaN(itemId)) {
+            return res.status(400).json({ 
+                success: 0, 
+                msg: 'ID articolo non valido' 
+            });
+        }
+        
+        // Usa la funzione aggiornata con validazione
+        const result = await updateItemDetailsWithValidation(itemId, itemData);
+        
+        if (result.success && result.warning) {
+            // Include l'avviso nella risposta
+            result.msg += `. ${result.warning}`;
+        }
+        
+        res.json(result);
     } catch (err) {
-      console.error('Error updating item details:', err);
-      res.status(500).json({ success: 0, msg: err.message });
+        console.error('Error updating item details:', err);
+        res.status(500).json({ success: 0, msg: err.message });
     }
-  });
+});
 
 // Importa articolo ERP con selezione componenti
 router.post('/projectArticles/items/import-with-selection', authenticateToken, async (req, res) => {
@@ -923,6 +933,74 @@ router.get('/projectArticles/erp-items/paginated', authenticateToken, async (req
         res.status(500).json({ 
             success: 0, 
             msg: err.message || 'Errore durante il recupero degli articoli ERP' 
+        });
+    }
+});
+
+// Valida un codice articolo per unicità
+router.post('/projectArticles/items/validate-code', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { itemCode, excludeItemId } = req.body;
+        
+        if (!itemCode || itemCode.trim() === '') {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Codice articolo richiesto'
+            });
+        }
+        
+        const result = await validateItemCode(companyId, itemCode.trim(), excludeItemId);
+        
+        res.json({
+            success: 1,
+            isValid: result.isValid,
+            message: result.message,
+            isWarning: result.isWarning || false
+        });
+    } catch (err) {
+        console.error('Error validating item code:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore durante la validazione del codice'
+        });
+    }
+});
+
+// Verifica disponibilità di un codice articolo
+router.get('/projectArticles/items/check-code/:itemCode', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { itemCode } = req.params;
+        const excludeItemId = req.query.excludeItemId ? parseInt(req.query.excludeItemId) : null;
+        
+        if (!itemCode || itemCode.trim() === '') {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Codice articolo richiesto'
+            });
+        }
+        
+        const result = await checkItemCodeExists(companyId, itemCode.trim(), excludeItemId);
+        
+        res.json({
+            success: 1,
+            exists: {
+                inProjects: result.existsInProjects,
+                inERP: result.existsInERP
+            },
+            canUse: result.canUse,
+            message: result.existsInProjects 
+                ? 'Codice già utilizzato in un articolo di progetto'
+                : result.existsInERP 
+                    ? 'Codice esiste nel gestionale Mago'
+                    : 'Codice disponibile'
+        });
+    } catch (err) {
+        console.error('Error checking item code:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore durante la verifica del codice'
         });
     }
 });

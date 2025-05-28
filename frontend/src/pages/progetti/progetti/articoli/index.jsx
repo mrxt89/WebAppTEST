@@ -9,6 +9,7 @@ import BOMComponentForm from "./BOMComponentForm";
 import BOMRoutingForm from "./BOMRoutingForm";
 import ArticleReferences from "./ArticleReferences";
 import ArticleActionsDropdown from "./ArticleActionsDropdown";
+import ArticleCodeInput from "./ArticleCodeInput";
 
 export {
   ProjectArticlesTab,
@@ -21,6 +22,7 @@ export {
   BOMRoutingForm,
   ArticleReferences,
   ArticleActionsDropdown,
+  ArticleCodeInput,
 };
 
 // Esportazione di default di ProjectArticlesTab per l'integrazione con il progetto
