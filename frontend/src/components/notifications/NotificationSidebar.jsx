@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import { swal } from "@/lib/common";
 import {
@@ -46,7 +46,7 @@ import axios from "axios";
 import { config } from "@/config";
 
 const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
-  // Utilizziamo il hook di Redux invece del context
+  // Hook Redux
   const {
     notifications,
     toggleReadUnread,
@@ -60,31 +60,31 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     fetchNotificationById,
   } = useNotifications();
 
+  // Stati dei filtri
   const [filterMentioned, setFilterMentioned] = useState(false);
   const [filterMessagesSent, setFilterMessagesSent] = useState(false);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [filterFavorites, setFilterFavorites] = useState(false);
-  const [completedFilter, setCompletedFilter] = useState("all"); // 'all', 'completed', 'active'
-  const [filteredNotifications, setFilteredNotifications] = useState([]);
+  const [completedFilter, setCompletedFilter] = useState("all");
+  const [filterLeftChats, setFilterLeftChats] = useState(false);
+  const [filterArchivedChats, setFilterArchivedChats] = useState(false);
+  const [filterMutedChats, setFilterMutedChats] = useState(false);
+
+  // Stati locali
   const [selectBackgroundColor, setSelectBackgroundColor] = useState("#ffffff");
   const [animatingItemId, setAnimatingItemId] = useState(null);
   const [animationPhase, setAnimationPhase] = useState(null);
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
-  // Filtro per le chat abbandonate
-  const [filterLeftChats, setFilterLeftChats] = useState(false);
-  // Filtro per le chat archiviate
-  const [filterArchivedChats, setFilterArchivedChats] = useState(false);
-  // Filtro per le chat silenziate
-  const [filterMutedChats, setFilterMutedChats] = useState(false);
-  // Stato per gestire la visibilità della sezione documenti
   const [isDocumentSearchVisible, setIsDocumentSearchVisible] = useState(false);
-  // Conteggio delle notifiche archiviate non lette
   const [archivedUnreadCount, setArchivedUnreadCount] = useState(0);
 
-  // Nuovi stati per la ricerca di chat legate a documenti
-  const [documentTab, setDocumentTab] = useState("customers"); // Tipo di documento attivo
+  // Stati per aggiornamenti ottimistici
+  const [optimisticUpdates, setOptimisticUpdates] = useState({});
+
+  // Stati per la ricerca documenti
+  const [documentTab, setDocumentTab] = useState("customers");
   const [documentsSearchTerm, setDocumentsSearchTerm] = useState("");
   const [documentsSearchResults, setDocumentsSearchResults] = useState([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
@@ -93,321 +93,31 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [isDocTypesOpen, setIsDocTypesOpen] = useState(false);
 
-  // Tipi di documento disponibili per la ricerca
+  // Refs
+  const animationTimeoutRef = useRef(null);
+  const sidebarRef = useRef(null);
+  const filterExpandedRef = useRef(null);
+  const notificationBarRef = useRef(null);
+  const scrollPositionRef = useRef(0);
+
+  // Wiki context
+  const { openWiki } = useWikiContext();
+
+  // Document types
   const documentTypes = [
     { id: "customers", label: "Clienti", icon: <User size={16} /> },
     { id: "suppliers", label: "Fornitori", icon: <Truck size={16} /> },
-    {
-      id: "SaleOrd",
-      label: "Ordini Cliente",
-      icon: <ShoppingCart size={16} />,
-    },
+    { id: "SaleOrd", label: "Ordini Cliente", icon: <ShoppingCart size={16} /> },
     { id: "SaleDoc", label: "Documenti Vendita", icon: <FileText size={16} /> },
-    {
-      id: "PurchaseOrd",
-      label: "Ordini Fornitore",
-      icon: <FileBox size={16} />,
-    },
-    {
-      id: "PurchaseDoc",
-      label: "Documenti Acquisto",
-      icon: <FileText size={16} />,
-    },
+    { id: "PurchaseOrd", label: "Ordini Fornitore", icon: <FileBox size={16} /> },
+    { id: "PurchaseDoc", label: "Documenti Acquisto", icon: <FileText size={16} /> },
     { id: "MO", label: "Ordini Produzione", icon: <Clipboard size={16} /> },
     { id: "BOM", label: "Distinte Base", icon: <Link size={16} /> },
     { id: "Item", label: "Articoli", icon: <Tag size={16} /> },
     { id: "Task", label: "Attività", icon: <Clipboard size={16} /> },
   ];
 
-  // Aggiungi un effetto per forzare il caricamento quando la sidebar diventa visibile
-  useEffect(() => {
-    // Forza il caricamento quando la sidebar diventa visibile
-    if (visible === true) {
-      forceLoadNotifications();
-    }
-  }, [visible]);
-
-  // Effetto per calcolare il conteggio delle notifiche archiviate non lette
-  useEffect(() => {
-    if (notifications && notifications.length > 0) {
-      const count = notifications.filter(
-        (notification) =>
-          (notification.archived === 1 || notification.archived === true) &&
-          !notification.isReadByUser,
-      ).length;
-      setArchivedUnreadCount(count);
-    }
-  }, [notifications]);
-
-  // Funzione per filtrare le notifiche
-  const filterNotifications = () => {
-    // Utilizziamo memoizzazione per migliorare le performance
-    const lastFilterKey = JSON.stringify({
-      filterMentioned,
-      filterMessagesSent,
-      showUnreadOnly,
-      searchTerm,
-      selectedCategory,
-      filterFavorites,
-      completedFilter,
-      filterLeftChats,
-      filterArchivedChats,
-      filterMutedChats,
-    });
-
-    // Memorizziamo l'ultimo stato di scrolling prima dell'aggiornamento
-    if (notificationBarRef.current) {
-      scrollPosition.current = notificationBarRef.current.scrollTop;
-    }
-
-    // Primo passo: applicare i filtri
-    const filtered = (notifications || []).filter((notification) => {
-      // Gestione delle notifiche archiviate
-      const isArchived =
-        notification.archived === 1 || notification.archived === true;
-
-      // Se filterArchivedChats è attivo, mostra SOLO le notifiche archiviate
-      // Se filterArchivedChats NON è attivo, mostra SOLO le notifiche NON archiviate
-      if (filterArchivedChats && !isArchived) return false;
-      if (!filterArchivedChats && isArchived) return false;
-
-      if (filterMentioned && !notification.isMentioned) return false;
-      if (filterMessagesSent && !notification.messagesSent) return false;
-      if (showUnreadOnly && notification.isReadByUser) return false;
-      if (filterFavorites && !notification.favorite) return false;
-      if (
-        selectedCategory !== "all" &&
-        notification.notificationCategoryId.toString() !== selectedCategory
-      )
-        return false;
-
-      // Filtra per stato completato/chiuso
-      if (completedFilter === "completed" && !notification.isClosed)
-        return false;
-      if (completedFilter === "active" && notification.isClosed) return false;
-
-      // Filtro per chat abbandonate
-      if (filterLeftChats && notification.chatLeft !== 1) return false;
-
-      // Filtro per chat silenziate
-      if (filterMutedChats && !isNotificationMuted(notification)) return false;
-
-      if (searchTerm) {
-        const lowerSearchTerm = searchTerm.toLowerCase();
-        const messages = parseMessages(notification.messages);
-        if (
-          !notification.title.toLowerCase().includes(lowerSearchTerm) &&
-          !messages.some(
-            (message) =>
-              message.message &&
-              message.message.toLowerCase().includes(lowerSearchTerm),
-          )
-        ) {
-          return false;
-        }
-      }
-      return true;
-    });
-
-    // Secondo passo: ordinare il risultato con uno stabile algorithm per evitare sfarfallio
-    const sortedFiltered = stableSort([...filtered], (a, b) => {
-      // Prima le notifiche con pin
-      if (a.pinned && !b.pinned) return -1;
-      if (!a.pinned && b.pinned) return 1;
-
-      // Poi per lastMessage (più recenti in alto)
-      // Utilizziamo il campo lastMessage fornito dal backend
-      return parseFloat(b.lastMessage || 0) - parseFloat(a.lastMessage || 0);
-    });
-
-    // Aggiorna lo stato solo se è effettivamente cambiato
-    if (
-      JSON.stringify(sortedFiltered.map((n) => n.notificationId)) !==
-      JSON.stringify(filteredNotifications.map((n) => n.notificationId))
-    ) {
-      setFilteredNotifications(sortedFiltered);
-    }
-  };
-
-  // 2. Aggiungi questa funzione di ordinamento stabile per prevenire il riordinamento casuale
-  const stableSort = (array, comparator) => {
-    // Per mantenere l'ordinamento stabile, aggiungiamo un indice a ciascun elemento
-    const stabilizedThis = array.map((el, index) => [el, index]);
-
-    // Ordiniamo prima in base al comparatore fornito, poi in base all'indice originale
-    stabilizedThis.sort((a, b) => {
-      const order = comparator(a[0], b[0]);
-      if (order !== 0) return order;
-      return a[1] - b[1]; // Se il comparatore restituisce 0, mantieni l'ordine originale
-    });
-
-    return stabilizedThis.map((el) => el[0]);
-  };
-
-  // Effetto per forzare il caricamento delle notifiche
-  useEffect(() => {
-    const handleNotificationsUpdated = () => {
-      if (visible) {
-        forceLoadNotifications();
-        // Forza il ri-filtraggio dopo il caricamento
-        setTimeout(filterNotifications, 300);
-      }
-    };
-
-    // Ascolta anche i nuovi messaggi
-    const handleNewMessage = (event) => {
-      if (visible && event.detail && event.detail.notificationId) {
-        fetchNotificationById(event.detail.notificationId).then(() => {
-          // Forza il ri-filtraggio delle notifiche
-          filterNotifications();
-        });
-      }
-    };
-
-    document.addEventListener(
-      "notifications-updated",
-      handleNotificationsUpdated,
-    );
-    document.addEventListener("new-message-received", handleNewMessage);
-
-    return () => {
-      document.removeEventListener(
-        "notifications-updated",
-        handleNotificationsUpdated,
-      );
-      document.removeEventListener("new-message-received", handleNewMessage);
-    };
-  }, [visible, forceLoadNotifications, fetchNotificationById]);
-
-  // Aggiungi un effetto per verificare la visibilità della sidebar
-  useEffect(() => {
-    const sidebarElement = document.querySelector(".notification-sidebar");
-    if (sidebarElement) {
-      // Verifica se le classi CSS corrispondono allo stato 'visible'
-      const hasShowClass = sidebarElement.classList.contains("show");
-      if (visible && !hasShowClass) {
-        sidebarElement.classList.add("show");
-        sidebarElement.classList.remove("hide");
-      } else if (!visible && hasShowClass) {
-        sidebarElement.classList.remove("show");
-        sidebarElement.classList.add("hide");
-      }
-    }
-  }, [visible]);
-
-  const animationTimeoutRef = useRef(null);
-  const sidebarRef = useRef(null);
-  const filterExpandedRef = useRef(null); // Aggiungiamo ref per il pannello filtri espanso
-
-  // Aggiungiamo l'hook per il contesto Wiki
-  const { openWiki } = useWikiContext();
-
-  // Inizializza le notifiche filtrate all'avvio
-  useEffect(() => {
-    if (notifications && notifications.length > 0) {
-      // All'inizio, mostra solo le notifiche NON archiviate
-      const nonArchivedNotifications = notifications.filter(
-        (notification) =>
-          !(notification.archived === 1 || notification.archived === true),
-      );
-      setFilteredNotifications(nonArchivedNotifications);
-    } else {
-      setFilteredNotifications([]);
-    }
-  }, [notifications]);
-
-  // Effetto per filtrare le notifiche ogni volta che cambiano o cambia un filtro
-  useEffect(() => {
-    if (notifications && notifications.length > 0) {
-      // Esegui il filtro immediatamente, senza timeout
-      filterNotifications();
-
-      // Ripristina la posizione di scorrimento dopo il render
-      requestAnimationFrame(() => {
-        if (notificationBarRef.current) {
-          notificationBarRef.current.scrollTop = scrollPosition.current;
-        }
-      });
-    }
-  }, [
-    notifications,
-    filterMentioned,
-    filterMessagesSent,
-    showUnreadOnly,
-    searchTerm,
-    selectedCategory,
-    filterFavorites,
-    completedFilter,
-    filterLeftChats,
-    filterArchivedChats,
-    filterMutedChats,
-  ]);
-
-  // Effetto per gestire il click fuori dai filtri espansi e chiuderli
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Se i filtri sono espansi e il click è fuori dal pannello dei filtri
-      if (
-        isFilterExpanded &&
-        filterExpandedRef.current &&
-        !filterExpandedRef.current.contains(event.target)
-      ) {
-        // Verifichiamo anche che non sia il pulsante dei filtri
-        const filterToggleButton = document.getElementById(
-          "notification-filter-toggle",
-        );
-        if (!filterToggleButton?.contains(event.target)) {
-          setIsFilterExpanded(false);
-        }
-      }
-
-      // Gestisci click fuori dai tipi documento
-      if (isDocTypesOpen && !event.target.closest(".document-type-dropdown")) {
-        setIsDocTypesOpen(false);
-      }
-    };
-
-    // Aggiungi l'event listener solo quando i filtri sono espansi
-    if (isFilterExpanded || isDocTypesOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    // Cleanup
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isFilterExpanded, isDocTypesOpen]);
-
-  // Effetto per chiudere i filtri quando la sidebar viene chiusa
-  useEffect(() => {
-    if (!visible && isFilterExpanded) {
-      setIsFilterExpanded(false);
-    }
-    if (!visible && isDocumentSearchVisible) {
-      setIsDocumentSearchVisible(false);
-    }
-  }, [visible]);
-
-  // Aggiungi anche questo useEffect per gestire la chiusura del dropdown quando si clicca fuori
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (isDocTypesOpen && !event.target.closest(".document-type-dropdown")) {
-        setIsDocTypesOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isDocTypesOpen]);
-
-  // Handler per il pulsante Wiki nella sidebar
-  const handleOpenWiki = (e) => {
-    e.stopPropagation();
-    openWiki("notifications", true); // Specifichiamo che stiamo aprendo dalla sidebar notifiche
-  };
-
+  // Helper functions
   const parseMessages = (messages) => {
     if (!messages) return [];
     if (typeof messages === "string") {
@@ -419,118 +129,6 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
       }
     }
     return messages;
-  };
-
-  // Funzione per cercare documenti in base al tipo e termine di ricerca
-  const searchDocuments = async () => {
-    if (!documentsSearchTerm.trim() || documentsSearchTerm.trim().length < 2)
-      return;
-
-    setDocumentsLoading(true);
-    setDocumentsSearchResults([]);
-    setSelectedDocument(null);
-
-    try {
-      const token = localStorage.getItem("token");
-      const searchType =
-        documentTab === "customers"
-          ? "Customer"
-          : documentTab === "suppliers"
-            ? "Supplier"
-            : documentTab;
-
-      const response = await axios.get(
-        `${config.API_BASE_URL}/documents/search?documentType=${searchType}&searchTerm=${encodeURIComponent(documentsSearchTerm)}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      if (response.data.success) {
-        setDocumentsSearchResults(response.data.data || []);
-      } else {
-        console.warn("Document search failed:", response.data.message);
-      }
-    } catch (error) {
-      console.error("Error searching documents:", error);
-    } finally {
-      setDocumentsLoading(false);
-    }
-  };
-
-  // Funzione per cercare chat legate a un documento
-  const searchChatsByDocument = async (document) => {
-    setSelectedDocument(document);
-    setDocumentChatsLoading(true);
-    setDocumentChats([]);
-
-    try {
-      const token = localStorage.getItem("token");
-      const searchType =
-        documentTab === "customers"
-          ? "Customer"
-          : documentTab === "suppliers"
-            ? "Supplier"
-            : documentTab;
-
-      // Costruisci il valore di ricerca in base al tipo di documento
-      let searchValue = "";
-      if (documentTab === "customers" || documentTab === "suppliers") {
-        searchValue = document.DocumentNumber; // CustSuppCode
-      } else if (
-        ["SaleOrd", "PurchaseOrd", "SaleDoc", "PurchaseDoc", "MO"].includes(
-          documentTab,
-        )
-      ) {
-        searchValue = document.DocumentId.toString();
-      } else if (documentTab === "BOM") {
-        searchValue = document.DocumentNumber; // BOM code
-      } else if (documentTab === "Item") {
-        searchValue = document.DocumentNumber; // Item code
-      }
-
-      const response = await axios.get(
-        `${config.API_BASE_URL}/chats/by-document?searchType=${searchType}&searchValue=${encodeURIComponent(searchValue)}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      if (response.data.success) {
-        setDocumentChats(response.data.data || []);
-      } else {
-        console.warn("Chat search failed:", response.data.message);
-      }
-    } catch (error) {
-      console.error("Error searching chats by document:", error);
-    } finally {
-      setDocumentChatsLoading(false);
-    }
-  };
-
-  // Funzione per aprire una chat in modalità sola lettura
-  const openChatInReadOnlyMode = async (notificationId) => {
-    try {
-      setDocumentChatsLoading(true);
-      const token = localStorage.getItem("token");
-      // Prima aggiungi l'utente in modalità sola lettura
-      const response = await axios.post(
-        `${config.API_BASE_URL}/chats/${notificationId}/read-only-access`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      if (response.data.success) {
-        // Se l'utente è stato aggiunto con successo o già ha accesso
-        // Poi apri la chat
-        openChatModal(notificationId);
-      } else {
-        console.error(
-          "Failed to gain read-only access:",
-          response.data.message,
-        );
-      }
-    } catch (error) {
-      console.error("Error opening chat in read-only mode:", error);
-    } finally {
-      setDocumentChatsLoading(false);
-    }
   };
 
   const timeSince = (date) => {
@@ -549,85 +147,351 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     return `${minutes} minuti fa`;
   };
 
-  const notificationBarRef = useRef(null);
-  const scrollPosition = useRef(0);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const stableSort = (array, comparator) => {
+    const stabilizedThis = array.map((el, index) => [el, index]);
+    stabilizedThis.sort((a, b) => {
+      const order = comparator(a[0], b[0]);
+      if (order !== 0) return order;
+      return a[1] - b[1];
+    });
+    return stabilizedThis.map((el) => el[0]);
+  };
 
-  useEffect(() => {
-    if (notificationBarRef.current) {
-      scrollPosition.current = notificationBarRef.current.scrollTop;
-    }
-
-    const restoreScrollPosition = () => {
-      if (notificationBarRef.current) {
-        notificationBarRef.current.scrollTop = scrollPosition.current;
+  // Applica gli aggiornamenti ottimistici alle notifiche
+  const notificationsWithOptimisticUpdates = useMemo(() => {
+    if (!notifications) return [];
+    
+    return notifications.map(notification => {
+      const update = optimisticUpdates[notification.notificationId];
+      if (update) {
+        return { ...notification, ...update };
       }
-    };
+      return notification;
+    });
+  }, [notifications, optimisticUpdates]);
 
-    setTimeout(restoreScrollPosition, 0);
-  }, [filteredNotifications]);
+  // DERIVAZIONE SINCRONA dei filtri - questa è la chiave!
+  const filteredNotifications = useMemo(() => {
+    if (!visible) return [];
 
-  // Effetto per mantenere la posizione di scorrimento durante gli aggiornamenti
-  useEffect(() => {
-    const handleScrollRestore = () => {
-      if (notificationBarRef.current && scrollPosition.current > 0) {
-        notificationBarRef.current.scrollTop = scrollPosition.current;
-      }
-    };
+    const filtered = notificationsWithOptimisticUpdates.filter((notification) => {
+      const isArchived = notification.archived === 1 || notification.archived === true;
 
-    // Aggiungiamo un listener per ripristinare la posizione dopo che il DOM è stato aggiornato
-    const observer = new MutationObserver(handleScrollRestore);
+      if (filterArchivedChats && !isArchived) return false;
+      if (!filterArchivedChats && isArchived) return false;
+      if (filterMentioned && !notification.isMentioned) return false;
+      if (filterMessagesSent && !notification.messagesSent) return false;
+      if (showUnreadOnly && notification.isReadByUser) return false;
+      if (filterFavorites && !notification.favorite) return false;
+      if (selectedCategory !== "all" && 
+          notification.notificationCategoryId.toString() !== selectedCategory) return false;
+      if (completedFilter === "completed" && !notification.isClosed) return false;
+      if (completedFilter === "active" && notification.isClosed) return false;
+      if (filterLeftChats && notification.chatLeft !== 1) return false;
+      if (filterMutedChats && !isNotificationMuted(notification)) return false;
 
-    if (notificationBarRef.current) {
-      observer.observe(notificationBarRef.current, {
-        childList: true,
-        subtree: true,
-      });
-
-      // Salva la posizione durante lo scorrimento
-      const handleScroll = () => {
-        scrollPosition.current = notificationBarRef.current.scrollTop;
-      };
-
-      notificationBarRef.current.addEventListener("scroll", handleScroll, {
-        passive: true,
-      });
-
-      return () => {
-        observer.disconnect();
-        if (notificationBarRef.current) {
-          notificationBarRef.current.removeEventListener(
-            "scroll",
-            handleScroll,
-          );
+      if (searchTerm) {
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        const messages = parseMessages(notification.messages);
+        if (!notification.title.toLowerCase().includes(lowerSearchTerm) &&
+            !messages.some(message => 
+              message.message && 
+              message.message.toLowerCase().includes(lowerSearchTerm)
+            )) {
+          return false;
         }
-      };
+      }
+      return true;
+    });
+
+    return stableSort([...filtered], (a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return parseFloat(b.lastMessage || 0) - parseFloat(a.lastMessage || 0);
+    });
+  }, [
+    notificationsWithOptimisticUpdates,
+    visible,
+    filterArchivedChats,
+    filterMentioned,
+    filterMessagesSent,
+    showUnreadOnly,
+    filterFavorites,
+    selectedCategory,
+    completedFilter,
+    filterLeftChats,
+    filterMutedChats,
+    searchTerm,
+    isNotificationMuted
+  ]);
+
+  // Salva la posizione dello scroll prima di ogni aggiornamento
+  const saveScrollPosition = useCallback(() => {
+    if (notificationBarRef.current) {
+      scrollPositionRef.current = notificationBarRef.current.scrollTop;
     }
   }, []);
 
-  const handleNotificationClick = (notification, e) => {
-    // Ferma la propagazione dell'evento per evitare che il click arrivi al document
-    // e venga interpretato come un click outside
-    e.stopPropagation();
+  // Ripristina la posizione dello scroll
+  const restoreScrollPosition = useCallback(() => {
+    if (notificationBarRef.current) {
+      notificationBarRef.current.scrollTop = scrollPositionRef.current;
+    }
+  }, []);
 
-    // Rendi la funzione più robusta
+  // Handlers ottimizzati
+  const handleNotificationClick = (notification, e) => {
+    e.stopPropagation();
+    
     if (notification && notification.notificationId && openChatModal) {
-      // Prova con piccolo delay per assicurarti che eventuali altri eventi siano completati
-      setTimeout(() => {
-        openChatModal(notification.notificationId);
-      }, 100);
-    } else {
-      console.error("Impossibile aprire la chat - parametri mancanti:", {
-        hasNotification: !!notification,
-        hasNotificationId: !!(notification && notification.notificationId),
-        hasOpenChatModal: !!openChatModal,
-      });
+      saveScrollPosition();
+      openChatModal(notification.notificationId);
+      
+      // Ripristina lo scroll dopo un breve delay
+      setTimeout(restoreScrollPosition, 50);
     }
   };
 
+  const handleToggleReadUnread = (notificationId, isRead, e) => {
+    e.stopPropagation();
+    saveScrollPosition();
+    
+    // Aggiornamento ottimistico immediato
+    setOptimisticUpdates(prev => ({
+      ...prev,
+      [notificationId]: { isReadByUser: !isRead }
+    }));
+    
+    toggleReadUnread(notificationId, !isRead)
+      .then(() => {
+        // Rimuovi l'aggiornamento ottimistico quando l'operazione è completata
+        setOptimisticUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[notificationId];
+          return newUpdates;
+        });
+
+        // Aggiorna il conteggio archiviate se necessario
+        const notification = notifications.find(n => n.notificationId === notificationId);
+        if (notification && (notification.archived === 1 || notification.archived === true)) {
+          const newCount = !isRead ? archivedUnreadCount - 1 : archivedUnreadCount + 1;
+          setArchivedUnreadCount(Math.max(0, newCount));
+        }
+        
+        restoreScrollPosition();
+      })
+      .catch((error) => {
+        console.error("Error toggling read status:", error);
+        // Rimuovi l'aggiornamento ottimistico in caso di errore
+        setOptimisticUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[notificationId];
+          return newUpdates;
+        });
+      });
+  };
+
+  const handleToggleFavorite = (notificationId, currentFavoriteStatus, e) => {
+    e.stopPropagation();
+    saveScrollPosition();
+    
+    // Aggiornamento ottimistico immediato
+    setOptimisticUpdates(prev => ({
+      ...prev,
+      [notificationId]: { favorite: !currentFavoriteStatus }
+    }));
+    
+    toggleFavorite(notificationId, !currentFavoriteStatus)
+      .then(() => {
+        // Rimuovi l'aggiornamento ottimistico
+        setOptimisticUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[notificationId];
+          return newUpdates;
+        });
+        
+        restoreScrollPosition();
+      })
+      .catch((error) => {
+        console.error("Error toggling favorite:", error);
+        // Rimuovi l'aggiornamento ottimistico in caso di errore
+        setOptimisticUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[notificationId];
+          return newUpdates;
+        });
+      });
+  };
+
+  const handleTogglePin = (notificationId, currentPinnedStatus, e) => {
+    e.stopPropagation();
+    saveScrollPosition();
+    
+    const newPinnedStatus = !currentPinnedStatus;
+
+    if (newPinnedStatus) {
+      // Animazione per il pin
+      setAnimatingItemId(notificationId);
+      setAnimationPhase("exit");
+
+      animationTimeoutRef.current = setTimeout(() => {
+        // Aggiornamento ottimistico
+        setOptimisticUpdates(prev => ({
+          ...prev,
+          [notificationId]: { pinned: true }
+        }));
+        
+        setAnimationPhase("enter");
+
+        togglePin(notificationId, newPinnedStatus)
+          .then(() => {
+            animationTimeoutRef.current = setTimeout(() => {
+              setAnimatingItemId(null);
+              setAnimationPhase(null);
+              
+              // Rimuovi l'aggiornamento ottimistico
+              setOptimisticUpdates(prev => {
+                const newUpdates = { ...prev };
+                delete newUpdates[notificationId];
+                return newUpdates;
+              });
+              
+              restoreScrollPosition();
+            }, 600);
+          })
+          .catch((error) => {
+            console.error("Error pinning notification:", error);
+            setAnimatingItemId(null);
+            setAnimationPhase(null);
+            // Rimuovi l'aggiornamento ottimistico
+            setOptimisticUpdates(prev => {
+              const newUpdates = { ...prev };
+              delete newUpdates[notificationId];
+              return newUpdates;
+            });
+          });
+      }, 400);
+    } else {
+      // Aggiornamento ottimistico per unpin
+      setOptimisticUpdates(prev => ({
+        ...prev,
+        [notificationId]: { pinned: false }
+      }));
+      
+      togglePin(notificationId, newPinnedStatus)
+        .then(() => {
+          // Rimuovi l'aggiornamento ottimistico
+          setOptimisticUpdates(prev => {
+            const newUpdates = { ...prev };
+            delete newUpdates[notificationId];
+            return newUpdates;
+          });
+          
+          restoreScrollPosition();
+        })
+        .catch((error) => {
+          console.error("Error unpinning notification:", error);
+          // Rimuovi l'aggiornamento ottimistico
+          setOptimisticUpdates(prev => {
+            const newUpdates = { ...prev };
+            delete newUpdates[notificationId];
+            return newUpdates;
+          });
+        });
+    }
+  };
+
+  const handleToggleMute = (notificationId, shouldMute, e) => {
+    e.stopPropagation();
+
+    if (shouldMute) {
+      swal
+        .fire({
+          title: "Silenzia notifiche",
+          text: "Per quanto tempo vuoi silenziare questa chat?",
+          icon: "question",
+          showCancelButton: true,
+          cancelButtonText: "Annulla",
+          confirmButtonText: "Conferma",
+          input: "select",
+          inputOptions: {
+            "8h": "8 ore",
+            "1d": "1 giorno",
+            "7d": "7 giorni",
+            forever: "Per sempre",
+          },
+          inputPlaceholder: "Seleziona durata",
+          inputValue: "8h",
+        })
+        .then((result) => {
+          if (result.isConfirmed) {
+            toggleMuteChat(notificationId, true, result.value);
+          }
+        });
+    } else {
+      toggleMuteChat(notificationId, false);
+    }
+  };
+
+  const handleArchiveNotification = (notificationId, e) => {
+    e.stopPropagation();
+    saveScrollPosition();
+
+    // Aggiornamento ottimistico
+    setOptimisticUpdates(prev => ({
+      ...prev,
+      [notificationId]: { archived: 1 }
+    }));
+
+    archiveChat(notificationId).then((result) => {
+      if (result && result.success) {
+        // Rimuovi l'aggiornamento ottimistico
+        setOptimisticUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[notificationId];
+          return newUpdates;
+        });
+      }
+    }).catch(() => {
+      // Rimuovi l'aggiornamento ottimistico in caso di errore
+      setOptimisticUpdates(prev => {
+        const newUpdates = { ...prev };
+        delete newUpdates[notificationId];
+        return newUpdates;
+      });
+    });
+  };
+
+  const handleUnarchiveNotification = (notificationId, e) => {
+    e.stopPropagation();
+    saveScrollPosition();
+
+    // Aggiornamento ottimistico
+    setOptimisticUpdates(prev => ({
+      ...prev,
+      [notificationId]: { archived: 0 }
+    }));
+
+    unarchiveChat(notificationId).then((result) => {
+      if (result && result.success) {
+        // Rimuovi l'aggiornamento ottimistico
+        setOptimisticUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[notificationId];
+          return newUpdates;
+        });
+      }
+    }).catch(() => {
+      // Rimuovi l'aggiornamento ottimistico in caso di errore
+      setOptimisticUpdates(prev => {
+        const newUpdates = { ...prev };
+        delete newUpdates[notificationId];
+        return newUpdates;
+      });
+    });
+  };
+
   const handleOpenNewMessageModal = () => {
-    setIsModalOpen(true);
-    // Eventiamo un custom event che verrà gestito dal MainPage
     document.dispatchEvent(new CustomEvent("openNewMessageModal"));
   };
 
@@ -655,11 +519,11 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     if (selectedValue === "all") {
       setSelectBackgroundColor("#ffffff");
     } else {
-      const selectedCategory = uniqueCategories.find(
+      const selectedCategoryObj = uniqueCategories.find(
         (category) => category.id.toString() === selectedValue,
       );
-      if (selectedCategory) {
-        setSelectBackgroundColor(selectedCategory.color);
+      if (selectedCategoryObj) {
+        setSelectBackgroundColor(selectedCategoryObj.color);
       }
     }
   };
@@ -668,16 +532,13 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     setCompletedFilter(value);
   };
 
-  // Toggle between expanded and collapsed filter panel
   const toggleFilterExpansion = () => {
     setIsFilterExpanded(!isFilterExpanded);
   };
 
-  // Toggle document search visibility
   const toggleDocumentSearch = () => {
     setIsDocumentSearchVisible(!isDocumentSearchVisible);
     if (!isDocumentSearchVisible) {
-      // Reset document search when opening
       setDocumentsSearchTerm("");
       setDocumentsSearchResults([]);
       setSelectedDocument(null);
@@ -685,29 +546,235 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     }
   };
 
-  // Handle archiving a notification
-  const handleArchiveNotification = (notificationId, e) => {
-    e.stopPropagation(); // Don't open the chat
-
-    archiveChat(notificationId).then((result) => {
-      if (result && result.success) {
-        // The state will be updated by Redux
-      }
-    });
+  const handleToggleArchivedFilter = () => {
+    setFilterArchivedChats(!filterArchivedChats);
   };
 
-  // Handle unarchiving a notification
-  const handleUnarchiveNotification = (notificationId, e) => {
-    e.stopPropagation(); // Don't open the chat
-
-    unarchiveChat(notificationId).then((result) => {
-      if (result && result.success) {
-        // The state will be updated by Redux
-      }
-    });
+  const handleOpenWiki = (e) => {
+    e.stopPropagation();
+    openWiki("notifications", true);
   };
 
-  // Ottieni le categorie uniche delle notifiche
+  const resetAllFilters = () => {
+    setFilterMentioned(false);
+    setFilterMessagesSent(false);
+    setShowUnreadOnly(false);
+    setSearchTerm("");
+    setSelectedCategory("all");
+    setFilterFavorites(false);
+    setCompletedFilter("all");
+    setFilterLeftChats(false);
+    setFilterArchivedChats(false);
+    setFilterMutedChats(false);
+  };
+
+  // Document search functions
+  const searchDocuments = async () => {
+    if (!documentsSearchTerm.trim() || documentsSearchTerm.trim().length < 2) return;
+
+    setDocumentsLoading(true);
+    setDocumentsSearchResults([]);
+    setSelectedDocument(null);
+
+    try {
+      const token = localStorage.getItem("token");
+      const searchType =
+        documentTab === "customers"
+          ? "Customer"
+          : documentTab === "suppliers"
+            ? "Supplier"
+            : documentTab;
+
+      const response = await axios.get(
+        `${config.API_BASE_URL}/documents/search?documentType=${searchType}&searchTerm=${encodeURIComponent(documentsSearchTerm)}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      if (response.data.success) {
+        setDocumentsSearchResults(response.data.data || []);
+      }
+    } catch (error) {
+      console.error("Error searching documents:", error);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  };
+
+  const searchChatsByDocument = async (document) => {
+    setSelectedDocument(document);
+    setDocumentChatsLoading(true);
+    setDocumentChats([]);
+
+    try {
+      const token = localStorage.getItem("token");
+      const searchType =
+        documentTab === "customers"
+          ? "Customer"
+          : documentTab === "suppliers"
+            ? "Supplier"
+            : documentTab;
+
+      let searchValue = "";
+      if (documentTab === "customers" || documentTab === "suppliers") {
+        searchValue = document.DocumentNumber;
+      } else if (["SaleOrd", "PurchaseOrd", "SaleDoc", "PurchaseDoc", "MO"].includes(documentTab)) {
+        searchValue = document.DocumentId.toString();
+      } else if (documentTab === "BOM") {
+        searchValue = document.DocumentNumber;
+      } else if (documentTab === "Item") {
+        searchValue = document.DocumentNumber;
+      }
+
+      const response = await axios.get(
+        `${config.API_BASE_URL}/chats/by-document?searchType=${searchType}&searchValue=${encodeURIComponent(searchValue)}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      if (response.data.success) {
+        setDocumentChats(response.data.data || []);
+      }
+    } catch (error) {
+      console.error("Error searching chats by document:", error);
+    } finally {
+      setDocumentChatsLoading(false);
+    }
+  };
+
+  const openChatInReadOnlyMode = async (notificationId) => {
+    try {
+      setDocumentChatsLoading(true);
+      const token = localStorage.getItem("token");
+      const response = await axios.post(
+        `${config.API_BASE_URL}/chats/${notificationId}/read-only-access`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      if (response.data.success) {
+        openChatModal(notificationId);
+      }
+    } catch (error) {
+      console.error("Error opening chat in read-only mode:", error);
+    } finally {
+      setDocumentChatsLoading(false);
+    }
+  };
+
+  // Effects
+  useEffect(() => {
+    if (visible === true) {
+      forceLoadNotifications();
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (notifications && notifications.length > 0) {
+      const count = notifications.filter(
+        (notification) =>
+          (notification.archived === 1 || notification.archived === true) &&
+          !notification.isReadByUser,
+      ).length;
+      setArchivedUnreadCount(count);
+    }
+  }, [notifications]);
+
+  // Ripristina lo scroll dopo gli aggiornamenti
+  useEffect(() => {
+    restoreScrollPosition();
+  }, [filteredNotifications]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isFilterExpanded && filterExpandedRef.current && 
+          !filterExpandedRef.current.contains(event.target)) {
+        const filterToggleButton = document.getElementById("notification-filter-toggle");
+        if (!filterToggleButton?.contains(event.target)) {
+          setIsFilterExpanded(false);
+        }
+      }
+
+      if (isDocTypesOpen && !event.target.closest(".document-type-dropdown")) {
+        setIsDocTypesOpen(false);
+      }
+    };
+
+    if (isFilterExpanded || isDocTypesOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isFilterExpanded, isDocTypesOpen]);
+
+  useEffect(() => {
+    if (!visible && isFilterExpanded) {
+      setIsFilterExpanded(false);
+    }
+    if (!visible && isDocumentSearchVisible) {
+      setIsDocumentSearchVisible(false);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    const handleNotificationsUpdated = () => {
+      if (visible) {
+        forceLoadNotifications();
+      }
+    };
+
+    const handleNewMessage = (event) => {
+      if (visible && event.detail && event.detail.notificationId) {
+        fetchNotificationById(event.detail.notificationId);
+      }
+    };
+
+    document.addEventListener("notifications-updated", handleNotificationsUpdated);
+    document.addEventListener("new-message-received", handleNewMessage);
+
+    return () => {
+      document.removeEventListener("notifications-updated", handleNotificationsUpdated);
+      document.removeEventListener("new-message-received", handleNewMessage);
+    };
+  }, [visible, forceLoadNotifications, fetchNotificationById]);
+
+  useEffect(() => {
+    const handleTitleUpdate = (event) => {
+      const { notificationId, newTitle } = event.detail;
+
+      // Usa aggiornamento ottimistico per il titolo
+      setOptimisticUpdates(prev => ({
+        ...prev,
+        [parseInt(notificationId)]: { title: newTitle }
+      }));
+
+      // Dopo un breve delay rimuovi l'aggiornamento ottimistico
+      // (quando Redux avrà aggiornato lo stato)
+      setTimeout(() => {
+        setOptimisticUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[parseInt(notificationId)];
+          return newUpdates;
+        });
+      }, 1000);
+    };
+
+    document.addEventListener("chat-title-updated", handleTitleUpdate);
+
+    return () => {
+      document.removeEventListener("chat-title-updated", handleTitleUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (animationTimeoutRef.current) {
+        clearTimeout(animationTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Ottieni le categorie uniche
   const uniqueCategories = Object.values(
     notifications.reduce((acc, notification) => {
       if (!acc[notification.notificationCategoryId]) {
@@ -721,295 +788,18 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     }, {}),
   );
 
-  const handleTogglePin = (notificationId, currentPinnedStatus, e) => {
-    // Ferma la propagazione per evitare l'apertura della chat
-    e.stopPropagation();
-
-    // Ottimistic UI update
-    const newPinnedStatus = !currentPinnedStatus;
-
-    // Se stiamo pinnando, avvia l'animazione
-    if (newPinnedStatus) {
-      // Salva lo stato corrente di scorrimento
-      if (notificationBarRef.current) {
-        scrollPosition.current = notificationBarRef.current.scrollTop;
-      }
-
-      // Prima fase: l'elemento esce verso destra
-      setAnimatingItemId(notificationId);
-      setAnimationPhase("exit");
-
-      // Impostiamo un timer per la seconda fase (entrata da sinistra)
-      animationTimeoutRef.current = setTimeout(() => {
-        // Esegui il riordinamento
-        togglePin(notificationId, newPinnedStatus)
-          .then(() => {
-            // Applica i filtri e mantieni l'ordine
-            filterNotifications();
-
-            // Seconda fase: l'elemento entra da sinistra
-            setAnimationPhase("enter");
-
-            // Puliamo l'animazione dopo che è completata
-            animationTimeoutRef.current = setTimeout(() => {
-              setAnimatingItemId(null);
-              setAnimationPhase(null);
-
-              // Ripristina la posizione di scorrimento
-              if (notificationBarRef.current) {
-                notificationBarRef.current.scrollTop = scrollPosition.current;
-              }
-            }, 600);
-          })
-          .catch((error) => {
-            console.error("Error pinning notification:", error);
-            setAnimatingItemId(null);
-            setAnimationPhase(null);
-
-            // Rollback in caso di errore
-            setFilteredNotifications((prevNotifications) =>
-              prevNotifications.map((notification) =>
-                notification.notificationId === notificationId
-                  ? { ...notification, pinned: currentPinnedStatus }
-                  : notification,
-              ),
-            );
-          });
-      }, 400);
-    } else {
-      // Per l'unpin, aggiorna lo stato in modo ottimistico ma stabile
-      const updatedNotifications = [...filteredNotifications].map(
-        (notification) =>
-          notification.notificationId === notificationId
-            ? { ...notification, pinned: newPinnedStatus }
-            : notification,
-      );
-
-      // Esegui l'ordinamento stabile
-      const sortedUpdated = stableSort(updatedNotifications, (a, b) => {
-        if (a.pinned && !b.pinned) return -1;
-        if (!a.pinned && b.pinned) return 1;
-
-        // Usa lastMessage dal backend invece di calcolare manualmente la data
-        return parseFloat(b.lastMessage || 0) - parseFloat(a.lastMessage || 0);
-      });
-
-      setFilteredNotifications(sortedUpdated);
-
-      // Esegui l'operazione reale
-      togglePin(notificationId, newPinnedStatus)
-        .then(() => {
-          // Riapplica i filtri se necessario
-          filterNotifications();
-        })
-        .catch(() => {
-          // Rollback in caso di errore
-          setFilteredNotifications((prevNotifications) =>
-            prevNotifications.map((notification) =>
-              notification.notificationId === notificationId
-                ? { ...notification, pinned: currentPinnedStatus }
-                : notification,
-            ),
-          );
-        });
-    }
-  };
-
-  // Funzione per silenziare le notifiche
-  const handleToggleMute = (notificationId, shouldMute, e) => {
-    e.stopPropagation();
-
-    if (shouldMute) {
-      // Mostra dialog per scegliere la durata
-      swal
-        .fire({
-          title: "Silenzia notifiche",
-          text: "Per quanto tempo vuoi silenziare questa chat?",
-          icon: "question",
-          showCancelButton: true,
-          cancelButtonText: "Annulla",
-          confirmButtonText: "Conferma",
-          input: "select",
-          inputOptions: {
-            "8h": "8 ore",
-            "1d": "1 giorno",
-            "7d": "7 giorni",
-            forever: "Per sempre",
-          },
-          inputPlaceholder: "Seleziona durata",
-          inputValue: "8h",
-        })
-        .then((result) => {
-          if (result.isConfirmed) {
-            toggleMuteChat(notificationId, true, result.value);
-          }
-        });
-    } else {
-      // Togli il silenziamento direttamente
-      toggleMuteChat(notificationId, false);
-    }
-  };
-
-  // Gestisci il toggling di "preferiti" senza propagazione
-  const handleToggleFavorite = (notificationId, currentFavoriteStatus, e) => {
-    e.stopPropagation();
-    toggleFavorite(notificationId, !currentFavoriteStatus);
-  };
-
-  // Gestisci il toggling di "letto/non letto" senza propagazione
-  const handleToggleReadUnread = (notificationId, isRead, e) => {
-    e.stopPropagation();
-
-    // Instead of immediately applying the update to filtered notifications,
-    // we should only update the specific notification's read status
-    // while preserving the current filters
-
-    // First find if the notification is in the current filtered set
-    const notificationInView = filteredNotifications.find(
-      (notification) => notification.notificationId === notificationId,
-    );
-
-    // Only perform UI update if the notification is currently visible
-    if (notificationInView) {
-      // Update only that specific notification in the filtered set
-      setFilteredNotifications((prevFilteredNotifications) =>
-        prevFilteredNotifications.map((notification) =>
-          notification.notificationId === notificationId
-            ? { ...notification, isReadByUser: !isRead }
-            : notification,
-        ),
-      );
-    }
-
-    // Then call the API to update the read status server-side
-    toggleReadUnread(notificationId, !isRead)
-      .then(() => {
-        // Aggiorna il conteggio delle notifiche archiviate non lette
-        if (notifications && notifications.length > 0) {
-          const notification = notifications.find(
-            (n) => n.notificationId === notificationId,
-          );
-          if (
-            notification &&
-            (notification.archived === 1 || notification.archived === true)
-          ) {
-            const newCount = !isRead
-              ? archivedUnreadCount - 1
-              : archivedUnreadCount + 1;
-            setArchivedUnreadCount(Math.max(0, newCount));
-          }
-        }
-      })
-      .catch((error) => {
-        console.error("Error toggling read status:", error);
-
-        // If there was an error, revert the local change only if it was in view
-        if (notificationInView) {
-          setFilteredNotifications((prevFilteredNotifications) =>
-            prevFilteredNotifications.map((notification) =>
-              notification.notificationId === notificationId
-                ? { ...notification, isReadByUser: isRead }
-                : notification,
-            ),
-          );
-        }
-      });
-  };
-
-  // Quando si cambia il filtro di archiviazione, invertiamo completamente la visualizzazione
-  const handleToggleArchivedFilter = () => {
-    setFilterArchivedChats(!filterArchivedChats);
-    // Il filterNotifications() verrà chiamato attraverso l'useEffect che monitora filterArchivedChats
-  };
-
-  useEffect(() => {
-    return () => {
-      if (animationTimeoutRef.current) {
-        clearTimeout(animationTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Listener per l'aggiornamento del titolo della chat
-  useEffect(() => {
-    const handleTitleUpdate = (event) => {
-      const { notificationId, newTitle } = event.detail;
-
-      // Aggiorna il titolo nella lista delle notifiche
-      setFilteredNotifications((prevNotifications) =>
-        prevNotifications.map((notification) =>
-          notification.notificationId === parseInt(notificationId)
-            ? { ...notification, title: newTitle }
-            : notification,
-        ),
-      );
-
-      // Forza un aggiornamento del componente specifico dopo un breve timeout
-      const notificationElement = document.getElementById(
-        `notification-item-${notificationId}`,
-      );
-      if (notificationElement) {
-        // Aggiungi una classe temporanea per forzare il re-render
-        notificationElement.classList.add("title-updating");
-
-        // Rimuovi la classe dopo un breve timeout
-        setTimeout(() => {
-          notificationElement.classList.remove("title-updating");
-
-          // Forza un aggiornamento del titolo specifico
-          const titleElement = document.getElementById(
-            `notification-title-${notificationId}`,
-          );
-          if (titleElement) {
-            titleElement.textContent = newTitle;
-          }
-        }, 100);
-      }
-    };
-
-    // Aggiungi l'event listener
-    document.addEventListener("chat-title-updated", handleTitleUpdate);
-
-    // Pulizia
-    return () => {
-      document.removeEventListener("chat-title-updated", handleTitleUpdate);
-    };
-  }, []);
-
-  // Aggiungi lo stile CSS per l'animazione
-  useEffect(() => {
-    const style = document.createElement("style");
-    style.textContent = `
-      .notification-item.title-updating {
-        transition: background-color 0.1s ease-in-out;
-        background-color: rgba(59, 130, 246, 0.05);
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-
   return (
     <div
       className={`notification-sidebar ${visible ? "show" : "hide"}`}
       id="notification-sidebar"
       ref={sidebarRef}
     >
-      <div
-        className="header"
-        style={{ height: isFilterExpanded ? "9rem" : "9rem" }}
-      >
+      <div className="header" style={{ height: isFilterExpanded ? "9rem" : "9rem" }}>
         <div className="flex justify-between items-center p-2">
-          <div
-            className="text-lg font-semibold"
-            id="notification-sidebar-title"
-          >
+          <div className="text-lg font-semibold" id="notification-sidebar-title">
             Notifiche
           </div>
 
-          {/* Aggiungiamo il pulsante Wiki nella sidebar */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -1029,11 +819,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
           </TooltipProvider>
         </div>
 
-        <div
-          className="filterControls"
-          id="notification-sidebar-filterControls"
-        >
-          {/* Search bar */}
+        <div className="filterControls" id="notification-sidebar-filterControls">
           <div className="px-2 mb-2 w-100">
             <div className="relative w-full">
               <input
@@ -1059,7 +845,6 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
             </div>
           </div>
 
-          {/* Visible filters */}
           <div className="flex items-center justify-center w-100 z-50 px-2 mb-1">
             <div className="flex w-100 z-50 items-center space-x-2">
               <button
@@ -1071,7 +856,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               >
                 <Filter className="w-5 h-5" />
               </button>
-              {/* Toggle button per la ricerca per documenti */}
+
               <button
                 className={`archa-button z-50 flex items-center justify-center w-10 h-10 p-2 ${isDocumentSearchVisible ? "text-blue-600 bg-blue-50" : "text-gray-700 bg-white"} border border-gray-200 rounded-lg hover:bg-gray-50`}
                 onClick={toggleDocumentSearch}
@@ -1100,6 +885,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                   </option>
                 ))}
               </select>
+
               <button
                 className="archa-button z-50 flex items-center justify-center w-10 h-10 p-2 text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
                 onClick={handleOpenNewMessageModal}
@@ -1111,12 +897,11 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
             </div>
           </div>
 
-          {/* Expanded filter options */}
           {isFilterExpanded && (
             <div
               className="px-3 py-2 mb-2 bg-white rounded-lg mx-2 border border-gray-200 shadow-md"
               id="notification-expanded-filters"
-              ref={filterExpandedRef} // Aggiunto ref per controllare click fuori
+              ref={filterExpandedRef}
               style={{
                 zIndex: 100,
                 width: window.innerWidth < 768 ? "95vw" : "calc(100% - 0.5rem)",
@@ -1129,7 +914,6 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 overflowY: "auto",
               }}
             >
-              {/* Header con titolo e pulsante di chiusura */}
               <div className="flex items-center justify-between mb-3 pb-2 border-b">
                 <h3 className="text-sm font-semibold">Filtri notifiche</h3>
                 <button
@@ -1141,23 +925,16 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 </button>
               </div>
 
-              {/* Non disturbare */}
               <div className="mb-4">
                 <DoNotDisturbToggle />
               </div>
 
-              {/* Filtri di base - layout a griglia */}
               <div className="mb-4">
-                <h4 className="text-xs font-medium text-gray-500 mb-2">
-                  Filtri principali
-                </h4>
+                <h4 className="text-xs font-medium text-gray-500 mb-2">Filtri principali</h4>
                 <div className="grid grid-cols-2 gap-2">
-                  {/* Filtro notifiche non lette - usando checkbox standard HTML */}
                   <div
                     className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      showUnreadOnly
-                        ? "bg-blue-50 border border-blue-200"
-                        : "hover:bg-gray-50 border border-transparent"
+                      showUnreadOnly ? "bg-blue-50 border border-blue-200" : "hover:bg-gray-50 border border-transparent"
                     }`}
                     onClick={() => setShowUnreadOnly(!showUnreadOnly)}
                   >
@@ -1180,36 +957,25 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                     </label>
                   </div>
 
-                  {/* Filtro preferiti */}
                   <div
                     className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filterFavorites
-                        ? "bg-yellow-50 border border-yellow-200 text-yellow-700"
-                        : "hover:bg-gray-50 border border-transparent text-gray-700"
+                      filterFavorites ? "bg-yellow-50 border border-yellow-200 text-yellow-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
                     }`}
                     onClick={() => setFilterFavorites(!filterFavorites)}
                     id="notification-favorites-filter"
                   >
-                    <Star
-                      className={`w-4 h-4 ${filterFavorites ? "fill-yellow-500 text-yellow-500" : ""}`}
-                    />
+                    <Star className={`w-4 h-4 ${filterFavorites ? "fill-yellow-500 text-yellow-500" : ""}`} />
                     <span className="text-sm">Preferiti</span>
                   </div>
                 </div>
               </div>
 
-              {/* Filtri per tipo - layout a griglia */}
               <div className="mb-4">
-                <h4 className="text-xs font-medium text-gray-500 mb-2">
-                  Tipo di notifiche
-                </h4>
+                <h4 className="text-xs font-medium text-gray-500 mb-2">Tipo di notifiche</h4>
                 <div className="grid grid-cols-2 gap-2">
-                  {/* Filtro menzioni */}
                   <div
                     className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filterMentioned
-                        ? "bg-indigo-50 border border-indigo-200 text-indigo-700"
-                        : "hover:bg-gray-50 border border-transparent text-gray-700"
+                      filterMentioned ? "bg-indigo-50 border border-indigo-200 text-indigo-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
                     }`}
                     onClick={() => setFilterMentioned(!filterMentioned)}
                     id="notification-mentioned-filter"
@@ -1218,12 +984,9 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                     <span className="text-sm">Menzioni</span>
                   </div>
 
-                  {/* Filtro messaggi inviati */}
                   <div
                     className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filterMessagesSent
-                        ? "bg-green-50 border border-green-200 text-green-700"
-                        : "hover:bg-gray-50 border border-transparent text-gray-700"
+                      filterMessagesSent ? "bg-green-50 border border-green-200 text-green-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
                     }`}
                     onClick={() => setFilterMessagesSent(!filterMessagesSent)}
                     id="notification-sent-filter"
@@ -1234,18 +997,12 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 </div>
               </div>
 
-              {/* Filtri per stato - layout a griglia */}
               <div className="mb-4">
-                <h4 className="text-xs font-medium text-gray-500 mb-2">
-                  Stato
-                </h4>
+                <h4 className="text-xs font-medium text-gray-500 mb-2">Stato</h4>
                 <div className="grid grid-cols-2 gap-2">
-                  {/* Filtro chat abbandonate */}
                   <div
                     className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filterLeftChats
-                        ? "bg-amber-50 border border-amber-200 text-amber-700"
-                        : "hover:bg-gray-50 border border-transparent text-gray-700"
+                      filterLeftChats ? "bg-amber-50 border border-amber-200 text-amber-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
                     }`}
                     onClick={() => setFilterLeftChats(!filterLeftChats)}
                     id="notification-left-chats-filter"
@@ -1254,12 +1011,9 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                     <span className="text-sm">Abbandonate</span>
                   </div>
 
-                  {/* Filtro chat archiviate */}
                   <div
                     className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filterArchivedChats
-                        ? "bg-purple-50 border border-purple-200 text-purple-700"
-                        : "hover:bg-gray-50 border border-transparent text-gray-700"
+                      filterArchivedChats ? "bg-purple-50 border border-purple-200 text-purple-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
                     }`}
                     onClick={handleToggleArchivedFilter}
                     id="notification-archived-chats-filter"
@@ -1273,12 +1027,9 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                     )}
                   </div>
 
-                  {/* Filtro chat silenziate */}
                   <div
                     className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filterMutedChats
-                        ? "bg-rose-50 border border-rose-200 text-rose-700"
-                        : "hover:bg-gray-50 border border-transparent text-gray-700"
+                      filterMutedChats ? "bg-rose-50 border border-rose-200 text-rose-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
                     }`}
                     onClick={() => setFilterMutedChats(!filterMutedChats)}
                     id="notification-muted-filter"
@@ -1289,20 +1040,12 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 </div>
               </div>
 
-              {/* Filtro stato completamento */}
               <div className="mb-4">
-                <label className="text-xs font-medium text-gray-500 mb-2 block">
-                  Stato completamento
-                </label>
-                <div
-                  className="flex justify-between bg-white border border-gray-200 rounded-lg p-0.5"
-                  id="notification-completion-filter"
-                >
+                <label className="text-xs font-medium text-gray-500 mb-2 block">Stato completamento</label>
+                <div className="flex justify-between bg-white border border-gray-200 rounded-lg p-0.5" id="notification-completion-filter">
                   <button
                     className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      completedFilter === "all"
-                        ? "bg-blue-100 text-blue-700"
-                        : "text-gray-600 hover:bg-gray-50"
+                      completedFilter === "all" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"
                     }`}
                     onClick={() => handleCompletedFilterChange("all")}
                     id="notification-filter-all"
@@ -1311,9 +1054,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                   </button>
                   <button
                     className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      completedFilter === "active"
-                        ? "bg-blue-100 text-blue-700"
-                        : "text-gray-600 hover:bg-gray-50"
+                      completedFilter === "active" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"
                     }`}
                     onClick={() => handleCompletedFilterChange("active")}
                     id="notification-filter-active"
@@ -1322,9 +1063,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                   </button>
                   <button
                     className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      completedFilter === "completed"
-                        ? "bg-blue-100 text-blue-700"
-                        : "text-gray-600 hover:bg-gray-50"
+                      completedFilter === "completed" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"
                     }`}
                     onClick={() => handleCompletedFilterChange("completed")}
                     id="notification-filter-completed"
@@ -1334,22 +1073,10 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 </div>
               </div>
 
-              {/* Pulsante per reimpostare tutti i filtri */}
               <div className="mt-4 pt-3 border-t border-gray-100 text-center">
                 <button
                   className="w-full py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg"
-                  onClick={() => {
-                    setShowUnreadOnly(false);
-                    setFilterFavorites(false);
-                    setFilterMentioned(false);
-                    setFilterMessagesSent(false);
-                    setSelectedCategory("all");
-                    setSearchTerm("");
-                    setCompletedFilter("all");
-                    setFilterLeftChats(false);
-                    setFilterArchivedChats(false);
-                    setFilterMutedChats(false);
-                  }}
+                  onClick={resetAllFilters}
                 >
                   Reimposta tutti i filtri
                 </button>
@@ -1359,20 +1086,15 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
         </div>
       </div>
 
-      {/* Document Search Section */}
       {isDocumentSearchVisible && (
         <div className="document-search-section bg-white border-b border-gray-200 p-3">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-sm font-medium">Cerca chat per documento</h3>
-            <button
-              onClick={toggleDocumentSearch}
-              className="text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={toggleDocumentSearch} className="text-gray-400 hover:text-gray-600">
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Document Type Dropdown */}
           <div className="mb-3 relative document-type-dropdown">
             <div
               className="p-2 border rounded-lg flex justify-between items-center cursor-pointer bg-white hover:bg-gray-50"
@@ -1380,31 +1102,23 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
             >
               <div className="flex items-center">
                 {React.cloneElement(
-                  documentTypes.find((t) => t.id === documentTab)?.icon || (
-                    <Link />
-                  ),
+                  documentTypes.find((t) => t.id === documentTab)?.icon || <Link />,
                   { className: "h-4 w-4 mr-2" },
                 )}
                 <span className="text-sm">
-                  {documentTypes.find((t) => t.id === documentTab)?.label ||
-                    "Seleziona categoria"}
+                  {documentTypes.find((t) => t.id === documentTab)?.label || "Seleziona categoria"}
                 </span>
               </div>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${isDocTypesOpen ? "rotate-180" : ""}`}
-              />
+              <ChevronDown className={`h-4 w-4 transition-transform ${isDocTypesOpen ? "rotate-180" : ""}`} />
             </div>
 
-            {/* Dropdown menu */}
             {isDocTypesOpen && (
               <div className="absolute left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 document-type-menu max-h-48 overflow-y-auto">
                 {documentTypes.map((type) => (
                   <button
                     key={type.id}
                     className={`w-full flex items-center py-2 px-3 text-sm hover:bg-gray-50 ${
-                      documentTab === type.id
-                        ? "bg-blue-50 text-blue-600 font-medium"
-                        : ""
+                      documentTab === type.id ? "bg-blue-50 text-blue-600 font-medium" : ""
                     }`}
                     onClick={() => {
                       setDocumentTab(type.id);
@@ -1414,9 +1128,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                       setIsDocTypesOpen(false);
                     }}
                   >
-                    {React.cloneElement(type.icon, {
-                      className: "h-4 w-4 mr-2",
-                    })}
+                    {React.cloneElement(type.icon, { className: "h-4 w-4 mr-2" })}
                     <span>{type.label}</span>
                   </button>
                 ))}
@@ -1424,7 +1136,6 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
             )}
           </div>
 
-          {/* Document Search Bar */}
           <div className="relative mb-3">
             <input
               type="text"
@@ -1453,22 +1164,16 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
           >
             {documentsLoading ? (
               <span className="flex items-center justify-center">
-                <i className="bi bi-arrow-repeat spin mr-2"></i> Ricerca in
-                corso...
+                <i className="bi bi-arrow-repeat spin mr-2"></i> Ricerca in corso...
               </span>
             ) : (
               "Cerca Documenti"
             )}
           </button>
 
-          {/* Document Results and Chat List */}
           <div className="mt-3" style={{ height: "50vh", overflowY: "auto" }}>
-            {/* Document Search Results */}
             {documentsSearchResults.length > 0 && (
-              <div
-                className="mb-3"
-                style={{ height: "50vh", overflowY: "auto" }}
-              >
+              <div className="mb-3" style={{ height: "50vh", overflowY: "auto" }}>
                 <h4 className="text-xs font-medium text-gray-600 mb-2">
                   Documenti trovati ({documentsSearchResults.length})
                 </h4>
@@ -1485,10 +1190,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                     >
                       <div className="flex items-start">
                         <div className="flex-shrink-0 mr-2 bg-gray-100 p-1.5 rounded-md">
-                          {
-                            documentTypes.find((t) => t.id === documentTab)
-                              ?.icon
-                          }
+                          {documentTypes.find((t) => t.id === documentTab)?.icon}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">
@@ -1499,15 +1201,10 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                               </span>
                             )}
                           </p>
-
                           {doc.DocumentReference && (
-                            <p className="text-xs text-gray-500 truncate">
-                              {doc.DocumentReference}
-                            </p>
+                            <p className="text-xs text-gray-500 truncate">{doc.DocumentReference}</p>
                           )}
-                          <p className="text-xs text-gray-500 truncate">
-                            {doc.DocumentDescription}
-                          </p>
+                          <p className="text-xs text-gray-500 truncate">{doc.DocumentDescription}</p>
                           {doc.DocumentDate && (
                             <p className="text-xs text-gray-400 flex items-center mt-1">
                               <Calendar className="h-3 w-3 mr-1" />
@@ -1517,9 +1214,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                         </div>
                         <ChevronDown
                           className={`h-4 w-4 text-gray-400 transform transition-transform ${
-                            selectedDocument?.DocumentId === doc.DocumentId
-                              ? "rotate-180"
-                              : ""
+                            selectedDocument?.DocumentId === doc.DocumentId ? "rotate-180" : ""
                           }`}
                         />
                       </div>
@@ -1529,23 +1224,18 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               </div>
             )}
 
-            {/* Document-Related Chats */}
             {selectedDocument && (
               <div className="mt-4">
                 <h4 className="text-xs font-medium text-gray-600 mb-2 flex items-center">
                   <MessageSquare className="h-3.5 w-3.5 mr-1" />
                   Chat legate a:
-                  <span className="ml-1 font-semibold text-blue-600">
-                    {selectedDocument.DocumentNumber}
-                  </span>
+                  <span className="ml-1 font-semibold text-blue-600">{selectedDocument.DocumentNumber}</span>
                 </h4>
 
                 {documentChatsLoading ? (
                   <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg">
                     <i className="bi bi-arrow-repeat spin mr-2"></i>
-                    <span className="text-sm text-gray-500">
-                      Caricamento chat...
-                    </span>
+                    <span className="text-sm text-gray-500">Caricamento chat...</span>
                   </div>
                 ) : documentChats.length > 0 ? (
                   <div className="space-y-2 max-h-[300px] overflow-y-auto">
@@ -1567,13 +1257,9 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                           <div className="flex items-center">
                             <span
                               className="w-3 h-3 rounded-full mr-2"
-                              style={{
-                                backgroundColor: chat.hexColor || "#6366f1",
-                              }}
+                              style={{ backgroundColor: chat.hexColor || "#6366f1" }}
                             ></span>
-                            <h5 className="text-sm font-medium truncate">
-                              {chat.title}
-                            </h5>
+                            <h5 className="text-sm font-medium truncate">{chat.title}</h5>
                           </div>
                           {!chat.isUserMember && (
                             <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full flex items-center">
@@ -1611,49 +1297,31 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               </div>
             )}
 
-            {/* Empty State for Document Search */}
-            {!documentsSearchResults.length &&
-              !documentsLoading &&
-              !selectedDocument &&
-              documentsSearchTerm.length >= 2 && (
-                <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg mt-3">
-                  <Link className="h-8 w-8 text-gray-300 mb-2" />
-                  <p className="text-sm text-gray-500 text-center">
-                    Nessun documento trovato. Prova a modificare i criteri di
-                    ricerca.
-                  </p>
-                </div>
-              )}
+            {!documentsSearchResults.length && !documentsLoading && !selectedDocument && documentsSearchTerm.length >= 2 && (
+              <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg mt-3">
+                <Link className="h-8 w-8 text-gray-300 mb-2" />
+                <p className="text-sm text-gray-500 text-center">
+                  Nessun documento trovato. Prova a modificare i criteri di ricerca.
+                </p>
+              </div>
+            )}
 
-            {/* Help Text for Document Search */}
-            {!documentsSearchResults.length &&
-              !documentsLoading &&
-              documentsSearchTerm.length < 2 && (
-                <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-xs text-blue-700">
-                    <strong>Suggerimento:</strong> Digita almeno 2 caratteri per
-                    cercare documenti. Puoi cercare{" "}
-                    {documentTypes
-                      .find((t) => t.id === documentTab)
-                      ?.label.toLowerCase()}{" "}
-                    per codice, descrizione o altri dati rilevanti.
-                  </p>
-                </div>
-              )}
+            {!documentsSearchResults.length && !documentsLoading && documentsSearchTerm.length < 2 && (
+              <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                <p className="text-xs text-blue-700">
+                  <strong>Suggerimento:</strong> Digita almeno 2 caratteri per cercare documenti. Puoi cercare{" "}
+                  {documentTypes.find((t) => t.id === documentTab)?.label.toLowerCase()} per codice, descrizione o altri dati rilevanti.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      <div
-        className="notifications-list"
-        ref={notificationBarRef}
-        id="notification-list-container"
-      >
-        {/* La sezione delle notifiche visibile solo quando non è attiva la ricerca per documenti */}
+      <div className="notifications-list" ref={notificationBarRef} id="notification-list-container">
         {!isDocumentSearchVisible &&
           (filteredNotifications && filteredNotifications.length > 0 ? (
             (() => {
-              // Rimuovi i duplicati usando un Set per tracciare gli ID già visti
               const uniqueIds = new Set();
               const uniqueNotifications = filteredNotifications.filter(notification => {
                 if (uniqueIds.has(notification.notificationId)) {
@@ -1666,15 +1334,10 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               
               return uniqueNotifications.map((notification) => {
                 const messages = parseMessages(notification.messages);
-                const lastMessage =
-                  messages.length > 0 ? messages[messages.length - 1] : null;
+                const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
                 const categoryColor = notification.hexColor;
-                // Verifica se questa chat è stata abbandonata dall'utente
-                const hasLeftChat =
-                  notification.chatLeft === 1 || notification.chatLeft === true;
-                // Verifica se questa chat è stata archiviata dall'utente
-                const isArchived =
-                  notification.archived === 1 || notification.archived === true;
+                const hasLeftChat = notification.chatLeft === 1 || notification.chatLeft === true;
+                const isArchived = notification.archived === 1 || notification.archived === true;
 
                 return (
                   <div
@@ -1697,7 +1360,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                       title={notification.notificationCategoryName}
                       id={`notification-category-indicator-${notification.notificationId}`}
                     ></div>
-                    {/* Div per la prima colonna di icone */}
+                    
                     <div className="notification-content1A">
                       <i
                         className={`${notification.pinned ? "bi-pin-fill text-black" : "bi-pin-angle text-gray-600"} pin-icon`}
@@ -1706,196 +1369,97 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                           setTimeout(() => {
                             e.currentTarget.classList.remove("pin-animation");
                           }, 600);
-                          handleTogglePin(
-                            notification.notificationId,
-                            notification.pinned,
-                            e,
-                          );
+                          handleTogglePin(notification.notificationId, notification.pinned, e);
                         }}
                         id={`notification-pin-${notification.notificationId}`}
-                        title={
-                          notification.pinned ? "Rimuovi pin" : "Aggiungi pin"
-                        }
+                        title={notification.pinned ? "Rimuovi pin" : "Aggiungi pin"}
                       ></i>
                       <i
-                        className={
-                          notification.favorite ? "bi bi-star-fill" : "bi bi-star"
-                        }
-                        onClick={(e) =>
-                          handleToggleFavorite(
-                            notification.notificationId,
-                            notification.favorite,
-                            e,
-                          )
-                        }
+                        className={notification.favorite ? "bi bi-star-fill" : "bi bi-star"}
+                        onClick={(e) => handleToggleFavorite(notification.notificationId, notification.favorite, e)}
                         id={`notification-favorite-${notification.notificationId}`}
-                        title={
-                          notification.favorite
-                            ? "Rimuovi dai preferiti"
-                            : "Aggiungi ai preferiti"
-                        }
+                        title={notification.favorite ? "Rimuovi dai preferiti" : "Aggiungi ai preferiti"}
                       ></i>
                       <i
                         className="bi bi-at"
                         style={{
-                          color: notification.mentionToRead
-                            ? "red"
-                            : notification.isMentioned
-                              ? "black"
-                              : "gray",
-                          opacity:
-                            notification.isMentioned || notification.mentionToRead
-                              ? 1
-                              : 0.5,
+                          color: notification.mentionToRead ? "red" : notification.isMentioned ? "black" : "gray",
+                          opacity: notification.isMentioned || notification.mentionToRead ? 1 : 0.5,
                         }}
                         id={`notification-mention-${notification.notificationId}`}
-                        title={
-                          notification.isMentioned
-                            ? "Sei stato menzionato in questa notifica"
-                            : ""
-                        }
+                        title={notification.isMentioned ? "Sei stato menzionato in questa notifica" : ""}
                       ></i>
                     </div>
-                    {/* Div per la seconda colonna di icone */}
+                    
                     <div className="notification-content1B">
-                      {/* Aggiungi bottone di archiviazione */}
                       <i
-                        className={
-                          isArchived
-                            ? "bi bi-archive-fill text-purple-600"
-                            : "bi bi-archive text-gray-600"
-                        }
+                        className={isArchived ? "bi bi-archive-fill text-purple-600" : "bi bi-archive text-gray-600"}
                         onClick={(e) =>
                           isArchived
-                            ? handleUnarchiveNotification(
-                                notification.notificationId,
-                                e,
-                              )
-                            : handleArchiveNotification(
-                                notification.notificationId,
-                                e,
-                              )
+                            ? handleUnarchiveNotification(notification.notificationId, e)
+                            : handleArchiveNotification(notification.notificationId, e)
                         }
                         id={`notification-archive-${notification.notificationId}`}
                         title={isArchived ? "Rimuovi dall'archivio" : "Archivia"}
                         style={{ cursor: "pointer" }}
                       ></i>
                       <i
-                        className={
-                          notification.isMuted
-                            ? "bi bi-bell-slash-fill text-gray-600"
-                            : "bi bi-bell text-gray-600"
-                        }
-                        onClick={(e) =>
-                          handleToggleMute(
-                            notification.notificationId,
-                            !notification.isMuted,
-                            e,
-                          )
-                        }
+                        className={notification.isMuted ? "bi bi-bell-slash-fill text-gray-600" : "bi bi-bell text-gray-600"}
+                        onClick={(e) => handleToggleMute(notification.notificationId, !notification.isMuted, e)}
                         id={`notification-mute-${notification.notificationId}`}
-                        title={
-                          notification.isMuted
-                            ? "Riattiva notifiche"
-                            : "Silenzia notifiche"
-                        }
+                        title={notification.isMuted ? "Riattiva notifiche" : "Silenzia notifiche"}
                         style={{ cursor: "pointer" }}
                       ></i>
                     </div>
 
                     <div className="notification-content2">
-                      <div
-                        className={`notification-header ${notification.isReadByUser ? "" : "unread"}`}
-                      >
+                      <div className={`notification-header ${notification.isReadByUser ? "" : "unread"}`}>
                         <span
-                          className={
-                            "notification-title " +
-                            (notification.isReadByUser ? "" : "unread")
-                          }
+                          className={"notification-title " + (notification.isReadByUser ? "" : "unread")}
                           id={`notification-title-${notification.notificationId}`}
                         >
                           {notification.title}
                           {hasLeftChat && (
-                            <span className="text-yellow-600 text-xs ml-1">
-                              (abbandonata)
-                            </span>
+                            <span className="text-yellow-600 text-xs ml-1">(abbandonata)</span>
                           )}
                           {isArchived && (
-                            <span className="text-purple-600 text-xs ml-1">
-                              (archiviata)
-                            </span>
+                            <span className="text-purple-600 text-xs ml-1">(archiviata)</span>
                           )}
                         </span>
-                        <span
-                          className={`time`}
-                          id={`notification-time-${notification.notificationId}`}
-                        >
+                        <span className={`time`} id={`notification-time-${notification.notificationId}`}>
                           {lastMessage ? timeSince(lastMessage.tbCreated) : ""}
                         </span>
                       </div>
-                      <span
-                        className="sender"
-                        id={`notification-sender-${notification.notificationId}`}
-                      >
+                      <span className="sender" id={`notification-sender-${notification.notificationId}`}>
                         {lastMessage ? lastMessage.senderName : ""}
                       </span>
-                      <div
-                        className="last-message-preview"
-                        id={`notification-preview-${notification.notificationId}`}
-                      >
+                      <div className="last-message-preview" id={`notification-preview-${notification.notificationId}`}>
                         {lastMessage ? lastMessage.message : ""}
                       </div>
                     </div>
+                    
                     <div
                       className="read-indicator-wrapper"
                       style={{
-                        backgroundColor: notification.isReadByUser
-                          ? "#e7e7e7"
-                          : "rgb(224, 42, 42)",
+                        backgroundColor: notification.isReadByUser ? "#e7e7e7" : "rgb(224, 42, 42)",
                       }}
-                      onClick={(e) =>
-                        handleToggleReadUnread(
-                          notification.notificationId,
-                          notification.isReadByUser,
-                          e,
-                        )
-                      }
+                      onClick={(e) => handleToggleReadUnread(notification.notificationId, notification.isReadByUser, e)}
                       id={`notification-read-indicator-${notification.notificationId}`}
-                      title={
-                        notification.isReadByUser
-                          ? "Segna come non letto"
-                          : "Segna come letto"
-                      }
+                      title={notification.isReadByUser ? "Segna come non letto" : "Segna come letto"}
                     ></div>
                   </div>
                 );
-              })
+              });
             })()
           ) : (
-            <div
-              className="flex flex-col items-center justify-center p-6 text-center text-gray-500"
-              id="notification-empty-state"
-            >
+            <div className="flex flex-col items-center justify-center p-6 text-center text-gray-500" id="notification-empty-state">
               <div className="mb-3 w-16 h-16 flex items-center justify-center rounded-full bg-gray-100">
                 <Filter className="w-8 h-8 text-gray-400" />
               </div>
-              <p className="mb-2">
-                Nessuna notifica corrisponde ai filtri selezionati
-              </p>
+              <p className="mb-2">Nessuna notifica corrisponde ai filtri selezionati</p>
               <button
                 className="mt-2 text-sm text-blue-600 hover:underline"
-                onClick={() => {
-                  setShowUnreadOnly(false);
-                  setFilterFavorites(false);
-                  setFilterMentioned(false);
-                  setFilterMessagesSent(false);
-                  setSelectedCategory("all");
-                  setSearchTerm("");
-                  setCompletedFilter("all");
-                  setFilterLeftChats(false);
-                  setFilterArchivedChats(false); // Reset del filtro archiviati
-                  setIsDocumentSearchVisible(false); // Chiudi la ricerca per documenti
-                }}
+                onClick={resetFilters}
                 id="notification-reset-filters"
               >
                 Reimposta tutti i filtri
@@ -1904,15 +1468,14 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
           ))}
       </div>
 
-      {/* CSS per stilizzare le chat archiviate */}
       <style>
         {`
           .notification-item.archived .notification-title {
-            color: #9333ea; /* text-purple-600 */
+            color: #9333ea;
           }
           
           .notification-item.archived {
-            background-color: rgba(147, 51, 234, 0.05); /* Sfondo leggermente viola */
+            background-color: rgba(147, 51, 234, 0.05);
           }
           
           .notification-item.muted .notification-title::after {
@@ -1925,7 +1488,6 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
             background-color: rgba(0, 0, 0, 0.02);
           }
 
-          /* Stili per la sezione di ricerca documenti */
           .document-search-section {
             max-height: 80vh;
             overflow-y: auto;
@@ -1962,7 +1524,6 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
             display: none;
           }
 
-          /* Animazione di caricamento */
           .spin {
             animation: spin 1s linear infinite;
           }
@@ -1970,6 +1531,68 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
           @keyframes spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
+          }
+
+          /* Animazioni per il pin */
+          .pin-exit-active {
+            animation: slideOutRight 0.4s ease-out forwards;
+          }
+
+          .pin-enter-active {
+            animation: slideInLeft 0.6s ease-out forwards;
+          }
+
+          @keyframes slideOutRight {
+            0% {
+              transform: translateX(0);
+              opacity: 1;
+            }
+            100% {
+              transform: translateX(100%);
+              opacity: 0;
+            }
+          }
+
+          @keyframes slideInLeft {
+            0% {
+              transform: translateX(-100%);
+              opacity: 0;
+            }
+            100% {
+              transform: translateX(0);
+              opacity: 1;
+            }
+          }
+
+          .pin-animation {
+            animation: pinRotate 0.6s ease-in-out;
+          }
+
+          @keyframes pinRotate {
+            0% { transform: rotate(0deg); }
+            50% { transform: rotate(20deg); }
+            100% { transform: rotate(0deg); }
+          }
+
+          /* Fix per evitare sfarfallii durante gli aggiornamenti */
+          .notifications-list {
+            will-change: contents;
+          }
+
+          .notification-item {
+            will-change: transform;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+          }
+
+          /* Transizioni fluide per i filtri */
+          .notification-item {
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+          }
+
+          .notification-item.title-updating {
+            transition: background-color 0.1s ease-in-out;
+            background-color: rgba(59, 130, 246, 0.05);
           }
         `}
       </style>

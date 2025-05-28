@@ -203,8 +203,7 @@ const MainPage = () => {
           toast({
             variant: "destructive",
             title: "Errore nel caricamento degli allegati",
-            description:
-              "Non è stato possibile caricare gli allegati della chat. Riprova più tardi.",
+            description: error.message,
           });
         }
 
