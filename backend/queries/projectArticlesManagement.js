@@ -2511,6 +2511,197 @@ const getERPItemsPaginated = async (companyId, page = 0, pageSize = 50, search =
     }
 };
 
+// Valida l'unicità del codice articolo
+const validateItemCode = async (companyId, itemCode, excludeItemId = null) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+        
+        // Parametri di input
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('ItemCode', sql.VarChar(64), itemCode);
+        
+        if (excludeItemId) {
+            request.input('ExcludeItemId', sql.BigInt, excludeItemId);
+        }
+        
+        // Parametri di output
+        request.output('IsValid', sql.Bit);
+        request.output('ErrorMessage', sql.NVarChar(255));
+        
+        // Esecuzione della stored procedure
+        await request.execute('MA_ProjectArticles_ValidateItemCode');
+        
+        const isValid = request.parameters.IsValid.value;
+        const errorMessage = request.parameters.ErrorMessage.value || '';
+        
+        return {
+            isValid: isValid === 1,
+            message: errorMessage,
+            isWarning: errorMessage.startsWith('AVVISO:')
+        };
+    } catch (err) {
+        console.error('Error validating item code:', err);
+        return {
+            isValid: false,
+            message: 'Errore durante la validazione del codice',
+            isWarning: false
+        };
+    }
+};
+
+// Verifica se un codice articolo è già utilizzato
+const checkItemCodeExists = async (companyId, itemCode, excludeItemId = null) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        // Query per verificare esistenza in MA_ProjectArticles_Items
+        let query = `
+            SELECT COUNT(*) as Count
+            FROM dbo.MA_ProjectArticles_Items
+            WHERE CompanyId = @CompanyId 
+            AND Item = @ItemCode 
+            AND Disabled = 0
+        `;
+        
+        if (excludeItemId) {
+            query += ` AND Id != @ExcludeItemId`;
+        }
+        
+        const request = pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('ItemCode', sql.VarChar(64), itemCode);
+            
+        if (excludeItemId) {
+            request.input('ExcludeItemId', sql.BigInt, excludeItemId);
+        }
+        
+        const result = await request.query(query);
+        const existsInProjects = result.recordset[0].Count > 0;
+        
+        // Verifica anche in MA_Items (gestionale)
+        const erpQuery = `
+            SELECT COUNT(*) as Count
+            FROM dbo.MA_Items
+            WHERE CompanyId = @CompanyId 
+            AND Item = @ItemCode 
+            AND Disabled = 0
+        `;
+        
+        const erpRequest = pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('ItemCode', sql.VarChar(64), itemCode);
+            
+        const erpResult = await erpRequest.query(erpQuery);
+        const existsInERP = erpResult.recordset[0].Count > 0;
+        
+        return {
+            existsInProjects,
+            existsInERP,
+            canUse: !existsInProjects // Può essere usato se non esiste nei progetti
+        };
+    } catch (err) {
+        console.error('Error checking item code existence:', err);
+        return {
+            existsInProjects: true, // Per sicurezza, considera come esistente
+            existsInERP: false,
+            canUse: false
+        };
+    }
+};
+
+const updateItemDetailsWithValidation = async (itemId, itemData) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        // Se viene modificato il codice, prima validalo
+        if (itemData.Code !== undefined) {
+            // Ottieni CompanyId dell'articolo
+            const itemQuery = await pool.request()
+                .input('Id', sql.BigInt, itemId)
+                .query('SELECT CompanyId FROM MA_ProjectArticles_Items WHERE Id = @Id');
+                
+            if (itemQuery.recordset.length === 0) {
+                return { success: 0, msg: "Articolo non trovato" };
+            }
+            
+            const companyId = itemQuery.recordset[0].CompanyId;
+            
+            // Valida il nuovo codice
+            const validation = await validateItemCode(companyId, itemData.Code, itemId);
+            
+            if (!validation.isValid) {
+                return { 
+                    success: 0, 
+                    msg: validation.message,
+                    field: 'Code'
+                };
+            }
+            
+            // Se c'è un avviso, includilo nella risposta
+            if (validation.isWarning) {
+                // Log dell'avviso ma continua
+                console.warn(`Code validation warning for item ${itemId}: ${validation.message}`);
+            }
+        }
+        
+        // Procedi con l'aggiornamento normale usando la funzione esistente
+        const request = pool.request();
+        
+        // Parametri obbligatori
+        request.input('Id', sql.BigInt, itemId);
+        
+        // Parametri opzionali in base ai dati forniti
+        if (itemData.Code !== undefined) request.input('Item', sql.VarChar(64), itemData.Code);
+        if (itemData.Description !== undefined) request.input('Description', sql.VarChar(128), itemData.Description);
+        if (itemData.Nature !== undefined) request.input('Nature', sql.Int, itemData.Nature);
+        if (itemData.Diameter !== undefined) request.input('Diameter', sql.Float, itemData.Diameter);
+        if (itemData.Bxh !== undefined) request.input('Bxh', sql.VarChar(11), itemData.Bxh);
+        if (itemData.Depth !== undefined) request.input('Depth', sql.Float, itemData.Depth);
+        if (itemData.Length !== undefined) request.input('Length', sql.Float, itemData.Length);
+        if (itemData.MediumRadius !== undefined) request.input('MediumRadius', sql.Float, itemData.MediumRadius);
+        if (itemData.CustomerItemReference !== undefined) request.input('CustomerItemReference', sql.VarChar(64), itemData.CustomerItemReference);
+        
+        // Costruisci la query di aggiornamento in base ai campi forniti
+        let updateFields = [];
+        
+        if (itemData.Code !== undefined) updateFields.push('Item = @Item');
+        if (itemData.Description !== undefined) updateFields.push('Description = @Description');
+        if (itemData.Nature !== undefined) updateFields.push('Nature = @Nature');
+        if (itemData.Diameter !== undefined) updateFields.push('Diameter = @Diameter');
+        if (itemData.Bxh !== undefined) updateFields.push('Bxh = @Bxh');
+        if (itemData.Depth !== undefined) updateFields.push('Depth = @Depth');
+        if (itemData.Length !== undefined) updateFields.push('Length = @Length');
+        if (itemData.MediumRadius !== undefined) updateFields.push('MediumRadius = @MediumRadius');
+        if (itemData.CustomerItemReference !== undefined) updateFields.push('CustomerItemReference = @CustomerItemReference');
+        
+        // Se non ci sono campi da aggiornare, esci
+        if (updateFields.length === 0) {
+            return { success: 1, msg: "Nessun campo da aggiornare" };
+        }
+        
+        // Aggiungi timestamp di modifica
+        updateFields.push('TBModified = GETDATE()');
+        
+        // Esegui la query di aggiornamento
+        const result = await request.query(`
+            UPDATE MA_ProjectArticles_Items
+            SET ${updateFields.join(', ')}
+            WHERE Id = @Id
+        `);
+        
+        return { 
+            success: 1, 
+            rowsAffected: result.rowsAffected[0], 
+            msg: `Dettagli articolo aggiornati con successo`,
+            warning: validation && validation.isWarning ? validation.message : null
+        };
+    } catch (err) {
+        console.error('Error updating item details with validation:', err);
+        return { success: 0, msg: err.message };
+    }
+};
+
 // Esporta tutte le funzioni
 module.exports = {
     addUpdateItem,
@@ -2539,9 +2730,12 @@ module.exports = {
     getBOMVersions,
     reorderBOMRoutings,
     getUnitsOfMeasure,
-    updateItemDetails,
+    updateItemDetails: updateItemDetailsWithValidation,
     importERPItemWithSelection,
     getERPBOMStructure,
     checkERPItemHasBOM,
-    getERPItemsPaginated
+    getERPItemsPaginated,
+    validateItemCode,
+    checkItemCodeExists,
+    updateItemDetailsWithValidation,
 };
