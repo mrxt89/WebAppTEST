@@ -62,12 +62,13 @@ const ArticleCodeInput = ({
         value.trim(),
         excludeItemId,
         (result) => {
+
           const newState = {
             status: result.isValid ? (result.isWarning ? 'warning' : 'valid') : 'invalid',
             message: result.message,
             isWarning: result.isWarning
           };
-          
+
           setValidationState(newState);
           
           if (onValidation) {
