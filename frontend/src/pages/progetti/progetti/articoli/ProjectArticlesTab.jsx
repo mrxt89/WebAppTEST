@@ -285,13 +285,12 @@ const ProjectArticlesTab = ({ project, canEdit }) => {
 
   return (
     <Card className="border flex flex-col project-articles-tab">
-
         <Tabs
           value={selectedTab}
           onValueChange={setSelectedTab}
           className="flex-1 flex flex-col"
         >
-          <div className="px-6 pt-2 border-b">
+          <div className="px-6 pt-2 border-b sticky top-0 bg-white z-10">
             <TabsList>
               <TabsTrigger value="list" onClick={() => setSelectedTab("list")}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
