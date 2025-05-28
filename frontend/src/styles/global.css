@@ -184,8 +184,9 @@ body {
 
 .page-content {
   position: relative;
-  top: 50px;
+  top: 45px;
   z-index: 0;
+  height: calc(100vh - 110px);
 }
 
 /* Navbar */

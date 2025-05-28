@@ -67,7 +67,7 @@ const BOMReferencePanel = ({ activeItem = null, setDragSettings = null }) => {
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" id="bom-reference-panel">
       {/* Opzioni comuni a tutte le tab, rinnovate con tooltip e indicazioni per il drag & drop */}
       <div className="border-b p-2 space-y-2 bg-gray-50">
         <div className="flex flex-col space-y-1">
@@ -158,7 +158,7 @@ const BOMReferencePanel = ({ activeItem = null, setDragSettings = null }) => {
               className="flex-1 flex items-center justify-center"
             >
               <Database className="h-4 w-4 mr-2" />
-              ERP
+              Mago
             </TabsTrigger>
             <TabsTrigger
               value="projects"
@@ -172,7 +172,7 @@ const BOMReferencePanel = ({ activeItem = null, setDragSettings = null }) => {
               className="flex-1 flex items-center justify-center"
             >
               <ClipboardList className="h-4 w-4 mr-2" />
-              Riferimenti
+              Rif.
             </TabsTrigger>
           </TabsList>
         </div>

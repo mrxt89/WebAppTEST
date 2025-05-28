@@ -12,7 +12,7 @@ const BOMDetailPanel = () => {
   const { activeTab, setActiveTab, selectedNode } = useBOMViewer();
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex flex-col overflow-auto" id="bom-detail-panel" style={{ height: "calc(100vh - 110px)" }}> 
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}

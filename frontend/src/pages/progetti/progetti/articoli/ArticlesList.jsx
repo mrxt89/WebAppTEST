@@ -39,6 +39,8 @@ import ArticleActionsDropdown from "./ArticleActionsDropdown";
  * @param {boolean} canEdit - Flag che indica se l'utente ha i permessi di modifica
  * @param {Object} project - Oggetto contenente i dati del progetto corrente
  * @param {Function} onRefresh - Callback per aggiornare la lista degli articoli
+ * @param {string} selectedRowId - ID della riga selezionata
+ * @param {Function} onRowClick - Callback per la selezione di una riga
  */
 const ArticlesList = ({
   items = [],
@@ -49,6 +51,8 @@ const ArticlesList = ({
   canEdit,
   project,
   onRefresh,
+  selectedRowId,
+  onRowClick,
 }) => {
   // Funzione per ottenere icona e colori in base alla natura dell'articolo
   const getNatureDetails = (nature) => {
@@ -157,7 +161,13 @@ const ArticlesList = ({
               if (item.MediumRadius) dimensions.push(`R${item.MediumRadius}`);
 
               return (
-                <TableRow key={item.Id} className="hover:bg-slate-50">
+                <TableRow 
+                  key={item.Id} 
+                  className={`hover:bg-slate-50 cursor-pointer ${
+                    selectedRowId === item.Id ? 'bg-yellow-50 hover:bg-yellow-100' : ''
+                  }`}
+                  onClick={() => onRowClick(item)}
+                >
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       {item.Item}
@@ -176,8 +186,7 @@ const ArticlesList = ({
                     </div>
                   </TableCell>
                   <TableCell
-                    className="max-w-[300px] truncate cursor-pointer hover:underline"
-                    onClick={() => onSelect(item)}
+                    className="max-w-[300px] truncate hover:underline"
                   >
                     {item.Description}
                     {item.CustomerItemReference && (

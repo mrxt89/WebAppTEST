@@ -469,7 +469,7 @@ const ComponentDetail = ({ component, editMode }) => {
 
       <div className="border rounded-md p-3 bg-blue-50">
         <h4 className="text-sm font-medium mb-2 text-blue-700">
-          Riferimento Cliente
+          Riferimento Cliente ff
         </h4>
         <div className="space-y-2">
           <div>
