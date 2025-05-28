@@ -350,7 +350,7 @@ const ArticleSelectionModal = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogContent className="max-w-4xl h-[80vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>
               Seleziona un Articolo Esistente o Crea Nuovo
@@ -405,7 +405,7 @@ const ArticleSelectionModal = ({
           <Tabs
             value={selectedTab}
             onValueChange={handleTabChange}
-            className="flex-1 flex flex-col h-2"
+            className="flex-1 flex flex-col min-h-0 " id="article-selection-modal"
           >
             <TabsList className="mb-4">
               <TabsTrigger value="temporary">
@@ -425,9 +425,9 @@ const ArticleSelectionModal = ({
             {/* Tab Articoli Temporanei */}
             <TabsContent
               value="temporary"
-              className="flex-1 flex flex-col m-0 border-none p-0 overflow-auto"
+              className="flex-1 flex flex-col m-0 border-none p-0 min-h-0"
             >
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-auto min-h-0" id="article-selection-modal-temporary-content">
                 {loading ? (
                   <div className="flex items-center justify-center h-20">
                     <Loader2 className="h-6 w-6 text-primary animate-spin" />
@@ -502,9 +502,9 @@ const ArticleSelectionModal = ({
             {/* Tab Articoli da Gestionale */}
             <TabsContent
               value="defined"
-              className="flex-1 flex flex-col m-0 border-none p-0 overflow-auto"
+              className="flex-1 flex flex-col m-0 border-none p-0 min-h-0" id="article-selection-modal-defined-content"
             >
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-auto min-h-0" id="article-selection-modal-defined-content">
                 {loading ? (
                   <div className="flex items-center justify-center h-20">
                     <Loader2 className="h-6 w-6 text-primary animate-spin" />
@@ -581,7 +581,7 @@ const ArticleSelectionModal = ({
             {/* Tab Nuovo Articolo */}
             <TabsContent
               value="new"
-              className="flex-1 flex flex-col m-0 border-none p-0"
+              className="flex-1 flex flex-col m-0 border-none p-0 min-h-0"
             >
               <Card>
                 <CardContent className="p-6">

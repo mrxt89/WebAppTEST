@@ -962,11 +962,11 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
   }
 
   return (
-    <div className="h-screen flex flex-col p-4 gap-4">
+    <div className=" flex flex-col p-2 gap-2" style={{ height: "calc(100vh - 110px)" }} id="project-management-split-view">
       {/* Header minimalista con dashboard, titolo e modifica */}
       <div className="flex items-center justify-between py-2 px-4 bg-[var(--primary)] text-white border rounded-md shadow-sm">
         <h1 className="text-lg font-medium truncate max-w-md mx-2">
-          {project.Name}
+          {project.Name} - {project.Description}
         </h1>
 
         {
@@ -983,11 +983,12 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden" style={{ height: "calc(100vh - 110px)" }} id="project-management-split-view-content1">
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
-          className="h-full flex flex-col"
+          className="flex-1 flex flex-col min-h-0 h-full"
+          id="project-management-split-view"
         >
           <div className="flex-none">
             <TabsList>
@@ -1041,127 +1042,138 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
             </TabsList>
           </div>
 
-          {/* Tab Panoramica */}
-          <TabsContent value="overview" className="flex-1 mt-2 overflow-auto">
-            <ProjectOverview project={project} />
-          </TabsContent>
+          <div className="flex-1 min-h-0 overflow-hidden" id="project-management-split-view-content2">
+            {/* Tab Panoramica */}
+            <TabsContent value="overview" className="h-full overflow-hidden">
+              <div className="h-full overflow-y-auto p-4">
+                <ProjectOverview project={project} />
+              </div>
+            </TabsContent>
 
-          {/* Tab Attività */}
-          <TabsContent value="tasks" className="flex-1 flex flex-col mt-2">
-            <div className="flex justify-between items-center mb-1">
-              {
-                <Dialog
-                  open={isAddTaskDialogOpen}
-                  onOpenChange={setIsAddTaskDialogOpen}
-                >
-                  <DialogTrigger asChild>
-                    <Button>Aggiungi Attività</Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Nuova Attività</DialogTitle>
-                    </DialogHeader>
-                    <NewTaskForm
-                      onSubmit={handleAddTask}
-                      onCancel={() => setIsAddTaskDialogOpen(false)}
-                      projectTasks={project.tasks || []}
+            {/* Tab Attività */}
+            <TabsContent value="tasks" className="h-full flex flex-col">
+              <div className="flex justify-between items-center mb-1">
+                {
+                  <Dialog
+                    open={isAddTaskDialogOpen}
+                    onOpenChange={setIsAddTaskDialogOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <Button>Aggiungi Attività</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Nuova Attività</DialogTitle>
+                      </DialogHeader>
+                      <NewTaskForm
+                        onSubmit={handleAddTask}
+                        onCancel={() => setIsAddTaskDialogOpen(false)}
+                        projectTasks={project.tasks || []}
+                      />
+                    </DialogContent>
+                    {/* Componente per cambiare vista */}
+                    <TasksViewToggler
+                      viewMode={tasksViewMode}
+                      setViewMode={setTasksViewMode}
+                      tasks={project.tasks || []}
                     />
-                  </DialogContent>
-                  {/* Componente per cambiare vista */}
-                  <TasksViewToggler
-                    viewMode={tasksViewMode}
-                    setViewMode={setTasksViewMode}
-                    tasks={project.tasks || []}
+                  </Dialog>
+                }
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-hidden" style={{ height: "calc(100vh - 110px)" }} id="project-management-split-view-content3">
+                {/* Visualizzazione condizionale in base al viewMode */}
+                {tasksViewMode === "kanban" && (
+                  <TasksKanban
+                    project={project}
+                    projectId={projectId}
+                    tasks={project.tasks}
+                    onTaskUpdate={handleTaskUpdate}
+                    onTaskClick={handleTaskClick}
+                    refreshProject={(callback) => loadProject(true, callback)}
                   />
-                </Dialog>
-              }
-            </div>
+                )}
+                {tasksViewMode === "table" && (
+                  <ProjectTasksTableImproved
+                    project={project}
+                    tasks={project.tasks}
+                    onTaskClick={handleTaskClick}
+                    onTaskUpdate={handleTaskUpdate}
+                    checkAdminPermission={checkAdminPermission}
+                    isOwnTask={isOwnTask}
+                    currentUserId={currentUserId}
+                  />
+                )}
+                {tasksViewMode === "gantt" && (
+                  <ProjectGanttView
+                    project={project}
+                    tasks={project.tasks || []}
+                    onTaskClick={handleTaskClick}
+                    onTaskUpdate={handleTaskUpdate}
+                    checkAdminPermission={checkAdminPermission}
+                    isOwnTask={isOwnTask}
+                    updateTaskSequence={updateTaskSequence}
+                    getProjectById={getProjectById}
+                    refreshProject={(callback) => loadProject(true, callback)}
+                    users={users}
+                  />
+                )}
+              </div>
+            </TabsContent>
 
-            <div className="flex-1 overflow-y-auto min-h-0">
-              {/* Visualizzazione condizionale in base al viewMode */}
-              {tasksViewMode === "kanban" && (
-                <TasksKanban
+            {/* Tab Team */}
+            <TabsContent value="team" className="h-full overflow-auto">
+              <div className="h-full">
+                <Card className="h-full flex flex-col">
+                  <CardHeader>
+                    <ProjectTeamSection
+                      project={project}
+                      users={users}
+                      isAddMemberDialogOpen={isAddMemberDialogOpen}
+                      setIsAddMemberDialogOpen={setIsAddMemberDialogOpen}
+                      newMember={newMember}
+                      setNewMember={setNewMember}
+                      handleAddMember={handleAddMember}
+                      handleRemoveMember={handleRemoveMember}
+                      updateMemberRole={updateMemberRole}
+                      currentUserId={currentUserId}
+                      getFilteredUsers={getFilteredUsers}
+                    />
+                  </CardHeader>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Tab Allegati */}
+            <TabsContent value="attachments" className="h-full overflow-auto">
+              <div className="h-full">
+                <Card className="h-full flex flex-col">
+                  <CardContent className="flex-1 overflow-hidden">
+                    <ProjectAttachmentsTab
+                      project={project}
+                      canEdit={true}
+                      onAttachmentChange={(callback) => loadProject(true, callback)}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Tab Articoli */}
+            <TabsContent value="articles" className="h-full overflow-auto" id="articles-tab">
+                <ProjectArticlesTab project={project} canEdit={true} />
+            </TabsContent>
+
+            {/* Tab Statistiche */}
+            <TabsContent value="analytics" className="h-full overflow-auto" id="analytics-tab">
+              <div className="h-full">
+                <ProjectAnalyticsTab
                   project={project}
-                  projectId={projectId}
-                  tasks={project.tasks}
-                  onTaskUpdate={handleTaskUpdate}
-                  onTaskClick={handleTaskClick}
                   refreshProject={(callback) => loadProject(true, callback)}
                 />
-              )}
-              {tasksViewMode === "table" && (
-                <ProjectTasksTableImproved
-                  project={project}
-                  tasks={project.tasks}
-                  onTaskClick={handleTaskClick}
-                  onTaskUpdate={handleTaskUpdate}
-                  checkAdminPermission={checkAdminPermission}
-                  isOwnTask={isOwnTask}
-                  currentUserId={currentUserId}
-                />
-              )}
-              {tasksViewMode === "gantt" && (
-                <ProjectGanttView
-                  project={project}
-                  tasks={project.tasks || []}
-                  onTaskClick={handleTaskClick}
-                  onTaskUpdate={handleTaskUpdate}
-                  checkAdminPermission={checkAdminPermission}
-                  isOwnTask={isOwnTask}
-                  updateTaskSequence={updateTaskSequence}
-                  getProjectById={getProjectById}
-                  refreshProject={(callback) => loadProject(true, callback)}
-                  users={users}
-                />
-              )}
-            </div>
-          </TabsContent>
-
-          {/* Tab Team */}
-          <TabsContent value="team" className="flex-1 mt-2">
-            <Card className="h-full flex flex-col">
-              <CardHeader>
-                <ProjectTeamSection
-                  project={project}
-                  users={users}
-                  isAddMemberDialogOpen={isAddMemberDialogOpen}
-                  setIsAddMemberDialogOpen={setIsAddMemberDialogOpen}
-                  newMember={newMember}
-                  setNewMember={setNewMember}
-                  handleAddMember={handleAddMember}
-                  handleRemoveMember={handleRemoveMember}
-                  updateMemberRole={updateMemberRole}
-                  currentUserId={currentUserId}
-                  getFilteredUsers={getFilteredUsers}
-                />
-              </CardHeader>
-              {/* La lista membri è ora gestita da ProjectTeamSection */}
-            </Card>
-          </TabsContent>
-
-          {/* Tab Allegati */}
-          <TabsContent value="attachments" className="flex-1 mt-2">
-            <Card className="h-full flex flex-col">
-              <CardContent className="flex-1 mt-4 overflow-hidden">
-                <ProjectAttachmentsTab
-                  project={project}
-                  canEdit={true}
-                  onAttachmentChange={(callback) => loadProject(true, callback)}
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
-          {/* Tab Articoli */}
-          <TabsContent value="articles" className="flex-1 mt-2">
-            <ProjectArticlesTab project={project} canEdit={true} />
-          </TabsContent>
-          {/* Tab Statistiche */}
-          <TabsContent value="analytics" className="flex-1 mt-2">
-            <ProjectAnalyticsTab
-              project={project}
-              refreshProject={(callback) => loadProject(true, callback)}
-            />
-          </TabsContent>
+              </div>
+            </TabsContent>
+          </div>
         </Tabs>
       </div>
 
@@ -1201,6 +1213,9 @@ const ProjectManagementSplitView = () => {
   const navigate = useNavigate();
   const { projectId } = useParams();
   const { fetchUsers } = useNotifications();
+  const [leftPanelWidth, setLeftPanelWidth] = useState(33.33); // Percentuale iniziale
+  const [isResizing, setIsResizing] = useState(false);
+  const containerRef = useRef(null);
   const {
     projects,
     loading: projectsLoading,
@@ -1264,6 +1279,39 @@ const ProjectManagementSplitView = () => {
     endDate: "",
     erpId: "",
   });
+
+  // Funzione per gestire il resize
+  const handleMouseDown = (e) => {
+    setIsResizing(true);
+    e.preventDefault();
+  };
+
+  const handleMouseMove = useCallback((e) => {
+    if (!isResizing || !containerRef.current) return;
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+    
+    // Limita il resize tra 20% e 80%
+    if (newWidth >= 20 && newWidth <= 80) {
+      setLeftPanelWidth(newWidth);
+    }
+  }, [isResizing]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
   // Caricamento iniziale
   useEffect(() => {
@@ -1554,9 +1602,12 @@ const ProjectManagementSplitView = () => {
 
   // Rendering
   return (
-    <div className="flex" style={{ height: "calc(100vh - 150px)" }}>
-      {/* Sezione sinistra (1/3) - Dashboard */}
-      <div className="w-1/3 border-r h-full flex flex-col p-4">
+    <div className="flex" style={{ height: "calc(100vh - 110px)" }} ref={containerRef}>
+      {/* Sezione sinistra (resizable) */}
+      <div 
+        className="h-full flex flex-col p-4" 
+        style={{ width: `${leftPanelWidth}%`, height: "calc(100vh - 110px)" }}
+      >
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Progetti</h2>
           <Dialog
@@ -1757,8 +1808,8 @@ const ProjectManagementSplitView = () => {
           </CollapsibleContent>
         </Collapsible>
 
-{/* Tabella stile Excel */}
-<Card className="flex-1 overflow-hidden flex flex-col">
+        {/* Tabella stile Excel */}
+        <Card className="flex-1 overflow-hidden flex flex-col">
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <span className="text-gray-500">Caricamento...</span>
@@ -1952,8 +2003,19 @@ const ProjectManagementSplitView = () => {
         </Card>
       </div>
 
-      {/* Sezione destra (2/3) - Dettaglio progetto */}
-      <div className="w-2/3 h-full overflow-hidden">
+      {/* Resize handle */}
+      <div
+        className={`w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors ${
+          isResizing ? 'bg-blue-600' : 'bg-gray-200'
+        }`}
+        onMouseDown={handleMouseDown}
+      />
+
+      {/* Sezione destra (resizable) */}
+      <div 
+        className="h-full flex flex-col p-4 overflow-hidden" 
+        style={{ width: `${100 - leftPanelWidth}%`, height: "calc(100vh - 110px)" }}
+      >
         {selectedProjectId ? (
           <ProjectDetailContainer 
             projectId={selectedProjectId} 

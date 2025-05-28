@@ -99,6 +99,8 @@ const ProjectArticlesTab = ({ project, canEdit }) => {
     { id: "false", description: "Temporanei" },
   ];
 
+  const [selectedRowId, setSelectedRowId] = useState(null);
+
   // Caricamento articoli
   const loadArticles = useCallback(async () => {
     if (!project?.ProjectID) return;
@@ -139,7 +141,14 @@ const ProjectArticlesTab = ({ project, canEdit }) => {
   // Gestione selezione item
   const handleItemSelect = (item) => {
     setSelectedItem(item);
+    setSelectedRowId(item.Id);
     setSelectedTab("details");
+  };
+
+  // Gestione click sulla riga
+  const handleRowClick = (item) => {
+    setSelectedItem(item);
+    setSelectedRowId(item.Id);
   };
 
   // Gestione apertura modale per selezionare articoli esistenti o crearne uno nuovo
@@ -275,20 +284,20 @@ const ProjectArticlesTab = ({ project, canEdit }) => {
   };
 
   return (
-    <Card className="border h-full flex flex-col project-articles-tab">
-      <CardContent className="p-0 flex-1 flex flex-col">
+    <Card className="border flex flex-col project-articles-tab">
+
         <Tabs
           value={selectedTab}
           onValueChange={setSelectedTab}
           className="flex-1 flex flex-col"
         >
-          <div className="px-6 pt-4 border-b">
+          <div className="px-6 pt-2 border-b">
             <TabsList>
               <TabsTrigger value="list" onClick={() => setSelectedTab("list")}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Lista Articoli
               </TabsTrigger>
-              {selectedItem && (
+             
                 <>
                   <TabsTrigger
                     value="details"
@@ -305,7 +314,7 @@ const ProjectArticlesTab = ({ project, canEdit }) => {
                     Distinta Base
                   </TabsTrigger>
                 </>
-              )}
+              
               {formMode && (
                 <TabsTrigger
                   value="form"
@@ -326,29 +335,6 @@ const ProjectArticlesTab = ({ project, canEdit }) => {
             {/* Header con filtri e bottone Nuovo Articolo */}
             <div className="px-6 py-4 border-b bg-slate-50 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-3 flex-1">
-                <div className="flex-grow-0 w-auto">
-                  <Select
-                    value={filters.statusId?.toString()}
-                    onValueChange={(value) =>
-                      handleFilterChange("statusId", parseInt(value))
-                    }
-                  >
-                    <SelectTrigger className="w-[150px]">
-                      <SelectValue placeholder="Stato" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusOptions.map((option) => (
-                        <SelectItem
-                          key={option.id}
-                          value={option.id.toString()}
-                        >
-                          {option.description}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 <div className="flex-grow-0 w-auto">
                   <Select
                     value={filters.nature?.toString()}
@@ -453,7 +439,9 @@ const ProjectArticlesTab = ({ project, canEdit }) => {
                 onCopy={canEdit ? handleCopyItem : undefined}
                 canEdit={canEdit}
                 project={project}
-                onRefresh={loadArticles} // Pass the refresh callback
+                onRefresh={loadArticles}
+                selectedRowId={selectedRowId}
+                onRowClick={handleRowClick}
               />
             </div>
 
@@ -523,7 +511,7 @@ const ProjectArticlesTab = ({ project, canEdit }) => {
             )}
           </TabsContent>
         </Tabs>
-      </CardContent>
+
     </Card>
   );
 };

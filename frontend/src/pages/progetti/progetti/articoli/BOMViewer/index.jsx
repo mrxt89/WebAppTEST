@@ -59,15 +59,15 @@ const BOMViewer = ({ item, project, canEdit = false, onRefresh }) => {
           activeItem,
           setDragSettings,
         }) => (
-          <div className="flex flex-col h-full border rounded-md overflow-hidden">
+          <div className="flex flex-col h-full border rounded-md overflow-hidden" id="bom-viewer">
             {/* Header con codice BOM, descrizione e selettore versione */}
             <BOMHeader />
 
             {/* Area principale con 3 pannelli ridimensionabili */}
             <ResizablePanelGroup direction="horizontal" className="flex-1">
               {/* Pannello sinistro - Vista ad albero (struttura BOM) */}
-              <ResizablePanel defaultSize={30} minSize={30} maxSize={40}>
-                <div className="h-full overflow-auto border-r">
+              <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
+                <div className="h-full overflow-auto border-r" id="bom-tree-view">
                   <BOMTreeView
                     draggingOver={draggingOver}
                     dropTarget={dropTarget}
@@ -77,14 +77,14 @@ const BOMViewer = ({ item, project, canEdit = false, onRefresh }) => {
               </ResizablePanel>
 
               {/* Pannello centrale - Vista dettagli con schede */}
-              <ResizablePanel defaultSize={50}>
-                <div className="h-full overflow-auto border-r">
+              <ResizablePanel defaultSize={50} minSize={30}>
+                <div className="h-full overflow-auto border-r" id="bom-detail-panel">
                   <BOMDetailPanel />
                 </div>
               </ResizablePanel>
 
               {/* Pannello destro - BOM di riferimento */}
-              <ResizablePanel defaultSize={20} minSize={20} maxSize={20}>
+              <ResizablePanel defaultSize={20} minSize={20} maxSize={30}>
                 <div className="h-full overflow-auto">
                   <BOMReferencePanel
                     activeItem={activeItem}

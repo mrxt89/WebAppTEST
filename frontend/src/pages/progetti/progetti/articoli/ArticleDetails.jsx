@@ -348,9 +348,9 @@ const ArticleDetails = ({
   const isFromERP = articleData.stato_erp === 1;
 
   return (
-    <div className="h-full flex flex-col overflow-auto">
+    <div className="h-full flex flex-col " id="article-details-container">
       {/* Header con bottoni azione */}
-      <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center sticky top-0 z-10">
+      <div className="bg-slate-50 px-6 py-4 border-b flex justify-between items-center sticky top-0 z-10" id="article-details-header">
         <div className="flex items-center gap-3">
           {onBack && (
             <Button
@@ -471,15 +471,15 @@ const ArticleDetails = ({
           </TabsList>
         </div>
 
-        <div className="flex-1 overflow-auto">
+       
           {/* Tab Informazioni Generali */}
           <TabsContent
             value="general"
-            className="pt-2 px-6 h-full overflow-auto"
+            className="pt-1 px-6 h-full " id="article-details-general-content"
           >
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
+           
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 " id="article-details-general-content-grid">
+                <div className="space-y-2" id="article-details-general-content-grid-item">
                   <Label htmlFor="item">Codice Articolo</Label>
                   {isEditing ? (
                     <Input
@@ -656,7 +656,7 @@ const ArticleDetails = ({
                   )}
                 </div>
               </div>
-            </div>
+            
           </TabsContent>
 
           {/* Tab Dimensioni */}
@@ -893,7 +893,7 @@ const ArticleDetails = ({
               }}
             />
           </TabsContent>
-        </div>
+        
       </Tabs>
     </div>
   );

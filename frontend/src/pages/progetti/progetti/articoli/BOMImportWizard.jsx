@@ -308,7 +308,7 @@ const BOMImportWizard = ({
           </div>
 
           {/* Toggle codice originale/temporaneo */}
-          {isSelected && !isAcquisto && (
+          {isSelected  && (
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
