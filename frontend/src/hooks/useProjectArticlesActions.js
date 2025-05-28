@@ -1376,122 +1376,88 @@ const checkERPItemHasBOM = useCallback(
     [makeRequest],
   );
 
-  // Valida un codice articolo
-const validateItemCode = useCallback(
-  async (itemCode, excludeItemId = null) => {
-    try {
-      if (!itemCode || itemCode.trim() === '') {
+  const validateItemCode = useCallback(
+    async (itemCode, excludeItemId = null) => {
+      try {
+        if (!itemCode || itemCode.trim() === '') {
+          return {
+            isValid: false,
+            message: 'Codice articolo richiesto',
+            isWarning: false
+          };
+        }
+  
+        const data = await makeRequest(
+          `${config.API_BASE_URL}/projectArticles/items/validate-code`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              itemCode: itemCode.trim(),
+              excludeItemId
+            }),
+          }
+        );
+  
+        return {
+          isValid: data.isValid || false,
+          message: data.message || '',
+          isWarning: data.isWarning || false
+        };
+      } catch (err) {
+        console.error("Error validating item code:", err);
         return {
           isValid: false,
-          message: 'Codice articolo richiesto',
+          message: err.message || 'Errore durante la validazione del codice',
           isWarning: false
         };
       }
-
-      const data = await makeRequest(
-        `${config.API_BASE_URL}/projectArticles/items/validate-code`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            itemCode: itemCode.trim(),
-            excludeItemId
-          }),
+    },
+    [makeRequest]
+  );
+  
+  // Verifica disponibilità di un codice articolo
+  const checkItemCodeAvailability = useCallback(
+    async (itemCode, excludeItemId = null) => {
+      try {
+        if (!itemCode || itemCode.trim() === '') {
+          return {
+            canUse: false,
+            exists: { inProjects: false, inERP: false },
+            message: 'Codice articolo richiesto'
+          };
         }
-      );
-
-      return {
-        isValid: data.isValid || false,
-        message: data.message || '',
-        isWarning: data.isWarning || false
-      };
-    } catch (err) {
-      console.error("Error validating item code:", err);
-      return {
-        isValid: false,
-        message: err.message || 'Errore durante la validazione del codice',
-        isWarning: false
-      };
-    }
-  },
-  [makeRequest]
-);
-
-// Verifica disponibilità di un codice articolo
-const checkItemCodeAvailability = useCallback(
-  async (itemCode, excludeItemId = null) => {
-    try {
-      if (!itemCode || itemCode.trim() === '') {
+  
+        let url = `${config.API_BASE_URL}/projectArticles/items/check-code/${encodeURIComponent(itemCode.trim())}`;
+        
+        if (excludeItemId) {
+          url += `?excludeItemId=${excludeItemId}`;
+        }
+  
+        const data = await makeRequest(url);
+  
+        return {
+          canUse: data.canUse || false,
+          exists: data.exists || { inProjects: false, inERP: false },
+          message: data.message || ''
+        };
+      } catch (err) {
+        console.error("Error checking item code availability:", err);
         return {
           canUse: false,
-          exists: { inProjects: false, inERP: false },
-          message: 'Codice articolo richiesto'
+          exists: { inProjects: true, inERP: false }, // Per sicurezza
+          message: err.message || 'Errore durante la verifica del codice'
         };
       }
-
-      let url = `${config.API_BASE_URL}/projectArticles/items/check-code/${encodeURIComponent(itemCode.trim())}`;
-      
-      if (excludeItemId) {
-        url += `?excludeItemId=${excludeItemId}`;
-      }
-
-      const data = await makeRequest(url);
-
-      return {
-        canUse: data.canUse || false,
-        exists: data.exists || { inProjects: false, inERP: false },
-        message: data.message || ''
-      };
-    } catch (err) {
-      console.error("Error checking item code availability:", err);
-      return {
-        canUse: false,
-        exists: { inProjects: true, inERP: false }, // Per sicurezza
-        message: err.message || 'Errore durante la verifica del codice'
-      };
-    }
-  },
-  [makeRequest]
-);
-
-// Valida un codice articolo in tempo reale (con debounce)
-const [validationCache, setValidationCache] = useState({});
-const [validationTimeouts, setValidationTimeouts] = useState({});
-
-const validateItemCodeRealTime = useCallback(
-  (itemCode, excludeItemId = null, callback, delay = 500) => {
-    const key = `${itemCode}_${excludeItemId || 'null'}`;
-    
-    // Cancella timeout precedente
-    if (validationTimeouts[key]) {
-      clearTimeout(validationTimeouts[key]);
-    }
-    
-    // Se il risultato è nella cache, usalo immediatamente
-    if (validationCache[key]) {
-      callback(validationCache[key]);
-      return;
-    }
-    
-    // Imposta nuovo timeout
-    const timeoutId = setTimeout(async () => {
+    },
+    [makeRequest]
+  );
+  
+  // Valida un codice articolo in tempo reale (versione semplificata)
+  const validateItemCodeRealTime = useCallback(
+    async (itemCode, excludeItemId = null, callback) => {
       try {
         const result = await validateItemCode(itemCode, excludeItemId);
-        
-        // Salva in cache
-        setValidationCache(prev => ({
-          ...prev,
-          [key]: result
-        }));
-        
-        // Chiama callback
         callback(result);
-        
-        // Pulisci timeout
-        setValidationTimeouts(prev => {
-          const newTimeouts = { ...prev };
-          delete newTimeouts[key];
-          return newTimeouts;
-        });
       } catch (error) {
         console.error('Error in real-time validation:', error);
         callback({
@@ -1500,69 +1466,57 @@ const validateItemCodeRealTime = useCallback(
           isWarning: false
         });
       }
-    }, delay);
-    
-    setValidationTimeouts(prev => ({
-      ...prev,
-      [key]: timeoutId
-    }));
-  },
-  [validateItemCode, validationCache, validationTimeouts]
-);
-
-// Pulisci cache di validazione quando necessario
-const clearValidationCache = useCallback(() => {
-  setValidationCache({});
-  Object.values(validationTimeouts).forEach(timeoutId => {
-    clearTimeout(timeoutId);
-  });
-  setValidationTimeouts({});
-}, [validationTimeouts]);
-
-// Aggiorna la funzione updateItemDetails esistente
-const updateItemDetailsValidated = useCallback(
-  async (itemId, itemData) => {
-    try {
-      setLoading(true);
-      
-      // Se viene modificato il codice, prima validalo
-      if (itemData.Code !== undefined) {
-        const validation = await validateItemCode(itemData.Code, itemId);
+    },
+    [validateItemCode]
+  );
+  
+  // Pulisci cache di validazione quando necessario
+  const clearValidationCache = useCallback(() => {
+    // Funzione vuota per compatibilità, non serve più cache
+  }, []);
+  
+  // Aggiorna la funzione updateItemDetails esistente
+  const updateItemDetailsValidated = useCallback(
+    async (itemId, itemData) => {
+      try {
+        setLoading(true);
         
-        if (!validation.isValid) {
-          return {
-            success: 0,
-            msg: validation.message,
-            field: 'Code'
-          };
+        // Se viene modificato il codice, prima validalo
+        if (itemData.Code !== undefined) {
+          const validation = await validateItemCode(itemData.Code, itemId);
+          
+          if (!validation.isValid) {
+            return {
+              success: 0,
+              msg: validation.message,
+              field: 'Code'
+            };
+          }
         }
+        
+        const data = await makeRequest(
+          `${config.API_BASE_URL}/projectArticles/items/${itemId}/details`,
+          {
+            method: "PUT",
+            body: JSON.stringify(itemData),
+          }
+        );
+        
+        // Pulisci cache se il codice è stato modificato con successo
+        // Non serve più pulire cache
+        
+        return data;
+      } catch (err) {
+        setError(err.message);
+        console.error("Error updating item details:", err);
+        throw err;
+      } finally {
+        setLoading(false);
       }
-      
-      const data = await makeRequest(
-        `${config.API_BASE_URL}/projectArticles/items/${itemId}/details`,
-        {
-          method: "PUT",
-          body: JSON.stringify(itemData),
-        }
-      );
-      
-      // Pulisci cache se il codice è stato modificato con successo
-      if (data.success && itemData.Code !== undefined) {
-        clearValidationCache();
-      }
-      
-      return data;
-    } catch (err) {
-      setError(err.message);
-      console.error("Error updating item details:", err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  },
-  [makeRequest, validateItemCode, clearValidationCache]
-);
-
+    },
+    [makeRequest, validateItemCode, clearValidationCache]
+  );
+  
   return {
     // Stati
     items,
