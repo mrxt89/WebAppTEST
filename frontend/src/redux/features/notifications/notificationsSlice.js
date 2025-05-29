@@ -4,10 +4,12 @@ import { enableMapSet } from "immer";
 import axios from "axios";
 import { config } from "../../../config";
 import { removeUserFromChat } from "./notificationsActions";
+
 // Abilita il supporto per Map e Set in Immer
 enableMapSet();
 
 let openChatModalRef = null;
+
 // Funzione helper per il parsing dei messaggi
 const parseMessages = (messages) => {
   if (!messages) return [];
@@ -49,7 +51,6 @@ export const callOpenChatModal = (notificationId) => {
   }
 };
 
-
 // Async thunks per le operazioni asincrone
 export const fetchNotifications = createAsyncThunk(
   "notifications/fetchNotifications",
@@ -62,18 +63,12 @@ export const fetchNotifications = createAsyncThunk(
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
-          "Cache-Control": "no-cache", // Evita la cache
+         "Cache-Control": "no-cache",
         },
       });
 
-      // Se la risposta è vuota o null, prova a utilizzare dei dati di test per debug
-      if (
-        !response.data ||
-        (Array.isArray(response.data) && response.data.length === 0)
-      ) {
-        console.warn(
-          "Nessuna notifica ricevuta dal server, verifica il backend.",
-        );
+     if (!response.data || (Array.isArray(response.data) && response.data.length === 0)) {
+       console.warn("Nessuna notifica ricevuta dal server, verifica il backend.");
       }
 
       return response.data;
@@ -84,11 +79,7 @@ export const fetchNotifications = createAsyncThunk(
         console.error("Data:", error.response.data);
       }
 
-      if (
-        error.response &&
-        (error.response.status === 401 || error.response.status === 403)
-      ) {
-        // Handle auth errors separately
+     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
         return rejectWithValue({
           type: "auth_error",
           message: "Session expired",
@@ -114,11 +105,10 @@ export const fetchNotificationById = createAsyncThunk(
         return rejectWithValue("No notification ID provided");
       }
 
-      // Aggiungi timestamp per evitare cache
+      // IMPORTANTE: Usa sempre openChat=1 per ottenere TUTTI i messaggi
       const timestamp = Date.now();
-
       const response = await axios.get(
-        `${config.API_BASE_URL}/notifications/${notificationId}?t=${timestamp}`,
+        `${config.API_BASE_URL}/notifications/${notificationId}?t=${timestamp}&openChat=1&allMessages=true`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -129,27 +119,28 @@ export const fetchNotificationById = createAsyncThunk(
       );
 
       if (response.data) {
-        // Emit an event to notify other parts of the app
         const event = new CustomEvent("notification-updated", {
           detail: {
             notificationId,
             timestamp: new Date().toISOString(),
+            isOpenChat: true
           },
         });
         document.dispatchEvent(event);
 
-        // Aggiungi un controllo per i messaggi
-        const hasMessages =
-          Array.isArray(response.data.messages) ||
-          (typeof response.data.messages === "string" &&
-            response.data.messages);
+        const hasMessages = Array.isArray(response.data.messages) || 
+          (typeof response.data.messages === "string" && response.data.messages);
 
         if (!hasMessages) {
-          console.warn(
-            `Notifica ${notificationId} ricevuta senza messaggi`,
-            response.data,
-          );
+          console.warn(`Notifica ${notificationId} ricevuta senza messaggi`, response.data);
         }
+
+        // Log per debug
+        const messageCount = Array.isArray(response.data.messages) 
+          ? response.data.messages.length 
+          : (typeof response.data.messages === "string" ? JSON.parse(response.data.messages || "[]").length : 0);
+        
+        console.log(`✅ fetchNotificationById: Caricati ${messageCount} messaggi per chat ${notificationId}`);
 
         return response.data;
       }
@@ -157,17 +148,8 @@ export const fetchNotificationById = createAsyncThunk(
       console.error(`Notifica ${notificationId} non trovata o risposta vuota`);
       return rejectWithValue("Notification not found");
     } catch (error) {
-      console.error(
-        `Errore in fetchNotificationById per ${notificationId}:`,
-        error,
-      );
-
-      if (error.response) {
-        console.error("Status:", error.response.status);
-        console.error("Data:", error.response.data);
-      }
-
-      return rejectWithValue(error.message || "Failed to fetch notification");
+      console.error("Error fetching notification:", error);
+      return rejectWithValue(error.message || "Error fetching notification");
     }
   },
 );
@@ -284,9 +266,7 @@ export const toggleFavorite = createAsyncThunk(
 
       return { notificationId, favorite };
     } catch (error) {
-      return rejectWithValue(
-        error.message || "Failed to toggle favorite status",
-      );
+     return rejectWithValue(error.message || "Failed to toggle favorite status");
     }
   },
 );
@@ -308,7 +288,6 @@ export const archiveChat = createAsyncThunk(
         return rejectWithValue(res.data.message || "Failed to archive chat");
       }
 
-      // Notify other components about the status change
       document.dispatchEvent(
         new CustomEvent("chat-status-changed", {
           detail: {
@@ -343,7 +322,6 @@ export const unarchiveChat = createAsyncThunk(
         return rejectWithValue(res.data.message || "Failed to unarchive chat");
       }
 
-      // Notify other components about the status change
       document.dispatchEvent(
         new CustomEvent("chat-status-changed", {
           detail: {
@@ -450,7 +428,6 @@ export const toggleMuteChat = createAsyncThunk(
         return rejectWithValue("Failed to update mute status");
       }
 
-      // Calculate expiry date based on duration
       let muteExpiryDate = null;
       if (duration && isMuted) {
         const now = new Date();
@@ -464,15 +441,11 @@ export const toggleMuteChat = createAsyncThunk(
           case "7d":
             muteExpiryDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
             break;
-          // 'forever' leaves muteExpiryDate as null
         }
       }
 
-      // Also update localStorage for fallback
       try {
-        const mutedChats = JSON.parse(
-          localStorage.getItem("mutedChats") || "{}",
-        );
+       const mutedChats = JSON.parse(localStorage.getItem("mutedChats") || "{}");
 
         if (isMuted) {
           mutedChats[notificationId] = {
@@ -502,7 +475,6 @@ export const updateChatTitle = createAsyncThunk(
       const token = localStorage.getItem("token");
       if (!token) return rejectWithValue("No token available");
 
-      // Validation
       if (!newTitle || !newTitle.trim()) {
         return rejectWithValue("Title cannot be empty");
       }
@@ -518,15 +490,11 @@ export const updateChatTitle = createAsyncThunk(
       );
 
       if (!response.data || !response.data.success) {
-        return rejectWithValue(
-          response.data?.message || "Failed to update title",
-        );
+       return rejectWithValue(response.data?.message || "Failed to update title");
       }
 
-      // Reload the notification to get updated data
       dispatch(fetchNotificationById(notificationId));
 
-      // Emetti un evento per notificare altre parti dell'app dell'aggiornamento del titolo
       document.dispatchEvent(
         new CustomEvent("chat-title-updated", {
           detail: {
@@ -543,68 +511,172 @@ export const updateChatTitle = createAsyncThunk(
   },
 );
 
+// Helper function to filter messages after leaving chat
+const filterMessagesAfterLeaving = (messages, chatLeft) => {
+ if (!chatLeft || !Array.isArray(messages) || messages.length === 0) {
+   return messages;
+ }
+
+ const leaveIndex = messages.findIndex(
+   (msg) =>
+     msg.message &&
+     msg.message.includes("ha lasciato la chat") &&
+     msg.senderId === getUserId(),
+ );
+
+ if (leaveIndex !== -1) {
+   return messages.slice(0, leaveIndex + 1);
+ }
+
+ return messages;
+};
+
 // Notifications slice
 const notificationsSlice = createSlice({
   name: "notifications",
   initialState: {
     notifications: [],
+   openChatData: {}, // NUOVO: Storage per dati completi delle chat aperte
     unreadCount: 0,
     loading: true,
     sending: false,
     error: null,
     unreadMessages: [],
     openChatIds: new Set(),
-    standaloneChats: new Set(), // Nuova proprietà per chat in finestre separate
+   standaloneChats: new Set(),
     dbViewCreated: false,
-    highlights: {}, // For tracking important points
+   highlights: {},
     loadingHighlights: false,
     attachmentsLoading: false,
     notificationAttachments: {},
   },
   reducers: {
+   // NUOVO: Aggiorna dati completi per chat aperta
+   setOpenChatData: (state, action) => {
+    const { notificationId, data } = action.payload;
+    const existingData = state.openChatData[notificationId];
+    
+    // Calcola i messaggi nella nuova data
+    const newMessagesCount = Array.isArray(data.messages) 
+      ? data.messages.length 
+      : (typeof data.messages === "string" ? JSON.parse(data.messages || "[]").length : 0);
+      
+    // Calcola i messaggi nei dati esistenti
+    const existingMessagesCount = existingData && Array.isArray(existingData.messages) 
+      ? existingData.messages.length 
+      : (existingData && typeof existingData.messages === "string" ? JSON.parse(existingData.messages || "[]").length : 0);
+    
+    // PROTEZIONE: Non sovrascrivere dati completi con dati incompleti
+    if (existingData && existingData.lastFullUpdate) {
+      // Se i nuovi dati hanno meno messaggi dei dati esistenti, e non hanno priorità, rifiuta
+      if (newMessagesCount < existingMessagesCount && !data._priority) {
+        console.log(`🚫 setOpenChatData: Rifiutando dati incompleti per chat ${notificationId} (${newMessagesCount} vs ${existingMessagesCount} messaggi)`);
+        return;
+      }
+      
+      // Se i nuovi dati sono più vecchi di 5 secondi rispetto all'ultimo aggiornamento completo, rifiuta
+      if (!data._priority && data.lastFullUpdate && 
+          existingData.lastFullUpdate && 
+          (existingData.lastFullUpdate - data.lastFullUpdate > 5000)) {
+        console.log(`🚫 setOpenChatData: Rifiutando dati obsoleti per chat ${notificationId}`);
+        return;
+      }
+    }
+    
+    console.log(`✅ setOpenChatData: Accettando dati per chat ${notificationId}:`, {
+      newMessages: newMessagesCount,
+      existingMessages: existingMessagesCount,
+      priority: !!data._priority,
+      reason: data._reloadReason || 'normal'
+    });
+    
+    state.openChatData[notificationId] = {
+      ...data,
+      lastFullUpdate: data.lastFullUpdate || Date.now(),
+    };
+    
+    // Rimuovi flag temporanei
+    delete state.openChatData[notificationId]._priority;
+    delete state.openChatData[notificationId]._reloadReason;
+  },
+   
+   // NUOVO: Rimuovi dati chat quando si chiude
+   removeOpenChatData: (state, action) => {
+     const notificationId = action.payload;
+     delete state.openChatData[notificationId];
+   },
+   
+   // NUOVO: Aggiungi nuovo messaggio a chat aperta
+   addMessageToOpenChat: (state, action) => {
+     const { notificationId, message } = action.payload;
+     if (state.openChatData[notificationId]) {
+       const messages = Array.isArray(state.openChatData[notificationId].messages)
+         ? state.openChatData[notificationId].messages
+         : JSON.parse(state.openChatData[notificationId].messages || "[]");
+       
+       if (!messages.find(m => m.messageId === message.messageId)) {
+         messages.push(message);
+         state.openChatData[notificationId].messages = messages;
+         state.openChatData[notificationId].messageCount = messages.length;
+       }
+     }
+   },
+
     registerOpenChat: (state, action) => {
-      state.openChatIds.add(parseInt(action.payload));
-    },
+     const notificationId = parseInt(action.payload);
+     state.openChatIds.add(notificationId);
+     
+     // Inizializza openChatData se non esiste
+     if (!state.openChatData[notificationId]) {
+       const notification = state.notifications.find(n => n.notificationId === notificationId);
+       if (notification) {
+         state.openChatData[notificationId] = {
+           ...notification,
+           lastFullUpdate: 0, // Forza caricamento completo
+         };
+       }
+     }
+   },
+
     unregisterOpenChat: (state, action) => {
-      state.openChatIds.delete(parseInt(action.payload));
+     const notificationId = parseInt(action.payload);
+     state.openChatIds.delete(notificationId);
+     delete state.openChatData[notificationId];
     },
+
     markMessageAsReceived: (state, action) => {
       const { notificationId, messageId } = action.payload;
-
-      // Logic for marking message as received is handled by the server
-      // We don't need to update state here
-
-      // But we can emit an event if needed
       document.dispatchEvent(
         new CustomEvent("message-received", {
           detail: { notificationId, messageId },
         }),
       );
     },
+
     resetNotificationError: (state) => {
       state.error = null;
     },
+
     addUnreadMessage: (state, action) => {
       state.unreadMessages.push(action.payload);
     },
+
     setAttachmentsLoading: (state, action) => {
       state.attachmentsLoading = action.payload;
     },
+
     setNotificationAttachments: (state, action) => {
       state.notificationAttachments = {
         ...state.notificationAttachments,
         [action.payload.notificationId]: action.payload.attachments,
       };
     },
-    // Registra una chat come aperta in finestra separata
+
     registerStandaloneChat: (state, action) => {
       state.standaloneChats.add(parseInt(action.payload));
 
-      // Salva anche in localStorage per persistenza tra refresh
       try {
-        const current = JSON.parse(
-          localStorage.getItem("standalone_chats") || "[]",
-        );
+       const current = JSON.parse(localStorage.getItem("standalone_chats") || "[]");
         if (!current.includes(parseInt(action.payload))) {
           localStorage.setItem(
             "standalone_chats",
@@ -615,56 +687,38 @@ const notificationsSlice = createSlice({
         console.error("Error saving standalone chat to localStorage:", e);
       }
 
-      // Registra anche la chat come aperta nello stato Redux
       state.openChatIds.add(parseInt(action.payload));
     },
 
-    // Rimuovi una chat dalla lista delle finestre separate
     unregisterStandaloneChat: (state, action) => {
       state.standaloneChats.delete(parseInt(action.payload));
 
-      // Aggiorna localStorage
       try {
-        const current = JSON.parse(
-          localStorage.getItem("standalone_chats") || "[]",
-        );
+       const current = JSON.parse(localStorage.getItem("standalone_chats") || "[]");
         localStorage.setItem(
           "standalone_chats",
-          JSON.stringify(
-            current.filter((id) => id !== parseInt(action.payload)),
-          ),
+         JSON.stringify(current.filter((id) => id !== parseInt(action.payload))),
         );
       } catch (e) {
         console.error("Error removing standalone chat from localStorage:", e);
       }
     },
-    // All'inizializzazione, caricare le chat aperte in finestre separate da localStorage
+
     initializeStandaloneChats: (state, action) => {
       try {
-        // Se l'azione contiene un payload, usalo direttamente
         if (action.payload && Array.isArray(action.payload)) {
-          state.standaloneChats = new Set(
-            action.payload.map((id) => parseInt(id)),
-          );
+         state.standaloneChats = new Set(action.payload.map((id) => parseInt(id)));
           return;
         }
 
-        // Altrimenti leggi da localStorage
-        const storedChats = JSON.parse(
-          localStorage.getItem("standalone_chats") || "[]",
-        );
+       const storedChats = JSON.parse(localStorage.getItem("standalone_chats") || "[]");
         state.standaloneChats = new Set(storedChats.map((id) => parseInt(id)));
-
-        // Nessuna verifica finestre in questa fase, sarà gestita separatamente
-        // per evitare problemi con accesso alle finestre durante l'inizializzazione
       } catch (e) {
         console.error("Error loading standalone chats from localStorage:", e);
-        // Assicurati che il set esista comunque
         state.standaloneChats = new Set();
       }
     },
 
-    // Pulizia delle chat in finestre separate che non esistono più
     cleanupStandaloneChats: (state, action) => {
       const toRemove = action.payload || [];
       toRemove.forEach((id) => {
@@ -681,35 +735,29 @@ const notificationsSlice = createSlice({
       })
       .addCase(fetchNotifications.fulfilled, (state, action) => {
         try {
-          // Crea una copia locale delle notifiche dal payload
           const notifications = [...action.payload];
-
-          // Calcola il conteggio dei messaggi non letti direttamente dal payload
           const unreadCount = notifications.reduce((count, notification) => {
             return count + (notification.isReadByUser ? 0 : 1);
           }, 0);
 
-          // Aggiorna lo stato in modo immutabile
           state.notifications = notifications;
           state.unreadCount = unreadCount;
           state.loading = false;
           state.error = null;
 
-          // Emetti l'evento solo se il conteggio è cambiato
           if (state.unreadCount !== unreadCount) {
-            // Usa requestAnimationFrame per emettere l'evento in modo sicuro
             requestAnimationFrame(() => {
               try {
                 document.dispatchEvent(
                   new CustomEvent("unread-count-changed", {
-                    detail: eventDetail,
+                   detail: {
+                     unreadCount,
+                     timestamp: Date.now(),
+                   },
                   }),
                 );
               } catch (eventError) {
-                console.error(
-                  "Errore nell'emissione dell'evento unread-count-changed:",
-                  eventError,
-                );
+               console.error("Errore nell'emissione dell'evento unread-count-changed:", eventError);
               }
             });
           }
@@ -722,7 +770,6 @@ const notificationsSlice = createSlice({
       .addCase(fetchNotifications.rejected, (state, action) => {
         state.loading = false;
         if (action.payload && action.payload.type === "auth_error") {
-          // Handle auth errors - likely requires app-level handling
           document.dispatchEvent(
             new CustomEvent("auth-error", {
               detail: { message: action.payload.message },
@@ -736,33 +783,57 @@ const notificationsSlice = createSlice({
       // Fetch single notification by ID
       .addCase(fetchNotificationById.fulfilled, (state, action) => {
         const notification = action.payload;
-        const index = state.notifications.findIndex(
-          (n) => n && n.notificationId === notification.notificationId,
-        );
-        if (index !== -1) {
-          // Aggiorna la notifica esistente (in modo "immutabile")
-          const newNotifications = [...state.notifications];
-          newNotifications[index] = notification;
-          state.notifications = newNotifications;
-        } else {
-          // Aggiungi la nuova notifica (in modo "immutabile")
-          state.notifications = [...state.notifications, notification];
+        const notificationId = notification.notificationId;
+        
+        // SEMPRE aggiorna openChatData se la chat è aperta o sta per essere aperta
+        if (state.openChatIds.has(notificationId) || action.meta?.arg?.openChat) {
+          console.log(`💾 Salvando dati completi in openChatData per chat ${notificationId}`);
+          
+          state.openChatData[notificationId] = {
+            ...notification,
+            lastFullUpdate: Date.now(),
+            _priority: true,
+            _hasAllMessages: true
+          };
+          
+          // Log per debug
+          const messageCount = Array.isArray(notification.messages) 
+            ? notification.messages.length 
+            : (typeof notification.messages === "string" ? JSON.parse(notification.messages || "[]").length : 0);
+          
+          console.log(`✅ openChatData aggiornato con ${messageCount} messaggi per chat ${notificationId}`);
         }
-
-        // Calcola il conteggio "unread" (in modo "immutabile") – cioè, crea un nuovo array (state.notifications) e filtra (senza accedere a state.notifications "proxy revocato") – così non si tenta di "get" su un proxy revocato.
+        
+        // Aggiorna la sidebar SOLO se la chat NON è aperta
+        if (!state.openChatIds.has(notificationId)) {
+          // Per la sidebar, limita a 5 messaggi
+          const sidebarNotification = {
+            ...notification,
+            messages: Array.isArray(notification.messages) 
+              ? notification.messages.slice(-5) 
+              : (typeof notification.messages === "string" 
+                ? JSON.parse(notification.messages || "[]").slice(-5)
+                : [])
+          };
+          
+          const index = state.notifications.findIndex(n => n.notificationId === notificationId);
+          if (index !== -1) {
+            state.notifications[index] = sidebarNotification;
+          } else {
+            state.notifications.push(sidebarNotification);
+          }
+        }
+        
+        // Ricalcola unreadCount
         try {
-          const newNotifications = [...state.notifications];
-          state.unreadCount = newNotifications.filter(
-            (n) => n && !n.isReadByUser && n.archived !== "1",
+          state.unreadCount = state.notifications.filter(
+            (n) => n && !n.isReadByUser && n.archived !== 1,
           ).length;
         } catch (e) {
-          console.error(
-            "Errore nel calcolo unreadCount (fetchNotificationById.fulfilled):",
-            e,
-          );
-          // In caso di errore, mantieni il valore precedente (state.unreadCount)
+          console.error("Errore nel calcolo unreadCount:", e);
         }
       })
+    
       .addCase(fetchNotificationById.rejected, (state, action) => {
         state.error = action.payload;
       })
@@ -777,122 +848,37 @@ const notificationsSlice = createSlice({
         state.sending = true;
       })
       .addCase(sendNotification.fulfilled, (state, action) => {
-        try {
           state.sending = false;
-
-          // Estrai i dati dalla risposta, con controlli di sicurezza
           const payload = action.payload || {};
-          const {
-            notificationId,
-            title,
-            messages,
-            membersInfo,
-            isClosed,
-            closingUser,
-            closingDate,
-            notificationCategoryId,
-          } = payload;
-
-          if (!notificationId) {
-            console.error("ID notifica mancante nella risposta");
-            return;
-          }
-
-          // Cerca in modo sicuro la notifica esistente
-          let existingNotification = null;
-          try {
-            if (state.notifications && Array.isArray(state.notifications)) {
-              existingNotification = state.notifications.find(
+       const { notificationId } = payload;
+       
+       if (!notificationId) return;
+       
+       // Se la chat è aperta, emetti evento per ricaricare
+       if (state.openChatIds.has(notificationId)) {
+         document.dispatchEvent(
+           new CustomEvent("reload-open-chat", {
+             detail: { 
+               notificationId,
+               isOwnMessage: true 
+             },
+           }),
+         );
+       }
+       
+       // Aggiorna notification nella sidebar come prima
+       const notificationIndex = state.notifications.findIndex(
                 (n) => n && n.notificationId === notificationId,
               );
-            }
-          } catch (findError) {
-            console.error(
-              "Errore nella ricerca della notifica esistente:",
-              findError,
-            );
-          }
-
-          // Determine if user has left the chat
-          const chatLeft = existingNotification
-            ? existingNotification.chatLeft
-            : 0;
-
-          // Process messages based on chatLeft state
-          let processedMessages = messages;
-          if (chatLeft && messages) {
-            try {
-              // If the user has left the chat, filter messages
-              const messagesArray = Array.isArray(messages)
-                ? [...messages] // crea una copia per sicurezza
-                : JSON.parse(messages);
-
-              const filteredMessages = filterMessagesAfterLeaving(
-                messagesArray,
-                chatLeft,
-              );
-
-              processedMessages = Array.isArray(messages)
-                ? filteredMessages
-                : JSON.stringify(filteredMessages);
-            } catch (msgError) {
-              console.error("Errore nel processing dei messaggi:", msgError);
-              // In caso di errore, mantieni i messaggi originali
-              processedMessages = messages;
-            }
-          }
-
-          const updatedNotification = {
-            notificationId,
-            title: title || "Notifica senza titolo",
-            messages: processedMessages || [],
-            membersInfo: membersInfo || [],
-            isClosed: isClosed || false,
-            closingUser: closingUser || null,
-            closingDate: closingDate || null,
-            notificationCategoryId: notificationCategoryId || 0,
-            chatLeft: chatLeft || 0,
-            lastUpdated: new Date().toISOString(),
-          };
-
-          // Trova in modo sicuro l'indice della notifica
-          let notificationIndex = -1;
-          try {
-            if (state.notifications && Array.isArray(state.notifications)) {
-              notificationIndex = state.notifications.findIndex(
-                (n) => n && n.notificationId === notificationId,
-              );
-            }
-          } catch (findIndexError) {
-            console.error(
-              "Errore nella ricerca dell'indice della notifica:",
-              findIndexError,
-            );
-          }
 
           if (notificationIndex !== -1) {
-            // Update existing notification
-            try {
-              state.notifications[notificationIndex] = updatedNotification;
-            } catch (updateError) {
-              console.error(
-                "Errore nell'aggiornamento della notifica esistente:",
-                updateError,
-              );
-            }
-          } else {
-            // Add new notification
-            try {
-              state.notifications.push(updatedNotification);
-            } catch (pushError) {
-              console.error(
-                "Errore nell'aggiunta della nuova notifica:",
-                pushError,
-              );
-            }
-          }
-
-          // Emit an event to notify other components
+         // Aggiorna solo metadati, non messaggi completi
+         const notification = state.notifications[notificationIndex];
+         if (payload.lastMessage) notification.lastMessage = payload.lastMessage;
+         if (payload.messageCount) notification.messageCount = payload.messageCount;
+       }
+       
+       // Emetti evento per altri componenti
           try {
             if (action.meta && action.meta.arg) {
               const event = new CustomEvent("chat-message-sent", {
@@ -906,28 +892,17 @@ const notificationsSlice = createSlice({
               document.dispatchEvent(event);
             }
           } catch (eventError) {
-            console.error(
-              "Errore nell'emissione dell'evento chat-message-sent:",
-              eventError,
-            );
-          }
-        } catch (error) {
-          console.error("Errore critico in sendNotification.fulfilled:", error);
-          state.sending = false;
+         console.error("Errore nell'emissione dell'evento chat-message-sent:", eventError);
         }
       })
       .addCase(sendNotification.rejected, (state, action) => {
         state.sending = false;
         state.error = action.payload;
       })
+
       .addCase(removeUserFromChat.fulfilled, (state, action) => {
         const { notificationId, removedUserId } = action.payload;
-
         // Non dobbiamo aggiornare lo stato qui poiché fetchNotificationById verrà chiamato
-        // e aggiornerà già lo stato con i dati più recenti
-
-        // Eventualmente potremmo aggiungere un flag o un messaggio temporaneo
-        // per indicare che un utente è stato rimosso
       })
       .addCase(removeUserFromChat.rejected, (state, action) => {
         state.error = action.payload;
@@ -938,40 +913,36 @@ const notificationsSlice = createSlice({
         const { notificationId, isReadByUser } = action.payload;
 
         try {
-          // Crea una copia locale delle notifiche
+         // Aggiorna openChatData se esiste
+         if (state.openChatData[notificationId]) {
+           state.openChatData[notificationId].isReadByUser = isReadByUser;
+         }
+
+         // Aggiorna notifications
           const notificationsCopy = [...state.notifications];
           const notificationIndex = notificationsCopy.findIndex(
             (n) => n && n.notificationId === notificationId,
           );
 
           if (notificationIndex !== -1) {
-            // Aggiorna la notifica nella copia locale
             notificationsCopy[notificationIndex] = {
               ...notificationsCopy[notificationIndex],
               isReadByUser,
             };
 
-            // Calcola il nuovo conteggio usando la copia locale
             const newUnreadCount = notificationsCopy.filter(
-              (n) =>
-                n &&
-                typeof n === "object" &&
-                !n.isReadByUser &&
-                n.archived !== "1",
+             (n) => n && typeof n === "object" && !n.isReadByUser && n.archived !== "1",
             ).length;
 
-            // Aggiorna lo stato in modo sicuro
             state.notifications = notificationsCopy;
             state.unreadCount = newUnreadCount;
 
-            // Aggiorna i messaggi non letti
             if (isReadByUser) {
               state.unreadMessages = state.unreadMessages.filter(
                 (message) => message.notificationId !== notificationId,
               );
             }
 
-            // Emetti evento per altri componenti usando i valori già calcolati
             const eventDetail = {
               notificationId,
               isReadByUser,
@@ -987,24 +958,23 @@ const notificationsSlice = createSlice({
                   }),
                 );
               } catch (eventError) {
-                console.error(
-                  "Errore nell'emissione dell'evento read-status-changed:",
-                  eventError,
-                );
+               console.error("Errore nell'emissione dell'evento read-status-changed:", eventError);
               }
             });
           }
         } catch (error) {
-          console.error(
-            "Errore nell'aggiornamento dello stato di lettura:",
-            error,
-          );
+         console.error("Errore nell'aggiornamento dello stato di lettura:", error);
         }
       })
 
       // Toggle pin status
       .addCase(togglePin.fulfilled, (state, action) => {
         const { notificationId, pinned } = action.payload;
+       
+       if (state.openChatData[notificationId]) {
+         state.openChatData[notificationId].pinned = pinned;
+       }
+       
         const notification = state.notifications.find(
           (n) => n.notificationId === notificationId,
         );
@@ -1017,6 +987,11 @@ const notificationsSlice = createSlice({
       // Toggle favorite status
       .addCase(toggleFavorite.fulfilled, (state, action) => {
         const { notificationId, favorite } = action.payload;
+       
+       if (state.openChatData[notificationId]) {
+         state.openChatData[notificationId].favorite = favorite;
+       }
+       
         const notification = state.notifications.find(
           (n) => n.notificationId === notificationId,
         );
@@ -1031,32 +1006,28 @@ const notificationsSlice = createSlice({
         const { notificationId, archived } = action.payload;
 
         try {
-          // Crea una copia locale delle notifiche
+         if (state.openChatData[notificationId]) {
+           state.openChatData[notificationId].archived = archived;
+         }
+
           const notificationsCopy = [...state.notifications];
           const notificationIndex = notificationsCopy.findIndex(
             (n) => n && n.notificationId === notificationId,
           );
 
           if (notificationIndex !== -1) {
-            // Aggiorna la notifica nella copia locale
             notificationsCopy[notificationIndex] = {
               ...notificationsCopy[notificationIndex],
               archived,
             };
 
-            // Se la notifica non era letta, ricalcola il conteggio
             if (!notificationsCopy[notificationIndex].isReadByUser) {
               const newUnreadCount = notificationsCopy.filter(
-                (n) =>
-                  n &&
-                  typeof n === "object" &&
-                  !n.isReadByUser &&
-                  n.archived !== "1",
+               (n) => n && typeof n === "object" && !n.isReadByUser && n.archived !== "1",
               ).length;
               state.unreadCount = newUnreadCount;
             }
 
-            // Aggiorna lo stato in modo sicuro
             state.notifications = notificationsCopy;
           }
         } catch (error) {
@@ -1067,32 +1038,28 @@ const notificationsSlice = createSlice({
         const { notificationId, archived } = action.payload;
 
         try {
-          // Crea una copia locale delle notifiche
+         if (state.openChatData[notificationId]) {
+           state.openChatData[notificationId].archived = archived;
+         }
+
           const notificationsCopy = [...state.notifications];
           const notificationIndex = notificationsCopy.findIndex(
             (n) => n && n.notificationId === notificationId,
           );
 
           if (notificationIndex !== -1) {
-            // Aggiorna la notifica nella copia locale
             notificationsCopy[notificationIndex] = {
               ...notificationsCopy[notificationIndex],
               archived,
             };
 
-            // Se la notifica non era letta, ricalcola il conteggio
             if (!notificationsCopy[notificationIndex].isReadByUser) {
               const newUnreadCount = notificationsCopy.filter(
-                (n) =>
-                  n &&
-                  typeof n === "object" &&
-                  !n.isReadByUser &&
-                  n.archived !== "1",
+               (n) => n && typeof n === "object" && !n.isReadByUser && n.archived !== "1",
               ).length;
               state.unreadCount = newUnreadCount;
             }
 
-            // Aggiorna lo stato in modo sicuro
             state.notifications = notificationsCopy;
           }
         } catch (error) {
@@ -1103,6 +1070,11 @@ const notificationsSlice = createSlice({
       // Reopen/close chat
       .addCase(reopenChat.fulfilled, (state, action) => {
         const { notificationId, isClosed } = action.payload;
+       
+       if (state.openChatData[notificationId]) {
+         state.openChatData[notificationId].isClosed = isClosed;
+       }
+       
         const notification = state.notifications.find(
           (n) => n.notificationId === notificationId,
         );
@@ -1113,6 +1085,11 @@ const notificationsSlice = createSlice({
       })
       .addCase(closeChat.fulfilled, (state, action) => {
         const { notificationId, isClosed } = action.payload;
+       
+       if (state.openChatData[notificationId]) {
+         state.openChatData[notificationId].isClosed = isClosed;
+       }
+       
         const notification = state.notifications.find(
           (n) => n.notificationId === notificationId,
         );
@@ -1125,6 +1102,18 @@ const notificationsSlice = createSlice({
       // Leave chat
       .addCase(leaveChat.fulfilled, (state, action) => {
         const { notificationId, chatLeft } = action.payload;
+       
+       if (state.openChatData[notificationId]) {
+         state.openChatData[notificationId].chatLeft = chatLeft;
+         
+         // Filter messages in openChatData
+         const messages = parseMessages(state.openChatData[notificationId].messages);
+         const filteredMessages = filterMessagesAfterLeaving(messages, chatLeft);
+         state.openChatData[notificationId].messages = Array.isArray(state.openChatData[notificationId].messages)
+           ? filteredMessages
+           : JSON.stringify(filteredMessages);
+       }
+       
         const notification = state.notifications.find(
           (n) => n.notificationId === notificationId,
         );
@@ -1132,12 +1121,8 @@ const notificationsSlice = createSlice({
         if (notification) {
           notification.chatLeft = chatLeft;
 
-          // Filter messages after leaving
           const messages = parseMessages(notification.messages);
-          const filteredMessages = filterMessagesAfterLeaving(
-            messages,
-            chatLeft,
-          );
+         const filteredMessages = filterMessagesAfterLeaving(messages, chatLeft);
           notification.messages = Array.isArray(notification.messages)
             ? filteredMessages
             : JSON.stringify(filteredMessages);
@@ -1147,6 +1132,12 @@ const notificationsSlice = createSlice({
       // Toggle mute
       .addCase(toggleMuteChat.fulfilled, (state, action) => {
         const { notificationId, isMuted, muteExpiryDate } = action.payload;
+       
+       if (state.openChatData[notificationId]) {
+         state.openChatData[notificationId].isMuted = isMuted;
+         state.openChatData[notificationId].muteExpiryDate = muteExpiryDate;
+       }
+       
         const notification = state.notifications.find(
           (n) => n.notificationId === notificationId,
         );
@@ -1160,6 +1151,11 @@ const notificationsSlice = createSlice({
       // Update chat title
       .addCase(updateChatTitle.fulfilled, (state, action) => {
         const { notificationId, title } = action.payload;
+       
+       if (state.openChatData[notificationId]) {
+         state.openChatData[notificationId].title = title;
+       }
+       
         const notification = state.notifications.find(
           (n) => n.notificationId === notificationId,
         );
@@ -1169,99 +1165,76 @@ const notificationsSlice = createSlice({
         }
       })
 
-      // Gestione aggiornamenti dal worker
+     // MODIFICA updateFromWorker per NON toccare openChatData
       .addCase("notifications/updateFromWorker", (state, action) => {
         try {
-          // Verifica se il payload è valido
-          if (!action.payload) {
-            console.error(
-              "Payload non valido in updateFromWorker (null/undefined)",
-            );
+        if (!action.payload || !Array.isArray(action.payload)) {
             return;
           }
 
-          if (!Array.isArray(action.payload)) {
-            console.error(
-              "Payload non valido in updateFromWorker (non è un array):",
-              action.payload,
-            );
-            return;
-          }
-
-          // Salva il valore corrente per rilevare cambiamenti
-          const previousUnreadCount = state.unreadCount;
-
-          // Aggiorna solo se ci sono dati validi
-          const newNotifications = [...action.payload]; // Crea una copia per evitare problemi con i proxy
-
-          // Aggiorna le notifiche nello state in modo sicuro
-          state.notifications = newNotifications;
-
-          // Calcola in modo sicuro il conteggio non letti
-          try {
-            state.unreadCount = newNotifications.filter(
-              (n) => n && n.isReadByUser === false && n.archived !== "1",
-            ).length;
-          } catch (countError) {
-            console.error("Errore nel calcolo dei non letti:", countError);
-            // Mantieni il valore precedente in caso di errore
-          }
-
-          // Controlla se il conteggio è cambiato
-          const unreadCountChanged = previousUnreadCount !== state.unreadCount;
-
-          // Emetti un evento in modo sicuro
-          if (unreadCountChanged) {
-            // Usa solo dati locali già presenti nello state, non accedere allo store
-            const currentUnreadCount = state.unreadCount || 0;
-
-            // Emetti l'evento in modo sincrono senza setTimeout
-            try {
+        const newNotifications = [...action.payload];
+        
+        // PER OGNI NOTIFICA DAL WORKER
+        newNotifications.forEach(workerNotif => {
+          // SE LA CHAT È APERTA, NON TOCCARE I SUOI MESSAGGI
+          if (state.openChatIds.has(workerNotif.notificationId)) {
+            const openChat = state.openChatData[workerNotif.notificationId];
+            
+            if (openChat && openChat.lastFullUpdate) {
+              console.log(`🚫 Worker: NON sovrascrivendo chat aperta ${workerNotif.notificationId}`);
+              
+              // Aggiorna SOLO i metadati, NON i messaggi
+              openChat.isReadByUser = workerNotif.isReadByUser;
+              openChat.isClosed = workerNotif.isClosed;
+              openChat.pinned = workerNotif.pinned;
+              openChat.favorite = workerNotif.favorite;
+              openChat.isMuted = workerNotif.isMuted;
+              openChat.archived = workerNotif.archived;
+              openChat.chatLeft = workerNotif.chatLeft;
+              openChat.lastMessage = workerNotif.lastMessage;
+              
+              // Se ci sono nuovi messaggi, richiedi aggiornamento completo
+              if (workerNotif.messageCount > (openChat.messageCount || 0)) {
+                setTimeout(() => {
               document.dispatchEvent(
-                new CustomEvent("notifications-updated", {
+                    new CustomEvent("reload-open-chat", {
                   detail: {
-                    timestamp: new Date().toISOString(),
-                    unreadCount: currentUnreadCount,
-                    unreadCountChanged: true,
+                        notificationId: workerNotif.notificationId,
+                        reason: "new-messages"
                   },
                 }),
               );
-            } catch (eventError) {
-              console.error(
-                "Errore nell'emissione dell'evento notifications-updated:",
-                eventError,
-              );
+                }, 0);
+              }
+              
+              return;
             }
           }
-        } catch (error) {
-          console.error("Errore critico in updateFromWorker:", error);
-          // Non propagare l'errore, ma registralo
-        }
-      });
-  },
+        });
+        
+        // Aggiorna notifications normalmente solo per chat NON aperte
+        const updatedNotifications = state.notifications.map(existingNotif => {
+          // Se la chat è aperta, mantieni la versione esistente
+          if (state.openChatIds.has(existingNotif.notificationId)) {
+            return existingNotif;
+          }
+          
+          // Altrimenti usa i dati del worker
+          const workerNotif = newNotifications.find(n => n.notificationId === existingNotif.notificationId);
+          return workerNotif || existingNotif;
+        });
+        
+        state.notifications = updatedNotifications;
+        state.unreadCount = updatedNotifications.filter(
+          (n) => n && n.isReadByUser === false && n.archived !== "1",
+        ).length;
+    
+      } catch (error) {
+        console.error("Errore in updateFromWorker:", error);
+      }
+    })
+ },
 });
-
-// Helper function to filter messages after leaving chat
-const filterMessagesAfterLeaving = (messages, chatLeft) => {
-  if (!chatLeft || !Array.isArray(messages) || messages.length === 0) {
-    return messages;
-  }
-
-  // Find the message that indicates the user left the chat
-  const leaveIndex = messages.findIndex(
-    (msg) =>
-      msg.message &&
-      msg.message.includes("ha lasciato la chat") &&
-      msg.senderId === getUserId(),
-  );
-
-  // If there's a leave message, show only messages up to that point
-  if (leaveIndex !== -1) {
-    return messages.slice(0, leaveIndex + 1);
-  }
-
-  return messages;
-};
 
 // Selectors
 export const selectNotifications = (state) => state.notifications.notifications;
@@ -1269,28 +1242,29 @@ export const selectUnreadCount = (state) => state.notifications.unreadCount;
 export const selectLoading = (state) => state.notifications.loading;
 export const selectSending = (state) => state.notifications.sending;
 export const selectError = (state) => state.notifications.error;
-export const selectUnreadMessages = (state) =>
-  state.notifications.unreadMessages;
+export const selectUnreadMessages = (state) => state.notifications.unreadMessages;
 export const selectOpenChatIds = (state) => state.notifications.openChatIds;
 export const selectDbViewCreated = (state) => state.notifications.dbViewCreated;
 export const selectHighlights = (state) => state.notifications.highlights;
-export const selectLoadingHighlights = (state) =>
-  state.notifications.loadingHighlights;
-export const selectAttachmentsLoading = (state) =>
-  state.notifications.attachmentsLoading;
-export const selectNotificationAttachments = (state) =>
-  state.notifications.notificationAttachments;
-export const selectStandaloneChats = (state) =>
-  state.notifications.standaloneChats;
+export const selectLoadingHighlights = (state) => state.notifications.loadingHighlights;
+export const selectAttachmentsLoading = (state) => state.notifications.attachmentsLoading;
+export const selectNotificationAttachments = (state) => state.notifications.notificationAttachments;
+export const selectStandaloneChats = (state) => state.notifications.standaloneChats;
+
+// NUOVO: Selettore per openChatData
+export const selectOpenChatData = (state, notificationId) => 
+ state.notifications.openChatData[notificationId];
+
+// NUOVO: Selettore per verificare se una chat ha dati completi
+export const selectHasFullChatData = (state, notificationId) => 
+ state.notifications.openChatData[notificationId]?.lastFullUpdate > 0;
 
 // Check if notification is muted
 export const isNotificationMuted = (notification) => {
   if (!notification.isMuted) return false;
 
-  // If there's no expiry date, it's muted forever
   if (!notification.muteExpiryDate) return true;
 
-  // Check if the expiry date has passed
   const now = new Date();
   const expiryDate = new Date(notification.muteExpiryDate);
   return now < expiryDate;
@@ -1298,6 +1272,9 @@ export const isNotificationMuted = (notification) => {
 
 // Export actions
 export const {
+ setOpenChatData,
+ removeOpenChatData,
+ addMessageToOpenChat,
   registerOpenChat,
   unregisterOpenChat,
   markMessageAsReceived,

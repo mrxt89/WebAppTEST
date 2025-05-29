@@ -8,8 +8,14 @@ import { CircleX } from "lucide-react";
 import { swal } from "../lib/common";
 import axios from "axios";
 import { config } from "../config";
-import { useSelector } from "react-redux";
-import { selectNotifications } from "../redux/features/notifications/notificationsSlice";
+import { useSelector, useDispatch } from "react-redux";
+import { 
+  selectNotifications,
+  selectOpenChatData,
+  setOpenChatData,
+  fetchNotificationById,
+  removeOpenChatData
+} from "../redux/features/notifications/notificationsSlice";
 
 // Aggiungi un identificatore univoco per la finestra
 if (!window.WINDOW_ID) {
@@ -59,6 +65,7 @@ const ErrorScreen = ({ error, onClose, onRetry }) => (
 const StandaloneChat = () => {
   const { id } = useParams();
   const notificationId = parseInt(id);
+  const dispatch = useDispatch();
   const windowManager = useWindowManager("standalone-");
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(null);
@@ -69,35 +76,17 @@ const StandaloneChat = () => {
   const chatRegisteredRef = useRef(false);
   const initializationAttempted = useRef(false);
 
-  // Extract functions from the hook
+  // Extract functions from the hook  
   const {
-    fetchNotificationById,
-    initializeWorker,
     unregisterStandaloneChat,
     registerOpenChat,
     toggleReadUnread,
     registerStandaloneChat,
-    DBNotificationsView,
-    reloadNotifications,
-    restartNotificationWorker,
   } = useNotifications();
 
-  // Aggiungi selettore per le notifiche
+  // Selettori Redux
   const notifications = useSelector(selectNotifications);
-
-  // Effect per monitorare le notifiche nello store
-  useEffect(() => {
-    if (notificationId && notifications.length > 0) {
-      const foundNotification = notifications.find(
-        (n) => n.notificationId === notificationId,
-      );
-      if (foundNotification && !loaded) {
-        setNotification(foundNotification);
-        setLoaded(true);
-        document.title = `Chat: ${foundNotification.title || "Conversazione"}`;
-      }
-    }
-  }, [notificationId, notifications, loaded]);
+  const openChatData = useSelector(state => selectOpenChatData(state, notificationId));
 
   // Miglioramento: funzione per recuperare il token e l'URL API in modo sicuro
   const getApiConfig = () => {
@@ -154,7 +143,7 @@ const StandaloneChat = () => {
     try {
       const { token, apiBaseUrl } = getApiConfig();
 
-      const response = await axios.get(`${apiBaseUrl}/response-options`, {
+      const response = await axios.get(`${apiBaseUrl}/notification-response-options`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Cache-Control": "no-cache, no-store",
@@ -182,7 +171,6 @@ const StandaloneChat = () => {
         return defaultOptions;
       }
 
-      // In production, rethrow to handle properly
       throw error;
     }
   };
@@ -193,10 +181,7 @@ const StandaloneChat = () => {
     setRetryCount((prev) => prev + 1);
     setLoaded(false);
     initializationAttempted.current = false;
-
-    // Force restart notifications worker on retry
-    restartNotificationWorker(true);
-  }, [restartNotificationWorker]);
+  }, []);
 
   // Improved initialization function
   const initialize = useCallback(async () => {
@@ -216,22 +201,55 @@ const StandaloneChat = () => {
         throw new Error("ID chat non valido");
       }
 
-      // Initialize redux worker with forceInit flag
-      initializeWorker(true);
+      // La standalone usa il worker esistente della main app
+      console.log('📱 StandaloneChat: Usando worker esistente dalla main app');
 
-      // Ensure DB view is created
-      await DBNotificationsView();
+      // Carica utenti e opzioni di risposta
+      const [fetchedUsers, fetchedOptions] = await Promise.all([
+        fetchUsers().catch(err => {
+          console.error("Errore caricamento utenti:", err);
+          return [];
+        }),
+        fetchResponseOptions().catch(err => {
+          console.error("Errore caricamento opzioni:", err);
+          return [];
+        })
+      ]);
 
-      // Aspetta che il worker sia pronto
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setUsers(fetchedUsers);
+      setResponseOptions(fetchedOptions);
 
-      // Carica la notifica con priorità alta
-      await fetchNotificationById(notificationId, true);
+      // Carica la notifica con TUTTI i messaggi
+      console.log(`🔄 StandaloneChat: Caricando dati completi per chat ${notificationId}...`);
+      
+      try {
+        // Usa dispatch invece di chiamare direttamente la funzione
+        const result = await dispatch(fetchNotificationById(notificationId)).unwrap();
+        
+        if (result) {
+          console.log(`✅ StandaloneChat: Caricati dati completi per chat ${notificationId}:`, {
+            messageCount: result.messageCount,
+            messagesLength: Array.isArray(result.messages) 
+              ? result.messages.length 
+              : (typeof result.messages === "string" ? JSON.parse(result.messages || "[]").length : 0)
+          });
+          
+          // Ora i dati dovrebbero essere già in openChatData grazie al reducer
+          // Ma per sicurezza settiamo anche lo stato locale
+          setNotification(result);
+          setLoaded(true);
+          
+          // Aggiorna il titolo della finestra
+          document.title = `Chat: ${result.title || "Conversazione"}`;
+        } else {
+          throw new Error("Nessun dato ricevuto per la notifica");
+        }
+      } catch (error) {
+        console.error(`Errore caricamento notifica ${notificationId}:`, error);
+        throw error;
+      }
 
-      // Aspetta che lo store sia aggiornato
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Register this chat as open in redux store
+      // Register this chat as open
       if (!chatRegisteredRef.current) {
         registerStandaloneChat(notificationId);
         registerOpenChat(notificationId);
@@ -248,14 +266,10 @@ const StandaloneChat = () => {
     }
   }, [
     notificationId,
-    fetchNotificationById,
-    initializeWorker,
-    DBNotificationsView,
-    reloadNotifications,
     registerStandaloneChat,
     registerOpenChat,
     toggleReadUnread,
-    notifications,
+    dispatch,
   ]);
 
   // Initialization effect
@@ -267,6 +281,7 @@ const StandaloneChat = () => {
     const handleBeforeUnload = () => {
       if (notificationId && chatRegisteredRef.current) {
         unregisterStandaloneChat(notificationId);
+        dispatch(removeOpenChatData(notificationId));
       }
     };
 
@@ -277,68 +292,67 @@ const StandaloneChat = () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       if (notificationId && chatRegisteredRef.current) {
         unregisterStandaloneChat(notificationId);
+        dispatch(removeOpenChatData(notificationId));
       }
     };
-  }, [notificationId, initialize, unregisterStandaloneChat, retryCount]);
+  }, [notificationId, initialize, unregisterStandaloneChat, retryCount, dispatch]);
 
   // Effect to handle notification updates from events
   useEffect(() => {
-    const handleNotificationUpdate = (event) => {
-      const { notificationId: updatedId } = event.detail || {};
+    const handleNotificationUpdate = async (event) => {
+      const { notificationId: updatedId, reason } = event.detail || {};
 
       // Only update if it matches our notification
       if (updatedId && updatedId === notificationId && loaded) {
-        fetchNotificationById(notificationId)
-          .then((updatedNotification) => {
-            if (updatedNotification) {
-              setNotification(updatedNotification);
+        console.log(`🔄 StandaloneChat: Ricaricando per evento ${reason}...`);
+        
+        try {
+          const result = await dispatch(fetchNotificationById(notificationId)).unwrap();
+          if (result) {
+            setNotification(result);
+            // openChatData viene già aggiornato dal reducer
+
+            // Se è un nuovo messaggio, segna la chat come letta
+            if (reason === 'new-message-received' || reason === 'chat-message-sent') {
+              dispatch(toggleReadUnread({
+                notificationId,
+                isReadByUser: true
+              }));
             }
-          })
-          .catch((err) =>
-            console.error("Errore aggiornamento da evento:", err),
-          );
+          }
+        } catch (error) {
+          console.error(`Errore ricaricamento per evento:`, error);
+        }
       }
     };
 
-    // Listen for various notification update events
-    document.addEventListener(
-      "notifications-updated",
-      handleNotificationUpdate,
-    );
-    document.addEventListener("chat-message-sent", handleNotificationUpdate);
-    document.addEventListener("message-updated", handleNotificationUpdate);
-    document.addEventListener(
+    // Ascolta eventi specifici per chat aperte
+    const events = [
+      "reload-open-chat",
+      "chat-message-sent",
+      "message-updated",
       "message-reaction-updated",
-      handleNotificationUpdate,
-    );
-    document.addEventListener("new-message-received", handleNotificationUpdate);
+      "message-deleted",
+      "new-message-received"
+    ];
+
+    events.forEach(eventName => {
+      document.addEventListener(eventName, handleNotificationUpdate);
+    });
 
     return () => {
-      document.removeEventListener(
-        "notifications-updated",
-        handleNotificationUpdate,
-      );
-      document.removeEventListener(
-        "chat-message-sent",
-        handleNotificationUpdate,
-      );
-      document.removeEventListener("message-updated", handleNotificationUpdate);
-      document.removeEventListener(
-        "message-reaction-updated",
-        handleNotificationUpdate,
-      );
-      document.removeEventListener(
-        "new-message-received",
-        handleNotificationUpdate,
-      );
+      events.forEach(eventName => {
+        document.removeEventListener(eventName, handleNotificationUpdate);
+      });
     };
-  }, [notificationId, fetchNotificationById, loaded]);
+  }, [notificationId, loaded, dispatch]);
 
   // Function to close the window
   const handleClose = useCallback(() => {
     // Before closing, unregister the chat
     if (notificationId && chatRegisteredRef.current) {
       unregisterStandaloneChat(notificationId);
+      dispatch(removeOpenChatData(notificationId));
       chatRegisteredRef.current = false;
     }
 
@@ -355,7 +369,10 @@ const StandaloneChat = () => {
         confirmButtonText: "OK",
       });
     }, 500);
-  }, [notificationId, unregisterStandaloneChat]);
+  }, [notificationId, unregisterStandaloneChat, dispatch]);
+
+  // Se OpenChatData è disponibile, usalo invece di notification
+  const currentNotification = openChatData || notification;
 
   // If there was an error, show error message
   if (error) {
@@ -365,7 +382,7 @@ const StandaloneChat = () => {
   }
 
   // If data is not loaded yet, show spinner
-  if (!loaded || !notification) {
+  if (!loaded || !currentNotification) {
     return <LoadingScreen />;
   }
 
@@ -373,7 +390,7 @@ const StandaloneChat = () => {
   return (
     <div className="h-screen w-screen bg-gray-100 overflow-hidden">
       <ChatWindow
-        notification={notification}
+        notification={currentNotification}
         onClose={handleClose}
         onMinimize={() => window.blur()}
         windowManager={windowManager}

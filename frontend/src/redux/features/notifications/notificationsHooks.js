@@ -5,6 +5,7 @@ import { swal } from "../../../lib/common";
 import axios from "axios";
 import { config } from "../../../config";
 import { callOpenChatModal } from "./notificationsSlice";
+import { store } from "../../store";
 
 // Importa le azioni e i selettori dal notificationsSlice
 import {
@@ -45,6 +46,11 @@ import {
   unregisterStandaloneChat,
   initializeStandaloneChats,
   cleanupStandaloneChats,
+  // NUOVO: Aggiungi questi import
+  selectOpenChatData,
+  setOpenChatData,
+  removeOpenChatData,
+  selectHasFullChatData,
 } from "./notificationsSlice";
 
 // Importa azioni worker e altre azioni
@@ -139,6 +145,9 @@ export const useNotifications = () => {
   const attachmentsLoading = useSelector(selectAttachmentsLoading);
   const notificationAttachments = useSelector(selectNotificationAttachments);
   const standaloneChats = useSelector(selectStandaloneChats);
+  
+  // NUOVO: Selettore per openChatData
+  const openChatData = useSelector(state => state.notifications.openChatData);
 
   // Stato locale per tracciare l'ultima volta che è stato eseguito un aggiornamento
   const [lastUpdateTime, setLastUpdateTime] = useState(0);
@@ -212,24 +221,31 @@ export const useNotifications = () => {
     [dispatch],
   );
 
+  // MODIFICA: getNotificationById per restituire openChatData se disponibile
   const getNotificationById = useCallback(
     async (notificationId, highPriority = false) => {
       if (!notificationId) return null;
 
       try {
-        // Usa handleNotificationUpdate invece di dispatch direttamente
+        // Prima controlla se abbiamo dati completi in openChatData
+        const existingData = openChatData[notificationId];
+        if (existingData && existingData.lastFullUpdate && 
+            Date.now() - existingData.lastFullUpdate < 60000) { // Dati freschi < 1 minuto
+          return existingData;
+        }
+
+        // Altrimenti carica dal server
         await handleNotificationUpdate(notificationId, highPriority);
 
-        // Ritorna la notifica dal selettore che è già disponibile
-        return notifications.find(
-          (n) => n.notificationId === parseInt(notificationId),
-        );
+        // Ritorna openChatData aggiornato o notification dalla lista
+        return openChatData[notificationId] || 
+               notifications.find(n => n.notificationId === parseInt(notificationId));
       } catch (error) {
         console.error("Error fetching notification by ID:", error);
         throw error;
       }
     },
-    [handleNotificationUpdate, notifications],
+    [handleNotificationUpdate, notifications, openChatData],
   );
 
   const DBNotificationsView = useCallback(() => {
@@ -879,10 +895,65 @@ export const useNotifications = () => {
   );
 
   const handleToggleMessageReaction = useCallback(
-    (messageId, reactionType) => {
-      return dispatch(
-        toggleMessageReaction({ messageId, reactionType }),
-      ).unwrap();
+    async (messageId, reactionType) => {
+      try {
+        console.log('handleToggleMessageReaction chiamato con:', { messageId, reactionType });
+        
+        // Validazione parametri
+        if (!messageId || !reactionType) {
+          console.error('Parametri mancanti per toggleMessageReaction:', { messageId, reactionType });
+          throw new Error('MessageId e reactionType sono obbligatori');
+        }
+        
+        // Assicurati che messageId sia un numero
+        const numericMessageId = parseInt(messageId);
+        if (isNaN(numericMessageId)) {
+          throw new Error('MessageId deve essere un numero valido');
+        }
+        
+        // Chiama il thunk con i parametri corretti come oggetto
+        const result = await dispatch(
+          toggleMessageReaction({ 
+            messageId: numericMessageId, 
+            reactionType: reactionType 
+          })
+        ).unwrap();
+        
+        console.log('Risultato toggleMessageReaction:', result);
+        
+        // Se abbiamo un notificationId nel risultato, aggiorna la notifica
+        if (result && result.notificationId) {
+          // Forza un aggiornamento completo della notifica
+          await dispatch(fetchNotificationById(result.notificationId, true));
+          
+          // Emetti l'evento per aggiornare i componenti
+          document.dispatchEvent(
+            new CustomEvent("message-reaction-updated", {
+              detail: {
+                messageId: numericMessageId,
+                notificationId: result.notificationId,
+                action: result.action || "modified",
+              },
+            }),
+          );
+          
+          // Emetti anche l'evento reload-open-chat per aggiornare le chat aperte
+          document.dispatchEvent(
+            new CustomEvent("reload-open-chat", {
+              detail: {
+                notificationId: result.notificationId,
+                reason: 'reaction-toggled',
+                forceComplete: true
+              },
+            }),
+          );
+        }
+        
+        return result;
+      } catch (error) {
+        console.error("Errore in handleToggleMessageReaction:", error);
+        throw error;
+      }
     },
     [dispatch],
   );
@@ -1121,6 +1192,44 @@ export const useNotifications = () => {
     [dispatch],
   );
 
+  // NUOVO: Funzione per ottenere dati chat aperta
+  const getOpenChatData = useCallback(
+    (notificationId) => {
+      return openChatData[notificationId];
+    },
+    [openChatData]
+  );
+
+  // NUOVO: Funzione per aggiornare openChatData
+  const updateOpenChatData = useCallback(
+    (notificationId, data) => {
+      dispatch(setOpenChatData({ notificationId, data }));
+    },
+    [dispatch]
+  );
+
+  // NUOVO: Funzione per rimuovere openChatData
+  const clearOpenChatData = useCallback(
+    (notificationId) => {
+      dispatch(removeOpenChatData(notificationId));
+    },
+    [dispatch]
+  );
+
+  // NUOVO: Funzione per verificare se abbiamo dati completi
+  const hasFullChatData = useCallback(
+    (notificationId) => {
+      const state = store.getState();
+      return selectHasFullChatData(state, notificationId);
+    },
+    []
+  );
+
+  // NUOVO: Funzione per fermare il notification worker
+  const stopNotificationWorker = useCallback(() => {
+    dispatch(stopNotificationsWorker());
+  }, [dispatch]);
+
   return {
     // State
     notifications,
@@ -1137,12 +1246,20 @@ export const useNotifications = () => {
     notificationAttachments,
     standaloneChats: Array.from(standaloneChats), // Convert Set to Array
     openChat,
+    
+    // NUOVO: Aggiungi openChatData
+    openChatData,
+    getOpenChatData,
+    updateOpenChatData,
+    clearOpenChatData,
+    hasFullChatData,
 
     // Worker management
     initializeWorker,
     restartNotificationWorker,
     forceLoadNotifications,
     reloadNotifications: handleReloadNotifications,
+    stopNotificationWorker,
 
     // Basic notification actions
     loadNotifications,

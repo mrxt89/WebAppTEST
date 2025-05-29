@@ -185,89 +185,144 @@ const MainPage = () => {
     };
   }, []);
 
-  // Enhanced open chat modal function
-  const openChatModal = async (notificationId) => {
-    if (!notificationId) {
-      console.error("openChatModal chiamato senza un ID notifica valido");
-      return;
-    }
-
-    try {
-      const notification = await fetchNotificationById(notificationId);
-
-      if (notification) {
+  // NUOVO: Effect per gestire reload delle chat aperte
+useEffect(() => {
+  const handleReloadOpenChat = async (event) => {
+    const { notificationId } = event.detail;
+    
+    // Trova la chat aperta
+    const openChat = openChats.find(
+      chat => chat.notificationId === notificationId
+    );
+    
+    if (openChat) {
+      // Ricarica dati completi
+      const fullData = await fetchNotificationById(notificationId, true);
+      
+      if (fullData) {
+        // Aggiorna la chat aperta con i nuovi dati
+        setOpenChats(prevChats => 
+          prevChats.map(chat => 
+            chat.notificationId === notificationId ? fullData : chat
+          )
+        );
+        
+        // Carica anche allegati se necessario
         try {
           await dispatch(fetchNotificationAttachments(notificationId)).unwrap();
         } catch (error) {
-          console.error("Errore nel caricamento degli allegati:", error);
-          toast({
-            variant: "destructive",
-            title: "Errore nel caricamento degli allegati",
-            description: error.message,
-          });
-        }
-
-        toggleReadUnread(notificationId, true);
-        registerOpenChat(notificationId);
-
-        const isMinimized = minimizedChats.some(
-          (chat) => chat.notificationId === notification.notificationId,
-        );
-
-        if (windowManager?.windowStates?.[notification.notificationId]) {
-          windowManager.activateWindow(notification.notificationId);
-        } else {
-          const defaultPos = {
-            x: Math.max(0, (window.innerWidth - 900) / 2),
-            y: 0,
-            width: 900,
-            height: 700,
-          };
-
-          if (windowManager?.createWindow) {
-            windowManager.createWindow(
-              notification.notificationId,
-              notification.notificationTitle || "Nuova Chat",
-              defaultPos,
-            );
-          }
-        }
-
-        if (isMinimized) {
-          if (toggleMinimize) {
-            toggleMinimize(notification.notificationId);
-          }
-
-          setMinimizedChats((prevMinimized) =>
-            prevMinimized.filter(
-              (chat) => chat.notificationId !== notification.notificationId,
-            ),
-          );
-        }
-
-        setOpenChats((prevChats) => {
-          if (
-            !prevChats.some(
-              (chat) => chat.notificationId === notification.notificationId,
-            )
-          ) {
-            return [...prevChats, notification];
-          }
-          return prevChats.map((chat) =>
-            chat.notificationId === notification.notificationId
-              ? notification
-              : chat,
-          );
-        });
-
-        if (windowManager?.activateWindow) {
-          windowManager.activateWindow(notification.notificationId);
+          console.error("Errore caricamento allegati:", error);
         }
       }
-    } catch (error) {
-      console.error("Errore durante l'apertura della chat:", error);
     }
   };
+
+  document.addEventListener("reload-open-chat", handleReloadOpenChat);
+  
+  return () => {
+    document.removeEventListener("reload-open-chat", handleReloadOpenChat);
+  };
+}, [openChats, fetchNotificationById, dispatch]);
+
+// Enhanced open chat modal function
+const openChatModal = async (notificationId) => {
+  if (!notificationId) {
+    console.error("openChatModal chiamato senza un ID notifica valido");
+    return;
+  }
+
+  try {
+    // IMPORTANTE: Forza SEMPRE il caricamento completo prima di aprire
+    console.log(`🔄 MainPage: Caricando dati completi per chat ${notificationId}`);
+    
+    // Fetch the complete notification data with all messages
+    const fullNotification = await fetchNotificationById(notificationId, true);
+
+    if (fullNotification) {
+      // Carica anche gli allegati
+      try {
+        await dispatch(fetchNotificationAttachments(notificationId)).unwrap();
+      } catch (error) {
+        console.error("Errore nel caricamento degli allegati:", error);
+        toast({
+          variant: "destructive",
+          title: "Errore nel caricamento degli allegati",
+          description: error.message,
+        });
+      }
+
+      // Marca come letta
+      toggleReadUnread(notificationId, true);
+      registerOpenChat(notificationId);
+
+      const isMinimized = minimizedChats.some(
+        (chat) => chat.notificationId === fullNotification.notificationId,
+      );
+
+      // Gestione window manager
+      if (windowManager?.windowStates?.[fullNotification.notificationId]) {
+        windowManager.activateWindow(fullNotification.notificationId);
+      } else {
+        const defaultPos = {
+          x: Math.max(0, (window.innerWidth - 900) / 2),
+          y: 0,
+          width: 900,
+          height: 700,
+        };
+
+        if (windowManager?.createWindow) {
+          windowManager.createWindow(
+            fullNotification.notificationId,
+            fullNotification.notificationTitle || "Nuova Chat",
+            defaultPos,
+          );
+        }
+      }
+
+      // Gestione minimizzate
+      if (isMinimized) {
+        if (toggleMinimize) {
+          toggleMinimize(fullNotification.notificationId);
+        }
+
+        setMinimizedChats((prevMinimized) =>
+          prevMinimized.filter(
+            (chat) => chat.notificationId !== fullNotification.notificationId,
+          ),
+        );
+      }
+
+      // IMPORTANTE: Non serve dispatch qui perché fetchNotificationById già popola openChatData
+      // quando la chat è registrata come aperta tramite registerOpenChat sopra
+
+      // Use the full notification data with all messages
+      setOpenChats((prevChats) => {
+        const existingChat = prevChats.find(
+          (chat) => chat.notificationId === fullNotification.notificationId
+        );
+        
+        if (!existingChat) {
+          return [...prevChats, fullNotification];
+        }
+        
+        // Update existing chat with full data
+        return prevChats.map((chat) =>
+          chat.notificationId === fullNotification.notificationId
+            ? fullNotification
+            : chat,
+        );
+      });
+
+      if (windowManager?.activateWindow) {
+        windowManager.activateWindow(fullNotification.notificationId);
+      }
+      
+      console.log(`✅ MainPage: Chat ${notificationId} aperta con ${fullNotification.messageCount || 0} messaggi`);
+    }
+  } catch (error) {
+    console.error("Errore durante l'apertura della chat:", error);
+  }
+};
 
   // Registra openChatModal in Redux quando il componente è montato
   useEffect(() => {

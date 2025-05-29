@@ -195,8 +195,7 @@ const ChatLayout = ({
             onEditMessage={onEditMessage}
             onViewVersionHistory={onViewVersionHistory}
             onReactionSelect={onReactionSelect}
-            users={users} // Assicuriamoci di passare gli utenti
-            newMessage={hasNewMessages}
+            users={users}
           />
         </div>
 

@@ -9,6 +9,7 @@ let forcedRefreshRequested = false;
 let highPriorityUpdate = false; // Flag per gli aggiornamenti ad alta priorità
 let debugEnabled = true; // Set to true to enable extensive logging
 let isOpenChat = false; // Flag per indicare se stiamo caricando per una chat aperta
+let isWorkerActive = true; // NUOVO: Flag per controllare se il worker è attivo
 
 // Set per prevenire notifiche duplicate ravvicinate
 let recentNotifications = new Set();
@@ -61,7 +62,7 @@ function haveNotificationsChanged(newNotifications) {
     const newMsgCount = newNotif.messageCount || 0;
     const cachedMsgCount = cachedNotif.messageCount || 0;
 
-    // Prendo dalla cche data ora dell'ultimo messaggio ricevuto (lastMessage)
+    // Prendo dalla cache data ora dell'ultimo messaggio ricevuto (lastMessage)
     const newLastMessageDate = new Date(newNotif.lastMessage);
     const cachedLastMessageDate = new Date(cachedNotif.lastMessage);
 
@@ -121,6 +122,12 @@ function extractLastMessagePreview(messages) {
 
 // Main function to fetch notifications
 async function fetchNotifications(notificationIdToFetch = null) {
+  // NUOVO: Controlla se il worker è attivo
+  if (!isWorkerActive) {
+    console.log("[Worker] Worker non attivo, skip fetch");
+    return;
+  }
+
   // Rate limit check - evita richieste troppo frequenti
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
@@ -135,7 +142,11 @@ async function fetchNotifications(notificationIdToFetch = null) {
     if (pollingTimeout) {
       clearTimeout(pollingTimeout);
     }
-    pollingTimeout = setTimeout(fetchNotifications, waitTime);
+    pollingTimeout = setTimeout(() => {
+      if (isWorkerActive) {
+        fetchNotifications();
+      }
+    }, waitTime);
     return;
   }
 
@@ -151,9 +162,11 @@ async function fetchNotifications(notificationIdToFetch = null) {
   try {
     let url = `${apiBaseUrl}/notifications`;
 
-    // Se è richiesta una notifica specifica, modifica l'URL
+    // MODIFICA CHIAVE: Se è richiesta una notifica specifica, usa sempre openChat=true
+    // per ottenere TUTTI i messaggi
     if (notificationIdToFetch) {
-      url = `${apiBaseUrl}/notifications/${notificationIdToFetch}?openChat=${isOpenChat ? "true" : "false"}`;
+      url = `${apiBaseUrl}/notifications/${notificationIdToFetch}?openChat=true&allMessages=true&t=${Date.now()}`;
+      console.log(`🔄 Worker: Caricando dati completi per chat ${notificationIdToFetch}`);
     }
 
     // Request with timeout
@@ -183,6 +196,7 @@ async function fetchNotifications(notificationIdToFetch = null) {
           type: "auth_error",
           error: "Session expired",
         });
+        isWorkerActive = false; // NUOVO: Disattiva il worker su errore auth
         return;
       }
       throw new Error(`Network response was not ok: ${response.status}`);
@@ -193,12 +207,21 @@ async function fetchNotifications(notificationIdToFetch = null) {
     if (notificationIdToFetch) {
       // Se abbiamo richiesto una notifica specifica, otteniamo un oggetto singolo
       const notification = await response.json();
+      
+      // MODIFICA: Log per debug
+      const messageCount = Array.isArray(notification.messages) 
+        ? notification.messages.length 
+        : (typeof notification.messages === "string" ? JSON.parse(notification.messages || "[]").length : 0);
+      
+      console.log(`📨 Worker: Ricevuti ${messageCount} messaggi per chat ${notificationIdToFetch} (messageCount: ${notification.messageCount})`);
+      
       notifications = [notification]; // Lo convertiamo in array per compatibilità
     } else {
-      // Altrimenti otteniamo l'array completo
+      // Altrimenti otteniamo l'array completo (solo per sidebar)
       notifications = await response.json();
     }
 
+    // Il resto della funzione rimane uguale...
     // Sort notifications by pin and date
     notifications.sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
@@ -348,6 +371,12 @@ async function fetchNotifications(notificationIdToFetch = null) {
 
 // Schedule the next fetch based on current state
 function scheduleNextFetch() {
+  // NUOVO: Non schedulare se il worker non è attivo
+  if (!isWorkerActive) {
+    console.log("[Worker] Worker non attivo, skip scheduling");
+    return;
+  }
+
   if (pollingTimeout) {
     clearTimeout(pollingTimeout);
   }
@@ -362,7 +391,11 @@ function scheduleNextFetch() {
     interval = 100; // Praticamente immediato
   }
 
-  pollingTimeout = setTimeout(fetchNotifications, interval);
+  pollingTimeout = setTimeout(() => {
+    if (isWorkerActive) {
+      fetchNotifications();
+    }
+  }, interval);
 }
 
 // Handle messages from React component
@@ -375,6 +408,7 @@ self.onmessage = (event) => {
         // Initialize worker with token and URL
         token = data.token;
         apiBaseUrl = data.apiBaseUrl;
+        isWorkerActive = true; // NUOVO: Attiva il worker
 
         // Enable debug if requested
         if (data.debug) {
@@ -384,14 +418,19 @@ self.onmessage = (event) => {
         // Default to sidebar mode (isOpenChat = false)
         isOpenChat = data.isOpenChat || false;
 
+        console.log("[Worker] Inizializzato e attivo");
+
         // Start fetching immediately
         fetchNotifications();
         break;
 
       case "stop":
         // Stop polling
+        console.log("[Worker] Ricevuto comando stop");
+        isWorkerActive = false; // NUOVO: Disattiva il worker
         if (pollingTimeout) {
           clearTimeout(pollingTimeout);
+          pollingTimeout = null;
         }
         break;
 
@@ -419,10 +458,11 @@ self.onmessage = (event) => {
           fetchNotifications();
         } else {
           // Normale ritardo di aggiornamento forzato
-          pollingTimeout = setTimeout(
-            fetchNotifications,
-            FORCED_REFRESH_INTERVAL,
-          );
+          pollingTimeout = setTimeout(() => {
+            if (isWorkerActive) {
+              fetchNotifications();
+            }
+          }, FORCED_REFRESH_INTERVAL);
         }
         break;
 
@@ -454,6 +494,7 @@ self.onmessage = (event) => {
           type: "pong",
           timestamp: Date.now(),
           lastUpdateTime,
+          isActive: isWorkerActive, // NUOVO: Includi stato attivo
         });
         break;
 

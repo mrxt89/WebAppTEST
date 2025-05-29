@@ -828,33 +828,37 @@ const ChatBottomBar = ({
 
           // Aggiornamento diretto tramite context
           if (contextFunctions.fetchNotificationById) {
-            setTimeout(() => {
-              contextFunctions.fetchNotificationById(
-                result.notificationId || notificationId,
-                true,
-              );
-              // Aggiorna gli allegati
-              getNotificationAttachments(
+            document.dispatchEvent(
+              new CustomEvent("reload-open-chat", {
+                detail: {
+                  notificationId: result.notificationId || notificationId,
+                  reason: "message-sent",
+                  forceComplete: true
+                },
+              }),
+            );
+            
+            // Aggiorna gli allegati se necessario
+            if (contextFunctions.getNotificationAttachments) {
+              contextFunctions.getNotificationAttachments(
                 result.notificationId || notificationId,
               )
-                .then((data) => {
-                  if (Array.isArray(data)) {
-                    // Emetti un evento per aggiornare ChatSidebar
-                    document.dispatchEvent(
-                      new CustomEvent("attachments-updated", {
-                        detail: {
-                          notificationId:
-                            result.notificationId || notificationId,
-                          attachments: data,
-                        },
-                      }),
-                    );
-                  }
-                })
-                .catch((err) => {
-                  console.error("Error refreshing attachments:", err);
-                });
-            }, 100);
+              .then((data) => {
+                if (Array.isArray(data)) {
+                  document.dispatchEvent(
+                    new CustomEvent("attachments-updated", {
+                      detail: {
+                        notificationId: result.notificationId || notificationId,
+                        attachments: data,
+                      },
+                    }),
+                  );
+                }
+              })
+              .catch((err) => {
+                console.error("Error refreshing attachments:", err);
+              });
+            }
           }
         } else {
           // Rimuovi il messaggio temporaneo in caso di errore
@@ -1058,7 +1062,7 @@ const ChatBottomBar = ({
         setPlaceholderVisible(true);
 
         // Emetti un evento per forzare l'aggiornamento
-        document.dispatchEvent(new CustomEvent("refreshNotifications"));
+       
 
         // Emetti anche un evento specifico
         document.dispatchEvent(

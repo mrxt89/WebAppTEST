@@ -8,6 +8,11 @@ class NotificationService {
     this.audioInitialized = false;
     this.pendingNotifications = []; // Coda per notifiche prima dell'inizializzazione
     this.notificationsEnabled = this.getNotificationSetting();
+    // Se non è mai stato impostato, mettilo a true di default
+    if (localStorage.getItem('notificationsEnabled') === null) {
+      localStorage.setItem('notificationsEnabled', 'true');
+      this.notificationsEnabled = true;
+    }
     this.soundEnabled = this.getSoundSetting();
     this.webNotificationsEnabled = this.getWebNotificationSetting();
     this.lastNotificationTime = Date.now();

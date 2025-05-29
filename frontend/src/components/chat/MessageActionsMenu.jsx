@@ -32,16 +32,18 @@ const MessageActionsMenu = ({
 
   // Function to handle reaction addition - with defensive check
   const handleAddReaction = (emoji) => {
-    // Only call onAddReaction if it exists and chat isn't left
+    console.log('MessageActionsMenu handleAddReaction:', { emoji, hasLeftChat });
+    
+    // Verifica che onAddReaction esista e chat non sia abbandonata
     if (typeof onAddReaction === "function" && !hasLeftChat) {
       try {
+        // Chiama onAddReaction con l'emoji
         onAddReaction(emoji);
       } catch (error) {
-        console.error("Error handling reaction in MessageActionsMenu:", error);
-        // Optionally show a user-friendly error toast/notification here
+        console.error("Errore in handleAddReaction:", error);
       }
     } else if (!onAddReaction) {
-      console.warn("onAddReaction function not provided to MessageActionsMenu");
+      console.warn("onAddReaction non è definito");
     }
   };
 

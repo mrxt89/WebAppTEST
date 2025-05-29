@@ -1,31 +1,139 @@
+// src/components/chat/ModernChat.jsx
 import React, { useState, useEffect, useRef } from "react";
 import ChatTopBar from "./ChatTopBar";
 import ChatBottomBar from "./ChatBottomBar";
 import ModernChatList from "./ModernChatList";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
+import { useDispatch, useSelector } from "react-redux";
+import { 
+  selectOpenChatData, 
+  setOpenChatData 
+} from "@/redux/features/notifications/notificationsSlice";
 
 const ModernChat = ({ notification, closeChat, onMinimize, isOpen }) => {
+  const dispatch = useDispatch();
+  
+  // NUOVO: Usa openChatData invece di notification diretta
+  const openChatData = useSelector(state => 
+    selectOpenChatData(state, notification?.notificationId)
+  );
+  
+  // NUOVO: Usa openChatData se disponibile, altrimenti notification
+  const currentNotification = openChatData || notification;
+  
   const [sending, setSending] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState(null);
   const chatListRef = useRef(null);
-  const { markMessageAsRead, toggleMessageReaction } = useNotifications();
+  const { 
+    markMessageAsRead, 
+    toggleMessageReaction,
+    fetchNotificationById 
+  } = useNotifications();
   const [hasMarkedAsRead, setHasMarkedAsRead] = useState(false);
+  const [isLoadingComplete, setIsLoadingComplete] = useState(false);
 
-  // Effetto per segnare i messaggi come letti all'apertura - IMPROVED VERSION
+  // NUOVO: Effetto per caricare dati completi quando si apre la chat
   useEffect(() => {
-    if (isOpen && !hasMarkedAsRead && notification) {
-      if (notification.notificationId && !notification.isReadByUser) {
-        markMessageAsRead(notification.notificationId);
+    if (isOpen && notification?.notificationId) {
+      const notificationId = notification.notificationId;
+      
+      // Rimuovo il controllo dei dati esistenti per forzare sempre il caricamento completo
+      console.log(`🔄 ModernChat: Caricando dati completi per chat ${notificationId}...`);
+      setIsLoadingComplete(true);
+      
+      // Carica TUTTI i messaggi con alta priorità
+      fetchNotificationById(notificationId, true)
+        .then((fullData) => {
+          if (fullData) {
+            console.log(`✅ ModernChat: Dati completi caricati per chat ${notificationId}:`, {
+              messageCount: fullData.messageCount,
+              messagesLength: Array.isArray(fullData.messages) 
+                ? fullData.messages.length 
+                : (typeof fullData.messages === "string" ? JSON.parse(fullData.messages || "[]").length : 0)
+            });
+            
+            // Aggiorna openChatData nel Redux con priorità
+            dispatch(setOpenChatData({
+              notificationId: notificationId,
+              data: {
+                ...fullData,
+                lastFullUpdate: Date.now(),
+                _priority: true
+              }
+            }));
+          }
+        })
+        .catch((error) => {
+          console.error(`❌ ModernChat: Errore nel caricamento per chat ${notificationId}:`, error);
+        })
+        .finally(() => {
+          setIsLoadingComplete(false);
+        });
+    }
+  }, [isOpen, notification?.notificationId, fetchNotificationById, dispatch]);
+
+// NUOVO: Effetto per gestire reload-open-chat con protezione
+useEffect(() => {
+  const handleReloadOpenChat = async (event) => {
+    const { notificationId: eventNotificationId, reason, forceComplete } = event.detail;
+    
+    if (eventNotificationId === notification?.notificationId) {
+      console.log(`🔄 ModernChat: Reload richiesto per chat ${eventNotificationId} (motivo: ${reason || 'unknown'})`);
+      
+      try {
+        const shouldForceComplete = forceComplete || reason === 'message-sent';
+        
+        const fullData = await fetchNotificationById(eventNotificationId, true);
+        
+        if (fullData) {
+          console.log(`✅ ModernChat: Reload completato per chat ${eventNotificationId}:`, {
+            messageCount: fullData.messageCount,
+            messagesLength: Array.isArray(fullData.messages) 
+              ? fullData.messages.length 
+              : (typeof fullData.messages === "string" ? JSON.parse(fullData.messages || "[]").length : 0)
+          });
+          
+          dispatch(setOpenChatData({
+            notificationId: eventNotificationId,
+            data: {
+              ...fullData,
+              lastFullUpdate: Date.now(),
+              _priority: true,
+              _reloadReason: reason,
+              _forceComplete: shouldForceComplete
+            }
+          }));
+        }
+      } catch (error) {
+        console.error(`❌ ModernChat: Errore durante reload per chat ${eventNotificationId}:`, error);
+      }
+    }
+  };
+
+  document.addEventListener("reload-open-chat", handleReloadOpenChat);
+  
+  return () => {
+    document.removeEventListener("reload-open-chat", handleReloadOpenChat);
+  };
+}, [notification?.notificationId, fetchNotificationById, dispatch]);
+
+  // Effetto per segnare i messaggi come letti all'apertura
+  useEffect(() => {
+    if (isOpen && !hasMarkedAsRead && currentNotification) {
+      if (currentNotification.notificationId && !currentNotification.isReadByUser) {
+        markMessageAsRead(currentNotification.notificationId);
         setHasMarkedAsRead(true);
       }
     }
-  }, [isOpen, notification, markMessageAsRead, hasMarkedAsRead]);
+  }, [isOpen, currentNotification, markMessageAsRead, hasMarkedAsRead]);
 
-  if (!notification) {
-    return <div>Loading...</div>;
+  if (!currentNotification) {
+    return <div className="flex items-center justify-center h-full">
+      <div className="text-gray-500">Caricamento messaggi...</div>
+    </div>;
   }
 
-  // Estrai le informazioni dalla notifica
+  // MODIFICA: Estrai le informazioni da currentNotification invece di notification
   const {
     title,
     messages,
@@ -33,18 +141,21 @@ const ModernChat = ({ notification, closeChat, onMinimize, isOpen }) => {
     notificationCategoryId,
     hexColor,
     chatLeft,
-    users = [], // Provide default empty array for users
-  } = notification;
+    users = [],
+    membersInfo = []
+  } = currentNotification;
 
   // Determina se l'utente ha abbandonato la chat
   const hasLeftChat = chatLeft === 1 || chatLeft === true;
 
-  // Assicurati che i messaggi siano in formato array
+  // MODIFICA: Assicurati che i messaggi siano in formato array - usa i dati completi
   const parsedMessages = Array.isArray(messages)
     ? messages
-    : JSON.parse(messages || "[]");
+    : typeof messages === 'string' 
+      ? JSON.parse(messages || "[]")
+      : [];
 
-  // Get current user from users array - make sure it's defined
+  // Get current user from users array
   const currentUser = users.find && users.find((user) => user.isCurrentUser);
 
   // Gestisci la risposta a un messaggio
@@ -62,6 +173,10 @@ const ModernChat = ({ notification, closeChat, onMinimize, isOpen }) => {
         notificationCategoryId={notificationCategoryId}
         hexColor={hexColor}
         hasLeftChat={hasLeftChat}
+        membersInfo={membersInfo}
+        users={users}
+        currentUser={currentUser}
+        notificationId={notificationId}
       />
 
       <div className="flex-1 overflow-hidden chat-background">
@@ -69,15 +184,15 @@ const ModernChat = ({ notification, closeChat, onMinimize, isOpen }) => {
           messages={parsedMessages}
           sending={sending}
           notificationId={notificationId}
-          isReadByUser={notification.isReadByUser || hasMarkedAsRead}
-          markMessageAsRead={null} // Don't pass this function to avoid double marking
+          isReadByUser={currentNotification.isReadByUser || hasMarkedAsRead}
+          markMessageAsRead={null}
           chatListRef={chatListRef}
           onReply={handleReply}
           categoryColor={hexColor}
           hasLeftChat={hasLeftChat}
           currentUser={currentUser}
           users={users || []}
-          notification={notification}
+          notification={currentNotification} // MODIFICA: Passa currentNotification
           toggleMessageReaction={toggleMessageReaction}
         />
       </div>
@@ -91,8 +206,9 @@ const ModernChat = ({ notification, closeChat, onMinimize, isOpen }) => {
           setSending={setSending}
           replyToMessage={replyToMessage}
           setReplyToMessage={setReplyToMessage}
-          hasLeftChat={hasLeftChat} // Pass hasLeftChat to component
-          users={users || []} // Ensure users is an array
+          hasLeftChat={hasLeftChat}
+          users={users || []}
+          notification={currentNotification} // MODIFICA: Passa currentNotification se necessario
         />
       )}
 

@@ -1143,7 +1143,7 @@ router.get('/messages/:messageId/reactions', authenticateToken, async (req, res)
 // 2. Route per aggiungere/rimuovere una reazione a un messaggio
 router.post('/messages/:messageId/reactions', authenticateToken, async (req, res) => {
   try {
-    const { messageId } = req.params;
+    const messageId = parseInt(req.params.messageId);
     const { reactionType } = req.body;
     const userId = req.user.UserId;
     

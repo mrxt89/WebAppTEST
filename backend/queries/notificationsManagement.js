@@ -18,8 +18,24 @@ async function getUserNotifications(userId) {
     let pool = await sql.connect(config.dbConfig);
     let result = await pool.request()
       .input('userId', sql.Int, userId)
-      .execute('GetUserNotifications');
-    return result.recordset;
+      .input('notificationId', sql.Int, 0)
+      .input('OpenChat', sql.Bit, 0)
+      .execute('GetUserNotificationsWithMessages');
+    
+    // Parsa i JSON fields per ogni notifica
+    return result.recordset.map(notification => {
+      if (notification.messages) {
+        notification.messages = typeof notification.messages === 'string' 
+          ? JSON.parse(notification.messages) 
+          : notification.messages;
+      }
+      if (notification.membersInfo) {
+        notification.membersInfo = typeof notification.membersInfo === 'string' 
+          ? JSON.parse(notification.membersInfo) 
+          : notification.membersInfo;
+      }
+      return notification;
+    });
   } catch (err) {
     console.error('Error fetching user notifications:', err);
     throw err;
@@ -28,21 +44,52 @@ async function getUserNotifications(userId) {
 
 async function getNotificationById(userId, notificationId, isOpenChat = true) {
   try {
-    // Prima ricreiamo la vista con i messaggi completi per questa notifica specifica
-    await createDBNotificationsView(userId, notificationId, 0, isOpenChat);
-    
-    // Poi recuperiamo i dati dalla vista
     let pool = await sql.connect(config.dbConfig);
     let result = await pool.request()
       .input('userId', sql.Int, userId)
       .input('notificationId', sql.Int, notificationId)
-      .execute('GetUserNotifications');
+      .input('OpenChat', sql.Bit, isOpenChat ? 1 : 0)
+      .execute('GetUserNotificationsWithMessages');
+    
     if (result.recordset.length === 0) {
       return null;
     }
+    
     const notification = result.recordset[0];
-    notification.messages = JSON.parse(notification.messages);
-    notification.membersInfo = JSON.parse(notification.membersInfo);
+    
+    // Parsa i JSON fields
+    if (notification.messages) {
+      notification.messages = typeof notification.messages === 'string' 
+        ? JSON.parse(notification.messages) 
+        : notification.messages;
+    }
+    if (notification.membersInfo) {
+      notification.membersInfo = typeof notification.membersInfo === 'string' 
+        ? JSON.parse(notification.membersInfo) 
+        : notification.membersInfo;
+    }
+    
+    // Processa anche i campi nelle reazioni dei messaggi se presenti
+    if (notification.messages && Array.isArray(notification.messages)) {
+      notification.messages = notification.messages.map(msg => {
+        if (msg.reactions && typeof msg.reactions === 'string') {
+          try {
+            msg.reactions = JSON.parse(msg.reactions);
+          } catch (e) {
+            msg.reactions = [];
+          }
+        }
+        if (msg.readByUsers && typeof msg.readByUsers === 'string') {
+          try {
+            msg.readByUsers = JSON.parse(msg.readByUsers);
+          } catch (e) {
+            msg.readByUsers = [];
+          }
+        }
+        return msg;
+      });
+    }
+    
     return notification;
   } catch (err) {
     console.error('Error fetching notification:', err);
@@ -75,11 +122,9 @@ ON T1.id = T0.defaultResponseOptionId
     return result.recordset;
   } catch (err) {
     console.error('Error fetching notification response options:', err);
-    throw err;  // This throws an error back to the router, resulting in a 500 response
+    throw err;
   }
 }
-
-
 
 async function markNotificationAsReceived(notificationId, userId, messageId) {
   try {
@@ -89,9 +134,11 @@ async function markNotificationAsReceived(notificationId, userId, messageId) {
       .input('userId', sql.Int, userId)
       .input('messageId', sql.Int, messageId)
       .query(`
-        UPDATE AR_NotificationDetails
+        UPDATE AR_NotificationDetails WITH (ROWLOCK)
         SET received = 1
-        WHERE notificationId = @notificationId AND receiverId = @userId AND messageId <= @messageId
+        WHERE notificationId = @notificationId 
+          AND receiverId = @userId 
+          AND messageId <= @messageId
       `);
   } catch (err) {
     console.error('Error marking message as received:', err);
@@ -107,22 +154,23 @@ async function markNotificationAsRead(notificationId, userId, isReadByUser) {
       .input('userId', sql.Int, userId)
       .input('isReadByUser', sql.Bit, isReadByUser)
       .query(`
-        DISABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
+        UPDATE AR_NotificationDetails WITH (ROWLOCK)
+        SET isReadByUser = @isReadByUser,
+            isReadByReceiver = CASE 
+              WHEN @isReadByUser = 1 AND isReadByReceiver = 0 THEN 1 
+              ELSE isReadByReceiver 
+            END,
+            ReceiverReadedDate = CASE 
+              WHEN @isReadByUser = 1 AND isReadByReceiver = 0 THEN GETDATE() 
+              ELSE ReceiverReadedDate 
+            END,
+            received = 1
+        WHERE notificationId = @notificationId 
+          AND receiverId = @userId;
 
-        UPDATE  AR_NotificationDetails
-        SET     isReadByUser = @isReadByUser
-                , isReadByReceiver = CASE WHEN @isReadByUser = 1 AND isReadByReceiver = 0 THEN 1 ELSE isReadByReceiver END
-                , ReceiverReadedDate = CASE WHEN @isReadByUser = 1 AND isReadByReceiver = 0 THEN GETDATE() ELSE ReceiverReadedDate END
-                , received = 1
-        WHERE   notificationId = @notificationId AND receiverId = @userId
-
-        UPDATE  AR_NotificationsView
-        SET     isReadByUser = @isReadByUser
-        WHERE   notificationId = @notificationId AND userId = @userId
-
-        UPDATE AR_Users SET LastOnline = GETDATE() WHERE UserId = @UserId;
-
-        ENABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
+        UPDATE AR_Users 
+        SET LastOnline = GETDATE() 
+        WHERE UserId = @userId;
       `);
   } catch (err) {
     console.error('Error marking notification as read:', err);
@@ -138,17 +186,10 @@ async function togglePinned(notificationId, userId, pinned) {
       .input('userId', sql.Int, userId)
       .input('pinned', sql.Bit, pinned)
       .query(`
-        DISABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
-
-        UPDATE AR_NotificationDetails
+        UPDATE AR_NotificationDetails WITH (ROWLOCK)
         SET pinned = @pinned
-        WHERE notificationId = @notificationId AND receiverId = @userId
-
-        UPDATE AR_NotificationsView
-        SET pinned = @pinned
-        WHERE notificationId = @notificationId AND userId = @userId;
-
-        ENABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
+        WHERE notificationId = @notificationId 
+          AND receiverId = @userId
       `);
   } catch (err) {
     console.error('Error toggling pinned:', err);
@@ -164,19 +205,10 @@ async function toggleFavorite(notificationId, userId, favorite) {
       .input('userId', sql.Int, userId)
       .input('favorite', sql.Bit, favorite)
       .query(`
-        DISABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
-
-        UPDATE AR_NotificationDetails
+        UPDATE AR_NotificationDetails WITH (ROWLOCK)
         SET favorite = @favorite
-        WHERE notificationId = @notificationId AND receiverId = @userId
-
-        UPDATE AR_NotificationsView
-        SET favorite = @favorite
-        WHERE notificationId = @notificationId AND userId = @userId;
-
-        ENABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
-
-
+        WHERE notificationId = @notificationId 
+          AND receiverId = @userId
       `);
   } catch (err) {
     console.error('Error toggling favorite:', err);
@@ -250,7 +282,6 @@ async function sendNotification(data) {
   const { notificationId, message, responseOptionId, eventId, title, notificationCategoryId, receiversList, userId, replyToMessageId, pollId } = data;
   try {
     let pool = await sql.connect(config.dbConfig);
-    // Prima di inviare i dati al server
     const cleanMessage = message.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
     let request = pool.request()
     .input('userId', sql.Int, userId)
@@ -259,52 +290,65 @@ async function sendNotification(data) {
     .input('responseOptionId', sql.Int, responseOptionId)
     .input('eventId', sql.Int, eventId)
     .input('replyToMessageId', sql.Int, replyToMessageId)
-    .input('SkipReturnInfo', sql.Int, 0);  // Assicurati che ritorni sempre i dati completi
+    .input('SkipReturnInfo', sql.Int, 0);
     
-    // Aggiungi parametri opzionali solo se sono presenti
     if (title) request.input('title', sql.NVarChar(sql.MAX), title);
     if (notificationCategoryId) request.input('notificationCategoryId', sql.Int, notificationCategoryId);
     if (receiversList) request.input('receiversList', sql.VarChar, receiversList);
-    if (pollId) request.input('pollId', sql.Int, pollId); // Nuovo parametro per messaggi con sondaggio
+    if (pollId) request.input('pollId', sql.Int, pollId);
     
     let result = await request.execute('SendNotification');
 
-    const record = result.recordset[0];
+    // Dopo aver inviato il messaggio, recupera i dati aggiornati usando la nuova stored
+    let updatedResult = await pool.request()
+      .input('userId', sql.Int, userId)
+      .input('notificationId', sql.Int, notificationId || result.recordset[0].notificationId)
+      .input('OpenChat', sql.Bit, 1)
+      .execute('GetUserNotificationsWithMessages');
     
-    // Gestione sicura del parsing dei messaggi
-    let parsedMessages;
-    try {
-      parsedMessages = typeof record.messages === 'string' 
-        ? JSON.parse(record.messages) 
-        : record.messages;
-    } catch (err) {
-      console.error('Error parsing messages:', err);
-      parsedMessages = [];
-    }
-    
-    // Gestione sicura del parsing dei membri
-    let parsedMembersInfo;
-    try {
-      parsedMembersInfo = typeof record.membersInfo === 'string' 
-        ? JSON.parse(record.membersInfo) 
-        : record.membersInfo;
-    } catch (err) {
-      console.error('Error parsing membersInfo:', err);
-      parsedMembersInfo = [];
-    }
+    if (updatedResult.recordset.length > 0) {
+      const notification = updatedResult.recordset[0];
+      
+      // Parsa i JSON fields
+      let parsedMessages = [];
+      try {
+        parsedMessages = typeof notification.messages === 'string' 
+          ? JSON.parse(notification.messages) 
+          : notification.messages || [];
+      } catch (err) {
+        console.error('Error parsing messages:', err);
+      }
+      
+      let parsedMembersInfo = [];
+      try {
+        parsedMembersInfo = typeof notification.membersInfo === 'string' 
+          ? JSON.parse(notification.membersInfo) 
+          : notification.membersInfo || [];
+      } catch (err) {
+        console.error('Error parsing membersInfo:', err);
+      }
 
+      return {
+        success: true,
+        msg: result.recordset[0].msg || 'Messaggio inviato',
+        notificationId: notification.notificationId,
+        notificationCategoryId: notification.notificationCategoryId,
+        title: notification.title,
+        messages: parsedMessages,
+        membersInfo: parsedMembersInfo,
+        isClosed: notification.isClosed,
+        closingUser: notification.closingUser,
+        closingDate: notification.closingDate,
+        serverTimestamp: new Date().toISOString()
+      };
+    }
+    
+    // Fallback se non troviamo la notifica aggiornata
     return {
       success: true,
-      msg: record.msg,
-      notificationId: record.notificationId ?? 0,
-      notificationCategoryId: record.notificationCategoryId ?? 0,
-      title: record.title ?? '',
-      messages: parsedMessages,
-      membersInfo: parsedMembersInfo,
-      isClosed: record.isClosed,
-      closingUser: record.closingUser,
-      closingDate: record.closingDate,
-      serverTimestamp: new Date().toISOString() // Aggiungi timestamp server per debugging
+      msg: result.recordset[0].msg || 'Messaggio inviato',
+      notificationId: result.recordset[0].notificationId || notificationId,
+      serverTimestamp: new Date().toISOString()
     };
   } catch (err) {
     console.error('Error sending notification:', err);
@@ -312,31 +356,27 @@ async function sendNotification(data) {
   }
 }
 
+// DEPRECATA - Non più necessaria con la nuova vista
 async function createDBNotificationsView(userId, notificationId = 0, allNotificationsByUser = 1, isOpenChat = false) {
+  console.warn('createDBNotificationsView is deprecated. Use GetUserNotificationsWithMessages instead.');
+  // Per retrocompatibilità, reindirizza a getUserNotifications
   try {
-    const pool = await sql.connect(config.dbConfig);
-    const result = await pool.request()
-      .input('userId', sql.Int, userId)
-      .input('notificationId', sql.Int, notificationId)
-      .input('allNotificationsByUser', sql.Int, allNotificationsByUser)
-      .input('OpenChat', sql.Bit, isOpenChat ? 1 : 0)
-      .execute('CreateNotificationsView');
-    return result.recordset;
+    if (notificationId && notificationId > 0) {
+      // Se è richiesta una notifica specifica
+      const notification = await getNotificationById(userId, notificationId, isOpenChat);
+      return notification ? [notification] : [];
+    } else {
+      // Altrimenti ritorna tutte le notifiche
+      return await getUserNotifications(userId);
+    }
   } catch (err) {
-    console.error('Error creating DB notifications view:', err);
+    console.error('Error in createDBNotificationsView:', err);
     throw err;
   }
 }
 
-/**
- * Imposta il colore di un messaggio specifico
- * @param {number} messageId - ID del messaggio da colorare
- * @param {number} userId - ID dell'utente che sta impostando il colore
- * @param {string} color - Codice esadecimale del colore
- */
 async function setMessageColor(messageId, userId, color) {
   try {
-    // Verificare che il formato del colore sia corretto (es. #FFFFFF)
     if (!color || !color.startsWith('#') || color.length !== 7) {
       throw new Error('Formato colore non valido. Deve essere in formato #RRGGBB');
     }
@@ -347,30 +387,11 @@ async function setMessageColor(messageId, userId, color) {
       .input('userId', sql.Int, userId)
       .input('color', sql.NVarChar(7), color)
       .query(`
-        UPDATE AR_NotificationDetails
+        UPDATE AR_NotificationDetails WITH (ROWLOCK)
         SET messageColor = @color
-        WHERE messageId = @messageId AND receiverId = @userId
+        WHERE messageId = @messageId 
+          AND receiverId = @userId
       `);
-    
-    // Recupera l'ID della notifica associata al messaggio
-    const notificationResult = await pool.request()
-      .input('messageId', sql.Int, messageId)
-      .query(`
-        SELECT notificationId 
-        FROM AR_NotificationDetails 
-        WHERE messageId = @messageId
-      `);
-    
-    if (notificationResult.recordset.length > 0) {
-      const notificationId = notificationResult.recordset[0].notificationId;
-      
-      // Aggiorna la vista delle notifiche per l'utente
-      await pool.request()
-        .input('userId', sql.Int, userId)
-        .input('notificationId', sql.Int, notificationId)
-        .input('allNotificationsByUser', sql.Int, 0)
-        .execute('CreateNotificationsView');
-    }
 
     return { success: true };
   } catch (err) {
@@ -379,11 +400,6 @@ async function setMessageColor(messageId, userId, color) {
   }
 }
 
-/**
- * Rimuove il colore di un messaggio specifico
- * @param {number} messageId - ID del messaggio
- * @param {number} userId - ID dell'utente
- */
 async function clearMessageColor(messageId, userId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -391,30 +407,11 @@ async function clearMessageColor(messageId, userId) {
       .input('messageId', sql.Int, messageId)
       .input('userId', sql.Int, userId)
       .query(`
-        UPDATE AR_NotificationDetails
+        UPDATE AR_NotificationDetails WITH (ROWLOCK)
         SET messageColor = NULL
-        WHERE messageId = @messageId AND receiverId = @userId
+        WHERE messageId = @messageId 
+          AND receiverId = @userId
       `);
-    
-    // Recupera l'ID della notifica associata al messaggio
-    const notificationResult = await pool.request()
-      .input('messageId', sql.Int, messageId)
-      .query(`
-        SELECT notificationId 
-        FROM AR_NotificationDetails 
-        WHERE messageId = @messageId
-      `);
-    
-    if (notificationResult.recordset.length > 0) {
-      const notificationId = notificationResult.recordset[0].notificationId;
-      
-      // Aggiorna la vista delle notifiche per l'utente
-      await pool.request()
-        .input('userId', sql.Int, userId)
-        .input('notificationId', sql.Int, notificationId)
-        .input('allNotificationsByUser', sql.Int, 0)
-        .execute('CreateNotificationsView');
-    }
     
     return { success: true };
   } catch (err) {
@@ -423,16 +420,8 @@ async function clearMessageColor(messageId, userId) {
   }
 }
 
-/**
- * Filtra i messaggi per colore o testo
- * @param {number} notificationId - ID della notifica
- * @param {number} userId - ID dell'utente
- * @param {string} color - Codice colore opzionale
- * @param {string} searchText - Testo da cercare opzionale
- */
 async function filterMessages(notificationId, userId, color, searchText) {
   try {
-    // Verifica che i parametri necessari siano presenti
     if (!notificationId) {
       throw new Error('NotificationId è obbligatorio');
     }
@@ -442,20 +431,18 @@ async function filterMessages(notificationId, userId, color, searchText) {
       SELECT nd.messageId, nd.message, nd.messageColor, nd.tbCreated, 
              u.firstName + ' ' + u.lastName AS senderName,
              CASE WHEN nd.senderId = @userId THEN 1 ELSE 0 END AS selectedUser
-      FROM AR_NotificationDetails nd
-      JOIN AR_Users u ON u.userId = nd.senderId
+      FROM AR_NotificationDetails nd WITH (NOLOCK)
+      JOIN AR_Users u WITH (NOLOCK) ON u.userId = nd.senderId
       WHERE nd.notificationId = @notificationId 
         AND nd.receiverId = @userId 
         AND nd.cancelled = 0
     `;
     
-    // Aggiungi filtri opzionali
     const params = {
       notificationId: { type: sql.Int, value: notificationId },
       userId: { type: sql.Int, value: userId }
     };
     
-    // Modifica qui per gestire correttamente il colore
     if (color && color.trim() !== '') {
       query += ` AND nd.messageColor = @color`;
       params.color = { type: sql.NVarChar(10), value: color };
@@ -466,12 +453,10 @@ async function filterMessages(notificationId, userId, color, searchText) {
       params.searchText = { type: sql.NVarChar(sql.MAX), value: `%${searchText}%` };
     }
     
-    
     query += ` ORDER BY nd.tbCreated DESC`;
     
     const request = pool.request();
     
-    // Aggiungi tutti i parametri alla request
     Object.entries(params).forEach(([key, param]) => {
       request.input(key, param.type, param.value);
     });
@@ -484,14 +469,6 @@ async function filterMessages(notificationId, userId, color, searchText) {
   }
 }
 
-/**
- * Aggiunge un punto importante alla conversazione
- * @param {number} notificationId - ID della notifica
- * @param {number} userId - ID dell'utente
- * @param {string} highlightText - Testo del punto importante
- * @param {boolean} isAutoGenerated - Indica se è stato generato automaticamente
- * @returns {Promise<Object>} - Risultato dell'operazione
- */
 async function addConversationHighlight(notificationId, userId, highlightText, isAutoGenerated = false) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -509,12 +486,6 @@ async function addConversationHighlight(notificationId, userId, highlightText, i
   }
 }
 
-/**
- * Rimuove un punto importante
- * @param {number} highlightId - ID del punto importante
- * @param {number} userId - ID dell'utente
- * @returns {Promise<Object>} - Risultato dell'operazione
- */
 async function removeConversationHighlight(highlightId, userId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -530,12 +501,6 @@ async function removeConversationHighlight(highlightId, userId) {
   }
 }
 
-/**
- * Ottiene i punti importanti di una conversazione
- * @param {number} notificationId - ID della notifica
- * @param {number} userId - ID dell'utente
- * @returns {Promise<Array>} - Lista dei punti importanti
- */
 async function getConversationHighlights(notificationId, userId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -551,12 +516,6 @@ async function getConversationHighlights(notificationId, userId) {
   }
 }
 
-/**
- * Genera automaticamente un riepilogo della conversazione
- * @param {number} notificationId - ID della notifica
- * @param {number} userId - ID dell'utente
- * @returns {Promise<Array>} - Lista dei punti importanti generati
- */
 async function generateConversationSummary(notificationId, userId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -572,13 +531,6 @@ async function generateConversationSummary(notificationId, userId) {
   }
 }
 
-
-/**
- * Permette a un utente di abbandonare una chat
- * @param {number} notificationId - ID della notifica/chat da abbandonare
- * @param {number} userId - ID dell'utente che vuole abbandonare la chat
- * @returns {Promise<Object>} - Risultato dell'operazione
- */
 async function leaveChat(notificationId, userId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -594,25 +546,12 @@ async function leaveChat(notificationId, userId) {
   }
 }
 
-/**
- * Crea un nuovo sondaggio
- * @param {number} notificationId - ID della notifica
- * @param {number} messageId - ID del messaggio
- * @param {string} question - Domanda del sondaggio
- * @param {Array} options - Opzioni di risposta
- * @param {boolean} allowMultipleAnswers - Permetti risposte multiple
- * @param {number} userId - ID dell'utente creatore
- * @param {Date} expirationDate - Data di scadenza (opzionale)
- * @returns {Promise<Object>} - Sondaggio creato
- */
 async function createPoll(notificationId, messageId, question, options, allowMultipleAnswers, userId, expirationDate) {
   try {
-    // Verifiche di sicurezza
     if (!notificationId || !messageId || !question || !options || !Array.isArray(options) || options.length < 2) {
       throw new Error('Parametri mancanti o non validi per la creazione del sondaggio');
     }
 
-    
     const optionsJson = JSON.stringify(options);
     
     let pool = await sql.connect(config.dbConfig);
@@ -626,8 +565,6 @@ async function createPoll(notificationId, messageId, question, options, allowMul
       .input('ExpirationDate', sql.DateTime, expirationDate || null)
       .execute('CreatePoll');
     
-    
-    
     return result.recordset[0];
   } catch (err) {
     console.error('Error creating poll:', err);
@@ -635,12 +572,6 @@ async function createPoll(notificationId, messageId, question, options, allowMul
   }
 }
 
-/**
- * Vota in un sondaggio
- * @param {number} optionId - ID dell'opzione selezionata
- * @param {number} userId - ID dell'utente votante
- * @returns {Promise<Object>} - Risultati aggiornati del sondaggio
- */
 async function votePoll(optionId, userId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -656,12 +587,6 @@ async function votePoll(optionId, userId) {
   }
 }
 
-/**
- * Ottieni un sondaggio specifico con i suoi risultati
- * @param {number} pollId - ID del sondaggio
- * @param {number} userId - ID dell'utente
- * @returns {Promise<Object>} - Dettagli e risultati del sondaggio
- */
 async function getPoll(pollId, userId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -677,12 +602,6 @@ async function getPoll(pollId, userId) {
   }
 }
 
-/**
- * Ottieni tutti i sondaggi di una notifica
- * @param {number} notificationId - ID della notifica
- * @param {number} userId - ID dell'utente
- * @returns {Promise<Array>} - Lista dei sondaggi con risultati
- */
 async function getNotificationPolls(notificationId, userId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -698,12 +617,6 @@ async function getNotificationPolls(notificationId, userId) {
   }
 }
 
-/**
- * Chiudi un sondaggio
- * @param {number} pollId - ID del sondaggio
- * @param {number} userId - ID dell'utente (deve essere il creatore)
- * @returns {Promise<Object>} - Sondaggio aggiornato
- */
 async function closePoll(pollId, userId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -726,22 +639,10 @@ async function archiveChat(notificationId, userId) {
       .input('notificationId', sql.Int, notificationId)
       .input('userId', sql.Int, userId)
       .query(`
-        DISABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
-
-        -- Imposta il flag cancelled a 1 solo per questo utente su AR_NotificationDetails
-        UPDATE AR_NotificationDetails
+        UPDATE AR_NotificationDetails WITH (ROWLOCK)
         SET archived = 1
         WHERE notificationId = @notificationId 
-        AND receiverId = @userId;
-
-        -- Imposta il flag cancelled a 1 solo per questo utente su AR_NotificationsView
-        UPDATE AR_NotificationsView
-        SET archived = 1
-        WHERE notificationId = @notificationId
-        AND userId = @userId;
-
-        ENABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
-
+          AND receiverId = @userId
       `);
 
     return { success: true, message: 'Chat archiviata con successo' };
@@ -758,21 +659,10 @@ async function unarchiveChat(notificationId, userId) {
       .input('notificationId', sql.Int, notificationId)
       .input('userId', sql.Int, userId)
       .query(`
-        DISABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
-
-        -- Imposta il flag archived a 0 per questo utente su AR_NotificationDetails
-        UPDATE AR_NotificationDetails
+        UPDATE AR_NotificationDetails WITH (ROWLOCK)
         SET archived = 0
         WHERE notificationId = @notificationId 
-        AND receiverId = @userId;
-
-        -- Imposta il flag archived a 0 per questo utente su AR_NotificationsView
-        UPDATE AR_NotificationsView
-        SET archived = 0
-        WHERE notificationId = @notificationId
-        AND userId = @userId;
-
-        ENABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
+          AND receiverId = @userId
       `);
 
     return { success: true, message: 'Chat rimossa dall\'archivio con successo' };
@@ -782,23 +672,15 @@ async function unarchiveChat(notificationId, userId) {
   }
 }
 
-/**
- * Aggiorna il titolo di una chat
- * @param {number} notificationId - ID della notifica/chat da aggiornare
- * @param {number} userId - ID dell'utente che sta aggiornando il titolo
- * @param {string} title - Nuovo titolo della chat
- * @returns {Promise<Object>} - Risultato dell'operazione
- */
 async function updateChatTitle(notificationId, userId, title) {
   try {
     let pool = await sql.connect(config.dbConfig);
     
-    // Aggiorna il titolo nella tabella AR_Notifications
     await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .input('title', sql.NVarChar(500), title)
       .query(`
-        UPDATE AR_Notifications
+        UPDATE AR_Notifications WITH (ROWLOCK)
         SET title = @title
         WHERE notificationId = @notificationId
       `);
@@ -814,13 +696,6 @@ async function updateChatTitle(notificationId, userId, title) {
   }
 }
 
-/**
- * Modifica un messaggio esistente
- * @param {number} messageId - ID del messaggio da modificare
- * @param {number} userId - ID dell'utente che sta modificando il messaggio
- * @param {string} newMessage - Nuovo testo del messaggio
- * @returns {Promise<Object>} - Risultato dell'operazione
- */
 async function editMessage(messageId, userId, newMessage) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -837,12 +712,6 @@ async function editMessage(messageId, userId, newMessage) {
   }
 }
 
-/**
- * Ottiene la cronologia delle versioni di un messaggio
- * @param {number} messageId - ID del messaggio
- * @param {number} userId - ID dell'utente che richiede la cronologia
- * @returns {Promise<Object>} - Cronologia delle versioni
- */
 async function getMessageVersionHistory(messageId, userId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -850,10 +719,6 @@ async function getMessageVersionHistory(messageId, userId) {
       .input('messageId', sql.Int, messageId)
       .input('userId', sql.Int, userId)
       .execute('GetMessageVersionHistory');
-    
-    // La stored procedure restituisce due resultset:
-    // 1. Versione corrente
-    // 2. Cronologia delle versioni precedenti
     
     const currentMessage = result.recordset[0] || null;
     const versionHistory = result.recordsets[1] || [];
@@ -869,7 +734,6 @@ async function getMessageVersionHistory(messageId, userId) {
   }
 }
 
-// Funzione per silenziare/annullare silenziamento di una chat
 async function toggleMuteChat(notificationId, userId, isMuted, expiryDate = null) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -879,22 +743,11 @@ async function toggleMuteChat(notificationId, userId, isMuted, expiryDate = null
       .input('isMuted', sql.Bit, isMuted)
       .input('expiryDate', sql.DateTime, expiryDate)
       .query(`
-        DISABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
-        
-        -- Imposta il flag isMuted e la data di scadenza per il silenziamento per AR_NotificationDetails
-        UPDATE AR_NotificationDetails
+        UPDATE AR_NotificationDetails WITH (ROWLOCK)
         SET isMuted = @isMuted,
             muteExpiryDate = @expiryDate
-        WHERE notificationId = @notificationId AND receiverId = @userId;
-
-        -- Imposta il flag isMuted e la data di scadenza per il silenziamento per AR_NotificationsView
-        UPDATE AR_NotificationsView
-        SET isMuted = @isMuted,
-            muteExpiryDate = @expiryDate
-        WHERE notificationId = @notificationId AND userId = @userId;
-
-        ENABLE TRIGGER [dbo].[TR_AR_NotificationDetails_Changes] ON [dbo].[AR_NotificationDetails];
-
+        WHERE notificationId = @notificationId 
+          AND receiverId = @userId
       `);
     
     return { 
@@ -907,7 +760,6 @@ async function toggleMuteChat(notificationId, userId, isMuted, expiryDate = null
   }
 }
 
-// Funzione per attivare/disattivare la modalità "Non disturbare"
 async function toggleDoNotDisturb(userId, enabled) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -915,7 +767,7 @@ async function toggleDoNotDisturb(userId, enabled) {
       .input('userId', sql.Int, userId)
       .input('enabled', sql.Bit, enabled)
       .query(`
-        UPDATE AR_Users
+        UPDATE AR_Users WITH (ROWLOCK)
         SET DoNotDisturb = @enabled
         WHERE userId = @userId
       `);
@@ -931,14 +783,13 @@ async function toggleDoNotDisturb(userId, enabled) {
   }
 }
 
-// Funzione per verificare lo stato della modalità "Non disturbare"
 async function getDoNotDisturbStatus(userId) {
   try {
     let pool = await sql.connect(config.dbConfig);
     const result = await pool.request()
       .input('userId', sql.Int, userId)
       .query(`
-        SELECT DoNotDisturb FROM AR_Users
+        SELECT DoNotDisturb FROM AR_Users WITH (NOLOCK)
         WHERE userId = @userId
       `);
     
@@ -955,37 +806,25 @@ async function getDoNotDisturbStatus(userId) {
   }
 }
 
-
-// File: notificationsManagement.js
-
-/**
- * Per ottenere tutti i messageId che corrispondono allo stesso messaggio logico
- * 
- * @param {number} messageId - ID del messaggio di riferimento
- * @returns {Promise<Array<number>>} - Array di tutti i messageId correlati
- */
 async function getRelatedMessageIds(messageId) {
   try {
     let pool = await sql.connect(config.dbConfig);
     
-    // Prima otteniamo le informazioni sul messaggio di riferimento
     const messageInfoResult = await pool.request()
       .input('messageId', sql.Int, messageId)
       .query(`
         SELECT notificationId, senderId, message, tbCreated
-        FROM AR_NotificationDetails
+        FROM AR_NotificationDetails WITH (NOLOCK)
         WHERE messageId = @messageId
       `);
     
     if (messageInfoResult.recordset.length === 0) {
       console.error(`Message with ID ${messageId} not found`);
-      return [messageId]; // Ritorna almeno l'ID originale
+      return [messageId];
     }
     
     const messageInfo = messageInfoResult.recordset[0];
     
-    // Ora cerchiamo tutti i messageId che corrispondono allo stesso messaggio logico
-    // utilizzando notificationId, senderId, message e tbCreated come criteri
     const relatedIdsResult = await pool.request()
       .input('notificationId', sql.Int, messageInfo.notificationId)
       .input('senderId', sql.Int, messageInfo.senderId)
@@ -993,47 +832,37 @@ async function getRelatedMessageIds(messageId) {
       .input('tbCreated', sql.DateTime, messageInfo.tbCreated)
       .query(`
         SELECT messageId
-        FROM AR_NotificationDetails
+        FROM AR_NotificationDetails WITH (NOLOCK)
         WHERE notificationId = @notificationId
           AND senderId = @senderId
           AND message = @message
           AND tbCreated = @tbCreated
       `);
     
-    // Estrai gli ID in un array
     const relatedIds = relatedIdsResult.recordset.map(row => row.messageId);
     
     return relatedIds;
   } catch (err) {
     console.error('Error getting related message IDs:', err);
-    return [messageId]; // In caso di errore, ritorna almeno l'ID originale
+    return [messageId];
   }
 }
 
-/**
- * Recupera tutte le reazioni per un messaggio, considerando tutti gli ID correlati
- * 
- * @param {number} messageId - ID del messaggio
- * @returns {Promise<Array>} - Lista delle reazioni
- */
 async function getMessageReactions(messageId) {
   try {
-    // Ottieni tutti gli ID correlati per questo messaggio
     const relatedMessageIds = await getRelatedMessageIds(messageId);
     
-    // Se non ci sono ID correlati, ritorna un array vuoto
     if (relatedMessageIds.length === 0) {
       return [];
     }
     
     let pool = await sql.connect(config.dbConfig);
     
-    // Costruisci la query dinamicamente per includere tutti gli ID correlati
     let query = `
       SELECT mr.ReactionID, mr.MessageID, mr.UserID, mr.ReactionType, mr.CreatedDate,
              u.firstName + ' ' + u.lastName AS UserName, u.email
-      FROM AR_MessageReactions mr
-      JOIN AR_Users u ON u.userId = mr.UserID
+      FROM AR_MessageReactions mr WITH (NOLOCK)
+      JOIN AR_Users u WITH (NOLOCK) ON u.userId = mr.UserID
       WHERE mr.MessageID IN (${relatedMessageIds.join(',')})
       ORDER BY mr.CreatedDate ASC
     `;
@@ -1043,34 +872,24 @@ async function getMessageReactions(messageId) {
     return result.recordset;
   } catch (err) {
     console.error('Error getting message reactions:', err);
-    return []; // Ritorna array vuoto in caso di errore
+    return [];
   }
 }
 
-/**
- * Aggiunge o rimuove una reazione a un messaggio, gestendo gli ID correlati
- * 
- * @param {number} messageId - ID del messaggio
- * @param {number} userId - ID dell'utente
- * @param {string} reactionType - Tipo di reazione (emoji)
- * @returns {Promise<Object>} - Risultato dell'operazione
- */
 async function addMessageReaction(messageId, userId, reactionType) {
   try {
-    // Verifica parametri
-    if (!messageId || !userId || !reactionType) {
+    console.log('addMessageReaction', messageId, userId, reactionType);
+    if (!messageId || !reactionType) {
       throw new Error('MessageId, userId e reactionType sono campi obbligatori');
     }
     
-    // Ottieni tutti gli ID correlati per questo messaggio
     const relatedMessageIds = await getRelatedMessageIds(messageId);
     
     let pool = await sql.connect(config.dbConfig);
     
-    // Cerca se esiste già una reazione dell'utente su uno qualsiasi degli ID correlati
     let existingReactionQuery = `
       SELECT ReactionID, MessageID, ReactionType
-      FROM AR_MessageReactions
+      FROM AR_MessageReactions WITH (NOLOCK)
       WHERE UserID = @userId AND MessageID IN (${relatedMessageIds.join(',')})
     `;
     
@@ -1078,13 +897,10 @@ async function addMessageReaction(messageId, userId, reactionType) {
       .input('userId', sql.Int, userId)
       .query(existingReactionQuery);
     
-    // Se l'utente ha già una reazione su uno qualsiasi degli ID correlati
     if (existingReactionResult.recordset.length > 0) {
       const existingReaction = existingReactionResult.recordset[0];
       
-      // Se sta cercando di aggiungere la stessa reazione, rimuovila (toggle)
       if (existingReaction.ReactionType === reactionType) {
-        
         await pool.request()
           .input('reactionId', sql.Int, existingReaction.ReactionID)
           .query(`
@@ -1092,25 +908,17 @@ async function addMessageReaction(messageId, userId, reactionType) {
             WHERE ReactionID = @reactionId
           `);
         
-        // Ottieni l'ID della notifica associata al messaggio
         const notificationResult = await pool.request()
           .input('messageId', sql.Int, messageId)
           .query(`
             SELECT notificationId
-            FROM AR_NotificationDetails
+            FROM AR_NotificationDetails WITH (NOLOCK)
             WHERE messageId = @messageId
           `);
         
         let notificationId = null;
         if (notificationResult.recordset.length > 0) {
           notificationId = notificationResult.recordset[0].notificationId;
-          
-          // Aggiorna la vista delle notifiche
-          await pool.request()
-            .input('userId', sql.Int, userId)
-            .input('notificationId', sql.Int, notificationId)
-            .input('allNotificationsByUser', sql.Int, 0)
-            .execute('CreateNotificationsView');
         }
         
         return {
@@ -1120,7 +928,6 @@ async function addMessageReaction(messageId, userId, reactionType) {
           notificationId
         };
       } else {
-        
         await pool.request()
           .input('reactionId', sql.Int, existingReaction.ReactionID)
           .query(`
@@ -1129,7 +936,6 @@ async function addMessageReaction(messageId, userId, reactionType) {
           `);
       }
     }
-    
     
     await pool.request()
       .input('messageId', sql.Int, messageId)
@@ -1140,25 +946,17 @@ async function addMessageReaction(messageId, userId, reactionType) {
         VALUES (@messageId, @userId, @reactionType)
       `);
     
-    // Ottieni l'ID della notifica associata al messaggio per aggiornare la vista
     const notificationResult = await pool.request()
       .input('messageId', sql.Int, messageId)
       .query(`
         SELECT notificationId
-        FROM AR_NotificationDetails
+        FROM AR_NotificationDetails WITH (NOLOCK)
         WHERE messageId = @messageId
       `);
     
     let notificationId = null;
     if (notificationResult.recordset.length > 0) {
       notificationId = notificationResult.recordset[0].notificationId;
-      
-      // Aggiorna la vista delle notifiche
-      await pool.request()
-        .input('userId', sql.Int, -1) // -1 indica "tutti gli utenti"
-        .input('notificationId', sql.Int, notificationId)
-        .input('allNotificationsByUser', sql.Int, 0)
-        .execute('CreateNotificationsView');
     }
     
     return {
@@ -1173,12 +971,6 @@ async function addMessageReaction(messageId, userId, reactionType) {
   }
 }
 
-/**
- * Ottiene informazioni su una specifica reazione
- * 
- * @param {number} reactionId - ID della reazione
- * @returns {Promise<Object|null>} - Informazioni sulla reazione o null se non trovata
- */
 async function getReactionInfo(reactionId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -1187,8 +979,8 @@ async function getReactionInfo(reactionId) {
       .query(`
         SELECT mr.ReactionID, mr.MessageID, mr.UserID, mr.ReactionType, mr.CreatedDate,
                nd.notificationId
-        FROM AR_MessageReactions mr
-        JOIN AR_NotificationDetails nd ON nd.messageId = mr.MessageID
+        FROM AR_MessageReactions mr WITH (NOLOCK)
+        JOIN AR_NotificationDetails nd WITH (NOLOCK) ON nd.messageId = mr.MessageID
         WHERE mr.ReactionID = @reactionId
       `);
     
@@ -1212,25 +1004,17 @@ async function getReactionInfo(reactionId) {
   }
 }
 
-/**
- * Rimuove una reazione specifica
- * 
- * @param {number} reactionId - ID della reazione da rimuovere
- * @param {number} userId - ID dell'utente che sta rimuovendo la reazione
- * @returns {Promise<Object>} - Risultato dell'operazione
- */
 async function removeMessageReaction(reactionId, userId) {
   try {
     let pool = await sql.connect(config.dbConfig);
     
-    // Verifica che la reazione appartenga all'utente
     const checkResult = await pool.request()
       .input('reactionId', sql.Int, reactionId)
       .input('userId', sql.Int, userId)
       .query(`
         SELECT mr.MessageID, nd.notificationId
-        FROM AR_MessageReactions mr
-        JOIN AR_NotificationDetails nd ON nd.messageId = mr.MessageID
+        FROM AR_MessageReactions mr WITH (NOLOCK)
+        JOIN AR_NotificationDetails nd WITH (NOLOCK) ON nd.messageId = mr.MessageID
         WHERE mr.ReactionID = @reactionId AND mr.UserID = @userId
       `);
     
@@ -1244,20 +1028,12 @@ async function removeMessageReaction(reactionId, userId) {
     const messageId = checkResult.recordset[0].MessageID;
     const notificationId = checkResult.recordset[0].notificationId;
     
-    // Rimuovi la reazione
     await pool.request()
       .input('reactionId', sql.Int, reactionId)
       .query(`
         DELETE FROM AR_MessageReactions
         WHERE ReactionID = @reactionId
       `);
-    
-    // Aggiorna la vista notifiche
-    await pool.request()
-      .input('userId', sql.Int, userId)
-      .input('notificationId', sql.Int, notificationId)
-      .input('allNotificationsByUser', sql.Int, 0)
-      .execute('CreateNotificationsView');
     
     return {
       success: true,
@@ -1274,12 +1050,6 @@ async function removeMessageReaction(reactionId, userId) {
   }
 }
 
-/**
- * Helper per ottenere l'ID della notifica associata a un messaggio
- * 
- * @param {number} messageId - ID del messaggio
- * @returns {Promise<Object|null>} - Oggetto con notificationId o null
- */
 async function getNotificationIdForMessage(messageId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -1287,7 +1057,7 @@ async function getNotificationIdForMessage(messageId) {
       .input('messageId', sql.Int, messageId)
       .query(`
         SELECT notificationId 
-        FROM AR_NotificationDetails 
+        FROM AR_NotificationDetails WITH (NOLOCK)
         WHERE messageId = @messageId
       `);
     
@@ -1298,32 +1068,22 @@ async function getNotificationIdForMessage(messageId) {
   }
 }
 
-/**
- * Elimina un messaggio (imposta cancelled = 1)
- * 
- * @param {number} messageId - ID del messaggio da eliminare
- * @param {number} userId - ID dell'utente che sta eliminando il messaggio
- * @returns {Promise<Object>} - Risultato dell'operazione
- */
 async function deleteMessage(messageId, userId) {
   try {
-    // Verifica parametri
-    if (!messageId || !userId) {
+    if (!messageId) {
       throw new Error('MessageId e userId sono campi obbligatori');
     }
     
-    // Ottieni tutti gli ID correlati per questo messaggio
     const relatedMessageIds = await getRelatedMessageIds(messageId);
     
     let pool = await sql.connect(config.dbConfig);
     
-    // Prima controlla che il messaggio appartenga all'utente
     const checkOwnershipResult = await pool.request()
       .input('messageId', sql.Int, messageId)
       .input('userId', sql.Int, userId)
       .query(`
         SELECT messageId, notificationId, senderId
-        FROM AR_NotificationDetails
+        FROM AR_NotificationDetails WITH (NOLOCK)
         WHERE messageId = @messageId AND senderId = @userId
       `);
     
@@ -1336,13 +1096,11 @@ async function deleteMessage(messageId, userId) {
     
     const notificationId = checkOwnershipResult.recordset[0].notificationId;
     
-    // Ora marca tutti i messaggi correlati come cancellati
-    // E imposta un testo standard per i messaggi cancellati
     await pool.request()
       .input('userId', sql.Int, userId)
       .input('messageIds', sql.NVarChar(sql.MAX), relatedMessageIds.join(','))
       .query(`
-        UPDATE AR_NotificationDetails
+        UPDATE AR_NotificationDetails WITH (ROWLOCK)
         SET cancelled = 1,
             message = 'Messaggio eliminato dall''utente'
         WHERE messageId IN (
@@ -1350,13 +1108,6 @@ async function deleteMessage(messageId, userId) {
         ) 
         AND senderId = @userId
       `);
-    
-    // Aggiorna la vista delle notifiche
-    await pool.request()
-      .input('userId', sql.Int, userId)
-      .input('notificationId', sql.Int, notificationId)
-      .input('allNotificationsByUser', sql.Int, 0)
-      .execute('CreateNotificationsView');
     
     return {
       success: true,
@@ -1373,29 +1124,19 @@ async function deleteMessage(messageId, userId) {
   }
 }
 
-/**
- * Recupera le reazioni di più messaggi in batch
- * @param {Array<number>} messageIds - Array di ID dei messaggi
- * @returns {Promise<Object>} - Mappa delle reazioni per messageId
- */
 async function getBatchReactions(messageIds, userId) {
   try {
-    // Verifica che messageIds sia un array valido
     if (!Array.isArray(messageIds) || messageIds.length === 0) {
       throw new Error('Parametro messageIds non valido o vuoto');
     }
     
-    // Limita il numero di messaggi per evitare richieste troppo pesanti
     const MAX_MESSAGES = 50;
     const messageIdsToProcess = messageIds.slice(0, MAX_MESSAGES);
     
-    // Crea una mappa per i risultati
     const reactionsMap = {};
     
-    // Utilizza una singola query per ottenere le reazioni di tutti i messaggi
     let pool = await sql.connect(config.dbConfig);
     
-    // Crea la query con IN clause
     const messageIdsString = messageIdsToProcess.join(',');
     
     const query = `
@@ -1407,10 +1148,10 @@ WITH MessaggiConRowNo AS (
         message,
         tbCreated,
         ROW_NUMBER() OVER(PARTITION BY message, tbCreated ORDER BY (CASE WHEN receiverId = @userId THEN 1 ELSE 0 END) DESC) AS RowNo
-    FROM AR_NotificationDetails
+    FROM AR_NotificationDetails WITH (NOLOCK)
     WHERE tbCreated IN (
         SELECT tbCreated
-        FROM AR_NotificationDetails
+        FROM AR_NotificationDetails WITH (NOLOCK)
 		WHERE messageId IN (${messageIdsString})
     )
 ),
@@ -1430,8 +1171,8 @@ SELECT mr.ReactionID
 		, mr.CreatedDate
 		, u.firstName + ' ' + u.lastName AS UserName
 		, u.email
-FROM	AR_MessageReactions mr
-JOIN	AR_Users u ON u.userId = mr.UserID
+FROM	AR_MessageReactions mr WITH (NOLOCK)
+JOIN	AR_Users u WITH (NOLOCK) ON u.userId = mr.UserID
 JOIN	(SELECT	m.messageId,
 					m.message,
 					m.tbCreated,
@@ -1444,7 +1185,6 @@ JOIN	(SELECT	m.messageId,
     
     const result = await pool.request().query(query);
     
-    // Organizza i risultati per messageId
     if (result.recordset && result.recordset.length > 0) {
       result.recordset.forEach(reaction => {
         const messageId = reaction.MessageID;
@@ -1468,21 +1208,12 @@ JOIN	(SELECT	m.messageId,
   }
 }
 
-/**
- * Recupera i sondaggi per più messaggi in batch
- * @param {number} notificationId - ID della notifica
- * @param {Array<number>} messageIds - Array di ID dei messaggi
- * @param {number} userId - ID dell'utente
- * @returns {Promise<Object>} - Mappa dei sondaggi per messageId
- */
 async function getBatchPolls(notificationId, messageIds, userId) {
   try {
-    // Verifica che messageIds sia un array valido
     if (!Array.isArray(messageIds) || messageIds.length === 0) {
       throw new Error('Parametro messageIds non valido o vuoto');
     }
     
-    // Ottieni tutti i sondaggi per questa notifica
     const polls = await getNotificationPolls(notificationId, userId);
     
     if (!polls || polls.length === 0) {
@@ -1491,10 +1222,8 @@ async function getBatchPolls(notificationId, messageIds, userId) {
       };
     }
     
-    // Crea una mappa di sondaggi per messageId
     const pollsMap = {};
     
-    // Filtra i sondaggi richiesti
     polls.forEach(poll => {
       if (messageIds.includes(poll.MessageID)) {
         pollsMap[poll.MessageID] = poll;
@@ -1510,13 +1239,6 @@ async function getBatchPolls(notificationId, messageIds, userId) {
   }
 }
 
-/**
- * Rimuove un utente da una chat
- * @param {number} notificationId - ID della notifica/chat
- * @param {number} adminUserId - ID dell'utente che sta rimuovendo
- * @param {number} userToRemoveId - ID dell'utente da rimuovere
- * @returns {Promise<Object>} - Risultato dell'operazione
- */
 async function removeUserFromChat(notificationId, adminUserId, userToRemoveId) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -1577,6 +1299,4 @@ module.exports = {
   getBatchReactions,
   getBatchPolls,
   removeUserFromChat
-  
-
 };

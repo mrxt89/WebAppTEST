@@ -2530,7 +2530,7 @@ const validateItemCode = async (companyId, itemCode, excludeItemId = null) => {
         request.output('ErrorMessage', sql.NVarChar(255));
         
         // Esecuzione della stored procedure
-        await request.execute('MA_ProjectArticles_ValidateItemCode');
+        const result = await request.execute('MA_ProjectArticles_ValidateItemCode');
         
         const isValid = result.output.IsValid;
         const errorMessage = result.output.ErrorMessage || '';
