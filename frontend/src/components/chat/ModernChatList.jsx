@@ -1,4 +1,3 @@
-// ModernChatList.jsx - Versione aggiornata con connessione diretta al context
 import React, {
   useEffect,
   useRef,
@@ -51,6 +50,8 @@ import { FaFlag, FaRegSmile } from "react-icons/fa";
 import ReactionPicker from "./ReactionPicker";
 import MessageReactions from "./MessageReactions";
 import MessageActionsMenu from "./MessageActionsMenu";
+import { useSelector } from "react-redux";
+import { selectOpenChatData } from "@/redux/features/notifications/notificationsSlice";
 
 // Assicurati che il modal sia configurato per il tuo root element
 Modal.setAppElement("#root");
@@ -172,6 +173,7 @@ const MessageAttachments = ({ attachments, onClick, onDownload }) => {
 };
 
 const ModernChatList = ({
+  messages = [],
   notificationId,
   chatListRef,
   onReply,
@@ -180,13 +182,16 @@ const ModernChatList = ({
   currentUser,
   users = [],
   animatedEditId,
-  newMessage,
   onScrollToBottom,
   onEditMessage,
 }) => {
-  // Ottieni direttamente l'accesso al context
+  // MODIFICA CHIAVE: Ottieni dati completi da openChatData invece che dal context generico
+  const openChatData = useSelector(state => 
+    selectOpenChatData(state, parseInt(notificationId))
+  );
+
+  // Ottieni l'accesso al context per le funzioni
   const {
-    notifications,
     fetchNotificationById,
     downloadNotificationAttachment,
     getNotificationAttachments,
@@ -232,6 +237,7 @@ const ModernChatList = ({
   const [selectedMessageVersions, setSelectedMessageVersions] = useState(null);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const reactionBatchSize = 20;
+  const [hasNewMessages, setHasNewMessages] = useState(false);
 
   // Modifico lo stato per gestire solo gli ID dei messaggi da evidenziare
   const [highlightedMessageIds, setHighlightedMessageIds] = useState(new Set());
@@ -240,53 +246,172 @@ const ModernChatList = ({
   // Aggiungo lo stato per tracciare l'indice corrente del messaggio evidenziato
   const [currentHighlightedIndex, setCurrentHighlightedIndex] = useState(0);
 
-  // Creazione di un valore derivato per trovare la notifica corrente dal context
-  const currentNotification = useMemo(() => {
-    if (!notifications || !notificationId) return null;
-    return notifications.find(
-      (n) => n.notificationId === parseInt(notificationId),
-    );
-  }, [notifications, notificationId]);
+  // Aggiungo un ref per tracciare l'ultimo messaggio visibile
+  const lastVisibleMessageRef = useRef(null);
 
-  // Effetto per aggiornare i messaggi locali dal context quando la notifica corrente cambia
+  const previousMessagesRef = useRef([]);
+
+  // Effetto per gestire i nuovi messaggi
   useEffect(() => {
-    if (currentNotification) {
-      // Estrai i messaggi
-      let notificationMessages = Array.isArray(currentNotification.messages)
-        ? currentNotification.messages
-        : typeof currentNotification.messages === "string"
-          ? JSON.parse(currentNotification.messages || "[]")
-          : [];
-
-      // Aggiorna i messaggi locali
-      setLocalMessages(notificationMessages);
-
-      // Auto-scroll se necessario (solo se non c'è stato scrolling manuale)
-      if (
-        !userHasScrolledRef.current &&
-        chatListRef.current &&
-        !initialScrollDone
-      ) {
-        // Prevenzione loop degli eventi
+    if (messages.length > previousMessagesRef.current.length) {
+      setHasNewMessages(true);
+      
+      if (!userHasScrolledRef.current) {
         scrollingToBottomRef.current = true;
-
-        // Scroll al fondo
         setTimeout(() => {
           if (chatListRef.current) {
             chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+            setTimeout(() => {
+              scrollingToBottomRef.current = false;
+            }, 500);
           }
-
-          // Reset flag
-          setTimeout(() => {
-            scrollingToBottomRef.current = false;
-            setInitialScrollDone(true);
-          }, 100);
         }, 100);
       }
     }
-  }, [currentNotification, notificationId, chatListRef, initialScrollDone]);
+    
+    previousMessagesRef.current = messages;
+  }, [messages]);
 
-  // Registra la chat come aperta o chiusa con il contesto
+  // Effetto per gestire lo scroll
+  useEffect(() => {
+    if (!chatListRef.current) return;
+
+    const handleScroll = () => {
+      if (scrollingToBottomRef.current) return;
+
+      const { scrollTop, scrollHeight, clientHeight } = chatListRef.current;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+      if (distanceFromBottom > 100) {
+        userHasScrolledRef.current = true;
+        setUserHasScrolled(true);
+        if (hasNewMessages) {
+          setShowScrollButton(true);
+        }
+      } else if (distanceFromBottom < 20) {
+        userHasScrolledRef.current = false;
+        setUserHasScrolled(false);
+        setShowScrollButton(false);
+        setHasNewMessages(false);
+        if (onScrollToBottom) {
+          onScrollToBottom();
+        }
+      }
+    };
+
+    chatListRef.current.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
+
+    const handleWheel = (e) => {
+      if (e.deltaY < 0) {
+        userHasScrolledRef.current = true;
+        setUserHasScrolled(true);
+        if (hasNewMessages) {
+          setShowScrollButton(true);
+        }
+      }
+    };
+
+    chatListRef.current.addEventListener("wheel", handleWheel, {
+      passive: true,
+    });
+
+    return () => {
+      if (chatListRef.current) {
+        chatListRef.current.removeEventListener("scroll", handleScroll);
+        chatListRef.current.removeEventListener("wheel", handleWheel);
+      }
+    };
+  }, [chatListRef.current, hasNewMessages, onScrollToBottom]);
+
+  // Funzione per salvare l'ultimo messaggio visibile
+  const saveLastVisibleMessage = useCallback(() => {
+    if (!chatListRef.current) return;
+    
+    const container = chatListRef.current;
+    const messages = container.querySelectorAll('[id^="message-"]');
+    
+    for (const message of messages) {
+      const rect = message.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      
+      if (rect.top >= containerRect.top && rect.bottom <= containerRect.bottom) {
+        lastVisibleMessageRef.current = message.id.replace('message-', '');
+        break;
+      }
+    }
+  }, []);
+
+  // Funzione per ripristinare la posizione dello scroll
+  const restoreScrollPosition = useCallback(() => {
+    if (!chatListRef.current || !lastVisibleMessageRef.current) return;
+    
+    const messageElement = document.getElementById(`message-${lastVisibleMessageRef.current}`);
+    if (messageElement) {
+      messageElement.scrollIntoView({ block: 'center', behavior: 'auto' });
+    }
+  }, []);
+
+  // MODIFICA CHIAVE: Usa openChatData per ottenere tutti i messaggi
+  useEffect(() => {
+    if (openChatData) {
+      console.log("openChatData aggiornato:", openChatData);
+      
+      // Estrai TUTTI i messaggi da openChatData
+      let messages = [];
+      if (Array.isArray(openChatData.messages)) {
+        messages = openChatData.messages;
+      } else if (typeof openChatData.messages === "string") {
+        try {
+          messages = JSON.parse(openChatData.messages || "[]");
+        } catch (e) {
+          console.error("Errore nel parsing dei messaggi:", e);
+          messages = [];
+        }
+      }
+
+      // Forza il caricamento di tutti i messaggi se non sono completi
+      if (openChatData.messageCount && messages.length < openChatData.messageCount) {
+        console.log(`⚠️ ModernChatList: Messaggi incompleti (${messages.length}/${openChatData.messageCount}), ricarico...`);
+        fetchNotificationById(notificationId, true)
+          .then((fullData) => {
+            if (fullData) {
+              const fullMessages = Array.isArray(fullData.messages) 
+                ? fullData.messages 
+                : JSON.parse(fullData.messages || "[]");
+              console.log(`✅ ModernChatList: Ricaricati ${fullMessages.length} messaggi completi`);
+              setLocalMessages(fullMessages);
+            }
+          })
+          .catch(error => {
+            console.error("Errore nel ricaricamento dei messaggi:", error);
+          });
+      } else {
+        console.log(`✅ ModernChatList: Caricati ${messages.length} messaggi da openChatData`);
+        setLocalMessages(messages);
+      }
+    }
+  }, [openChatData, notificationId, fetchNotificationById]);
+
+  // MODIFICA: Carica dati completi al mount del componente
+  useEffect(() => {
+    if (notificationId && !openChatData) {
+      console.log(`Caricando dati completi per chat ${notificationId}...`);
+      fetchNotificationById(notificationId, true)
+        .then((fullData) => {
+          if (fullData) {
+            console.log(`Dati completi caricati per chat ${notificationId}:`, fullData);
+            // I dati vengono automaticamente salvati in openChatData tramite il slice
+          }
+        })
+        .catch((error) => {
+          console.error(`Errore nel caricamento dati completi per chat ${notificationId}:`, error);
+        });
+    }
+  }, [notificationId, openChatData, fetchNotificationById]);
+
+  // Registra la chat come aperta
   useEffect(() => {
     if (notificationId && registerOpenChat) {
       // Registra la chat come aperta
@@ -300,6 +425,204 @@ const ModernChatList = ({
       };
     }
   }, [notificationId, registerOpenChat, unregisterOpenChat]);
+
+  // MODIFICA: Listener per chat-message-sent che ricarica i messaggi
+  useEffect(() => {
+    const handleMessageSent = async (event) => {
+      const { notificationId: eventNotificationId, forceScroll, tempMessage } = event.detail;
+      
+      if (eventNotificationId === parseInt(notificationId)) {
+        console.log(`Messaggio inviato, aggiorno immediatamente la chat ${notificationId}...`);
+        
+        // Se c'è un messaggio temporaneo, aggiungilo subito
+        if (tempMessage) {
+          setLocalMessages(prev => {
+            // Verifica se il messaggio temporaneo non è già presente
+            const exists = prev.some(msg => msg.messageId === tempMessage.messageId);
+            if (!exists) {
+              const newMessages = [...prev, tempMessage];
+              // Forza lo scroll in fondo dopo l'aggiunta del messaggio
+              setTimeout(() => {
+                if (chatListRef.current) {
+                  chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+                }
+              }, 50);
+              return newMessages;
+            }
+            return prev;
+          });
+        }
+        
+        // Forza scroll immediato
+        if (forceScroll || !userHasScrolledRef.current) {
+          scrollingToBottomRef.current = true;
+          setTimeout(() => {
+            if (chatListRef.current) {
+              chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+              userHasScrolledRef.current = false;
+              setShowScrollButton(false);
+              setUserHasScrolled(false);
+            }
+            setTimeout(() => {
+              scrollingToBottomRef.current = false;
+            }, 100);
+          }, 50);
+        }
+        
+        try {
+          // Forza il ricaricamento completo con openChat=1
+          const fullData = await fetchNotificationById(notificationId, true);
+          if (fullData) {
+            console.log(`Dati completi ricaricati dopo invio messaggio:`, fullData);
+            // Forza l'aggiornamento dei messaggi locali
+            if (Array.isArray(fullData.messages)) {
+              setLocalMessages(fullData.messages);
+            } else if (typeof fullData.messages === "string") {
+              try {
+                const parsedMessages = JSON.parse(fullData.messages || "[]");
+                setLocalMessages(parsedMessages);
+              } catch (e) {
+                console.error("Errore nel parsing dei messaggi:", e);
+              }
+            }
+            
+            // Scrolla di nuovo dopo aver caricato i dati reali
+            if (forceScroll || !userHasScrolledRef.current) {
+              setTimeout(() => {
+                if (chatListRef.current) {
+                  chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+                }
+              }, 100);
+            }
+
+            // Marca come letto il messaggio nella sidebar
+            await toggleReadUnread(notificationId, true);
+            document.dispatchEvent(
+              new CustomEvent("notification-updated", {
+                detail: { notificationId },
+              })
+            );
+          }
+        } catch (error) {
+          console.error(`Errore nel ricaricamento dopo invio messaggio:`, error);
+          // Rimuovi il messaggio temporaneo in caso di errore
+          if (tempMessage) {
+            setLocalMessages(prev => prev.filter(msg => msg.messageId !== tempMessage.messageId));
+          }
+        }
+      }
+    };
+
+    document.addEventListener("chat-message-sent", handleMessageSent);
+    
+    return () => {
+      document.removeEventListener("chat-message-sent", handleMessageSent);
+    };
+  }, [notificationId, fetchNotificationById, toggleReadUnread]);
+
+  // Aggiungo un nuovo listener per i messaggi ricevuti
+  useEffect(() => {
+    const handleNewMessage = async (event) => {
+      const { notificationId: eventNotificationId } = event.detail;
+      
+      if (eventNotificationId === parseInt(notificationId)) {
+        console.log(`Nuovo messaggio ricevuto per chat ${notificationId}, marco come letto...`);
+        
+        try {
+          // Marca come letto il messaggio nella sidebar
+          await toggleReadUnread(notificationId, true);
+          document.dispatchEvent(
+            new CustomEvent("notification-updated", {
+              detail: { notificationId },
+            })
+          );
+        } catch (error) {
+          console.error(`Errore nel marcare come letto il messaggio:`, error);
+        }
+      }
+    };
+
+    document.addEventListener("new-message-received", handleNewMessage);
+    
+    return () => {
+      document.removeEventListener("new-message-received", handleNewMessage);
+    };
+  }, [notificationId, toggleReadUnread]);
+
+  // MODIFICA: Listener per reload-open-chat che ricarica dati completi
+  useEffect(() => {
+    const handleReloadOpenChat = async (event) => {
+      const { notificationId: eventNotificationId, forceComplete } = event.detail;
+      
+      if (eventNotificationId === parseInt(notificationId)) {
+        console.log(`Ricaricando dati completi per chat ${notificationId}...`);
+        
+        // Salva la posizione corrente prima dell'aggiornamento
+        saveLastVisibleMessage();
+        
+        try {
+          // Forza il ricaricamento completo con openChat=1
+          const fullData = await fetchNotificationById(notificationId, true);
+          if (fullData) {
+            console.log(`Dati completi ricaricati per chat ${notificationId}:`, fullData);
+            
+            // Estrai i messaggi in modo sicuro
+            let messages = [];
+            if (Array.isArray(fullData.messages)) {
+              messages = fullData.messages;
+            } else if (typeof fullData.messages === "string") {
+              try {
+                messages = JSON.parse(fullData.messages || "[]");
+              } catch (e) {
+                console.error("Errore nel parsing dei messaggi:", e);
+              }
+            }
+
+            // Verifica che abbiamo tutti i messaggi
+            if (fullData.messageCount && messages.length < fullData.messageCount) {
+              console.log(`⚠️ Messaggi incompleti (${messages.length}/${fullData.messageCount}), ricarico...`);
+              const completeData = await fetchNotificationById(notificationId, true);
+              if (completeData) {
+                const completeMessages = Array.isArray(completeData.messages) 
+                  ? completeData.messages 
+                  : JSON.parse(completeData.messages || "[]");
+                console.log(`✅ Ricaricati ${completeMessages.length} messaggi completi`);
+                setLocalMessages(completeMessages);
+              }
+            } else {
+              console.log(`✅ Aggiornati ${messages.length} messaggi`);
+              setLocalMessages(messages);
+            }
+
+            // Se forceComplete è true, forziamo un altro ricaricamento
+            if (forceComplete) {
+              setTimeout(async () => {
+                const finalData = await fetchNotificationById(notificationId, true);
+                if (finalData) {
+                  const finalMessages = Array.isArray(finalData.messages) 
+                    ? finalData.messages 
+                    : JSON.parse(finalData.messages || "[]");
+                  console.log(`✅ Ricaricamento finale: ${finalMessages.length} messaggi`);
+                  setLocalMessages(finalMessages);
+                }
+              }, 500);
+            }
+
+            // Ripristina la posizione dello scroll dopo l'aggiornamento
+            setTimeout(restoreScrollPosition, 100);
+          }
+        } catch (error) {
+          console.error(`Errore nel ricaricamento per chat ${notificationId}:`, error);
+        }
+      }
+    };
+
+    document.addEventListener("reload-open-chat", handleReloadOpenChat);
+    
+    return () => {
+      document.removeEventListener("reload-open-chat", handleReloadOpenChat);
+    };
+  }, [notificationId, fetchNotificationById, saveLastVisibleMessage, restoreScrollPosition]);
 
   // Aggiornamento periodico delle reazioni per i messaggi visibili
   useEffect(() => {
@@ -367,8 +690,8 @@ const ModernChatList = ({
       const { scrollTop, scrollHeight, clientHeight } = chatListRef.current;
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
 
-      // Se l'utente è in fondo alla chat (entro 50px) e ci sono nuovi messaggi non letti
-      if (distanceFromBottom < 50 && notificationId && newMessage) {
+      // Se l'utente è in fondo alla chat (entro 50px)
+      if (distanceFromBottom < 50 && notificationId) {
         // Usa toggleReadUnread dal context per aggiornare sia il backend che il Redux
         toggleReadUnread(notificationId, true).then(() => {
           // Dopo aver aggiornato lo stato, forza un refresh della notifica
@@ -433,7 +756,6 @@ const ModernChatList = ({
     };
   }, [
     chatListRef.current,
-    newMessage,
     notificationId,
     toggleReadUnread,
     fetchNotificationById,
@@ -936,6 +1258,9 @@ const ModernChatList = ({
     if (hasLeftChat) return;
 
     try {
+      // Salva la posizione corrente dello scroll
+      const scrollPosition = chatListRef.current?.scrollTop;
+
       const { isConfirmed } = await swal.fire({
         title: "Sei sicuro?",
         text: "Il messaggio verrà eliminato per tutti. Questa azione non può essere annullata.",
@@ -949,11 +1274,17 @@ const ModernChatList = ({
 
       if (!isConfirmed) return;
 
+      // Aggiorna localmente il messaggio
       updateMessagesLocally(messageId, (msg) => ({
         ...msg,
         message: "Messaggio eliminato dall'utente",
         cancelled: "1",
       }));
+
+      // Ripristina la posizione dello scroll dopo l'aggiornamento locale
+      if (chatListRef.current && scrollPosition !== undefined) {
+        chatListRef.current.scrollTop = scrollPosition;
+      }
 
       swal.fire({
         title: "Eliminazione in corso...",
@@ -977,8 +1308,45 @@ const ModernChatList = ({
       if (response.data && response.data.success) {
         setEditingMessageId(null);
 
+        // Forza il ricaricamento completo della chat
         if (response.data.notificationId) {
-          await fetchNotificationById(response.data.notificationId);
+          try {
+            // Dispatch dell'evento reload-open-chat per forzare il ricaricamento completo
+            document.dispatchEvent(
+              new CustomEvent("reload-open-chat", {
+                detail: {
+                  notificationId: parseInt(response.data.notificationId),
+                  reason: 'message-deleted',
+                  forceComplete: true
+                }
+              })
+            );
+
+            // Ricarica i dati completi
+            const fullData = await fetchNotificationById(response.data.notificationId, true);
+            if (fullData) {
+              // Aggiorna i messaggi locali con i dati freschi dal server
+              if (Array.isArray(fullData.messages)) {
+                setLocalMessages(fullData.messages);
+              } else if (typeof fullData.messages === "string") {
+                try {
+                  const parsedMessages = JSON.parse(fullData.messages || "[]");
+                  setLocalMessages(parsedMessages);
+                } catch (e) {
+                  console.error("Errore nel parsing dei messaggi:", e);
+                }
+              }
+
+              // Ripristina la posizione dello scroll dopo l'aggiornamento
+              setTimeout(() => {
+                if (chatListRef.current && scrollPosition !== undefined) {
+                  chatListRef.current.scrollTop = scrollPosition;
+                }
+              }, 100);
+            }
+          } catch (error) {
+            console.error("Errore nel ricaricamento dopo eliminazione:", error);
+          }
         }
 
         swal.fire({
@@ -989,10 +1357,11 @@ const ModernChatList = ({
           showConfirmButton: false,
         });
 
+        // Notifica l'eliminazione del messaggio
         document.dispatchEvent(
           new CustomEvent("message-deleted", {
             detail: {
-              messageId,
+              messageId: response.data.messageId,
               notificationId: response.data.notificationId,
             },
           }),
@@ -1082,44 +1451,31 @@ const ModernChatList = ({
 
   // Gestione delle reazioni ai messaggi
   const handleReactionSelect = async (messageId, emoji) => {
-    if (hasLeftChat) return Promise.resolve(); // No reactions if user left chat
+    if (hasLeftChat) return Promise.resolve();
 
     try {
-      // Salva la posizione di scroll corrente
-      const currentScrollPosition = chatListRef.current
-        ? chatListRef.current.scrollTop
-        : 0;
+      setLoading(true);
 
-      setLoading(true); // Show loading indicator while processing
+      // Salva la posizione corrente dello scroll
+      const scrollPosition = chatListRef.current?.scrollTop;
 
-      // Check if toggleMessageReaction exists before calling it
-      if (!toggleMessageReaction) {
-        console.error("toggleMessageReaction function not available");
-        throw new Error("toggleMessageReaction function not available");
-      }
-
-      // Get the current message to update locally
-      const currentMessage = localMessages.find(
-        (msg) => msg.messageId === messageId,
-      );
+      // Update local cache optimistically
+      const currentMessage = localMessages.find(msg => msg.messageId === messageId);
       if (currentMessage) {
         const currentReactions = messageReactionsCache[messageId] || [];
-
         const userHasReaction = currentReactions.some(
-          (r) => r.UserID === currentUser?.userId && r.ReactionType === emoji,
+          r => r.UserID === currentUser?.userId && r.ReactionType === emoji
         );
 
-        // Update the local cache optimistically
         if (userHasReaction) {
-          setMessageReactionsCache((prev) => ({
+          setMessageReactionsCache(prev => ({
             ...prev,
             [messageId]: (prev[messageId] || []).filter(
-              (r) =>
-                !(r.UserID === currentUser?.userId && r.ReactionType === emoji),
+              r => !(r.UserID === currentUser?.userId && r.ReactionType === emoji)
             ),
           }));
         } else {
-          setMessageReactionsCache((prev) => ({
+          setMessageReactionsCache(prev => ({
             ...prev,
             [messageId]: [
               ...(prev[messageId] || []),
@@ -1138,20 +1494,39 @@ const ModernChatList = ({
       await toggleMessageReaction(messageId, emoji);
 
       // Trigger update event
-      const event = new CustomEvent("message-reaction-updated", {
-        detail: {
-          messageId: messageId,
-          notificationId: notificationId,
-        },
-      });
-      document.dispatchEvent(event);
+      document.dispatchEvent(
+        new CustomEvent("message-reaction-updated", {
+          detail: { messageId, notificationId },
+        })
+      );
 
-      // Ripristina la posizione di scroll dopo un breve ritardo
-      setTimeout(() => {
-        if (chatListRef.current) {
-          chatListRef.current.scrollTop = currentScrollPosition;
-        }
-      }, 50);
+      // Ripristina la posizione dello scroll
+      if (chatListRef.current && scrollPosition !== undefined) {
+        chatListRef.current.scrollTop = scrollPosition;
+      }
+
+      // Forza il ricaricamento completo della chat
+      try {
+        // Dispatch dell'evento reload-open-chat per forzare il ricaricamento completo
+        document.dispatchEvent(
+          new CustomEvent("reload-open-chat", {
+            detail: {
+              notificationId: parseInt(notificationId),
+              reason: 'reaction-toggled',
+              forceComplete: true
+            }
+          })
+        );
+
+        // Ripristina nuovamente la posizione dopo il ricaricamento
+        setTimeout(() => {
+          if (chatListRef.current && scrollPosition !== undefined) {
+            chatListRef.current.scrollTop = scrollPosition;
+          }
+        }, 100);
+      } catch (error) {
+        console.error("Errore nel ricaricamento dopo reazione:", error);
+      }
 
       return Promise.resolve();
     } catch (error) {
@@ -1164,33 +1539,17 @@ const ModernChatList = ({
 
   // Funzione per lo scroll manuale al fondo
   const handleScrollToBottom = () => {
-    if (chatListRef?.current) {
+    if (chatListRef.current) {
       scrollingToBottomRef.current = true;
       chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
-      setShowScrollButton(false);
-      setUserHasScrolled(false);
       userHasScrolledRef.current = false;
-
-      // Aggiungo la logica per marcare i messaggi come letti
-      if (notificationId && newMessage) {
-        toggleReadUnread(notificationId, true).then(() => {
-          fetchNotificationById(notificationId, true).then(() => {
-            document.dispatchEvent(
-              new CustomEvent("notification-updated", {
-                detail: { notificationId },
-              }),
-            );
-            // Notifica il componente padre che siamo arrivati in fondo
-            if (onScrollToBottom) {
-              onScrollToBottom();
-            }
-          });
-        });
-      }
-
+      setUserHasScrolled(false);
+      setShowScrollButton(false);
+      setHasNewMessages(false);
+      
       setTimeout(() => {
         scrollingToBottomRef.current = false;
-      }, 100);
+      }, 500);
     }
   };
 
@@ -1246,66 +1605,6 @@ const ModernChatList = ({
             : ""}
           {message.editCount > 1 ? ` (${message.editCount} volte)` : ""}
         </span>
-      </div>
-    );
-  };
-
-  // Funzione per renderizzare il menu contestuale dell'avatar
-  const renderAvatarContextMenu = () => {
-    if (!avatarContextMenu) return null;
-
-    const { user, position } = avatarContextMenu;
-
-    return (
-      <div
-        className="avatar-context-menu absolute bg-white rounded-md shadow-lg z-50 p-2 min-w-[180px]"
-        style={{
-          top: `${position.y}px`,
-          left: `${position.x}px`,
-          transform: "translate(-50%, 10px)",
-        }}
-      >
-        <div className="flex flex-col">
-          <div className="flex items-center p-2 border-b border-gray-200">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
-              style={{
-                backgroundColor: generateAvatarColor(
-                  `${user.firstName} ${user.lastName}`,
-                ),
-              }}
-            >
-              {user.firstName[0]}
-              {user.lastName[0]}
-            </div>
-            <div className="ml-2">
-              <div className="text-sm font-medium">
-                {user.firstName} {user.lastName}
-              </div>
-              <div className="text-xs text-gray-500">
-                {user.email || "Nessuna email"}
-              </div>
-            </div>
-          </div>
-
-          <button
-            className="flex items-center p-2 hover:bg-gray-100 rounded-md mt-1 text-sm"
-            onClick={() => handleStartChatWithUser(user.userId)}
-            title="Nuova chat"
-          >
-            <MessageSquare className="h-4 w-4 mr-2 text-blue-500" />
-            <span>Nuova chat</span>
-          </button>
-
-          <button
-            className="flex items-center p-2 hover:bg-gray-100 rounded-md text-sm"
-            onClick={() => handleMentionUser(user)}
-            title="Menziona nella risposta"
-          >
-            <User className="h-4 w-4 mr-2 text-green-500" />
-            <span>Menziona</span>
-          </button>
-        </div>
       </div>
     );
   };
@@ -1556,6 +1855,18 @@ const ModernChatList = ({
       );
     };
   }, []);
+
+  // MODIFICA: Debug per verificare che stiamo usando tutti i messaggi
+  useEffect(() => {
+    if (localMessages.length > 0) {
+      console.log(`🔍 ModernChatList per chat ${notificationId}: Visualizzando ${localMessages.length} messaggi totali`);
+      
+      // Confronta con i messaggi della sidebar (se disponibili)
+      if (openChatData?.messageCount) {
+        console.log(`📊 openChatData messageCount: ${openChatData.messageCount}, messaggi visualizzati: ${localMessages.length}`);
+      }
+    }
+  }, [localMessages, notificationId, openChatData]);
 
   // Mostra un banner informativo se l'utente ha abbandonato la chat
   if (hasLeftChat && localMessages.length > 0) {
@@ -2322,10 +2633,10 @@ const ModernChatList = ({
         )}
 
         {/* Pulsante "Torna all'ultimo messaggio" */}
-        {(showScrollButton || newMessage) && (
+        {(showScrollButton || hasNewMessages) && (
           <motion.button
             className={`absolute bottom-6 right-4 rounded-full p-2 shadow-lg transition-colors duration-200 flex items-center justify-center ${
-              newMessage
+              hasNewMessages
                 ? "bg-red-500 text-white hover:bg-red-600"
                 : "bg-blue-500 text-white hover:bg-blue-600"
             }`}
@@ -2339,7 +2650,7 @@ const ModernChatList = ({
               justifyContent: "center",
             }}
             onClick={handleScrollToBottom}
-            aria-label={newMessage ? "Nuovo messaggio" : "Scorri fino in fondo"}
+            aria-label={hasNewMessages ? "Nuovi messaggi" : "Scorri fino in fondo"}
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
@@ -2351,8 +2662,7 @@ const ModernChatList = ({
           </motion.button>
         )}
 
-        {/* Renderizzo il menu contestuale dell'avatar se attivo */}
-        {avatarContextMenu && renderAvatarContextMenu()}
+        
       </div>
 
       {/* Visualizzatore file */}

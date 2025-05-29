@@ -14,13 +14,17 @@ export const NotificationProvider = ({ children }) => {
     initializeWorker, 
     reloadNotifications, 
     forceLoadNotifications,
-    stopNotificationWorker  // Ottieni lo stopNotificationWorker da useNotifications
+    stopNotificationWorker
   } = useNotifications();
   
   // Riferimenti per timeout e interval
   const timeoutIdRef = useRef(null);
   const refreshIntervalRef = useRef(null);
   const audioInitializedRef = useRef(false);
+  const workerInitializedRef = useRef(false);
+
+  // IMPORTANTE: Controllo se siamo in una finestra standalone
+  const isStandalone = window.location.pathname.includes('standalone-chat');
 
   // Inizializza il contesto delle notifiche prima di tutto
   useEffect(() => {
@@ -75,8 +79,8 @@ export const NotificationProvider = ({ children }) => {
       window.notificationsContext = null;
     }
     
-    // Ferma i worker
-    if (stopNotificationWorker) {
+    // Ferma i worker solo se non siamo in standalone
+    if (!isStandalone && stopNotificationWorker) {
       stopNotificationWorker();
     }
     
@@ -112,12 +116,28 @@ export const NotificationProvider = ({ children }) => {
 
   // Initialize the notification worker on component mount
   useEffect(() => {
-    initializeWorker();
+    // IMPORTANTE: Non inizializzare il worker se siamo in standalone
+    if (isStandalone) {
+      console.log("[NotificationProvider] Skipping initialization for standalone window");
+      return;
+    }
 
-    // Force reload notifications after a short delay to ensure initial data
-    timeoutIdRef.current = setTimeout(() => {
-      reloadNotifications(true); // high priority
-    }, 1000);
+    // Controlla se il worker esiste già
+    if (window.notificationWorker && !workerInitializedRef.current) {
+      console.log("[NotificationProvider] Worker già esistente, skip inizializzazione");
+      workerInitializedRef.current = true;
+      return;
+    }
+
+    if (!workerInitializedRef.current) {
+      initializeWorker();
+      workerInitializedRef.current = true;
+
+      // Force reload notifications after a short delay to ensure initial data
+      timeoutIdRef.current = setTimeout(() => {
+        reloadNotifications(true); // high priority
+      }, 1000);
+    }
 
     // Add event listeners for audio initialization
     document.addEventListener("click", initAudioOnInteraction, { once: false });
@@ -136,20 +156,27 @@ export const NotificationProvider = ({ children }) => {
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
       }
+      // NON fermare il worker qui se siamo main window
+      if (!isStandalone) {
+        workerInitializedRef.current = false;
+      }
       document.removeEventListener("click", initAudioOnInteraction);
       document.removeEventListener("keydown", initAudioOnInteraction);
       document.removeEventListener("touchstart", initAudioOnInteraction);
     };
-  }, [initializeWorker, reloadNotifications, forceLoadNotifications]);
+  }, [initializeWorker, reloadNotifications, forceLoadNotifications, isStandalone]);
 
   // Listen for new-message-received events
   useEffect(() => {
-    document.addEventListener("new-message-received", handleNewMessage);
+    // Solo se non siamo in standalone
+    if (!isStandalone) {
+      document.addEventListener("new-message-received", handleNewMessage);
 
-    return () => {
-      document.removeEventListener("new-message-received", handleNewMessage);
-    };
-  }, [forceLoadNotifications]);
+      return () => {
+        document.removeEventListener("new-message-received", handleNewMessage);
+      };
+    }
+  }, [forceLoadNotifications, isStandalone]);
 
   return <>{children}</>;
 };
