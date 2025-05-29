@@ -19,7 +19,7 @@ import DoNotDisturbIndicator from "../chat/DoNotDisturbIndicator";
 import useWindowManager from "../../hooks/useWindowManager";
 import { useDispatch } from "react-redux";
 import { fetchNotificationAttachments } from "@/redux/features/notifications/notificationsActions";
-import { registerOpenChatModal } from "@/redux/features/notifications/notificationsSlice";
+import { registerOpenChatModal, initChatPagination, setOpenChatData  } from "@/redux/features/notifications/notificationsSlice";
 import { WikiProvider, WikiHelper } from "../wiki";
 
 const MainPage = () => {
@@ -232,36 +232,68 @@ const openChatModal = async (notificationId) => {
   }
 
   try {
-    // IMPORTANTE: Forza SEMPRE il caricamento completo prima di aprire
-    console.log(`🔄 MainPage: Caricando dati completi per chat ${notificationId}`);
+    console.log(`🔄 MainPage: Caricando prima pagina di messaggi per chat ${notificationId}`);
     
-    // Fetch the complete notification data with all messages
-    const fullNotification = await fetchNotificationById(notificationId, true);
+    // Inizializza la paginazione PRIMA di caricare i dati
+    dispatch(initChatPagination({ 
+      notificationId,
+      hasMoreMessages: true,
+      isLoadingMore: false,
+      pageSize: 25
+    }));
+    
+    // Carica la prima pagina di messaggi con parametro openChat=1 per ottenere il conteggio totale
+    const response = await axios.get(
+      `${config.API_BASE_URL}/notifications/${notificationId}?pageSize=25&openChat=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
 
-    if (fullNotification) {
-      // Carica anche gli allegati
+    const initialData = response.data;
+
+    if (initialData) {
+      // Log per debug
+      console.log(`📥 Dati iniziali ricevuti:`, {
+        messageCount: initialData.messageCount,
+        totalMessageCount: initialData.totalMessageCount,
+        hasMoreMessages: initialData.hasMoreMessages,
+        messagesLength: Array.isArray(initialData.messages) 
+          ? initialData.messages.length 
+          : (typeof initialData.messages === 'string' ? JSON.parse(initialData.messages || "[]").length : 0)
+      });
+
+      // Salva i dati iniziali in openChatData con info di paginazione
+      dispatch(setOpenChatData({
+        notificationId,
+        data: {
+          ...initialData,
+          _isInitialLoad: true,
+          hasMoreMessages: initialData.hasMoreMessages,
+          totalMessageCount: initialData.totalMessageCount || initialData.messageCount
+        }
+      }));
+
+      // Carica allegati
       try {
         await dispatch(fetchNotificationAttachments(notificationId)).unwrap();
       } catch (error) {
         console.error("Errore nel caricamento degli allegati:", error);
-        toast({
-          variant: "destructive",
-          title: "Errore nel caricamento degli allegati",
-          description: error.message,
-        });
       }
 
-      // Marca come letta
+      // Registra e apri la chat
       toggleReadUnread(notificationId, true);
       registerOpenChat(notificationId);
 
+      // Gestione finestra
       const isMinimized = minimizedChats.some(
-        (chat) => chat.notificationId === fullNotification.notificationId,
+        (chat) => chat.notificationId === initialData.notificationId,
       );
 
-      // Gestione window manager
-      if (windowManager?.windowStates?.[fullNotification.notificationId]) {
-        windowManager.activateWindow(fullNotification.notificationId);
+      if (windowManager?.windowStates?.[initialData.notificationId]) {
+        windowManager.activateWindow(initialData.notificationId);
       } else {
         const defaultPos = {
           x: Math.max(0, (window.innerWidth - 900) / 2),
@@ -272,55 +304,56 @@ const openChatModal = async (notificationId) => {
 
         if (windowManager?.createWindow) {
           windowManager.createWindow(
-            fullNotification.notificationId,
-            fullNotification.notificationTitle || "Nuova Chat",
+            initialData.notificationId,
+            initialData.title || "Nuova Chat",
             defaultPos,
           );
         }
       }
 
-      // Gestione minimizzate
-      if (isMinimized) {
-        if (toggleMinimize) {
-          toggleMinimize(fullNotification.notificationId);
-        }
-
-        setMinimizedChats((prevMinimized) =>
-          prevMinimized.filter(
-            (chat) => chat.notificationId !== fullNotification.notificationId,
-          ),
-        );
-      }
-
-      // IMPORTANTE: Non serve dispatch qui perché fetchNotificationById già popola openChatData
-      // quando la chat è registrata come aperta tramite registerOpenChat sopra
-
-      // Use the full notification data with all messages
+      // Aggiungi a openChats
       setOpenChats((prevChats) => {
         const existingChat = prevChats.find(
-          (chat) => chat.notificationId === fullNotification.notificationId
+          (chat) => chat.notificationId === initialData.notificationId
         );
         
         if (!existingChat) {
-          return [...prevChats, fullNotification];
+          return [...prevChats, initialData];
         }
         
-        // Update existing chat with full data
         return prevChats.map((chat) =>
-          chat.notificationId === fullNotification.notificationId
-            ? fullNotification
+          chat.notificationId === initialData.notificationId
+            ? initialData
             : chat,
         );
       });
 
-      if (windowManager?.activateWindow) {
-        windowManager.activateWindow(fullNotification.notificationId);
-      }
-      
-      console.log(`✅ MainPage: Chat ${notificationId} aperta con ${fullNotification.messageCount || 0} messaggi`);
+      // Rimuovi dalle chat minimizzate se presente
+      setMinimizedChats((prevMinimized) => 
+        prevMinimized.filter(
+          (chat) => chat.notificationId !== initialData.notificationId
+        )
+      );
+
+      console.log(`✅ MainPage: Chat ${notificationId} aperta con ${initialData.messages?.length || 0} messaggi iniziali`);
     }
   } catch (error) {
     console.error("Errore durante l'apertura della chat:", error);
+    
+    // Mostra un messaggio di errore all'utente
+    if (error.response?.status === 404) {
+      swal.fire({
+        icon: "error",
+        title: "Chat non trovata",
+        text: "La chat richiesta non esiste o non hai i permessi per accedervi.",
+      });
+    } else {
+      swal.fire({
+        icon: "error",
+        title: "Errore",
+        text: "Si è verificato un errore durante l'apertura della chat.",
+      });
+    }
   }
 };
 
@@ -365,7 +398,7 @@ const openChatModal = async (notificationId) => {
           }
         }
 
-        fetchNotificationById(notificationId);
+        fetchNotificationById(notificationId, true);
       }
     };
 
@@ -421,7 +454,7 @@ const openChatModal = async (notificationId) => {
       if (!notificationId) return;
 
       try {
-        await fetchNotificationById(notificationId);
+        await fetchNotificationById(notificationId, true);
 
         const openChat = openChats.find(
           (chat) => chat.notificationId === notificationId,

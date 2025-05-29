@@ -56,7 +56,7 @@ export const createPoll = createAsyncThunk(
 
       if (response.data && response.data.success) {
         // Update the notification to include the new poll
-        dispatch(fetchNotificationById(notificationId));
+        dispatch(fetchNotificationById(notificationId, true));
 
         // Emit an event for other components
         const event = new CustomEvent("poll-created", {

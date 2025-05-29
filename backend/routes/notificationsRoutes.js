@@ -81,10 +81,20 @@ router.get('/notifications', authenticateToken, async (req, res) => {
 
 router.get('/notifications/:notificationId', authenticateToken, async (req, res) => {
   const { notificationId } = req.params;
+  // Aggiungi supporto per parametri di paginazione
+  const { pageSize, lastMessageId } = req.query;
   const userId = req.user.UserId;
 
   try {
-    const notification = await getNotificationById(userId, notificationId);
+    // Passa i parametri di paginazione se presenti
+    const notification = await getNotificationById(
+      userId, 
+      notificationId,
+      true, // openChat = true per chat specifiche
+      pageSize ? parseInt(pageSize) : undefined,
+      lastMessageId ? parseInt(lastMessageId) : undefined
+    );
+    
     if (!notification) {
       return res.status(404).json({ error: 'Notification not found' });
     }

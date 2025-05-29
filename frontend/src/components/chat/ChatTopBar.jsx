@@ -317,9 +317,10 @@ const ChatTopBar = ({
       const success = await updateChatTitle(notificationId, editedTitle);
       if (success && typeof setTitle === "function") {
         setTitle(editedTitle);
-
+    
         // Aggiorna la notifica per avere i dati aggiornati
-        await fetchNotificationById(notificationId);
+        // Usa true per chat aperte per ottenere tutti i messaggi
+        await fetchNotificationById(notificationId, true);
       }
     }
 
