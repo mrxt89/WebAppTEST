@@ -185,26 +185,43 @@ const StandaloneChat = () => {
 
   // Improved initialization function
   const initialize = useCallback(async () => {
-    if (initializationAttempted.current) return;
+    // Previeni inizializzazioni multiple
+    if (initializationAttempted.current || loaded) return;
     initializationAttempted.current = true;
-
+  
     try {
       document.title = "Caricamento chat...";
-
+  
       // Verify token
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("Sessione scaduta, effettua il login");
       }
-
+  
       if (!notificationId || isNaN(notificationId)) {
         throw new Error("ID chat non valido");
       }
-
-      // La standalone usa il worker esistente della main app
+  
+      // Controlla se abbiamo già i dati in Redux
+      if (openChatData && openChatData.lastFullUpdate) {
+        console.log(`✅ StandaloneChat: Usando dati esistenti da Redux per chat ${notificationId}`);
+        setNotification(openChatData);
+        setLoaded(true);
+        document.title = `Chat: ${openChatData.title || "Conversazione"}`;
+        
+        // Register this chat as open
+        if (!chatRegisteredRef.current) {
+          registerStandaloneChat(notificationId);
+          registerOpenChat(notificationId);
+          chatRegisteredRef.current = true;
+        }
+        
+        return;
+      }
+  
       console.log('📱 StandaloneChat: Usando worker esistente dalla main app');
-
-      // Carica utenti e opzioni di risposta
+  
+      // Carica utenti e opzioni di risposta in parallelo
       const [fetchedUsers, fetchedOptions] = await Promise.all([
         fetchUsers().catch(err => {
           console.error("Errore caricamento utenti:", err);
@@ -215,15 +232,15 @@ const StandaloneChat = () => {
           return [];
         })
       ]);
-
+  
       setUsers(fetchedUsers);
       setResponseOptions(fetchedOptions);
-
+  
       // Carica la notifica con TUTTI i messaggi
       console.log(`🔄 StandaloneChat: Caricando dati completi per chat ${notificationId}...`);
       
       try {
-        // Usa dispatch invece di chiamare direttamente la funzione
+        // CORREZIONE QUI: passa notificationId come numero, non come oggetto
         const result = await dispatch(fetchNotificationById(notificationId, true)).unwrap();
         
         if (result) {
@@ -234,12 +251,8 @@ const StandaloneChat = () => {
               : (typeof result.messages === "string" ? JSON.parse(result.messages || "[]").length : 0)
           });
           
-          // Ora i dati dovrebbero essere già in openChatData grazie al reducer
-          // Ma per sicurezza settiamo anche lo stato locale
           setNotification(result);
           setLoaded(true);
-          
-          // Aggiorna il titolo della finestra
           document.title = `Chat: ${result.title || "Conversazione"}`;
         } else {
           throw new Error("Nessun dato ricevuto per la notifica");
@@ -248,13 +261,13 @@ const StandaloneChat = () => {
         console.error(`Errore caricamento notifica ${notificationId}:`, error);
         throw error;
       }
-
+  
       // Register this chat as open
       if (!chatRegisteredRef.current) {
         registerStandaloneChat(notificationId);
         registerOpenChat(notificationId);
         chatRegisteredRef.current = true;
-
+  
         // Mark the notification as read
         await toggleReadUnread(notificationId, true);
       }
@@ -270,6 +283,8 @@ const StandaloneChat = () => {
     registerOpenChat,
     toggleReadUnread,
     dispatch,
+    openChatData,
+    loaded
   ]);
 
   // Initialization effect

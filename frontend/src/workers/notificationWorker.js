@@ -453,17 +453,14 @@ self.onmessage = (event) => {
           clearTimeout(pollingTimeout);
         }
 
-        if (highPriorityUpdate) {
-          // Esegui immediatamente senza ritardo
-          fetchNotifications();
-        } else {
+
           // Normale ritardo di aggiornamento forzato
           pollingTimeout = setTimeout(() => {
             if (isWorkerActive) {
               fetchNotifications();
             }
           }, FORCED_REFRESH_INTERVAL);
-        }
+        
         break;
 
       case "fetch_notification":
