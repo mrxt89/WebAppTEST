@@ -162,7 +162,9 @@ const ChatWindow = ({
  const lastMessageIdRef = useRef(null);
  const previousMessagesRef = useRef([]);
  const [hasNewMessages, setHasNewMessages] = useState(false);
-
+ const lastDataUpdateRef = useRef(null);
+ const lastInitializedNotificationRef = useRef(null)
+ 
  // Stato specifico per gli utenti della chat
  const [chatUsers, setChatUsers] = useState([]);
  const {
@@ -620,12 +622,43 @@ const ChatWindow = ({
    }
  }, [notification?.notificationId]);
 
- // MODIFICA: Effect per aggiornare quando openChatData cambia
  useEffect(() => {
-   if (openChatData) {
-     updateMessagesFromNotification();
-   }
- }, [openChatData, updateMessagesFromNotification]);
+  if (openChatData) {
+    // Usa un ref per tracciare l'ultimo update ed evitare loop
+    const currentDataTimestamp = openChatData.lastFullUpdate || 0;
+    
+    // Solo se i dati sono effettivamente nuovi
+    if (!lastDataUpdateRef.current || currentDataTimestamp > lastDataUpdateRef.current) {
+      lastDataUpdateRef.current = currentDataTimestamp;
+      
+      // Aggiorna i messaggi solo se sono effettivamente cambiati
+      const messages = Array.isArray(openChatData.messages)
+        ? openChatData.messages
+        : typeof openChatData.messages === "string"
+          ? JSON.parse(openChatData.messages || "[]")
+          : [];
+      
+      // Confronta con i messaggi attuali per evitare re-render inutili
+      const currentMessageIds = parsedMessages.map(m => m.messageId).join(',');
+      const newMessageIds = messages.map(m => m.messageId).join(',');
+      
+      if (currentMessageIds !== newMessageIds) {
+        setParsedMessages(messages);
+      }
+      
+      // Aggiorna altri stati solo se necessario
+      const membersInfo = Array.isArray(openChatData.membersInfo)
+        ? openChatData.membersInfo
+        : typeof openChatData.membersInfo === "string"
+          ? JSON.parse(openChatData.membersInfo || "[]")
+          : [];
+      
+      setParsedMembersInfo(membersInfo);
+      setHasLeftChat(openChatData.chatLeft === 1 || openChatData.chatLeft === true);
+      setIsArchived(openChatData.archived === 1 || openChatData.archived === true);
+    }
+  }
+}, [openChatData]);
 
  // Effetto per gestire gli aggiornamenti di stato delle chat
  useEffect(() => {
