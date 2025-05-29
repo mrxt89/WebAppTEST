@@ -224,7 +224,7 @@ const StandaloneChat = () => {
       
       try {
         // Usa dispatch invece di chiamare direttamente la funzione
-        const result = await dispatch(fetchNotificationById(notificationId)).unwrap();
+        const result = await dispatch(fetchNotificationById(notificationId, true)).unwrap();
         
         if (result) {
           console.log(`✅ StandaloneChat: Caricati dati completi per chat ${notificationId}:`, {
@@ -307,7 +307,7 @@ const StandaloneChat = () => {
         console.log(`🔄 StandaloneChat: Ricaricando per evento ${reason}...`);
         
         try {
-          const result = await dispatch(fetchNotificationById(notificationId)).unwrap();
+          const result = await dispatch(fetchNotificationById(notificationId, true)).unwrap();
           if (result) {
             setNotification(result);
             // openChatData viene già aggiornato dal reducer

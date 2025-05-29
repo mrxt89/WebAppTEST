@@ -485,7 +485,7 @@ export const useNotifications = () => {
               if (notificationId) {
                 // Usa setTimeout per evitare chiamate durante l'esecuzione del reducer
                 setTimeout(() => {
-                  dispatch(fetchNotificationById(notificationId));
+                  dispatch(fetchNotificationById(notificationId, true));
                   // Aggiorna anche gli allegati
                   dispatch(refreshAttachments(notificationId));
                 }, 0);

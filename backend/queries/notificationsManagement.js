@@ -42,14 +42,24 @@ async function getUserNotifications(userId) {
   }
 }
 
-async function getNotificationById(userId, notificationId, isOpenChat = true) {
+async function getNotificationById(userId, notificationId, isOpenChat = true, pageSize = null, lastMessageId = null) {
   try {
     let pool = await sql.connect(config.dbConfig);
-    let result = await pool.request()
+    let request = pool.request()
       .input('userId', sql.Int, userId)
       .input('notificationId', sql.Int, notificationId)
-      .input('OpenChat', sql.Bit, isOpenChat ? 1 : 0)
-      .execute('GetUserNotificationsWithMessages');
+      .input('OpenChat', sql.Bit, isOpenChat ? 1 : 0);
+    
+    // Aggiungi parametri di paginazione se forniti
+    if (pageSize !== null && pageSize !== undefined) {
+      request.input('PageSize', sql.Int, pageSize);
+    }
+    
+    if (lastMessageId !== null && lastMessageId !== undefined) {
+      request.input('LastMessageId', sql.Int, lastMessageId);
+    }
+    
+    let result = await request.execute('GetUserNotificationsWithMessages');
     
     if (result.recordset.length === 0) {
       return null;
@@ -1254,6 +1264,8 @@ async function removeUserFromChat(notificationId, adminUserId, userToRemoveId) {
     throw err;
   }
 }
+
+
 
 module.exports = {
   getNotifications,

@@ -3,7 +3,7 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 import { config } from "../../../config";
 import { fetchNotificationById, toggleReadUnread } from "./notificationsSlice";
-
+import { store } from "../../../redux/store";
 // Async thunk for editing a message
 export const editMessage = createAsyncThunk(
   "messageManagement/editMessage",
@@ -36,7 +36,10 @@ export const editMessage = createAsyncThunk(
           // Aggiungi un piccolo ritardo prima di aggiornare la notifica
           // per dare tempo al backend di processare completamente la modifica
           setTimeout(() => {
-            dispatch(fetchNotificationById(response.data.NotificationId));
+            // Usa true per ottenere tutti i messaggi se la chat è aperta
+            const state = store.getState();
+            const isOpenChat = state.notifications?.openChatIds?.has(response.data.NotificationId);
+            dispatch(fetchNotificationById(response.data.NotificationId, isOpenChat));
             
             // Segna la notifica come letta
             dispatch(toggleReadUnread({
@@ -139,8 +142,11 @@ export const deleteMessage = createAsyncThunk(
       if (response.data && response.data.success) {
         // If we have the notification ID, update the notification data
         if (response.data.notificationId) {
-          dispatch(fetchNotificationById(response.data.notificationId));
-
+          // Usa true per ottenere tutti i messaggi se la chat è aperta
+          const state = store.getState();
+          const isOpenChat = state.notifications?.openChatIds?.has(response.data.notificationId);
+          dispatch(fetchNotificationById(response.data.notificationId, isOpenChat));
+      
           // Emit an event for other components
           const event = new CustomEvent("message-deleted", {
             detail: {
@@ -219,8 +225,10 @@ export const setMessageColor = createAsyncThunk(
 
         if (notificationId) {
           // Update the notification to reflect the color change
-          dispatch(fetchNotificationById(notificationId));
-
+          const state = store.getState();
+          const isOpenChat = state.notifications?.openChatIds?.has(notificationId);
+          dispatch(fetchNotificationById(notificationId, isOpenChat));
+        
           // Emit an event for other components
           const event = new CustomEvent("message-color-changed", {
             detail: {
@@ -301,8 +309,10 @@ export const clearMessageColor = createAsyncThunk(
 
         if (notificationId) {
           // Update the notification to reflect the color change
-          dispatch(fetchNotificationById(notificationId));
-
+          const state = store.getState();
+          const isOpenChat = state.notifications?.openChatIds?.has(notificationId);
+          dispatch(fetchNotificationById(notificationId, isOpenChat));
+        
           // Emit an event for other components
           const event = new CustomEvent("message-color-changed", {
             detail: {
@@ -410,6 +420,7 @@ const messageManagementSlice = createSlice({
     filteredMessages: {}, // Organized by notificationId
     loading: false,
     error: null,
+    pagination: {},
   },
   reducers: {
     clearVersionHistory: (state, action) => {
@@ -431,6 +442,31 @@ const messageManagementSlice = createSlice({
         // Clear all filtered messages
         state.filteredMessages = {};
       }
+    },
+    loadMoreMessagesSuccess: (state, action) => {
+      const { notificationId, messages, hasMoreMessages } = action.payload;
+      const chatKey = `chat_${notificationId}`;
+      
+      if (!state[chatKey]) {
+        state[chatKey] = [];
+      }
+      
+      // Rimuovi eventuali duplicati
+      const existingIds = new Set(state[chatKey].map(m => m.messageId));
+      const newMessages = messages.filter(m => !existingIds.has(m.messageId));
+      
+      // Aggiungi i nuovi messaggi all'inizio dell'array
+      state[chatKey] = [...newMessages, ...state[chatKey]];
+      
+      // Aggiorna lo stato della paginazione
+      state.pagination = {
+        ...state.pagination,
+        [notificationId]: {
+          ...state.pagination[notificationId],
+          hasMoreMessages,
+          isLoadingMore: false
+        }
+      };
     },
   },
   extraReducers: (builder) => {
@@ -526,7 +562,7 @@ const messageManagementSlice = createSlice({
 });
 
 // Export actions
-export const { clearVersionHistory, clearFilteredMessages } =
+export const { clearVersionHistory, clearFilteredMessages, loadMoreMessagesSuccess } =
   messageManagementSlice.actions;
 
 // Export selectors

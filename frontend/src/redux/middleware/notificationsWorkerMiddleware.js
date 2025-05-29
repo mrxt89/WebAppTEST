@@ -185,33 +185,31 @@ const notificationsWorkerMiddleware = (store) => {
             if (newNotifications) {
               try {
                 const currentState = store.getState();
-                const currentNotifications =
-                  currentState.notifications?.notifications || [];
-
-                const hasChanges = hasNotificationChanges(
-                  currentNotifications,
-                  newNotifications,
-                );
-
+                const currentNotifications = currentState.notifications?.notifications || [];
+                const openChatIds = currentState.notifications?.openChatIds || new Set();
+                
+                // NON aggiornare openChatData dal worker
+                const hasChanges = hasNotificationChanges(currentNotifications, newNotifications);
+                
                 if (hasChanges) {
+                  // Aggiorna solo la sidebar, non openChatData
                   store.dispatch({
                     type: "notifications/updateFromWorker",
-                    payload: newNotifications,
+                    payload: newNotifications.map(notif => {
+                      // Se la chat è aperta, mantieni solo metadati nella sidebar
+                      if (openChatIds.has(notif.notificationId)) {
+                        return {
+                          ...notif,
+                          messages: [] // Non includere messaggi per chat aperte
+                        };
+                      }
+                      return notif;
+                    }),
                     meta: {
                       source: "worker",
                       timestamp: Date.now(),
                     },
                   });
-
-                  document.dispatchEvent(
-                    new CustomEvent("notifications-updated", {
-                      detail: {
-                        timestamp: Date.now(),
-                        source: "worker",
-                        hasChanges: true,
-                      },
-                    }),
-                  );
                 }
               } catch (error) {
                 console.error("Error processing notification update:", error);
@@ -398,10 +396,10 @@ const notificationsWorkerMiddleware = (store) => {
                       }),
                     );
                   
-                    // Fetch notifica se chat non aperta
-                    if (!state.notifications.openChatIds.has(parseInt(notificationId))) {
-                      store.dispatch(fetchNotificationById(notificationId));
-                    }
+                    // Fetch notifica - usa true per chat aperte per ottenere tutti i messaggi
+                    const isOpenChat = state.notifications.openChatIds.has(parseInt(notificationId));
+                    // Carica sempre la notifica, ma con parametro diverso per chat aperte/chiuse
+                    store.dispatch(fetchNotificationById(notificationId, isOpenChat));
                   }
                 });
               } catch (e) {

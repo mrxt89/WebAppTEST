@@ -154,6 +154,80 @@ export const fetchNotificationById = createAsyncThunk(
   },
 );
 
+// Nuovo thunk per caricare più messaggi
+export const loadMoreMessages = createAsyncThunk(
+  "notifications/loadMoreMessages",
+  async ({ notificationId, lastMessageId, pageSize = 25 }, { rejectWithValue, getState }) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return rejectWithValue("No token available");
+
+      console.log(`📄 loadMoreMessages - Richiesta API:`, {
+        url: `${config.API_BASE_URL}/notifications/${notificationId}?pageSize=${pageSize}&lastMessageId=${lastMessageId}&openChat=1`,
+        notificationId,
+        lastMessageId,
+        pageSize
+      });
+
+      const response = await axios.get(
+        `${config.API_BASE_URL}/notifications/${notificationId}?pageSize=${pageSize}&lastMessageId=${lastMessageId}&openChat=1`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache",
+          },
+        },
+      );
+
+      console.log(`📥 loadMoreMessages - Risposta API:`, {
+        status: response.status,
+        dataKeys: Object.keys(response.data || {}),
+        hasMessages: !!response.data?.messages
+      });
+
+      if (!response.data) {
+        return rejectWithValue("No data received");
+      }
+
+      // Estrai i messaggi dalla risposta
+      let messages = [];
+      if (response.data.messages) {
+        if (typeof response.data.messages === 'string') {
+          try {
+            messages = JSON.parse(response.data.messages);
+            console.log(`📦 Parsed string messages: ${messages.length} messaggi`);
+          } catch (e) {
+            console.error('Error parsing messages:', e);
+            messages = [];
+          }
+        } else if (Array.isArray(response.data.messages)) {
+          messages = response.data.messages;
+          console.log(`📦 Array messages: ${messages.length} messaggi`);
+        }
+      }
+
+      console.log(`✅ loadMoreMessages - Risultato:`, {
+        numeroMessaggi: messages.length,
+        primoId: messages[0]?.messageId,
+        ultimoId: messages[messages.length - 1]?.messageId,
+        hasMoreMessages: response.data.hasMoreMessages,
+        totalMessageCount: response.data.totalMessageCount
+      });
+
+      return {
+        notificationId,
+        newMessages: messages,
+        hasMoreMessages: response.data.hasMoreMessages || false,
+        totalMessageCount: response.data.totalMessageCount || 0
+      };
+    } catch (error) {
+      console.error("❌ Error loading more messages:", error);
+      return rejectWithValue(error.message || "Failed to load more messages");
+    }
+  },
+);
+
+
 export const createDBNotificationsView = createAsyncThunk(
   "notifications/createDBNotificationsView",
   async (_, { rejectWithValue }) => {
@@ -493,7 +567,7 @@ export const updateChatTitle = createAsyncThunk(
        return rejectWithValue(response.data?.message || "Failed to update title");
       }
 
-      dispatch(fetchNotificationById(notificationId));
+      dispatch(fetchNotificationById(notificationId, true));
 
       document.dispatchEvent(
         new CustomEvent("chat-title-updated", {
@@ -536,70 +610,137 @@ const notificationsSlice = createSlice({
   name: "notifications",
   initialState: {
     notifications: [],
-   openChatData: {}, // NUOVO: Storage per dati completi delle chat aperte
+    openChatData: {}, // NUOVO: Storage per dati completi delle chat aperte
+    chatPagination: {},
     unreadCount: 0,
     loading: true,
     sending: false,
     error: null,
     unreadMessages: [],
     openChatIds: new Set(),
-   standaloneChats: new Set(),
+    standaloneChats: new Set(),
     dbViewCreated: false,
-   highlights: {},
+    highlights: {},
     loadingHighlights: false,
     attachmentsLoading: false,
     notificationAttachments: {},
   },
   reducers: {
+    initChatPagination: (state, action) => {
+      const { notificationId } = action.payload;
+      state.chatPagination[notificationId] = {
+        hasMoreMessages: true,
+        isLoadingMore: false,
+        oldestMessageId: null,
+      };
+    },
    // NUOVO: Aggiorna dati completi per chat aperta
    setOpenChatData: (state, action) => {
     const { notificationId, data } = action.payload;
-    const existingData = state.openChatData[notificationId];
     
-    // Calcola i messaggi nella nuova data
-    const newMessagesCount = Array.isArray(data.messages) 
-      ? data.messages.length 
-      : (typeof data.messages === "string" ? JSON.parse(data.messages || "[]").length : 0);
+    if (!state.openChatData[notificationId] || data._isInitialLoad) {
+      const messages = Array.isArray(data.messages) 
+        ? data.messages 
+        : (typeof data.messages === 'string' ? JSON.parse(data.messages || "[]") : []);
       
-    // Calcola i messaggi nei dati esistenti
-    const existingMessagesCount = existingData && Array.isArray(existingData.messages) 
-      ? existingData.messages.length 
-      : (existingData && typeof existingData.messages === "string" ? JSON.parse(existingData.messages || "[]").length : 0);
-    
-    // PROTEZIONE: Non sovrascrivere dati completi con dati incompleti
-    if (existingData && existingData.lastFullUpdate) {
-      // Se i nuovi dati hanno meno messaggi dei dati esistenti, e non hanno priorità, rifiuta
-      if (newMessagesCount < existingMessagesCount && !data._priority) {
-        console.log(`🚫 setOpenChatData: Rifiutando dati incompleti per chat ${notificationId} (${newMessagesCount} vs ${existingMessagesCount} messaggi)`);
-        return;
+      // Calcola hasMoreMessages basandoti sul conteggio totale
+      const totalCount = data.totalMessageCount || data.messageCount || messages.length;
+      const hasMore = messages.length < totalCount;
+      
+      console.log(`📊 setOpenChatData - Inizializzazione paginazione:`, {
+        notificationId,
+        messagesLoaded: messages.length,
+        totalCount,
+        hasMore
+      });
+      
+      state.openChatData[notificationId] = {
+        ...data,
+        messages: messages,
+        lastFullUpdate: Date.now(),
+        totalMessageCount: totalCount // Assicurati che questo sia salvato
+      };
+      
+      // Inizializza paginazione con i dati corretti
+      if (messages.length > 0) {
+        const sortedMessages = [...messages].sort((a, b) => 
+          new Date(a.tbCreated) - new Date(b.tbCreated)
+        );
+        
+        const oldestMessage = sortedMessages[0];
+        
+        state.chatPagination[notificationId] = {
+          hasMoreMessages: hasMore,
+          isLoadingMore: false,
+          oldestMessageId: oldestMessage.messageId,
+          totalLoaded: messages.length,
+          totalAvailable: totalCount
+        };
+        
+        console.log(`✅ Paginazione inizializzata per chat ${notificationId}:`, state.chatPagination[notificationId]);
       }
+    } else {
+      // Aggiorna solo metadati
+      state.openChatData[notificationId] = {
+        ...state.openChatData[notificationId],
+        ...data,
+        messages: state.openChatData[notificationId].messages,
+        lastFullUpdate: Date.now(),
+      };
+    }
+  },
+  appendMessagesToChat: (state, action) => {
+    const { notificationId, messages, hasMoreMessages, totalMessageCount } = action.payload;
+    
+    if (state.openChatData[notificationId]) {
+      const existingMessages = state.openChatData[notificationId].messages || [];
+      const existingIds = new Set(existingMessages.map(m => m.messageId));
       
-      // Se i nuovi dati sono più vecchi di 5 secondi rispetto all'ultimo aggiornamento completo, rifiuta
-      if (!data._priority && data.lastFullUpdate && 
-          existingData.lastFullUpdate && 
-          (existingData.lastFullUpdate - data.lastFullUpdate > 5000)) {
-        console.log(`🚫 setOpenChatData: Rifiutando dati obsoleti per chat ${notificationId}`);
-        return;
+      // Filtra duplicati
+      const newMessages = messages.filter(m => !existingIds.has(m.messageId));
+      
+      console.log(`🔄 Appending ${newMessages.length} nuovi messaggi a ${existingMessages.length} esistenti`);
+      
+      if (newMessages.length > 0) {
+        // Combina i messaggi
+        const allMessages = [...existingMessages, ...newMessages];
+        
+        // Ordina tutti i messaggi per data crescente (più vecchi prima)
+        const sortedMessages = allMessages.sort((a, b) => 
+          new Date(a.tbCreated) - new Date(b.tbCreated)
+        );
+        
+        state.openChatData[notificationId].messages = sortedMessages;
+        
+        // Trova il nuovo messaggio più vecchio
+        const newOldestMessage = sortedMessages[0];
+        
+        // Aggiorna paginazione
+        state.chatPagination[notificationId] = {
+          hasMoreMessages: hasMoreMessages || false,
+          isLoadingMore: false,
+          oldestMessageId: newOldestMessage.messageId,
+          totalLoaded: sortedMessages.length,
+          totalAvailable: totalMessageCount || sortedMessages.length
+        };
+        
+        console.log(`✅ Paginazione aggiornata:`, {
+          oldestMessageId: newOldestMessage.messageId,
+          hasMoreMessages,
+          totalLoaded: sortedMessages.length,
+          totalAvailable: totalMessageCount
+        });
+      } else {
+        // Nessun nuovo messaggio, ferma la paginazione
+        state.chatPagination[notificationId] = {
+          ...state.chatPagination[notificationId],
+          hasMoreMessages: false,
+          isLoadingMore: false
+        };
+        console.log(`⚠️ Nessun nuovo messaggio da aggiungere. Paginazione fermata.`);
       }
     }
-    
-    console.log(`✅ setOpenChatData: Accettando dati per chat ${notificationId}:`, {
-      newMessages: newMessagesCount,
-      existingMessages: existingMessagesCount,
-      priority: !!data._priority,
-      reason: data._reloadReason || 'normal'
-    });
-    
-    state.openChatData[notificationId] = {
-      ...data,
-      lastFullUpdate: data.lastFullUpdate || Date.now(),
-    };
-    
-    // Rimuovi flag temporanei
-    delete state.openChatData[notificationId]._priority;
-    delete state.openChatData[notificationId]._reloadReason;
   },
-   
    // NUOVO: Rimuovi dati chat quando si chiude
    removeOpenChatData: (state, action) => {
      const notificationId = action.payload;
@@ -729,6 +870,26 @@ const notificationsSlice = createSlice({
 
   extraReducers: (builder) => {
     builder
+    .addCase(loadMoreMessages.pending, (state, action) => {
+        const notificationId = action.meta.arg.notificationId;
+        if (state.chatPagination[notificationId]) {
+          state.chatPagination[notificationId].isLoadingMore = true;
+        }
+      })
+      .addCase(loadMoreMessages.fulfilled, (state, action) => {
+        const { notificationId, newMessages, hasMoreMessages } = action.payload;
+        
+        // Usa il reducer appendMessagesToChat
+        notificationsSlice.caseReducers.appendMessagesToChat(state, {
+          payload: { notificationId, messages: newMessages, hasMoreMessages }
+        });
+      })
+      .addCase(loadMoreMessages.rejected, (state, action) => {
+        const notificationId = action.meta.arg.notificationId;
+        if (state.chatPagination[notificationId]) {
+          state.chatPagination[notificationId].isLoadingMore = false;
+        }
+      })
       // Fetch notifications
       .addCase(fetchNotifications.pending, (state) => {
         state.loading = true;
@@ -785,28 +946,57 @@ const notificationsSlice = createSlice({
         const notification = action.payload;
         const notificationId = notification.notificationId;
         
-        // SEMPRE aggiorna openChatData se la chat è aperta o sta per essere aperta
-        if (state.openChatIds.has(notificationId) || action.meta?.arg?.openChat) {
-          console.log(`💾 Salvando dati completi in openChatData per chat ${notificationId}`);
+        // IMPORTANTE: Se la chat è aperta e abbiamo già dati completi, NON sovrascrivere con dati parziali
+        if (state.openChatIds.has(notificationId) && state.openChatData[notificationId]) {
+          const existingData = state.openChatData[notificationId];
           
+          // Se abbiamo già più messaggi di quelli nuovi, mantieni i vecchi
+          const existingMessageCount = Array.isArray(existingData.messages) 
+            ? existingData.messages.length 
+            : 0;
+          
+          const newMessageCount = Array.isArray(notification.messages) 
+            ? notification.messages.length 
+            : (typeof notification.messages === "string" ? JSON.parse(notification.messages || "[]").length : 0);
+          
+          console.log(`🔍 fetchNotificationById per chat aperta ${notificationId}:`, {
+            existingMessages: existingMessageCount,
+            newMessages: newMessageCount,
+            willUpdate: newMessageCount >= existingMessageCount
+          });
+          
+          // Solo aggiorna se abbiamo PIÙ messaggi o se è una richiesta esplicita con openChat
+          if (newMessageCount >= existingMessageCount || action.meta?.arg?.openChat) {
+            console.log(`💾 Aggiornando openChatData per chat ${notificationId} con ${newMessageCount} messaggi`);
+            state.openChatData[notificationId] = {
+              ...notification,
+              lastFullUpdate: Date.now(),
+              _priority: true,
+              _hasAllMessages: newMessageCount >= existingMessageCount
+            };
+          } else {
+            console.log(`⚠️ Skip aggiornamento openChatData - manteniamo ${existingMessageCount} messaggi invece di ${newMessageCount}`);
+            // Aggiorna solo i metadati, non i messaggi
+            state.openChatData[notificationId] = {
+              ...state.openChatData[notificationId],
+              ...notification,
+              messages: existingData.messages, // MANTIENI I MESSAGGI ESISTENTI
+              lastFullUpdate: existingData.lastFullUpdate
+            };
+          }
+        } else if (state.openChatIds.has(notificationId) || action.meta?.arg?.openChat) {
+          // Prima volta che carichiamo
+          console.log(`💾 Prima volta salvando in openChatData per chat ${notificationId}`);
           state.openChatData[notificationId] = {
             ...notification,
             lastFullUpdate: Date.now(),
             _priority: true,
             _hasAllMessages: true
           };
-          
-          // Log per debug
-          const messageCount = Array.isArray(notification.messages) 
-            ? notification.messages.length 
-            : (typeof notification.messages === "string" ? JSON.parse(notification.messages || "[]").length : 0);
-          
-          console.log(`✅ openChatData aggiornato con ${messageCount} messaggi per chat ${notificationId}`);
         }
         
         // Aggiorna la sidebar SOLO se la chat NON è aperta
         if (!state.openChatIds.has(notificationId)) {
-          // Per la sidebar, limita a 5 messaggi
           const sidebarNotification = {
             ...notification,
             messages: Array.isArray(notification.messages) 
@@ -1273,6 +1463,7 @@ export const isNotificationMuted = (notification) => {
 // Export actions
 export const {
  setOpenChatData,
+ initChatPagination,
  removeOpenChatData,
  addMessageToOpenChat,
   registerOpenChat,

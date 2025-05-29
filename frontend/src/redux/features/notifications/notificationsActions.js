@@ -25,6 +25,69 @@ export const stopNotificationsWorker = () => ({
   type: "notifications/stopWorker",
 });
 
+export const loadMoreMessages = createAsyncThunk(
+  "notifications/loadMoreMessages",
+  async ({ notificationId, lastMessageId, pageSize = 25 }, { rejectWithValue, getState }) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return rejectWithValue("No token available");
+
+      console.log(`📄 Caricando messaggi precedenti per chat ${notificationId}`);
+      console.log(`   - Ultimo messageId: ${lastMessageId}`);
+      console.log(`   - Page size: ${pageSize}`);
+
+      const response = await axios.get(
+        `${config.API_BASE_URL}/notifications/${notificationId}?pageSize=${pageSize}&lastMessageId=${lastMessageId}&openChat=1`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache",
+          },
+        },
+      );
+
+      if (!response.data) {
+        return rejectWithValue("No data received");
+      }
+
+      // Estrai i messaggi dalla risposta
+      let messages = [];
+      if (response.data.messages) {
+        if (typeof response.data.messages === 'string') {
+          try {
+            messages = JSON.parse(response.data.messages);
+          } catch (e) {
+            console.error('Error parsing messages:', e);
+            messages = [];
+          }
+        } else if (Array.isArray(response.data.messages)) {
+          messages = response.data.messages;
+        }
+      }
+
+      console.log(`✅ Ricevuti ${messages.length} messaggi dal server`);
+      console.log(`   - Ha più messaggi: ${response.data.hasMoreMessages}`);
+      console.log(`   - Totale messaggi: ${response.data.totalMessageCount}`);
+
+      // Log dei messageId per debug
+      if (messages.length > 0) {
+        console.log(`   - Primo messageId: ${messages[0].messageId}`);
+        console.log(`   - Ultimo messageId: ${messages[messages.length - 1].messageId}`);
+      }
+
+      return {
+        notificationId,
+        newMessages: messages,
+        hasMoreMessages: response.data.hasMoreMessages || false,
+        totalMessageCount: response.data.totalMessageCount || 0
+      };
+    } catch (error) {
+      console.error("Error loading more messages:", error);
+      return rejectWithValue(error.message || "Failed to load more messages");
+    }
+  },
+);
+
 export const batchFetchNotificationAttachments = createAsyncThunk(
   "notifications/batchFetchAttachments",
   async (notificationIds, { dispatch }) => {
@@ -315,7 +378,7 @@ export const sendNotificationWithAttachments = createAsyncThunk(
 
       // Update the notification list ONCE after successful upload of all attachments
       if (notificationId > 0) {
-        await dispatch(fetchNotificationById(notificationId));
+        await dispatch(fetchNotificationById(notificationId, true));
       }
 
       return {
@@ -354,7 +417,7 @@ export const removeUserFromChat = createAsyncThunk(
       }
 
       // Aggiorna la notifica per riflettere i cambiamenti
-      await dispatch(fetchNotificationById(notificationId));
+      await dispatch(fetchNotificationById(notificationId, true));
 
       // Notifica altri componenti del cambiamento
       document.dispatchEvent(

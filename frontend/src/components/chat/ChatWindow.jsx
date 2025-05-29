@@ -430,22 +430,22 @@ const ChatWindow = ({
          }
 
          messageUpdateTimeoutRef.current = setTimeout(() => {
-           forceUpdateFromServer();
-
-           document.dispatchEvent(
-             new CustomEvent("chat-message-sent", {
-               detail: {
-                 notificationId: notificationData.notificationId,
-                 messageId: result.messageId || tempMessage.messageId,
-                 isFromCurrentUser: true,
-               },
-             }),
-           );
-
-           document.dispatchEvent(new CustomEvent("refreshNotifications"));
-
-           messageUpdateTimeoutRef.current = null;
-         }, 300);
+          forceUpdateFromServer(true); // Forza caricamento completo
+        
+          document.dispatchEvent(
+            new CustomEvent("chat-message-sent", {
+              detail: {
+                notificationId: notificationData.notificationId,
+                messageId: result.messageId || tempMessage.messageId,
+                isFromCurrentUser: true,
+              },
+            }),
+          );
+        
+          document.dispatchEvent(new CustomEvent("refreshNotifications"));
+        
+          messageUpdateTimeoutRef.current = null;
+        }, 300);
        }
 
        return result;
@@ -520,13 +520,33 @@ const ChatWindow = ({
  // NUOVO: Effect per gestire reload-open-chat
  useEffect(() => {
   const handleReloadOpenChat = async (event) => {
-    const { notificationId: eventNotificationId, reason, forceComplete } = event.detail;
+    const { notificationId: eventNotificationId, forceComplete } = event.detail;
     
-    if (eventNotificationId === notification?.notificationId) {
-      console.log(`🔄 ChatWindow: Reload richiesto per chat ${eventNotificationId} (motivo: ${reason})`);
+    if (eventNotificationId === parseInt(notification.notificationId)) {
+      console.log(`Ricaricando dati completi per chat ${notification.notificationId}...`);
       
-      const shouldForceComplete = forceComplete || reason === 'message-sent';
-      await forceUpdateFromServer(shouldForceComplete);
+      try {
+        // Forza il ricaricamento completo con openChat=1
+        const fullData = await fetchNotificationById(notification.notificationId, true);
+        if (fullData) {
+          console.log(`Dati completi ricaricati per chat ${notification.notificationId}:`, fullData);
+          
+          // Aggiorna i messaggi mantenendo quelli già caricati
+          if (Array.isArray(fullData.messages)) {
+            setParsedMessages(prevMessages => {
+              const newMessages = [...prevMessages];
+              fullData.messages.forEach(msg => {
+                if (!newMessages.some(m => m.messageId === msg.messageId)) {
+                  newMessages.push(msg);
+                }
+              });
+              return newMessages.sort((a, b) => new Date(a.tbCreated) - new Date(b.tbCreated));
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Errore nel ricaricamento per chat ${notification.notificationId}:`, error);
+      }
     }
   };
 
@@ -535,7 +555,7 @@ const ChatWindow = ({
   return () => {
     document.removeEventListener("reload-open-chat", handleReloadOpenChat);
   };
-}, [notification?.notificationId, forceUpdateFromServer]);
+}, [notification?.notificationId, fetchNotificationById]);
 
  // Effetto per gestire nuovi messaggi in arrivo
  useEffect(() => {
@@ -617,7 +637,7 @@ const ChatWindow = ({
        notification &&
        notificationId === notification.notificationId
      ) {
-       await fetchNotificationById(notificationId);
+       await fetchNotificationById(notificationId, true);
 
        if (action === "left") {
          setHasLeftChat(true);
@@ -1226,10 +1246,10 @@ const ChatWindow = ({
        const result = await leaveChat(notificationId);
 
        if (result) {
-         await fetchNotificationById(notificationId);
-
+         await fetchNotificationById(notificationId, true);
+       
          setHasLeftChat(true);
-
+       
          swal.fire({
            title: "Chat abbandonata",
            text: "Hai abbandonato questa conversazione",
@@ -1278,10 +1298,10 @@ const ChatWindow = ({
      const result = await archiveChat(notification.notificationId);
 
      if (result && result.success) {
-       await fetchNotificationById(notification.notificationId);
-
+       await fetchNotificationById(notification.notificationId, true);
+     
        setIsArchived(true);
-
+     
        swal.fire({
          icon: "success",
          title: "Chat archiviata",
@@ -1329,10 +1349,10 @@ const ChatWindow = ({
      const result = await unarchiveChat(notification.notificationId);
 
      if (result && result.success) {
-       await fetchNotificationById(notification.notificationId);
-
+       await fetchNotificationById(notification.notificationId, true);
+     
        setIsArchived(false);
-
+     
        swal.fire({
          icon: "success",
          title: "Chat recuperata",

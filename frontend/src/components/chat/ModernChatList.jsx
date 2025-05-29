@@ -50,8 +50,9 @@ import { FaFlag, FaRegSmile } from "react-icons/fa";
 import ReactionPicker from "./ReactionPicker";
 import MessageReactions from "./MessageReactions";
 import MessageActionsMenu from "./MessageActionsMenu";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { selectOpenChatData } from "@/redux/features/notifications/notificationsSlice";
+import { loadMoreMessages } from "@/redux/features/notifications/notificationsActions";
 
 // Assicurati che il modal sia configurato per il tuo root element
 Modal.setAppElement("#root");
@@ -65,6 +66,49 @@ const Spinner = () => (
 
 const MIN_FETCH_INTERVAL = 5000; // 5 secondi tra un fetch e l'altro
 const CHAT_REFRESH_INTERVAL = 5000;
+
+// Hook per il caricamento infinito
+const useInfiniteScroll = (callback, hasMore, isLoading) => {
+  const observer = useRef();
+  const lastMessageElementRef = useCallback(
+    (node) => {
+      if (isLoading) {
+        console.log('🔄 InfiniteScroll: Skip - loading in corso');
+        return;
+      }
+      
+      if (observer.current) observer.current.disconnect();
+      
+      observer.current = new IntersectionObserver((entries) => {
+        const [entry] = entries;
+        console.log('👁️ IntersectionObserver:', {
+          isIntersecting: entry.isIntersecting,
+          hasMore,
+          isLoading,
+          target: entry.target?.id
+        });
+        
+        if (entry.isIntersecting && hasMore && !isLoading) {
+          console.log('🚀 Triggering loadMore from IntersectionObserver');
+          callback();
+        }
+      }, {
+        root: null,
+        rootMargin: '200px 0px', // Trigger 200px prima di raggiungere l'elemento
+        threshold: 0.1
+      });
+      
+      if (node) {
+        console.log('🎯 Observing element:', node.id);
+        observer.current.observe(node);
+      }
+    },
+    [isLoading, hasMore, callback]
+  );
+
+  return lastMessageElementRef;
+};
+
 
 // Funzione per generare un colore casuale in base al nome
 const generateAvatarColor = (name) => {
@@ -185,6 +229,16 @@ const ModernChatList = ({
   onScrollToBottom,
   onEditMessage,
 }) => {
+  const dispatch = useDispatch();
+  
+  // Ottieni lo stato della paginazione da Redux
+  const chatPagination = useSelector(state => 
+    state.notifications.chatPagination[notificationId] || {}
+  );
+
+  
+
+
   // MODIFICA CHIAVE: Ottieni dati completi da openChatData invece che dal context generico
   const openChatData = useSelector(state => 
     selectOpenChatData(state, parseInt(notificationId))
@@ -250,6 +304,82 @@ const ModernChatList = ({
   const lastVisibleMessageRef = useRef(null);
 
   const previousMessagesRef = useRef([]);
+
+  // Stati per il caricamento infinito
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [page, setPage] = useState(1);
+  const MESSAGES_PER_PAGE = 50;
+
+  useEffect(() => {
+    console.log('📊 ModernChatList - Stato paginazione dettagliato:', {
+      notificationId,
+      pagination: chatPagination,
+      hasMoreMessages: chatPagination?.hasMoreMessages,
+      isLoadingMore: chatPagination?.isLoadingMore,
+      oldestMessageId: chatPagination?.oldestMessageId,
+      messageCount: localMessages.length,
+      totalAvailable: openChatData?.totalMessageCount || openChatData?.messageCount,
+      shouldLoadMore: chatPagination?.hasMoreMessages && !chatPagination?.isLoadingMore
+    });
+  }, [chatPagination, notificationId, localMessages.length, openChatData]);
+
+  // Funzione per caricare più messaggi
+  const handleLoadMoreMessages = useCallback(() => {
+    const pagination = chatPagination || {};
+    
+    console.log('🔍 handleLoadMoreMessages chiamato:', {
+      notificationId,
+      pagination,
+      hasMessages: localMessages.length,
+      localMessagesIds: localMessages.map(m => m.messageId).slice(0, 5)
+    });
+    
+    // Previeni chiamate multiple o se non ci sono più messaggi
+    if (pagination.isLoadingMore) {
+      console.log('⏸️ Caricamento già in corso, skip');
+      return;
+    }
+    
+    if (!pagination.hasMoreMessages) {
+      console.log('⏸️ Nessun altro messaggio da caricare');
+      return;
+    }
+    
+    // IMPORTANTE: Usa oldestMessageId dalla paginazione se disponibile
+    let oldestMessageId = pagination.oldestMessageId;
+    
+    // Se non c'è oldestMessageId nella paginazione, trovalo dai messaggi locali
+    if (!oldestMessageId && localMessages.length > 0) {
+      const oldestMessage = [...localMessages].sort((a, b) => 
+        new Date(a.tbCreated) - new Date(b.tbCreated)
+      )[0];
+      
+      if (oldestMessage) {
+        oldestMessageId = oldestMessage.messageId;
+      }
+    }
+    
+    if (!oldestMessageId) {
+      console.error('❌ Nessun messaggio trovato per determinare lastMessageId');
+      return;
+    }
+    
+    console.log(`📄 Caricando messaggi precedenti a messageId: ${oldestMessageId}`);
+    
+    dispatch(loadMoreMessages({
+      notificationId: parseInt(notificationId),
+      lastMessageId: oldestMessageId,
+      pageSize: 25
+    }));
+  }, [dispatch, notificationId, chatPagination, localMessages]);
+
+  // Usa l'hook per il caricamento infinito
+  const lastMessageElementRef = useInfiniteScroll(
+    handleLoadMoreMessages,
+    chatPagination.hasMoreMessages,
+    chatPagination.isLoadingMore
+  );
 
   // Effetto per gestire i nuovi messaggi
   useEffect(() => {
@@ -353,6 +483,33 @@ const ModernChatList = ({
     }
   }, []);
 
+  useEffect(() => {
+    // Salva l'altezza dello scroll prima di aggiungere nuovi messaggi
+    const prevScrollHeight = chatListRef.current?.scrollHeight || 0;
+    
+    // Dopo che i messaggi sono stati aggiunti
+    if (chatPagination.isLoadingMore === false && prevScrollHeight > 0) {
+      const newScrollHeight = chatListRef.current?.scrollHeight || 0;
+      const scrollDiff = newScrollHeight - prevScrollHeight;
+      
+      // Mantieni la posizione visiva aggiustando lo scroll
+      if (scrollDiff > 0 && chatListRef.current) {
+        chatListRef.current.scrollTop += scrollDiff;
+      }
+    }
+  }, [localMessages.length]);
+
+  // Aggiungi questo useEffect per scrollare in fondo al caricamento iniziale
+useEffect(() => {
+  // Solo al primo caricamento quando abbiamo messaggi
+  if (localMessages.length > 0 && !initialScrollDone && chatListRef.current) {
+    setTimeout(() => {
+      chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+      setInitialScrollDone(true);
+    }, 100);
+  }
+}, [localMessages.length, initialScrollDone]);
+
   // MODIFICA CHIAVE: Usa openChatData per ottenere tutti i messaggi
   useEffect(() => {
     if (openChatData) {
@@ -362,37 +519,62 @@ const ModernChatList = ({
       let messages = [];
       if (Array.isArray(openChatData.messages)) {
         messages = openChatData.messages;
+        console.log(`📦 openChatData.messages è un array con ${messages.length} elementi`);
       } else if (typeof openChatData.messages === "string") {
         try {
           messages = JSON.parse(openChatData.messages || "[]");
+          console.log(`📦 openChatData.messages era una stringa, parsed in array con ${messages.length} elementi`);
         } catch (e) {
           console.error("Errore nel parsing dei messaggi:", e);
           messages = [];
         }
       }
-
-      // Forza il caricamento di tutti i messaggi se non sono completi
-      if (openChatData.messageCount && messages.length < openChatData.messageCount) {
-        console.log(`⚠️ ModernChatList: Messaggi incompleti (${messages.length}/${openChatData.messageCount}), ricarico...`);
-        fetchNotificationById(notificationId, true)
-          .then((fullData) => {
-            if (fullData) {
-              const fullMessages = Array.isArray(fullData.messages) 
-                ? fullData.messages 
-                : JSON.parse(fullData.messages || "[]");
-              console.log(`✅ ModernChatList: Ricaricati ${fullMessages.length} messaggi completi`);
-              setLocalMessages(fullMessages);
-            }
-          })
-          .catch(error => {
-            console.error("Errore nel ricaricamento dei messaggi:", error);
-          });
-      } else {
-        console.log(`✅ ModernChatList: Caricati ${messages.length} messaggi da openChatData`);
-        setLocalMessages(messages);
+  
+      // Log dettagliato dei messaggi
+      console.log(`📊 Dettaglio messaggi:`, {
+        primoMessaggio: messages[0]?.messageId,
+        ultimoMessaggio: messages[messages.length - 1]?.messageId,
+        tuttiGliId: messages.map(m => m.messageId)
+      });
+  
+      console.log(`✅ ModernChatList: Usando ${messages.length} messaggi da openChatData (totali: ${openChatData.totalMessageCount || openChatData.messageCount})`);
+      
+      // IMPORTANTE: Mantieni i messaggi esistenti e aggiungi solo quelli nuovi
+      setLocalMessages(prevMessages => {
+        // Se non abbiamo messaggi precedenti, usa direttamente quelli nuovi
+        if (prevMessages.length === 0) {
+          return messages;
+        }
+        
+        // Crea un Set di ID esistenti per evitare duplicati
+        const existingIds = new Set(prevMessages.map(m => m.messageId));
+        
+        // Filtra i nuovi messaggi per includere solo quelli non esistenti
+        const newMessages = messages.filter(m => !existingIds.has(m.messageId));
+        
+        // Se ci sono nuovi messaggi, uniscili e ordina per data
+        if (newMessages.length > 0) {
+          const allMessages = [...prevMessages, ...newMessages];
+          return allMessages.sort((a, b) => new Date(a.tbCreated) - new Date(b.tbCreated));
+        }
+        
+        // Se non ci sono nuovi messaggi, mantieni quelli esistenti
+        return prevMessages;
+      });
+      
+      // Se abbiamo meno messaggi del totale, log
+      if (openChatData.totalMessageCount && messages.length < openChatData.totalMessageCount) {
+        console.log(`📄 Ci sono altri ${openChatData.totalMessageCount - messages.length} messaggi da caricare`);
       }
     }
-  }, [openChatData, notificationId, fetchNotificationById]);
+  }, [openChatData, notificationId]);
+
+  useEffect(() => {
+    console.log(`🔄 localMessages aggiornato: ${localMessages.length} messaggi`, {
+      primoId: localMessages[0]?.messageId,
+      ultimoId: localMessages[localMessages.length - 1]?.messageId
+    });
+  }, [localMessages]);
 
   // MODIFICA: Carica dati completi al mount del componente
   useEffect(() => {
@@ -1669,16 +1851,30 @@ const ModernChatList = ({
   // Funzione per raggruppare i messaggi per data
   const groupMessagesByDate = (messages) => {
     if (!Array.isArray(messages)) return {};
-
+  
+    // Ordina i messaggi per data (dal più vecchio al più recente)
+    const sortedMessages = [...messages].sort((a, b) => 
+      new Date(a.tbCreated) - new Date(b.tbCreated)
+    );
+  
     const groups = {};
-    messages.forEach((message) => {
+    sortedMessages.forEach((message) => {
       const dateKey = formatDate(message.tbCreated);
       if (!groups[dateKey]) {
         groups[dateKey] = [];
       }
       groups[dateKey].push(message);
     });
-    return groups;
+  
+    // Ordina le date (dal più vecchio al più recente)
+    const sortedGroups = {};
+    Object.keys(groups)
+      .sort((a, b) => new Date(a) - new Date(b))
+      .forEach(date => {
+        sortedGroups[date] = groups[date];
+      });
+  
+    return sortedGroups;
   };
 
   // Helper per formattare la data
@@ -1882,7 +2078,7 @@ const ModernChatList = ({
               ([date, dateMessages]) => (
                 <React.Fragment key={date}>
                   {renderDate(date)}
-
+  
                   {dateMessages.map((message, index) => {
                     const originalMessage = findOriginalMessage(
                       message.replyToMessageId,
@@ -2225,38 +2421,27 @@ const ModernChatList = ({
                       {renderDate(date)}
 
                       {dateMessages.map((message, index) => {
+                        // IMPORTANTE: Usa l'indice 0 per il messaggio più vecchio quando ordini dal più vecchio al più recente
+                        const isFirstMessage = date === Object.keys(groupMessagesByDate(localMessages))[0] && 
+                                              index === 0;
                         const readers = readByUsers[index];
-                        const originalMessage = findOriginalMessage(
-                          message.replyToMessageId,
-                        );
-                        const isCurrentUserMessage = message.selectedUser; // Flag per verificare se il messaggio è dell'utente corrente
-                        const senderName = isCurrentUserMessage
-                          ? "Tu"
-                          : message.senderName;
-                        const messageColor = message.messageColor; // Il colore del messaggio
-                        const isHighlighted = highlightedMessageIds.has(
-                          message.messageId,
-                        );
+                        const originalMessage = findOriginalMessage(message.replyToMessageId);
+                        const messageColor = message.messageColor;
+                        const isHighlighted = highlightedMessageIds.has(message.messageId);
                         const containsPoll = isPollMessage(message);
-                        // Aggiungi una classe se il messaggio è stato appena modificato
-                        const isJustEdited =
-                          animatedEditId === message.messageId;
-
+                        const isJustEdited = animatedEditId === message.messageId;
+                        
                         return (
                           <motion.div
                             key={message.messageId}
-                            ref={(el) =>
-                              (messageRefs.current[message.messageId] = el)
-                            }
+                            ref={isFirstMessage ? lastMessageElementRef : null}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ duration: 0.2 }}
                             className={cn(
                               "flex p-2 mb-2 relative",
-                              isCurrentUserMessage
-                                ? "justify-end"
-                                : "justify-start",
+                              message.selectedUser ? "justify-end" : "justify-start",
                               isHighlighted
                                 ? "highlighted-message bg-yellow-50 border-l-4 border-yellow-400 shadow-sm"
                                 : "",
@@ -2268,7 +2453,7 @@ const ModernChatList = ({
                             id={`message-${message.messageId}`}
                           >
                             {/* Avatar per messaggi ricevuti */}
-                            {isCurrentUserMessage == "0" && (
+                            {!message.selectedUser && (
                               <MessageAvatar
                                 senderName={message.senderName}
                                 onClick={(e) =>
@@ -2283,15 +2468,12 @@ const ModernChatList = ({
                                 <div
                                   className="message-quote cursor-pointer mb-1"
                                   onClick={() =>
-                                    handlePreviewClick(
-                                      originalMessage.messageId,
-                                    )
+                                    handlePreviewClick(originalMessage.messageId)
                                   }
                                 >
                                   <div className="text-sm font-semibold text-gray-700">
                                     {originalMessage.senderName}
                                   </div>
-
                                   <div className="text-xs text-gray-700 line-clamp-2">
                                     {originalMessage.message}
                                   </div>
@@ -2301,53 +2483,30 @@ const ModernChatList = ({
                               {/* Bolla del messaggio */}
                               <div className="flex items-center gap-2">
                                 {/* Bandierina a sinistra per ricevuti, a destra per inviati */}
-                                {isCurrentUserMessage == "0" &&
-                                  messageColor && (
-                                    <span
-                                      className="message-flag animate-flag"
-                                      style={{ color: messageColor }}
-                                      title={
-                                        messageColor
-                                          ? `Colore: ${messageColor}`
-                                          : "Nessun colore"
-                                      }
-                                    >
-                                      <FaFlag />
-                                    </span>
-                                  )}
-
-                                {/* Timestamp per messaggi dell'utente corrente */}
-                                {isCurrentUserMessage == "1" && (
-                                  <div
-                                    className={cn(
-                                      "message-timestamp",
-                                      isCurrentUserMessage == "0"
-                                        ? "text-right"
-                                        : "text-left",
-                                    )}
+                                {!message.selectedUser && messageColor && (
+                                  <span
+                                    className="message-flag animate-flag"
+                                    style={{ color: messageColor }}
+                                    title={
+                                      messageColor
+                                        ? `Colore: ${messageColor}`
+                                        : "Nessun colore"
+                                    }
                                   >
-                                    {formatTime(message.tbCreated)}
-                                    {message.isEdited == "1" && (
-                                      <span className="ml-1 text-gray-400 text-[10px]">
-                                        ✎
-                                      </span>
-                                    )}
-                                  </div>
+                                    <FaFlag />
+                                  </span>
                                 )}
 
                                 <div
                                   className={cn(
                                     "message-bubble relative",
-                                    isCurrentUserMessage == "1"
-                                      ? "sent"
-                                      : "received",
+                                    message.selectedUser ? "sent" : "received",
                                   )}
                                   style={
                                     messageColor
                                       ? {
                                           backgroundColor: messageColor + "15",
-                                          color:
-                                            getContrastTextColor(messageColor),
+                                          color: getContrastTextColor(messageColor),
                                           boxShadow: `0 2px 8px ${messageColor}33`,
                                         }
                                       : {}
@@ -2358,7 +2517,7 @@ const ModernChatList = ({
                                     className={`absolute top-2 right-2 p-1 rounded-full transition-colors ${
                                       editingMessageId === message.messageId
                                         ? "bg-gray-200 text-gray-800"
-                                        : isCurrentUserMessage == "1"
+                                        : message.selectedUser == "1"
                                           ? "text-white/70 hover:text-white hover:bg-white/20"
                                           : "text-gray-500/70 hover:text-gray-700 hover:bg-gray-200/50"
                                     }`}
@@ -2432,11 +2591,11 @@ const ModernChatList = ({
                                               }
                                             }, 500); // Piccolo ritardo per assicurarsi che la reazione sia stata salvata
                                           }}
-                                          canEdit={isCurrentUserMessage == "1"}
+                                          canEdit={message.selectedUser == "1"}
                                           isEdited={message.isEdited == "1"}
                                           hasLeftChat={hasLeftChat}
                                           isCurrentUserMessage={
-                                            isCurrentUserMessage == "1"
+                                            message.selectedUser == "1"
                                           }
                                           isCancelled={message.cancelled == "1"}
                                         />
@@ -2552,7 +2711,7 @@ const ModernChatList = ({
                                   {colorPickerMessageId === message.messageId &&
                                     !hasLeftChat && (
                                       <div
-                                        className={`absolute z-50 ${isCurrentUserMessage == "1" ? "right-10" : "left-10"} top-2 flex ${isCurrentUserMessage == "1" ? "flex-row-reverse" : "flex-row"} items-start color-picker-area`}
+                                        className={`absolute z-50 ${message.selectedUser == "1" ? "right-10" : "left-10"} top-2 flex ${message.selectedUser == "1" ? "flex-row-reverse" : "flex-row"} items-start color-picker-area`}
                                       >
                                         <MessageColorPicker
                                           messageId={message.messageId}
@@ -2565,7 +2724,7 @@ const ModernChatList = ({
                                     )}
 
                                   {/* Indicatore di messaggi letti */}
-                                  {isCurrentUserMessage == "1" &&
+                                  {message.selectedUser == "1" &&
                                     readers?.length > 0 && (
                                       <div
                                         className="absolute bottom-1 right-2 text-xs text-gray-500 cursor-pointer"
@@ -2580,16 +2739,16 @@ const ModernChatList = ({
                                   {/* Indicatore di messaggio modificato */}
                                   {renderEditedIndicator(
                                     message,
-                                    isCurrentUserMessage,
+                                    message.selectedUser == "1",
                                   )}
                                 </div>
 
                                 {/* Timestamp per utenti non correnti */}
-                                {isCurrentUserMessage == "0" && (
+                                {message.selectedUser == "0" && (
                                   <div
                                     className={cn(
                                       "message-timestamp",
-                                      isCurrentUserMessage == "0"
+                                      message.selectedUser == "0"
                                         ? "text-right"
                                         : "text-left",
                                     )}
@@ -2604,7 +2763,7 @@ const ModernChatList = ({
                                 )}
 
                                 {/* Bandierina a destra per inviati */}
-                                {isCurrentUserMessage == "1" &&
+                                {message.selectedUser == "1" &&
                                   messageColor && (
                                     <span
                                       className="message-flag animate-flag"
@@ -2624,10 +2783,19 @@ const ModernChatList = ({
                         );
                       })}
                     </React.Fragment>
-                  ),
+                  )
                 )
               )}
             </AnimatePresence>
+
+            {/* Indicatore di caricamento */}
+            {chatPagination.isLoadingMore && (
+            <div className="flex justify-center items-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500"></div>
+              <span className="ml-2 text-sm text-gray-500">Caricamento messaggi precedenti...</span>
+            </div>
+          )}
+
             <div ref={messagesEndRef} />
           </div>
         )}
