@@ -36,7 +36,7 @@ import VersionHistoryModal from "./VersionHistoryModal";
 import { FaFlag } from "react-icons/fa";
 import MessageActionsMenu from "./MessageActionsMenu";
 import { useSelector, useDispatch } from "react-redux";
-import { selectOpenChatData } from "@/redux/features/notifications/notificationsSlice";
+import { selectOpenChatData, setOpenChatData  } from "@/redux/features/notifications/notificationsSlice";
 import { loadMoreMessages } from "@/redux/features/notifications/notificationsActions";
 
 // Assicurati che il modal sia configurato per il tuo root element
@@ -585,7 +585,13 @@ useEffect(() => {
     const handleMessageSent = async (event) => {
       const { notificationId: eventNotificationId, forceScroll, tempMessage } = event.detail;
       
-      if (eventNotificationId === parseInt(notificationId)) {
+      // Assicurati che notificationId sia valido
+      if (!eventNotificationId || !notificationId) {
+        console.error("NotificationId mancante:", { eventNotificationId, notificationId });
+        return;
+      }
+      
+      if (parseInt(eventNotificationId) === parseInt(notificationId)) {
         console.log(`Messaggio inviato, aggiorno immediatamente la chat ${notificationId}...`);
         
         // Se c'è un messaggio temporaneo, aggiungilo subito
@@ -628,15 +634,53 @@ useEffect(() => {
           const fullData = await fetchNotificationById(notificationId, true);
           if (fullData) {
             console.log(`Dati completi ricaricati dopo invio messaggio:`, fullData);
-            // Forza l'aggiornamento dei messaggi locali
-            if (Array.isArray(fullData.messages)) {
-              setLocalMessages(fullData.messages);
-            } else if (typeof fullData.messages === "string") {
-              try {
-                const parsedMessages = JSON.parse(fullData.messages || "[]");
-                setLocalMessages(parsedMessages);
-              } catch (e) {
-                console.error("Errore nel parsing dei messaggi:", e);
+            
+            // MODIFICA: Se abbiamo meno messaggi del totale, carica tutti i messaggi
+            if (fullData.messageCount && fullData.messages && fullData.messages.length < fullData.messageCount) {
+              console.log(`⚠️ Caricamento incompleto (${fullData.messages.length}/${fullData.messageCount}). Richiedo TUTTI i messaggi...`);
+              
+              // Fai una richiesta specifica per ottenere TUTTI i messaggi
+              const token = localStorage.getItem("token");
+              const response = await axios.get(
+                `${config.API_BASE_URL}/notifications/${notificationId}?openChat=1&allMessages=true&pageSize=${fullData.messageCount}`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Cache-Control": "no-cache",
+                  },
+                }
+              );
+              
+              if (response.data && response.data.messages) {
+                const allMessages = Array.isArray(response.data.messages)
+                  ? response.data.messages
+                  : JSON.parse(response.data.messages || "[]");
+                
+                setLocalMessages(allMessages);
+                console.log(`✅ Caricati tutti i ${allMessages.length} messaggi`);
+                
+                // Aggiorna anche openChatData con tutti i messaggi
+                dispatch(setOpenChatData({
+                  notificationId: parseInt(notificationId),
+                  data: {
+                    ...fullData,
+                    messages: allMessages,
+                    lastFullUpdate: Date.now(),
+                    _hasAllMessages: true
+                  }
+                }));
+              }
+            } else {
+              // Usa i messaggi ricevuti
+              if (Array.isArray(fullData.messages)) {
+                setLocalMessages(fullData.messages);
+              } else if (typeof fullData.messages === "string") {
+                try {
+                  const parsedMessages = JSON.parse(fullData.messages || "[]");
+                  setLocalMessages(parsedMessages);
+                } catch (e) {
+                  console.error("Errore nel parsing dei messaggi:", e);
+                }
               }
             }
             
@@ -648,12 +692,12 @@ useEffect(() => {
                 }
               }, 100);
             }
-
+  
             // Marca come letto il messaggio nella sidebar
             await toggleReadUnread(notificationId, true);
             document.dispatchEvent(
               new CustomEvent("notification-updated", {
-                detail: { notificationId },
+                detail: { notificationId: parseInt(notificationId) },
               })
             );
           }
@@ -666,13 +710,13 @@ useEffect(() => {
         }
       }
     };
-
+  
     document.addEventListener("chat-message-sent", handleMessageSent);
     
     return () => {
       document.removeEventListener("chat-message-sent", handleMessageSent);
     };
-  }, [notificationId, fetchNotificationById, toggleReadUnread]);
+  }, [notificationId, fetchNotificationById, toggleReadUnread, dispatch]);
 
   // Aggiungo un nuovo listener per i messaggi ricevuti
   useEffect(() => {
@@ -2120,6 +2164,18 @@ useEffect(() => {
 
                           {/* Bolla del messaggio */}
                           <div className="flex items-center gap-2">
+                            {/* Timestamp per utenti correnti */}
+                            {message.selectedUser == "1" && (
+                              <div className="message-timestamp text-right text-xs text-gray-500">
+                                {formatTime(message.tbCreated)}
+                                {message.isEdited == "1" && (
+                                  <span className="ml-1 text-gray-400 text-[10px]">
+                                    ✎
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
                             {/* Bandierina a sinistra per ricevuti, a destra per inviati */}
                             {isCurrentUserMessage == "0" && messageColor && (
                               <span
@@ -2381,6 +2437,33 @@ useEffect(() => {
             className="flex-1 overflow-y-auto chat-list-container"
             ref={chatListRef}
           >
+            {/* Pulsante per caricare manualmente i messaggi precedenti */}
+            {chatPagination.hasMoreMessages && (
+              <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm py-2 px-4 flex justify-center">
+                <button
+                  onClick={handleLoadMoreMessages}
+                  disabled={chatPagination.isLoadingMore}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    chatPagination.isLoadingMore
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                  }`}
+                >
+                  {chatPagination.isLoadingMore ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500"></div>
+                      <span>Caricamento...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronUp className="h-4 w-4" />
+                      <span>Carica messaggi precedenti</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
             <AnimatePresence>
               {localMessages.length === 0 ? (
                 <div className="text-center text-gray-500 mt-10">
@@ -2454,6 +2537,18 @@ useEffect(() => {
 
                               {/* Bolla del messaggio */}
                               <div className="flex items-center gap-2">
+                                {/* Timestamp per utenti correnti */}
+                                {message.selectedUser == "1" && (
+                                  <div className="message-timestamp text-right text-xs text-gray-500">
+                                    {formatTime(message.tbCreated)}
+                                    {message.isEdited == "1" && (
+                                      <span className="ml-1 text-gray-400 text-[10px]">
+                                        ✎
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
                                 {/* Bandierina a sinistra per ricevuti, a destra per inviati */}
                                 {!message.selectedUser && messageColor && (
                                   <span

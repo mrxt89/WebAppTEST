@@ -40,6 +40,11 @@ const ChatLayout = ({
   hasNewMessages,
   reopenChat,
   closeChat,
+  // NUOVI PROPS PER LA PAGINAZIONE:
+  onLoadMore,
+  hasMoreMessages,
+  isLoadingMore,
+  totalMessageCount,
 }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);

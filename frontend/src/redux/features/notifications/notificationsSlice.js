@@ -946,7 +946,12 @@ const notificationsSlice = createSlice({
         const notification = action.payload;
         const notificationId = notification.notificationId;
         
-        // IMPORTANTE: Se la chat è aperta e abbiamo già dati completi, NON sovrascrivere con dati parziali
+        // IMPORTANTE: Se la chat è aperta, marca SEMPRE come letta
+        if (state.openChatIds.has(notificationId)) {
+          notification.isReadByUser = true; // FORZA come letta
+        }
+        
+        // Se la chat è aperta e abbiamo già dati completi, NON sovrascrivere con dati parziali
         if (state.openChatIds.has(notificationId) && state.openChatData[notificationId]) {
           const existingData = state.openChatData[notificationId];
           
@@ -970,6 +975,7 @@ const notificationsSlice = createSlice({
             console.log(`💾 Aggiornando openChatData per chat ${notificationId} con ${newMessageCount} messaggi`);
             state.openChatData[notificationId] = {
               ...notification,
+              isReadByUser: true, // SEMPRE letta se aperta
               lastFullUpdate: Date.now(),
               _priority: true,
               _hasAllMessages: newMessageCount >= existingMessageCount
@@ -980,6 +986,7 @@ const notificationsSlice = createSlice({
             state.openChatData[notificationId] = {
               ...state.openChatData[notificationId],
               ...notification,
+              isReadByUser: true, // SEMPRE letta se aperta
               messages: existingData.messages, // MANTIENI I MESSAGGI ESISTENTI
               lastFullUpdate: existingData.lastFullUpdate
             };
@@ -989,6 +996,7 @@ const notificationsSlice = createSlice({
           console.log(`💾 Prima volta salvando in openChatData per chat ${notificationId}`);
           state.openChatData[notificationId] = {
             ...notification,
+            isReadByUser: true, // SEMPRE letta se aperta
             lastFullUpdate: Date.now(),
             _priority: true,
             _hasAllMessages: true
@@ -1012,13 +1020,30 @@ const notificationsSlice = createSlice({
           } else {
             state.notifications.push(sidebarNotification);
           }
+        } else {
+          // Se la chat è aperta, aggiorna comunque nella sidebar ma con isReadByUser = true
+          const index = state.notifications.findIndex(n => n.notificationId === notificationId);
+          if (index !== -1) {
+            state.notifications[index] = {
+              ...state.notifications[index],
+              ...notification,
+              isReadByUser: true, // FORZA come letta
+              messages: Array.isArray(notification.messages) 
+                ? notification.messages.slice(-5) 
+                : (typeof notification.messages === "string" 
+                  ? JSON.parse(notification.messages || "[]").slice(-5)
+                  : [])
+            };
+          }
         }
         
-        // Ricalcola unreadCount
+        // Ricalcola unreadCount ESCLUDENDO le chat aperte
         try {
           state.unreadCount = state.notifications.filter(
-            (n) => n && !n.isReadByUser && n.archived !== 1,
+            (n) => n && !n.isReadByUser && n.archived !== 1 && !state.openChatIds.has(n.notificationId)
           ).length;
+          
+          console.log(`📊 UnreadCount dopo fetchNotificationById: ${state.unreadCount}`);
         } catch (e) {
           console.error("Errore nel calcolo unreadCount:", e);
         }
@@ -1356,25 +1381,27 @@ const notificationsSlice = createSlice({
       })
 
      // MODIFICA updateFromWorker per NON toccare openChatData
-      .addCase("notifications/updateFromWorker", (state, action) => {
-        try {
+     .addCase("notifications/updateFromWorker", (state, action) => {
+      try {
         if (!action.payload || !Array.isArray(action.payload)) {
-            return;
-          }
-
+          return;
+        }
+    
         const newNotifications = [...action.payload];
         
         // PER OGNI NOTIFICA DAL WORKER
         newNotifications.forEach(workerNotif => {
-          // SE LA CHAT È APERTA, NON TOCCARE I SUOI MESSAGGI
+          // SE LA CHAT È APERTA, FORZA isReadByUser = true
           if (state.openChatIds.has(workerNotif.notificationId)) {
+            workerNotif.isReadByUser = true; // MODIFICA CHIAVE
+            
             const openChat = state.openChatData[workerNotif.notificationId];
             
             if (openChat && openChat.lastFullUpdate) {
               console.log(`🚫 Worker: NON sovrascrivendo chat aperta ${workerNotif.notificationId}`);
               
               // Aggiorna SOLO i metadati, NON i messaggi
-              openChat.isReadByUser = workerNotif.isReadByUser;
+              openChat.isReadByUser = true; // ASSICURA che sia marcata come letta
               openChat.isClosed = workerNotif.isClosed;
               openChat.pinned = workerNotif.pinned;
               openChat.favorite = workerNotif.favorite;
@@ -1386,14 +1413,14 @@ const notificationsSlice = createSlice({
               // Se ci sono nuovi messaggi, richiedi aggiornamento completo
               if (workerNotif.messageCount > (openChat.messageCount || 0)) {
                 setTimeout(() => {
-              document.dispatchEvent(
+                  document.dispatchEvent(
                     new CustomEvent("reload-open-chat", {
-                  detail: {
+                      detail: {
                         notificationId: workerNotif.notificationId,
                         reason: "new-messages"
-                  },
-                }),
-              );
+                      },
+                    }),
+                  );
                 }, 0);
               }
               
@@ -1404,9 +1431,9 @@ const notificationsSlice = createSlice({
         
         // Aggiorna notifications normalmente solo per chat NON aperte
         const updatedNotifications = state.notifications.map(existingNotif => {
-          // Se la chat è aperta, mantieni la versione esistente
+          // Se la chat è aperta, mantieni la versione esistente MA con isReadByUser = true
           if (state.openChatIds.has(existingNotif.notificationId)) {
-            return existingNotif;
+            return { ...existingNotif, isReadByUser: true };
           }
           
           // Altrimenti usa i dati del worker
@@ -1414,11 +1441,26 @@ const notificationsSlice = createSlice({
           return workerNotif || existingNotif;
         });
         
+        // Aggiungi nuove notifiche che non esistevano prima
+        newNotifications.forEach(workerNotif => {
+          if (!updatedNotifications.find(n => n.notificationId === workerNotif.notificationId)) {
+            // Se è una nuova notifica per una chat aperta, marcala come letta
+            if (state.openChatIds.has(workerNotif.notificationId)) {
+              workerNotif.isReadByUser = true;
+            }
+            updatedNotifications.push(workerNotif);
+          }
+        });
+        
         state.notifications = updatedNotifications;
+        
+        // CALCOLO CORRETTO di unreadCount escludendo le chat aperte
         state.unreadCount = updatedNotifications.filter(
-          (n) => n && n.isReadByUser === false && n.archived !== "1",
+          (n) => n && n.isReadByUser === false && n.archived !== "1" && n.archived !== 1
         ).length;
-    
+        
+        console.log(`📊 UnreadCount aggiornato: ${state.unreadCount}`);
+        
       } catch (error) {
         console.error("Errore in updateFromWorker:", error);
       }

@@ -13,7 +13,7 @@ let highPriorityUpdate = false; // Flag per gli aggiornamenti ad alta priorità
 let debugEnabled = true; // Set to true to enable extensive logging
 let isOpenChat = false; // Flag per indicare se stiamo caricando per una chat aperta
 let isWorkerActive = true; // NUOVO: Flag per controllare se il worker è attivo
-
+let openChatIds = new Set();
 // Set per prevenire notifiche duplicate ravvicinate
 let recentNotifications = new Set();
 // Tracking per identificare quali notifiche hanno nuovi messaggi in un ciclo
@@ -78,6 +78,15 @@ function haveNotificationsChanged(newNotifications) {
     if (newMsgCount > cachedMsgCount) {
       notificationsWithNewMessages.add(newNotif.notificationId);
       hasChanges = true;
+    }
+
+    // MODIFICA CHIAVE: Se la chat è aperta, forza isReadByUser = true
+    if (openChatIds.has(newNotif.notificationId)) {
+      newNotif.isReadByUser = true;
+      // Se era non letto prima e ora è aperto, è un cambiamento
+      if (!cachedNotif.isReadByUser) {
+        hasChanges = true;
+      }
     }
 
     // Check for read status changes
@@ -448,6 +457,14 @@ self.onmessage = (event) => {
         // Start fetching immediately
         fetchNotifications();
         break;
+
+    case "update_open_chats":
+      // NUOVO: Aggiorna la lista delle chat aperte
+      if (data.openChatIds) {
+        openChatIds = new Set(data.openChatIds);
+        console.log("[Worker] Chat aperte aggiornate:", Array.from(openChatIds));
+      }
+      break;
 
       case "stop":
         // Stop polling

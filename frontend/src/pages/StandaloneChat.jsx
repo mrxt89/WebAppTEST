@@ -74,7 +74,8 @@ const StandaloneChat = () => {
   const [users, setUsers] = useState([]);
   const [responseOptions, setResponseOptions] = useState([]);
   const chatRegisteredRef = useRef(false);
-  const initializationAttempted = useRef(false);
+  const initializationCompleteRef = useRef(false);
+  const dataFetchedRef = useRef(false);
 
   // Extract functions from the hook  
   const {
@@ -97,111 +98,87 @@ const StandaloneChat = () => {
     return { token, apiBaseUrl: config.API_BASE_URL };
   };
 
-  // Improved function to fetch users with retry mechanism
-  const fetchUsers = async () => {
+  // Funzione ottimizzata per caricare utenti e opzioni
+  const loadInitialData = useCallback(async () => {
+    // Previeni chiamate multiple
+    if (dataFetchedRef.current) return;
+    dataFetchedRef.current = true;
+
     try {
       const { token, apiBaseUrl } = getApiConfig();
 
-      const response = await axios.get(`${apiBaseUrl}/users`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Cache-Control": "no-cache, no-store",
-          Pragma: "no-cache",
-        },
-      });
-
-      if (response.data) {
-        setUsers(response.data);
-        return response.data;
-      }
-
-      throw new Error("Risposta vuota dal server");
-    } catch (error) {
-      console.error("Errore caricamento utenti:", error);
-
-      // Provide default users only in development
-      if (process.env.NODE_ENV === "development") {
-        const defaultUsers = [
-          {
-            userId: 1,
-            firstName: "Utente",
-            lastName: "Corrente",
-            isCurrentUser: true,
+      // Carica utenti e opzioni in parallelo
+      const [usersResponse, optionsResponse] = await Promise.all([
+        axios.get(`${apiBaseUrl}/users`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache",
           },
-          { userId: 2, firstName: "Support", lastName: "Team" },
-        ];
-        setUsers(defaultUsers);
-        return defaultUsers;
+        }),
+        axios.get(`${apiBaseUrl}/notification-response-options`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache",
+          },
+        })
+      ]);
+
+      if (usersResponse.data) {
+        setUsers(usersResponse.data);
       }
 
-      throw error;
-    }
-  };
-
-  // Improved function to fetch response options
-  const fetchResponseOptions = async () => {
-    try {
-      const { token, apiBaseUrl } = getApiConfig();
-
-      const response = await axios.get(`${apiBaseUrl}/notification-response-options`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Cache-Control": "no-cache, no-store",
-          Pragma: "no-cache",
-        },
-      });
-
-      if (response.data) {
-        setResponseOptions(response.data);
-        return response.data;
+      if (optionsResponse.data) {
+        setResponseOptions(optionsResponse.data);
       }
-
-      throw new Error("Risposta vuota dal server");
     } catch (error) {
-      console.error("Errore caricamento opzioni di risposta:", error);
-
-      // Provide default options only in development
+      console.error("Errore caricamento dati iniziali:", error);
+      
+      // In sviluppo, usa dati di default
       if (process.env.NODE_ENV === "development") {
-        const defaultOptions = [
+        setUsers([
+          { userId: 1, firstName: "Utente", lastName: "Corrente", isCurrentUser: true },
+          { userId: 2, firstName: "Support", lastName: "Team" },
+        ]);
+        setResponseOptions([
           { id: 1, text: "Grazie per l'informazione" },
           { id: 2, text: "Capisco, procederò come indicato" },
           { id: 3, text: "Potrebbe fornirmi maggiori dettagli?" },
-        ];
-        setResponseOptions(defaultOptions);
-        return defaultOptions;
+        ]);
       }
-
-      throw error;
     }
-  };
+  }, []);
 
   // Function to handle retries
   const handleRetry = useCallback(() => {
     setError(null);
     setRetryCount((prev) => prev + 1);
     setLoaded(false);
-    initializationAttempted.current = false;
+    initializationCompleteRef.current = false;
+    dataFetchedRef.current = false;
   }, []);
 
-  // Improved initialization function
+  // Funzione principale di inizializzazione
   const initialize = useCallback(async () => {
     // Previeni inizializzazioni multiple
-    if (initializationAttempted.current || loaded) return;
-    initializationAttempted.current = true;
-  
+    if (initializationCompleteRef.current) return;
+    initializationCompleteRef.current = true;
+
     try {
       document.title = "Caricamento chat...";
-  
+
       // Verify token
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("Sessione scaduta, effettua il login");
       }
-  
+
       if (!notificationId || isNaN(notificationId)) {
         throw new Error("ID chat non valido");
       }
-  
+
+      // Prima carica i dati statici (utenti e opzioni)
+      await loadInitialData();
+
       // Controlla se abbiamo già i dati in Redux
       if (openChatData && openChatData.lastFullUpdate) {
         console.log(`✅ StandaloneChat: Usando dati esistenti da Redux per chat ${notificationId}`);
@@ -209,51 +186,45 @@ const StandaloneChat = () => {
         setLoaded(true);
         document.title = `Chat: ${openChatData.title || "Conversazione"}`;
         
-        // Register this chat as open
+        // Register this chat as open se non già fatto
         if (!chatRegisteredRef.current) {
           registerStandaloneChat(notificationId);
           registerOpenChat(notificationId);
           chatRegisteredRef.current = true;
+          
+          // Mark as read
+          if (!openChatData.isReadByUser) {
+            toggleReadUnread(notificationId, true);
+          }
         }
         
         return;
       }
-  
-      console.log('📱 StandaloneChat: Usando worker esistente dalla main app');
-  
-      // Carica utenti e opzioni di risposta in parallelo
-      const [fetchedUsers, fetchedOptions] = await Promise.all([
-        fetchUsers().catch(err => {
-          console.error("Errore caricamento utenti:", err);
-          return [];
-        }),
-        fetchResponseOptions().catch(err => {
-          console.error("Errore caricamento opzioni:", err);
-          return [];
-        })
-      ]);
-  
-      setUsers(fetchedUsers);
-      setResponseOptions(fetchedOptions);
-  
-      // Carica la notifica con TUTTI i messaggi
+
       console.log(`🔄 StandaloneChat: Caricando dati completi per chat ${notificationId}...`);
       
       try {
-        // CORREZIONE QUI: passa notificationId come numero, non come oggetto
-        const result = await dispatch(fetchNotificationById(notificationId, true)).unwrap();
+        // Carica la notifica con TUTTI i messaggi
+        const result = await dispatch(fetchNotificationById(notificationId)).unwrap();
         
         if (result) {
-          console.log(`✅ StandaloneChat: Caricati dati completi per chat ${notificationId}:`, {
-            messageCount: result.messageCount,
-            messagesLength: Array.isArray(result.messages) 
-              ? result.messages.length 
-              : (typeof result.messages === "string" ? JSON.parse(result.messages || "[]").length : 0)
-          });
+          console.log(`✅ StandaloneChat: Caricati dati completi per chat ${notificationId}`);
           
           setNotification(result);
           setLoaded(true);
           document.title = `Chat: ${result.title || "Conversazione"}`;
+          
+          // Register this chat as open se non già fatto
+          if (!chatRegisteredRef.current) {
+            registerStandaloneChat(notificationId);
+            registerOpenChat(notificationId);
+            chatRegisteredRef.current = true;
+            
+            // Mark as read
+            if (!result.isReadByUser) {
+              toggleReadUnread(notificationId, true);
+            }
+          }
         } else {
           throw new Error("Nessun dato ricevuto per la notifica");
         }
@@ -261,38 +232,30 @@ const StandaloneChat = () => {
         console.error(`Errore caricamento notifica ${notificationId}:`, error);
         throw error;
       }
-  
-      // Register this chat as open
-      if (!chatRegisteredRef.current) {
-        registerStandaloneChat(notificationId);
-        registerOpenChat(notificationId);
-        chatRegisteredRef.current = true;
-  
-        // Mark the notification as read
-        await toggleReadUnread(notificationId, true);
-      }
+
     } catch (error) {
       console.error("Errore inizializzazione:", error);
       setError(error.message || "Errore di caricamento");
-      initializationAttempted.current = false;
+      initializationCompleteRef.current = false;
       return null;
     }
   }, [
     notificationId,
+    openChatData,
     registerStandaloneChat,
     registerOpenChat,
     toggleReadUnread,
     dispatch,
-    openChatData,
-    loaded
+    loadInitialData
   ]);
 
-  // Initialization effect
+  // Initialization effect - esegui solo una volta
   useEffect(() => {
-    // Execute initialization
     initialize();
+  }, [notificationId, retryCount]); // Rimuovi initialize dalle dipendenze per evitare loop
 
-    // Set listener for window closing
+  // Cleanup effect
+  useEffect(() => {
     const handleBeforeUnload = () => {
       if (notificationId && chatRegisteredRef.current) {
         unregisterStandaloneChat(notificationId);
@@ -302,7 +265,6 @@ const StandaloneChat = () => {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    // Cleanup
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       if (notificationId && chatRegisteredRef.current) {
@@ -310,22 +272,22 @@ const StandaloneChat = () => {
         dispatch(removeOpenChatData(notificationId));
       }
     };
-  }, [notificationId, initialize, unregisterStandaloneChat, retryCount, dispatch]);
+  }, [notificationId, unregisterStandaloneChat, dispatch]);
 
-  // Effect to handle notification updates from events
+  // Effect per gestire aggiornamenti notifica
   useEffect(() => {
+    if (!loaded) return;
+
     const handleNotificationUpdate = async (event) => {
       const { notificationId: updatedId, reason } = event.detail || {};
 
-      // Only update if it matches our notification
-      if (updatedId && updatedId === notificationId && loaded) {
+      if (updatedId && updatedId === notificationId) {
         console.log(`🔄 StandaloneChat: Ricaricando per evento ${reason}...`);
         
         try {
-          const result = await dispatch(fetchNotificationById(notificationId, true)).unwrap();
+          const result = await dispatch(fetchNotificationById(notificationId)).unwrap();
           if (result) {
             setNotification(result);
-            // openChatData viene già aggiornato dal reducer
 
             // Se è un nuovo messaggio, segna la chat come letta
             if (reason === 'new-message-received' || reason === 'chat-message-sent') {
