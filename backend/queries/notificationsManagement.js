@@ -13,14 +13,20 @@ async function getNotifications() {
   }
 }
 
-async function getUserNotifications(userId) {
+async function getUserNotifications(userId, searchText = null) {
   try {
     let pool = await sql.connect(config.dbConfig);
-    let result = await pool.request()
+    let request = pool.request()
       .input('userId', sql.Int, userId)
       .input('notificationId', sql.Int, 0)
-      .input('OpenChat', sql.Bit, 0)
-      .execute('GetUserNotificationsWithMessages');
+      .input('OpenChat', sql.Bit, 0);
+    
+    // Aggiungi searchText se fornito
+    if (searchText && searchText.trim() !== '') {
+      request.input('SearchText', sql.NVarChar(255), searchText.trim());
+    }
+    
+    let result = await request.execute('GetUserNotificationsWithMessages');
     
     // Parsa i JSON fields per ogni notifica
     return result.recordset.map(notification => {
@@ -42,7 +48,7 @@ async function getUserNotifications(userId) {
   }
 }
 
-async function getNotificationById(userId, notificationId, isOpenChat = true, pageSize = null, lastMessageId = null) {
+async function getNotificationById(userId, notificationId, isOpenChat = true, pageSize = null, lastMessageId = null, searchText = null) {
   try {
     let pool = await sql.connect(config.dbConfig);
     let request = pool.request()
@@ -57,6 +63,11 @@ async function getNotificationById(userId, notificationId, isOpenChat = true, pa
     
     if (lastMessageId !== null && lastMessageId !== undefined) {
       request.input('LastMessageId', sql.Int, lastMessageId);
+    }
+    
+    // Aggiungi searchText se fornito
+    if (searchText && searchText.trim() !== '') {
+      request.input('SearchText', sql.NVarChar(255), searchText.trim());
     }
     
     let result = await request.execute('GetUserNotificationsWithMessages');
@@ -103,6 +114,26 @@ async function getNotificationById(userId, notificationId, isOpenChat = true, pa
     return notification;
   } catch (err) {
     console.error('Error fetching notification:', err);
+    throw err;
+  }
+}
+
+// Nuova funzione per ricerca avanzata
+async function searchInNotifications(userId, searchText, notificationId = null, pageSize = 50, lastMessageId = null) {
+  try {
+    if (!searchText || searchText.trim() === '') {
+      throw new Error('SearchText è obbligatorio');
+    }
+    
+    if (notificationId) {
+      // Ricerca in una notifica specifica
+      return await getNotificationById(userId, notificationId, true, pageSize, lastMessageId, searchText);
+    } else {
+      // Ricerca in tutte le notifiche
+      return await getUserNotifications(userId, searchText);
+    }
+  } catch (err) {
+    console.error('Error searching in notifications:', err);
     throw err;
   }
 }
@@ -459,7 +490,7 @@ async function filterMessages(notificationId, userId, color, searchText) {
     }
     
     if (searchText && searchText.trim() !== '') {
-      query += ` AND nd.message LIKE @searchText`;
+      query += ` AND (nd.message LIKE @searchText OR (u.firstName + ' ' + u.lastName) LIKE @searchText OR u.username LIKE @searchText)`;
       params.searchText = { type: sql.NVarChar(sql.MAX), value: `%${searchText}%` };
     }
     
@@ -1270,6 +1301,7 @@ async function removeUserFromChat(notificationId, adminUserId, userToRemoveId) {
 module.exports = {
   getNotifications,
   getUserNotifications,
+  searchInNotifications,
   getNotificationById,
   getNotificationResponseOptions,
   markNotificationAsReceived,

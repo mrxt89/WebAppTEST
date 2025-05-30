@@ -58,6 +58,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     isNotificationMuted,
     forceLoadNotifications,
     fetchNotificationById,
+    searchInNotifications,
   } = useNotifications();
 
   // Stati dei filtri
@@ -92,6 +93,12 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
   const [documentChatsLoading, setDocumentChatsLoading] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [isDocTypesOpen, setIsDocTypesOpen] = useState(false);
+
+  // Stati per gestire la ricerca API vs locale
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isApiSearch, setIsApiSearch] = useState(false);
+  const [searchError, setSearchError] = useState(null);
 
   // Refs
   const animationTimeoutRef = useRef(null);
@@ -174,6 +181,17 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
   const filteredNotifications = useMemo(() => {
     if (!visible) return [];
 
+    // Se stiamo utilizzando la ricerca API, usa i risultati
+    if (isApiSearch && searchResults.length > 0) {
+      return searchResults;
+    }
+    
+    // Se stiamo utilizzando la ricerca API ma non ci sono risultati, mostra array vuoto
+    if (isApiSearch && searchTerm.trim() !== "") {
+      return [];
+    }
+
+    // Altrimenti usa la logica di filtro locale esistente
     const filtered = notificationsWithOptimisticUpdates.filter((notification) => {
       const isArchived = notification.archived === 1 || notification.archived === true;
 
@@ -190,7 +208,8 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
       if (filterLeftChats && notification.chatLeft !== 1) return false;
       if (filterMutedChats && !isNotificationMuted(notification)) return false;
 
-      if (searchTerm) {
+      // Per la ricerca locale, mantieni la logica esistente solo se non stiamo usando l'API
+      if (searchTerm && !isApiSearch) {
         const lowerSearchTerm = searchTerm.toLowerCase();
         const messages = parseMessages(notification.messages);
         if (!notification.title.toLowerCase().includes(lowerSearchTerm) &&
@@ -212,6 +231,9 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
   }, [
     notificationsWithOptimisticUpdates,
     visible,
+    isApiSearch,
+    searchResults,
+    searchTerm,
     filterArchivedChats,
     filterMentioned,
     filterMessagesSent,
@@ -221,9 +243,43 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     completedFilter,
     filterLeftChats,
     filterMutedChats,
-    searchTerm,
     isNotificationMuted
   ]);
+
+  // Funzione per gestire la ricerca API
+  const performApiSearch = useCallback(async (searchText) => {
+    if (!searchText || searchText.trim().length < 2) {
+      setIsApiSearch(false);
+      setSearchResults([]);
+      setSearchError(null);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      setSearchError(null);
+      setIsApiSearch(true);
+
+      console.log(`🔍 Eseguendo ricerca API: "${searchText}"`);
+      
+      const results = await searchInNotifications(searchText);
+      
+      console.log(`✅ Ricerca completata: ${results?.length || 0} risultati`);
+      
+      if (results && Array.isArray(results)) {
+        setSearchResults(results);
+      } else {
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error("❌ Errore nella ricerca:", error);
+      setSearchError("Errore durante la ricerca. Riprova.");
+      setIsApiSearch(false);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [searchInNotifications]);
 
   // Salva la posizione dello scroll prima di ogni aggiornamento
   const saveScrollPosition = useCallback(() => {
@@ -496,12 +552,48 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
   };
 
   const handleSearchChange = (event) => {
-    setSearchTerm(event.target.value);
+    const newSearchTerm = event.target.value;
+    setSearchTerm(newSearchTerm);
+    
+    // Se il campo è vuoto, torna alla visualizzazione normale
+    if (!newSearchTerm || newSearchTerm.trim() === "") {
+      setIsApiSearch(false);
+      setSearchResults([]);
+      setSearchError(null);
+      return;
+    }
+
+    // Implementa debouncing per la ricerca API
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      performApiSearch(newSearchTerm);
+    }, 500); // Attendi 500ms prima di cercare
   };
 
   const handleClearSearch = () => {
     setSearchTerm("");
+    setIsApiSearch(false);
+    setSearchResults([]);
+    setSearchError(null);
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
   };
+
+  // ref per il timeout della ricerca
+  const searchTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleDocumentsSearchChange = (event) => {
     setDocumentsSearchTerm(event.target.value);
@@ -555,7 +647,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     openWiki("notifications", true);
   };
 
-  const resetAllFilters = () => {
+const resetAllFilters = () => {
     setFilterMentioned(false);
     setFilterMessagesSent(false);
     setShowUnreadOnly(false);
@@ -566,6 +658,15 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     setFilterLeftChats(false);
     setFilterArchivedChats(false);
     setFilterMutedChats(false);
+    
+    // Reset anche la ricerca API
+    setIsApiSearch(false);
+    setSearchResults([]);
+    setSearchError(null);
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
   };
 
   // Document search functions
@@ -799,7 +900,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
           <div className="text-lg font-semibold" id="notification-sidebar-title">
             Notifiche
           </div>
-
+  
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -818,33 +919,59 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
             </Tooltip>
           </TooltipProvider>
         </div>
-
+  
         <div className="filterControls" id="notification-sidebar-filterControls">
           <div className="px-2 mb-2 w-100">
             <div className="relative w-full">
               <input
                 type="text"
-                placeholder="Cerca notifiche..."
+                placeholder={isSearching ? "Ricerca in corso..." : "Cerca notifiche..."}
                 value={searchTerm}
                 onChange={handleSearchChange}
-                className="w-full p-2 pl-9 pr-9 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full p-2 pl-9 pr-9 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  isSearching ? "bg-gray-50" : ""
+                } ${searchError ? "border-red-500" : ""}`}
                 id="notification-search-input"
+                disabled={isSearching}
               />
               <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none w-100 justify-content-end px-2.5">
-                <Search className="w-4 h-4 text-gray-400" />
+                {isSearching ? (
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4 text-gray-400" />
+                )}
               </div>
               {searchTerm && (
                 <button
                   onClick={handleClearSearch}
                   className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
                   id="notification-search-clear"
+                  disabled={isSearching}
                 >
                   <X className="w-4 h-4" />
                 </button>
               )}
             </div>
+            
+            {/* NUOVO: Mostra indicatori di stato della ricerca */}
+            {isApiSearch && (
+              <div className="text-xs mt-1 px-1">
+                {searchError ? (
+                  <span className="text-red-600 flex items-center">
+                    <X className="w-3 h-3 mr-1" />
+                    {searchError}
+                  </span>
+                ) : (
+                  <span className="text-blue-600 flex items-center">
+                    <Search className="w-3 h-3 mr-1" />
+                    {isSearching ? "Ricerca in corso..." : 
+                     `${searchResults.length} risultati per "${searchTerm}"`}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-
+  
           <div className="flex items-center justify-center w-100 z-50 px-2 mb-1">
             <div className="flex w-100 z-50 items-center space-x-2">
               <button
@@ -856,7 +983,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               >
                 <Filter className="w-5 h-5" />
               </button>
-
+  
               <button
                 className={`archa-button z-50 flex items-center justify-center w-10 h-10 p-2 ${isDocumentSearchVisible ? "text-blue-600 bg-blue-50" : "text-gray-700 bg-white"} border border-gray-200 rounded-lg hover:bg-gray-50`}
                 onClick={toggleDocumentSearch}
@@ -865,7 +992,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               >
                 <Link className="w-5 h-5" />
               </button>
-
+  
               <select
                 value={selectedCategory}
                 onChange={handleCategoryChange}
@@ -885,7 +1012,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                   </option>
                 ))}
               </select>
-
+  
               <button
                 className="archa-button z-50 flex items-center justify-center w-10 h-10 p-2 text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
                 onClick={handleOpenNewMessageModal}
@@ -896,7 +1023,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               </button>
             </div>
           </div>
-
+  
           {isFilterExpanded && (
             <div
               className="px-3 py-2 mb-2 bg-white rounded-lg mx-2 border border-gray-200 shadow-md"
@@ -924,11 +1051,11 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                   <X className="w-4 h-4" />
                 </button>
               </div>
-
+  
               <div className="mb-4">
                 <DoNotDisturbToggle />
               </div>
-
+  
               <div className="mb-4">
                 <h4 className="text-xs font-medium text-gray-500 mb-2">Filtri principali</h4>
                 <div className="grid grid-cols-2 gap-2">
@@ -956,7 +1083,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                       Solo non lette
                     </label>
                   </div>
-
+  
                   <div
                     className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
                       filterFavorites ? "bg-yellow-50 border border-yellow-200 text-yellow-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
@@ -969,7 +1096,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                   </div>
                 </div>
               </div>
-
+  
               <div className="mb-4">
                 <h4 className="text-xs font-medium text-gray-500 mb-2">Tipo di notifiche</h4>
                 <div className="grid grid-cols-2 gap-2">
@@ -983,7 +1110,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                     <AtSign className="w-4 h-4" />
                     <span className="text-sm">Menzioni</span>
                   </div>
-
+  
                   <div
                     className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
                       filterMessagesSent ? "bg-green-50 border border-green-200 text-green-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
@@ -996,7 +1123,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                   </div>
                 </div>
               </div>
-
+  
               <div className="mb-4">
                 <h4 className="text-xs font-medium text-gray-500 mb-2">Stato</h4>
                 <div className="grid grid-cols-2 gap-2">
@@ -1010,7 +1137,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                     <LogOut className="w-4 h-4" />
                     <span className="text-sm">Abbandonate</span>
                   </div>
-
+  
                   <div
                     className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
                       filterArchivedChats ? "bg-purple-50 border border-purple-200 text-purple-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
@@ -1026,7 +1153,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                       </span>
                     )}
                   </div>
-
+  
                   <div
                     className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
                       filterMutedChats ? "bg-rose-50 border border-rose-200 text-rose-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
@@ -1039,7 +1166,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                   </div>
                 </div>
               </div>
-
+  
               <div className="mb-4">
                 <label className="text-xs font-medium text-gray-500 mb-2 block">Stato completamento</label>
                 <div className="flex justify-between bg-white border border-gray-200 rounded-lg p-0.5" id="notification-completion-filter">
@@ -1072,7 +1199,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                   </button>
                 </div>
               </div>
-
+  
               <div className="mt-4 pt-3 border-t border-gray-100 text-center">
                 <button
                   className="w-full py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg"
@@ -1085,7 +1212,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
           )}
         </div>
       </div>
-
+  
       {isDocumentSearchVisible && (
         <div className="document-search-section bg-white border-b border-gray-200 p-3">
           <div className="flex justify-between items-center mb-3">
@@ -1094,7 +1221,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               <X className="h-4 w-4" />
             </button>
           </div>
-
+  
           <div className="mb-3 relative document-type-dropdown">
             <div
               className="p-2 border rounded-lg flex justify-between items-center cursor-pointer bg-white hover:bg-gray-50"
@@ -1111,7 +1238,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               </div>
               <ChevronDown className={`h-4 w-4 transition-transform ${isDocTypesOpen ? "rotate-180" : ""}`} />
             </div>
-
+  
             {isDocTypesOpen && (
               <div className="absolute left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 document-type-menu max-h-48 overflow-y-auto">
                 {documentTypes.map((type) => (
@@ -1135,7 +1262,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               </div>
             )}
           </div>
-
+  
           <div className="relative mb-3">
             <input
               type="text"
@@ -1156,7 +1283,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               </button>
             )}
           </div>
-
+  
           <button
             onClick={searchDocuments}
             className="w-full py-2 px-3 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -1170,7 +1297,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               "Cerca Documenti"
             )}
           </button>
-
+  
           <div className="mt-3" style={{ height: "50vh", overflowY: "auto" }}>
             {documentsSearchResults.length > 0 && (
               <div className="mb-3" style={{ height: "50vh", overflowY: "auto" }}>
@@ -1223,7 +1350,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 </div>
               </div>
             )}
-
+  
             {selectedDocument && (
               <div className="mt-4">
                 <h4 className="text-xs font-medium text-gray-600 mb-2 flex items-center">
@@ -1231,7 +1358,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                   Chat legate a:
                   <span className="ml-1 font-semibold text-blue-600">{selectedDocument.DocumentNumber}</span>
                 </h4>
-
+  
                 {documentChatsLoading ? (
                   <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg">
                     <i className="bi bi-arrow-repeat spin mr-2"></i>
@@ -1268,11 +1395,11 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                             </span>
                           )}
                         </div>
-
+  
                         <p className="text-xs text-gray-500 line-clamp-2 mb-2">
                           {chat.lastMessage || "Nessun messaggio"}
                         </p>
-
+  
                         <div className="flex items-center justify-between text-xs text-gray-400">
                           <span className="flex items-center">
                             <User className="h-3 w-3 mr-1" />
@@ -1296,7 +1423,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 )}
               </div>
             )}
-
+  
             {!documentsSearchResults.length && !documentsLoading && !selectedDocument && documentsSearchTerm.length >= 2 && (
               <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg mt-3">
                 <Link className="h-8 w-8 text-gray-300 mb-2" />
@@ -1305,7 +1432,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 </p>
               </div>
             )}
-
+  
             {!documentsSearchResults.length && !documentsLoading && documentsSearchTerm.length < 2 && (
               <div className="mt-3 p-3 bg-blue-50 rounded-lg">
                 <p className="text-xs text-blue-700">
@@ -1317,7 +1444,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
           </div>
         </div>
       )}
-
+  
       <div className="notifications-list" ref={notificationBarRef} id="notification-list-container">
         {!isDocumentSearchVisible &&
           (filteredNotifications && filteredNotifications.length > 0 ? (
@@ -1338,7 +1465,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 const categoryColor = notification.hexColor;
                 const hasLeftChat = notification.chatLeft === 1 || notification.chatLeft === true;
                 const isArchived = notification.archived === 1 || notification.archived === true;
-
+  
                 return (
                   <div
                     key={`notification-${notification.notificationId}`}

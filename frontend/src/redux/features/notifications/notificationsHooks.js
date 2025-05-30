@@ -519,6 +519,68 @@ export const useNotifications = () => {
     });
   }, [dispatch, openChatIds]);
 
+  const handleSearchInNotifications = useCallback(
+    async (searchText, notificationId = null, pageSize = 50, lastMessageId = null) => {
+      try {
+        if (!searchText || searchText.trim() === '') {
+          throw new Error('SearchText è obbligatorio');
+        }
+  
+        const token = localStorage.getItem("token");
+        if (!token) throw new Error("No token available");
+  
+        console.log(`🔍 searchInNotifications chiamato:`, {
+          searchText: searchText.trim(),
+          notificationId,
+          pageSize,
+          lastMessageId
+        });
+  
+        let url = `${config.API_BASE_URL}/search?searchText=${encodeURIComponent(searchText.trim())}`;
+        
+        // Aggiungi parametri opzionali
+        if (notificationId) {
+          url += `&notificationId=${notificationId}`;
+        }
+        if (pageSize) {
+          url += `&pageSize=${pageSize}`;
+        }
+        if (lastMessageId) {
+          url += `&lastMessageId=${lastMessageId}`;
+        }
+  
+        const response = await axios.get(url, {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache"
+          },
+        });
+  
+        console.log(`✅ Ricerca completata:`, {
+          success: response.data.success,
+          resultsCount: response.data.results?.length || 0,
+          searchScope: response.data.searchScope
+        });
+  
+        if (response.data.success) {
+          // Se è una ricerca in una chat specifica, restituisci la notifica
+          if (notificationId && response.data.results) {
+            return response.data.results;
+          }
+          
+          // Se è una ricerca generale, restituisci l'array di notifiche
+          return response.data.results || [];
+        } else {
+          throw new Error(response.data.error || 'Errore nella ricerca');
+        }
+      } catch (error) {
+        console.error("Error searching in notifications:", error);
+        throw error;
+      }
+    },
+    []
+  );
+
   const handleUpdateChatTitle = useCallback(
     async (notificationId, newTitle) => {
       try {
@@ -1246,6 +1308,7 @@ export const useNotifications = () => {
     notificationAttachments,
     standaloneChats: Array.from(standaloneChats), // Convert Set to Array
     openChat,
+    searchInNotifications: handleSearchInNotifications,
     
     // NUOVO: Aggiungi openChatData
     openChatData,
