@@ -1,8 +1,8 @@
 // src/components/chat/PopoutButton.jsx
 import React, { useCallback, useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { useNotifications } from "../../redux/features/notifications/notificationsHooks";
-import { swal } from "../../lib/common";
+import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
+import { swal } from "@/lib/common";
 
 const PopoutButton = ({ notificationId, title, onSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);

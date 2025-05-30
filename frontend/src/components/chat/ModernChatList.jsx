@@ -5,50 +5,35 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { Avatar } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { formatDistanceToNow } from "date-fns";
-import { it } from "date-fns/locale";
-import { debounce, throttle, isEqual } from "lodash";
+import { debounce } from "lodash";
 import "@/styles/ModernChatList.css";
 import {
   File,
   FileText,
   Image,
   Download,
-  Reply,
-  Palette,
-  AlertOctagon,
   BarChart,
-  Edit,
   Clock,
   MoreVertical,
-  History,
-  X,
   MessageSquare,
   User,
-  Heart,
-  ThumbsUp,
-  Smile,
   ArrowBigDown,
   ChevronUp,
   ChevronDown,
 } from "lucide-react";
-import FileViewer from "../ui/fileViewer";
+import FileViewer from "@/components/ui/fileViewer";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import { swal } from "../../lib/common";
+import { swal } from "@/lib/common";
 import { motion, AnimatePresence } from "framer-motion";
 import MessageColorPicker from "./MessageColorPicker";
 import PollMessage from "./PollMessage";
 import Modal from "react-modal";
 import EditMessageModal from "./EditMessageModal";
 import axios from "axios";
-import { config } from "../../config";
+import { config } from "@/config";
 import VersionHistoryModal from "./VersionHistoryModal";
-import { FaFlag, FaRegSmile } from "react-icons/fa";
-import ReactionPicker from "./ReactionPicker";
-import MessageReactions from "./MessageReactions";
+import { FaFlag } from "react-icons/fa";
 import MessageActionsMenu from "./MessageActionsMenu";
 import { useSelector, useDispatch } from "react-redux";
 import { selectOpenChatData } from "@/redux/features/notifications/notificationsSlice";
@@ -310,19 +295,6 @@ const ModernChatList = ({
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [page, setPage] = useState(1);
   const MESSAGES_PER_PAGE = 50;
-
-  useEffect(() => {
-    console.log('📊 ModernChatList - Stato paginazione dettagliato:', {
-      notificationId,
-      pagination: chatPagination,
-      hasMoreMessages: chatPagination?.hasMoreMessages,
-      isLoadingMore: chatPagination?.isLoadingMore,
-      oldestMessageId: chatPagination?.oldestMessageId,
-      messageCount: localMessages.length,
-      totalAvailable: openChatData?.totalMessageCount || openChatData?.messageCount,
-      shouldLoadMore: chatPagination?.hasMoreMessages && !chatPagination?.isLoadingMore
-    });
-  }, [chatPagination, notificationId, localMessages.length, openChatData]);
 
   // Funzione per caricare più messaggi
   const handleLoadMoreMessages = useCallback(() => {

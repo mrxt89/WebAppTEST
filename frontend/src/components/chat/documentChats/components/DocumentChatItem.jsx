@@ -1,5 +1,4 @@
-import React from "react";
-import { MessageSquare, Users, Info, Calendar, Eye, X } from "lucide-react";
+import { MessageSquare, Users, Calendar, Eye, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getDocumentTypeConfig } from "../config/documentTypes";
 

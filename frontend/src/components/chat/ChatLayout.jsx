@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import ModernChatList from "./ModernChatList";
 import { motion, AnimatePresence } from "framer-motion";
-import FileViewer from "../ui/fileViewer";
+import FileViewer from "@/components/ui/fileViewer";
 import ChatSidebar from "./ChatSidebar";
 import ChatBottomBar from "./ChatBottomBar"; // Aggiungi import per ChatBottomBar
 

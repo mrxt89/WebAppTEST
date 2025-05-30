@@ -9,8 +9,8 @@ import {
   FileText,
 } from "lucide-react";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import { swal } from "../../lib/common";
-import FileViewer from "../ui/fileViewer";
+import { swal } from "@/lib/common";
+import FileViewer from "@/components/ui/fileViewer";
 
 const AttachmentsList = ({ notificationId, onAttachmentUploaded }) => {
   const {

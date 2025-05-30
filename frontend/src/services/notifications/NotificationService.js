@@ -918,8 +918,27 @@ class NotificationService {
   /**
    * Corretto metodo notifyNewMessage senza chiamata al suono
    */
-  notifyNewMessage(message, senderName, notificationId) {
+  notifyNewMessage(message, senderName, notificationId, senderId = null) {
     if (!message || !senderName || !notificationId) {
+      return;
+    }
+  
+    // Ottieni l'ID dell'utente corrente
+    let currentUserId = null;
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const userData = JSON.parse(userStr);
+        currentUserId = userData.userId || userData.UserId || userData.id || userData.ID;
+      }
+    } catch (e) {
+      console.error("Error getting current user ID:", e);
+    }
+  
+    // Se il senderId corrisponde all'utente corrente, non notificare
+    if (senderId && currentUserId && 
+        (senderId === currentUserId || senderId.toString() === currentUserId.toString())) {
+      console.log("Skipping notification for own message");
       return;
     }
 

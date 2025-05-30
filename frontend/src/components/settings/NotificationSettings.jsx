@@ -1,7 +1,7 @@
 // src/components/settings/NotificationSettings.jsx
 import React from "react";
 import { Bell, Volume2, VolumeX, Monitor } from "lucide-react";
-import useNotificationSettings from "../../redux/features/notifications/useNotificationSettings";
+import useNotificationSettings from "@/redux/features/notifications/useNotificationSettings";
 
 function NotificationSettings() {
   // Utilizziamo il nostro hook personalizzato per gestire le impostazioni

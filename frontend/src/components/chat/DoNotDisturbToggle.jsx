@@ -1,8 +1,8 @@
 // components/chat/DoNotDisturbToggle.jsx
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { BellOff, Bell, Info } from "lucide-react";
-import { Switch } from "../ui/switch";
-import notificationService from "../../services/notifications/NotificationService";
+import { Switch } from "@/components/ui/switch";
+import notificationService from "@/services/notifications/NotificationService";
 import {
   Tooltip,
   TooltipContent,
@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import axios from "axios";
-import { config } from "../../config";
+import { config } from "@/config";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 
 const DoNotDisturbToggle = () => {

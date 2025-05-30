@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { BarChart, Check, CheckCircle, Clock, X } from "lucide-react";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import { swal } from "../../lib/common";
+import { swal } from "@/lib/common";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
 

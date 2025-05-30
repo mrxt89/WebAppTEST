@@ -1,6 +1,7 @@
 // src/components/main/MainPage.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { swal } from "@/lib/common";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import NotificationSidebar from "../notifications/NotificationSidebar";

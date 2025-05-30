@@ -1,7 +1,7 @@
 // src/components/DoNotDisturbIndicator.jsx
 import React, { useState, useEffect } from "react";
 import { BellOff } from "lucide-react";
-import notificationService from "../../services/notifications/NotificationService";
+import notificationService from "@/services/notifications/NotificationService";
 
 const DoNotDisturbIndicator = () => {
   const [isActive, setIsActive] = useState(
