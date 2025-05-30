@@ -559,43 +559,37 @@ class NotificationService {
       // Gestione click con log e garanzia di apertura chat
       notification.onclick = () => {
         console.log("Notifica cliccata per chat:", notificationId);
-
+      
         try {
           // Focus sulla finestra principale
           window.focus();
-
-          // CORREZIONE CRITICA: Usa la funzione corretta per aprire la chat
-          // Prova tutte le varianti con più log per debug
-          if (typeof window.openChatModal === "function") {
-            console.log("Apertura chat con openChatModal");
-            window.openChatModal(notificationId);
-          } else if (typeof window.parent?.openChatModal === "function") {
-            console.log("Apertura chat con parent.openChatModal");
-            window.parent.openChatModal(notificationId);
-          } else if (
-            window.opener &&
-            typeof window.opener.openChatModal === "function"
-          ) {
-            console.log("Apertura chat con opener.openChatModal");
-            window.opener.openChatModal(notificationId);
-          } else {
-            console.warn(
-              "openChatModal non trovato, tentativo fallback navigazione",
-            );
-            // Fallback: naviga direttamente alla chat
-            const chatUrl = `/chat/${notificationId}`;
-            window.location.href = chatUrl;
-          }
+      
+          // CORREZIONE: Importa e usa callOpenChatModal dal modulo corretto
+          import('@/redux/features/notifications/notificationsSlice').then(module => {
+            if (module.callOpenChatModal) {
+              console.log("Apertura chat con callOpenChatModal importato");
+              module.callOpenChatModal(notificationId);
+            } else {
+              console.error("callOpenChatModal non trovato nel modulo");
+              // Fallback: naviga direttamente alla chat
+              window.location.href = `/chat/${notificationId}`;
+            }
+          }).catch(error => {
+            console.error("Errore durante import del modulo:", error);
+            // Fallback
+            window.location.href = `/chat/${notificationId}`;
+          });
+      
         } catch (clickError) {
           console.error("Errore durante apertura chat:", clickError);
-          // Fallback ancora più semplice
+          // Fallback semplice
           try {
             window.location.href = `/chat/${notificationId}`;
           } catch (e) {
             console.error("Fallback navigazione fallito:", e);
           }
         }
-
+      
         // Chiudi sempre la notifica
         notification.close();
       };

@@ -1,20 +1,22 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import ProtectedRoute from "../ProtectedRoute";
-import AdminDashboard from "@/pages/admin/AdminDashboard";
-import ProjectManagementSplitView from "@/pages/progetti/progetti/ProjectManagementSplitView";
-import CategoriesPage from "@/pages/progetti/categorie/ProjectCategories";
-import TemplatesPage from "@/pages/progetti/templates/projectTemplates";
-import MyTasksPage from "@/pages/progetti/attivita/MyTasksPage";
-import ChangePassword from "@/pages/user/ChangePassword";
-import UserProfile from "@/pages/user/UserProfile";
+import AdminDashboard from "../../pages/admin/AdminDashboard";
+import ProjectManagementSplitView from "../../pages/progetti/progetti/ProjectManagementSplitView";
+import CategoriesPage from "../../pages/progetti/categorie/ProjectCategories";
+import TemplatesPage from "../../pages/progetti/templates/projectTemplates";
+import ProjectCustomers from "../../pages/progetti/clienti/ProjectCustomers";
+import MyTasksPage from "../../pages/progetti/attivita/MyTasksPage";
+import ChangePassword from "../../pages/user/ChangePassword";
+import UserProfile from "../../pages/user/UserProfile";
 import MainMenu from "../MainMenu";
 
 // Import the NotificationProvider (which is now a placeholder function)
 import { NotificationProvider } from "@/redux/features/notifications/NotificationProvider";
 
 const MainContainer = ({
+  menuItems,
   breadcrumb = [], // Ensure breadcrumb is an array
   handleNavigate,
   handleBreadcrumbClick,
@@ -25,6 +27,7 @@ const MainContainer = ({
   currentLevelItems,
   children, // Aggiungo il supporto per i children
 }) => {
+  const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   // Monitora l'apertura dei dialog per gestire correttamente l'accessibilità
