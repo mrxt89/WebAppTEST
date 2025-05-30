@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import EmojiPicker from "./Emoji-picker";
-import { swal } from "../../lib/common";
+import { swal } from "@/lib/common";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import { debounce } from "lodash";
 import "@/styles/chat-components.css";

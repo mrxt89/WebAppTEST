@@ -26,9 +26,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import FileViewer from "../ui/fileViewer";
-import { swal } from "../../lib/common";
-import useAIActions from "../../hooks/useAIActions";
+import FileViewer from "@/components/ui/fileViewer";
+import { swal } from "@/lib/common";
+import useAIActions from "@/hooks/useAIActions";
 import DocumentLinker from "./DocumentLinker";
 
 const ChatSidebar = forwardRef((props, ref) => {

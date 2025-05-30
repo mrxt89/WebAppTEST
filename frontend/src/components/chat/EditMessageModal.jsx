@@ -9,7 +9,7 @@ import {
   Smile,
 } from "lucide-react";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import { swal } from "../../lib/common";
+import { swal } from "@/lib/common";
 import EmojiPicker from "./Emoji-picker";
 import "@/styles/chat-components.css";
 

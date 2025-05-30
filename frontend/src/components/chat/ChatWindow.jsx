@@ -5,7 +5,7 @@ import ChatTopBar from "./ChatTopBar";
 import ChatLayout from "./ChatLayout";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import { debounce } from "lodash";
-import { swal } from "../../lib/common";
+import { swal } from "@/lib/common";
 import { useDispatch, useSelector } from "react-redux";
 import { 
  selectOpenChatData, 

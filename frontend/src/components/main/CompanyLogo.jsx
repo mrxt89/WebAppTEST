@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { useCompany } from "../../context/CompanyContext";
+import { useState, useEffect } from "react";
+import { useCompany } from "@/context/CompanyContext";
 
 const CompanyLogo = ({ className, style = {}, onClick }) => {
   const { getCompanyLogoUrl } = useCompany();
   const [logoUrl, setLogoUrl] = useState("/images/logos/Logo.png"); // Default logo
-  const [error, setError] = useState(false);
   const [attemptedUrls, setAttemptedUrls] = useState([]);
 
   useEffect(() => {
@@ -20,7 +19,6 @@ const CompanyLogo = ({ className, style = {}, onClick }) => {
     if (urlsToTry.length > 0) {
       setLogoUrl(urlsToTry[0]);
       setAttemptedUrls(urlsToTry);
-      setError(false);
     }
   }, [getCompanyLogoUrl]);
 
@@ -32,7 +30,6 @@ const CompanyLogo = ({ className, style = {}, onClick }) => {
       setLogoUrl(nextUrl);
     } else {
       // Se abbiamo provato tutti gli URL, usiamo il logo di default
-      setError(true);
       setLogoUrl("/images/logos/Logo.png");
     }
   };

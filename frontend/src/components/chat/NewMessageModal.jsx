@@ -5,7 +5,7 @@ import ChatBottomBar from "./ChatBottomBar";
 import ChatLayout from "./ChatLayout";
 
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import { swal } from "../../lib/common";
+import { swal } from "@/lib/common";
 import { Paperclip, X, ChevronRight, ChevronLeft } from "lucide-react";
 
 Modal.setAppElement("#root");

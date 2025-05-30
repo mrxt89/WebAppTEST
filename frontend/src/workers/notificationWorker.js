@@ -1,6 +1,9 @@
+// src/workers/notificationWorker.js
+
 // Worker state
 let token = null;
 let apiBaseUrl = null;
+let currentUserId = null; // NUOVO: Memorizza l'ID utente passato dal thread principale
 let isRequestInProgress = false;
 let pollingTimeout = null;
 let lastUpdateTime = Date.now();
@@ -104,20 +107,28 @@ function haveNotificationsChanged(newNotifications) {
   return hasChanges;
 }
 
-// Extract last message text for notification preview
-function extractLastMessagePreview(messages) {
+// Extract last message details including sender info
+function extractLastMessageDetails(messages) {
   try {
     const parsedMessages = Array.isArray(messages)
       ? messages
-      : JSON.parse(messages);
+      : JSON.parse(messages || "[]");
     if (parsedMessages && parsedMessages.length > 0) {
       const lastMessage = parsedMessages[parsedMessages.length - 1];
-      return lastMessage.message || "";
+      return {
+        text: lastMessage.message || "Nuovo messaggio",
+        senderId: lastMessage.senderId || lastMessage.SenderId || null,
+        senderName: lastMessage.senderName || lastMessage.SenderName || "Unknown"
+      };
     }
   } catch (e) {
-    logError("Error extracting message preview:", e);
+    logError("Error extracting message details:", e);
   }
-  return "Nuovo messaggio";
+  return {
+    text: "Nuovo messaggio",
+    senderId: null,
+    senderName: "Unknown"
+  };
 }
 
 // Main function to fetch notifications
@@ -221,7 +232,6 @@ async function fetchNotifications(notificationIdToFetch = null) {
       notifications = await response.json();
     }
 
-    // Il resto della funzione rimane uguale...
     // Sort notifications by pin and date
     notifications.sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
@@ -261,9 +271,10 @@ async function fetchNotifications(notificationIdToFetch = null) {
               : 0;
             const increment = newMsgCount - cachedMsgCount;
 
-            // Estrai preview e sender
+            // Estrai dettagli dell'ultimo messaggio
             let senderName = "Unknown";
             let messagePreview = "Nuovo messaggio";
+            let senderId = null;
 
             try {
               const messages = Array.isArray(notification.messages)
@@ -272,12 +283,23 @@ async function fetchNotifications(notificationIdToFetch = null) {
 
               if (messages.length > 0) {
                 const lastMessage = messages[messages.length - 1];
-                senderName =
-                  lastMessage.senderName || notification.title || "Unknown";
+                senderName = lastMessage.senderName || lastMessage.SenderName || notification.title || "Unknown";
                 messagePreview = lastMessage.message || "Nuovo messaggio";
+                senderId = lastMessage.senderId || lastMessage.SenderId || null;
               }
             } catch (e) {
-              logError(`Error getting sender and preview:`, e);
+              logError(`Error parsing messages for notification ${notification.notificationId}:`, e);
+            }
+
+            // Controlla se è un messaggio proprio usando currentUserId dal worker state
+            const isOwnMessage = currentUserId && senderId && 
+                                (senderId === currentUserId || 
+                                 senderId.toString() === currentUserId.toString() ||
+                                 parseInt(senderId) === parseInt(currentUserId));
+
+            if (isOwnMessage) {
+              console.log(`[Worker] Skipping own message notification for chat ${notification.notificationId} (senderId: ${senderId}, currentUserId: ${currentUserId})`);
+              return null;
             }
 
             // Controlla se questa notifica è stata mostrata di recente
@@ -301,8 +323,10 @@ async function fetchNotifications(notificationIdToFetch = null) {
               senderName,
               messagePreview,
               isRecent,
+              senderId, // Includi senderId per ulteriori controlli
             };
-          });
+          })
+          .filter(info => info !== null); // Rimuovi i null (messaggi propri)
 
         // Invia un solo evento con tutte le informazioni sui nuovi messaggi
         if (newMessagesInfo.length > 0) {
@@ -408,6 +432,7 @@ self.onmessage = (event) => {
         // Initialize worker with token and URL
         token = data.token;
         apiBaseUrl = data.apiBaseUrl;
+        currentUserId = data.userId; // NUOVO: Ricevi l'ID utente dal thread principale
         isWorkerActive = true; // NUOVO: Attiva il worker
 
         // Enable debug if requested
@@ -418,7 +443,7 @@ self.onmessage = (event) => {
         // Default to sidebar mode (isOpenChat = false)
         isOpenChat = data.isOpenChat || false;
 
-        console.log("[Worker] Inizializzato e attivo");
+        console.log("[Worker] Inizializzato e attivo con userId:", currentUserId);
 
         // Start fetching immediately
         fetchNotifications();
@@ -438,6 +463,7 @@ self.onmessage = (event) => {
         // Force immediate reload
         token = data.token || token;
         apiBaseUrl = data.apiBaseUrl || apiBaseUrl;
+        currentUserId = data.userId || currentUserId; // NUOVO: Aggiorna userId se fornito
 
         // Imposta lo stato isOpenChat
         isOpenChat = data.isOpenChat || false;
@@ -453,13 +479,12 @@ self.onmessage = (event) => {
           clearTimeout(pollingTimeout);
         }
 
-
-          // Normale ritardo di aggiornamento forzato
-          pollingTimeout = setTimeout(() => {
-            if (isWorkerActive) {
-              fetchNotifications();
-            }
-          }, FORCED_REFRESH_INTERVAL);
+        // Normale ritardo di aggiornamento forzato
+        pollingTimeout = setTimeout(() => {
+          if (isWorkerActive) {
+            fetchNotifications();
+          }
+        }, FORCED_REFRESH_INTERVAL);
         
         break;
 
@@ -467,6 +492,7 @@ self.onmessage = (event) => {
         // Fetch a specific notification with the full message history
         token = data.token || token;
         apiBaseUrl = data.apiBaseUrl || apiBaseUrl;
+        currentUserId = data.userId || currentUserId; // NUOVO: Aggiorna userId se fornito
 
         // Imposta lo stato isOpenChat (di solito true per questa operazione)
         isOpenChat = data.isOpenChat || true;
@@ -478,6 +504,12 @@ self.onmessage = (event) => {
 
         // Execute fetch immediately for the specified notification
         fetchNotifications(data.notificationId);
+        break;
+
+      case "update_user":
+        // NUOVO: Caso per aggiornare l'ID utente se cambia
+        currentUserId = data.userId;
+        console.log("[Worker] UserId aggiornato a:", currentUserId);
         break;
 
       case "debug":
@@ -492,6 +524,7 @@ self.onmessage = (event) => {
           timestamp: Date.now(),
           lastUpdateTime,
           isActive: isWorkerActive, // NUOVO: Includi stato attivo
+          currentUserId: currentUserId // NUOVO: Includi userId corrente per debug
         });
         break;
 

@@ -1,7 +1,7 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import CompanyLogo from "./CompanyLogo";
-import { WikiButton } from "../wiki";
+import { WikiButton } from "@/components/wiki";
 
 // Componente memoizzato per il pulsante notifiche
 const NotificationButton = memo(({ unreadCount, toggleSidebar }) => {

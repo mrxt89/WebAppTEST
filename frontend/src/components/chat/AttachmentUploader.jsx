@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Paperclip, Upload, Camera, X, Loader2 } from "lucide-react";
-import { swal } from "../../lib/common";
+import { swal } from "@/lib/common";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import FileDropZone from "@/components/ui/FileDropZone";
 

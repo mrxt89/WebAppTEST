@@ -10,7 +10,7 @@ import {
   Check,
 } from "lucide-react";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import { swal } from "../../lib/common";
+import { swal } from "@/lib/common";
 
 const CreatePollForm = ({ notificationId, onSuccess, onCancel }) => {
   const [question, setQuestion] = useState("");

@@ -139,6 +139,19 @@ const notificationsWorkerMiddleware = (store) => {
     const token = localStorage.getItem("token");
 
     if (token) {
+
+      // Ottieni l'userId
+      let userId = null;
+      try {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          const userData = JSON.parse(userStr);
+          userId = userData.userId || userData.UserId || userData.id || userData.ID;
+        }
+      } catch (e) {
+        console.error("Error getting userId for worker:", e);
+      }
+
       worker.postMessage({
         type: "init",
         data: {
@@ -147,6 +160,7 @@ const notificationsWorkerMiddleware = (store) => {
           debug: true,
           isStandalone: false,
           windowId: window.WINDOW_ID || Date.now().toString(36),
+          userId: userId,
         },
       });
 
@@ -227,23 +241,42 @@ const notificationsWorkerMiddleware = (store) => {
             }
             break;
 
-          case "new_message":
-            console.log("🚨 NEW_MESSAGE EVENT RICEVUTO:", event.data);
-            if (event.data.newMessagesInfo) {
-              try {
-                const state = store.getState();
-                if (!state?.notifications?.notifications) {
-                  return;
-                }
-          
-                event.data.newMessagesInfo.forEach((messageInfo) => {
-                  const {
-                    notificationId,
-                    newMessageCount,
-                    senderName,
-                    messagePreview,
-                    isRecent,
-                  } = messageInfo;
+            case "new_message":
+              console.log("🚨 NEW_MESSAGE EVENT RICEVUTO:", event.data);
+              if (event.data.newMessagesInfo) {
+                try {
+                  const state = store.getState();
+                  if (!state?.notifications?.notifications) {
+                    return;
+                  }
+            
+                  // Ottieni l'ID dell'utente corrente
+                  let currentUserId = null;
+                  try {
+                    const userStr = localStorage.getItem("user");
+                    if (userStr) {
+                      const userData = JSON.parse(userStr);
+                      currentUserId = userData.userId || userData.UserId || userData.id || userData.ID;
+                    }
+                  } catch (e) {
+                    console.error("Errore recupero userId:", e);
+                  }
+            
+                  event.data.newMessagesInfo.forEach((messageInfo) => {
+                    const {
+                      notificationId,
+                      newMessageCount,
+                      senderName,
+                      messagePreview,
+                      isRecent,
+                      isOwnMessage, // Nuovo campo
+                    } = messageInfo;
+            
+                    // SKIP se è un proprio messaggio
+                    if (isOwnMessage) {
+                      console.log(`Skipping notification for own message in chat ${notificationId}`);
+                      return;
+                    }
           
                   // MODIFICA CHIAVE: Se la chat è aperta, ricarica TUTTI i messaggi
                   if (state.notifications.openChatIds.has(parseInt(notificationId))) {
@@ -474,12 +507,25 @@ const notificationsWorkerMiddleware = (store) => {
         return next(action);
       }
       
+      // Ottieni l'userId aggiornato
+      let userId = null;
+      try {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          const userData = JSON.parse(userStr);
+          userId = userData.userId || userData.UserId || userData.id || userData.ID;
+        }
+      } catch (e) {
+        console.error("Error getting userId for reload:", e);
+      }
+
       worker.postMessage({
         type: "reload",
         data: {
           token,
           apiBaseUrl: config.API_BASE_URL,
           highPriority: action.payload?.highPriority,
+          userId: userId,
         },
       });
     }

@@ -50,12 +50,12 @@ import { useNotifications } from "@/redux/features/notifications/notificationsHo
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import axios from "axios";
-import { config } from "../../config";
+import { config } from "@/config";
 import PollButton from "./PollButton";
 import PollFilter from "./PollFilter";
 import DocumentLinker from "./DocumentLinker";
 import ImprovedSearchBar from "./ImprovedSearchBar";
-import { swal } from "../../lib/common";
+import { swal } from "@/lib/common";
 import PopoutButton from "./PopoutButton";
 
 const ChatTopBar = ({

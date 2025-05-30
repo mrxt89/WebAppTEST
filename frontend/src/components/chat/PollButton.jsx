@@ -6,7 +6,7 @@ import Modal from "react-modal";
 import CreatePollForm from "./CreatePollForm";
 import PollsList from "./PollsList";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import { swal } from "../../lib/common";
+import { swal } from "@/lib/common";
 
 // Assicurati che Modal sia configurato correttamente
 Modal.setAppElement("#root");
