@@ -9,6 +9,7 @@ const { getNotifications
         , getNotificationResponseOptions
         , markNotificationAsReceived
         , markNotificationAsRead
+        , searchInNotifications
         , togglePinned
         , toggleFavorite
         , closeChat
@@ -70,8 +71,10 @@ router.get('/get-notifications', async (req, res) => {
 
 router.get('/notifications', authenticateToken, async (req, res) => {
   const userId = req.user.UserId;
+  const { searchText } = req.query; 
+  
   try {
-    const notifications = await getUserNotifications(userId);
+    const notifications = await getUserNotifications(userId, searchText);
     res.json(notifications);
   } catch (err) {
     console.error('Error fetching user notifications:', err);
@@ -81,18 +84,17 @@ router.get('/notifications', authenticateToken, async (req, res) => {
 
 router.get('/notifications/:notificationId', authenticateToken, async (req, res) => {
   const { notificationId } = req.params;
-  // Aggiungi supporto per parametri di paginazione
-  const { pageSize, lastMessageId } = req.query;
+  const { pageSize, lastMessageId, searchText } = req.query; 
   const userId = req.user.UserId;
 
   try {
-    // Passa i parametri di paginazione se presenti
     const notification = await getNotificationById(
       userId, 
       notificationId,
       true, // openChat = true per chat specifiche
       pageSize ? parseInt(pageSize) : undefined,
-      lastMessageId ? parseInt(lastMessageId) : undefined
+      lastMessageId ? parseInt(lastMessageId) : undefined,
+      searchText // Passa il searchText
     );
     
     if (!notification) {
@@ -102,6 +104,98 @@ router.get('/notifications/:notificationId', authenticateToken, async (req, res)
   } catch (err) {
     console.error('Error fetching notification:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Nuova route dedicata per la ricerca
+router.get('/search', authenticateToken, async (req, res) => {
+  const userId = req.user.UserId;
+  const { searchText, notificationId, pageSize, lastMessageId } = req.query;
+  
+  try {
+    if (!searchText || searchText.trim() === '') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'SearchText è obbligatorio' 
+      });
+    }
+    
+    const results = await searchInNotifications(
+      userId, 
+      searchText.trim(),
+      notificationId ? parseInt(notificationId) : null,
+      pageSize ? parseInt(pageSize) : 50,
+      lastMessageId ? parseInt(lastMessageId) : null
+    );
+    
+    res.json({
+      success: true,
+      results,
+      searchText: searchText.trim(),
+      searchScope: notificationId ? 'single_chat' : 'all_chats'
+    });
+  } catch (err) {
+    console.error('Error searching in notifications:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error durante la ricerca' 
+    });
+  }
+});
+
+// Route per ricerca avanzata con più filtri
+router.post('/search/advanced', authenticateToken, async (req, res) => {
+  const userId = req.user.UserId;
+  const { 
+    searchText, 
+    notificationId, 
+    pageSize = 50, 
+    lastMessageId,
+    dateFrom,
+    dateTo,
+    senderIds,
+    messageColor,
+    onlyMentions,
+    onlyUnread 
+  } = req.body;
+  
+  try {
+    if (!searchText || searchText.trim() === '') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'SearchText è obbligatorio' 
+      });
+    }
+    
+    // Per ora usa la funzione base, ma potresti estenderla per supportare filtri avanzati
+    const results = await searchInNotifications(
+      userId, 
+      searchText.trim(),
+      notificationId ? parseInt(notificationId) : null,
+      parseInt(pageSize),
+      lastMessageId ? parseInt(lastMessageId) : null
+    );
+    
+    res.json({
+      success: true,
+      results,
+      searchText: searchText.trim(),
+      filters: {
+        notificationId,
+        dateFrom,
+        dateTo,
+        senderIds,
+        messageColor,
+        onlyMentions,
+        onlyUnread
+      }
+    });
+  } catch (err) {
+    console.error('Error in advanced search:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error durante la ricerca avanzata' 
+    });
   }
 });
 
@@ -673,13 +767,23 @@ router.get('/filter-messages', authenticateToken, async (req, res) => {
   const userId = req.user.UserId;
   
   try {
-    // Verifica che i parametri necessari siano presenti
     if (!notificationId) {
-      return res.status(400).json({ success: false, error: 'NotificationId è obbligatorio' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'NotificationId è obbligatorio' 
+      });
     }
     
     const results = await filterMessages(notificationId, userId, color, searchText);
-    res.json(results);
+    res.json({
+      success: true,
+      results,
+      filters: {
+        notificationId,
+        color,
+        searchText
+      }
+    });
   } catch (err) {
     console.error('Error filtering messages:', err);
     res.status(500).json({ success: false, error: 'Server error' });
