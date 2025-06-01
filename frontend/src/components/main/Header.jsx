@@ -1,5 +1,7 @@
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { selectUnreadCount } from "@/redux/features/notifications/notificationsSlice";
 import CompanyLogo from "./CompanyLogo";
 import { WikiButton } from "@/components/wiki";
 
@@ -30,9 +32,11 @@ const NotificationButton = memo(({ unreadCount, toggleSidebar }) => {
   );
 });
 
+// Aggiungi displayName per il debug
+NotificationButton.displayName = 'NotificationButton';
+
 const Header = ({
   user,
-  unreadCount,
   toggleSidebar,
   toggleDropdown,
   handleHomeClick,
@@ -44,6 +48,69 @@ const Header = ({
   setPageTitle,
 }) => {
   const navigate = useNavigate();
+  
+  // MODIFICA CHIAVE: Usa Redux per ottenere unreadCount direttamente
+  const reduxUnreadCount = useSelector(selectUnreadCount);
+  const [localUnreadCount, setLocalUnreadCount] = useState(reduxUnreadCount);
+
+  // NUOVO: Ascolta gli eventi di aggiornamento del contatore
+  useEffect(() => {
+    const handleUnreadCountChanged = (event) => {
+      if (event.detail && typeof event.detail.unreadCount === 'number') {
+        console.log('[Header] Aggiornamento unreadCount da evento:', event.detail);
+        
+        // Se l'evento viene dalla sidebar chiusa o è un refresh forzato, aggiorna sempre
+        if (event.detail.source === 'sidebar-closed' || event.detail.forced) {
+          setLocalUnreadCount(event.detail.unreadCount);
+        } 
+        // Altrimenti aggiorna solo se il contatore è maggiore di 0 o se viene dalla sidebar filtrata mentre è aperta
+        else if (event.detail.unreadCount > 0 || event.detail.source === 'sidebar-filtered') {
+          setLocalUnreadCount(event.detail.unreadCount);
+        }
+        // Se il contatore è 0 ma non viene dalla sidebar, mantieni il valore Redux
+        else {
+          console.log('[Header] Ignorando contatore 0, mantengo valore Redux:', reduxUnreadCount);
+        }
+      }
+    };
+  
+    const handleReadStatusChanged = (event) => {
+      if (event.detail && typeof event.detail.unreadCount === 'number') {
+        console.log('[Header] Aggiornamento unreadCount da read-status:', event.detail.unreadCount);
+        setLocalUnreadCount(event.detail.unreadCount);
+      }
+    };
+  
+    const handleNotificationsUpdated = () => {
+      console.log('[Header] Notifiche aggiornate, usando valore Redux:', reduxUnreadCount);
+      // Usa direttamente il valore Redux quando le notifiche vengono aggiornate
+      setLocalUnreadCount(reduxUnreadCount);
+    };
+  
+    // Ascolta tutti gli eventi che potrebbero cambiare il contatore
+    document.addEventListener("unread-count-changed", handleUnreadCountChanged);
+    document.addEventListener("read-status-changed", handleReadStatusChanged);
+    document.addEventListener("notifications-updated", handleNotificationsUpdated);
+    document.addEventListener("new-message-received", handleNotificationsUpdated);
+    document.addEventListener("chat-message-sent", handleNotificationsUpdated);
+  
+    return () => {
+      document.removeEventListener("unread-count-changed", handleUnreadCountChanged);
+      document.removeEventListener("read-status-changed", handleReadStatusChanged);
+      document.removeEventListener("notifications-updated", handleNotificationsUpdated);
+      document.removeEventListener("new-message-received", handleNotificationsUpdated);
+      document.removeEventListener("chat-message-sent", handleNotificationsUpdated);
+    };
+  }, [reduxUnreadCount]);
+
+  // NUOVO: Sincronizza con Redux quando cambia
+  useEffect(() => {
+    console.log('[Header] Redux unreadCount cambiato:', reduxUnreadCount);
+    // Aggiorna solo se Redux ha un valore valido (>= 0)
+    if (reduxUnreadCount >= 0) {
+      setLocalUnreadCount(reduxUnreadCount);
+    }
+  }, [reduxUnreadCount]);
 
   // Funzione per gestire l'apertura del dropdown e la chiusura della sidebar
   const handleDropdownToggle = () => {
@@ -60,6 +127,11 @@ const Header = ({
     setBreadcrumb([]);
     navigate(route);
     toggleDropdown();
+  };
+
+  // NUOVO: Forza un refresh del contatore quando la sidebar viene aperta
+  const handleToggleSidebar = () => {
+    toggleSidebar();
   };
 
   return (
@@ -85,8 +157,8 @@ const Header = ({
             {/* Notifications Section */}
             <div className="flex items-center space-x-4">
               <NotificationButton
-                unreadCount={unreadCount}
-                toggleSidebar={toggleSidebar}
+                unreadCount={localUnreadCount}
+                toggleSidebar={handleToggleSidebar}
               />
             </div>
 

@@ -273,18 +273,7 @@ const ChatWindow = ({
         // Marca come interagito per rimuovere indicatore nuovi messaggi
         markAsInteracted();
         
-        // Emetti eventi per compatibilità
-        document.dispatchEvent(
-          new CustomEvent("chat-message-sent", {
-            detail: {
-              notificationId: notification.notificationId,
-              messageId: result.messageId,
-              isFromCurrentUser: true,
-            },
-          }),
-        );
-        
-        document.dispatchEvent(new CustomEvent("refreshNotifications"));
+       
       }
 
       return result;

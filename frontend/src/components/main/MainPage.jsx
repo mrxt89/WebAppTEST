@@ -577,30 +577,42 @@ const openChatModal = async (notificationId) => {
       console.error("closeChatModal chiamato senza un ID notifica valido");
       return;
     }
-
+  
+    console.log(`🔒 Chiudendo chat ${notificationId}`);
+  
+    // 1. Chiudi la finestra se esiste
     if (windowManager?.closeWindow) {
       windowManager.closeWindow(notificationId);
     }
-
+  
+    // 2. IMPORTANTE: Annulla la registrazione PRIMA di rimuovere dai state
     if (unregisterOpenChat) {
       unregisterOpenChat(notificationId);
+      console.log(`✅ Chat ${notificationId} rimossa da openChatIds`);
     }
-
+  
+    // 3. Rimuovi dagli state locali
     setOpenChats((prevChats) => {
       const newChats = prevChats.filter(
         (chat) => chat.notificationId !== notificationId,
       );
+      console.log(`📊 Chat aperte rimanenti: ${newChats.map(c => c.notificationId).join(', ')}`);
       return newChats;
     });
-
+  
     setMinimizedChats((prevMinimized) => {
       const newMinimized = prevMinimized.filter(
         (chat) => chat.notificationId !== notificationId,
       );
       return newMinimized;
     });
+  
+    // 4. Forza un aggiornamento del worker
+    setTimeout(() => {
+      document.dispatchEvent(new CustomEvent("sync-open-chats"));
+    }, 100);
   };
-
+  
   // Close all chats function
   const closeAllChats = () => {
     openChats.forEach((chat) => {

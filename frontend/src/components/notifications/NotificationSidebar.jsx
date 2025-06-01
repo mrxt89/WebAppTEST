@@ -106,6 +106,10 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
   const filterExpandedRef = useRef(null);
   const notificationBarRef = useRef(null);
   const scrollPositionRef = useRef(0);
+  const searchTimeoutRef = useRef(null);
+  
+  // NUOVO: Ref per tracciare lo stato precedente di visibilità
+  const prevVisibleRef = useRef(visible);
 
   // Wiki context
   const { openWiki } = useWikiContext();
@@ -584,17 +588,6 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     }
   };
 
-  // ref per il timeout della ricerca
-  const searchTimeoutRef = useRef(null);
-
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const handleDocumentsSearchChange = (event) => {
     setDocumentsSearchTerm(event.target.value);
   };
@@ -647,7 +640,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     openWiki("notifications", true);
   };
 
-const resetAllFilters = () => {
+  const resetAllFilters = () => {
     setFilterMentioned(false);
     setFilterMessagesSent(false);
     setShowUnreadOnly(false);
@@ -872,8 +865,73 @@ const resetAllFilters = () => {
       if (animationTimeoutRef.current) {
         clearTimeout(animationTimeoutRef.current);
       }
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
     };
   }, []);
+
+
+
+  // NUOVO: Handler per l'evento force-count-refresh
+  useEffect(() => {
+    const handleForceCountRefresh = () => {
+      // Usa SEMPRE le notifiche non filtrate per il refresh forzato
+      const currentUnreadCount = notifications.filter(
+        notification => !notification.isReadByUser && 
+                       notification.archived !== 1 && 
+                       notification.archived !== "1"
+      ).length;
+      
+      console.log('[NotificationSidebar] Force refresh contatore:', currentUnreadCount);
+      
+      document.dispatchEvent(
+        new CustomEvent("unread-count-changed", {
+          detail: {
+            unreadCount: currentUnreadCount,
+            timestamp: Date.now(),
+            forced: true,
+            source: 'sidebar-forced'
+          }
+        })
+      );
+    };
+    
+    document.addEventListener("force-count-refresh", handleForceCountRefresh);
+    
+    return () => {
+      document.removeEventListener("force-count-refresh", handleForceCountRefresh);
+    };
+  }, [notifications]);
+
+  // NUOVO: Gestisci il cambio di visibilità
+  useEffect(() => {
+    // Se la sidebar è appena stata chiusa
+    if (prevVisibleRef.current === true && visible === false) {
+      // Calcola il contatore totale non filtrato
+      const totalUnreadCount = notifications.filter(
+        notification => !notification.isReadByUser && 
+                       notification.archived !== 1 && 
+                       notification.archived !== "1"
+      ).length;
+      
+      console.log('[NotificationSidebar] Sidebar appena chiusa, emetto contatore totale:', totalUnreadCount);
+      
+      // Emetti l'evento una sola volta
+      document.dispatchEvent(
+        new CustomEvent("unread-count-changed", {
+          detail: {
+            unreadCount: totalUnreadCount,
+            timestamp: Date.now(),
+            source: 'sidebar-just-closed'
+          }
+        })
+      );
+    }
+    
+    // Aggiorna il ref per il prossimo render
+    prevVisibleRef.current = visible;
+  }, [visible, notifications]);
 
   // Ottieni le categorie uniche
   const uniqueCategories = Object.values(
