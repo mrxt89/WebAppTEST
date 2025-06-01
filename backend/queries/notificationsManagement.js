@@ -340,10 +340,42 @@ async function sendNotification(data) {
     
     let result = await request.execute('SendNotification');
 
-    // Dopo aver inviato il messaggio, recupera i dati aggiornati usando la nuova stored
+    // IMPORTANTE: Recupera il messageId appena creato
+    const finalNotificationId = notificationId || result.recordset[0].notificationId;
+    
+    // Query per ottenere l'ultimo messaggio inviato dall'utente
+    let messageResult = await pool.request()
+      .input('notificationId', sql.Int, finalNotificationId)
+      .input('userId', sql.Int, userId)
+      .input('message', sql.NVarChar(sql.MAX), cleanMessage)
+      .query(`
+        SELECT TOP 1 
+              messageId
+              , message
+              , senderId
+              , (SELECT firstName + ' ' + lastName FROM AR_Users (NOLOCK) WHERE userId = T0.senderId) AS senderName
+              , tbCreated
+              , replyToMessageId
+        FROM AR_NotificationDetails T0
+        JOIN AR_Users T1 ON T0.senderId = T1.userId
+        WHERE notificationId = @notificationId 
+          AND senderId = @userId 
+          AND message = @message
+        ORDER BY messageId DESC
+      `);
+
+    let createdMessageId = null;
+    let createdMessage = null;
+    
+    if (messageResult.recordset.length > 0) {
+      createdMessageId = messageResult.recordset[0].messageId;
+      createdMessage = messageResult.recordset[0];
+    }
+
+    // Recupera i dati aggiornati
     let updatedResult = await pool.request()
       .input('userId', sql.Int, userId)
-      .input('notificationId', sql.Int, notificationId || result.recordset[0].notificationId)
+      .input('notificationId', sql.Int, finalNotificationId)
       .input('OpenChat', sql.Bit, 1)
       .execute('GetUserNotificationsWithMessages');
     
@@ -380,15 +412,20 @@ async function sendNotification(data) {
         isClosed: notification.isClosed,
         closingUser: notification.closingUser,
         closingDate: notification.closingDate,
+        messageCount: parsedMessages.length,
+        realMessageId: createdMessageId, // IMPORTANTE: Aggiungi il messageId reale
+        lastMessage: createdMessage, // IMPORTANTE: Aggiungi il messaggio completo
         serverTimestamp: new Date().toISOString()
       };
     }
     
-    // Fallback se non troviamo la notifica aggiornata
+    // Fallback
     return {
       success: true,
       msg: result.recordset[0].msg || 'Messaggio inviato',
-      notificationId: result.recordset[0].notificationId || notificationId,
+      notificationId: finalNotificationId,
+      realMessageId: createdMessageId,
+      lastMessage: createdMessage,
       serverTimestamp: new Date().toISOString()
     };
   } catch (err) {

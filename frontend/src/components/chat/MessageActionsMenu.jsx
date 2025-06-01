@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Reply, Palette, Edit, History, Trash2 } from "lucide-react";
+import { Reply, Palette, Edit, History, Trash2, Loader2 } from "lucide-react";
 import { FaRegSmile } from "react-icons/fa";
 import ReactionPicker from "./ReactionPicker";
 
@@ -28,17 +28,22 @@ const MessageActionsMenu = ({
   isCurrentUserMessage,
   isCancelled = false,
 }) => {
+  const [loadingReactions, setLoadingReactions] = useState({});
+
   if (!isOpen) return null;
 
   // Function to handle reaction addition - with defensive check
-  const handleAddReaction = (emoji) => {
+  const handleAddReaction = async (emoji) => {
     // Only call onAddReaction if it exists and chat isn't left
     if (typeof onAddReaction === "function" && !hasLeftChat) {
       try {
-        onAddReaction(emoji);
+        setLoadingReactions(prev => ({ ...prev, [emoji]: true }));
+        await onAddReaction(emoji);
+        onClose(); // Chiudi il menu dopo l'aggiunta della reazione
       } catch (error) {
         console.error("Error handling reaction in MessageActionsMenu:", error);
-        // Optionally show a user-friendly error toast/notification here
+      } finally {
+        setLoadingReactions(prev => ({ ...prev, [emoji]: false }));
       }
     } else if (!onAddReaction) {
       console.warn("onAddReaction function not provided to MessageActionsMenu");
@@ -73,11 +78,16 @@ const MessageActionsMenu = ({
                 {QuickReactions.map((reaction) => (
                   <button
                     key={reaction.emoji}
-                    className="p-1.5 hover:bg-gray-200 rounded-full transition-colors"
+                    className="p-1.5 hover:bg-gray-200 rounded-full transition-colors relative"
                     onClick={() => handleAddReaction(reaction.emoji)}
                     title={reaction.title}
+                    disabled={loadingReactions[reaction.emoji]}
                   >
-                    <span className="text-base">{reaction.emoji}</span>
+                    {loadingReactions[reaction.emoji] ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <span className="text-base">{reaction.emoji}</span>
+                    )}
                   </button>
                 ))}
                 <ReactionPicker
