@@ -312,8 +312,22 @@ const notificationsWorkerMiddleware = (store) => {
                     if (state.notifications.openChatIds.has(parseInt(notificationId))) {
                       console.log(`🔄 Middleware: Chat ${notificationId} è aperta, ricaricando dati completi...`);
                       
+                      // IMPORTANTE: Usa fetchNotificationById per ottenere TUTTI i messaggi
                       store.dispatch(fetchNotificationById(parseInt(notificationId), true));
                       
+                      // Emetti anche l'evento per notificare useOpenChat
+                      document.dispatchEvent(
+                        new CustomEvent("open-chat-new-message", {
+                          detail: {
+                            notificationId: parseInt(notificationId),
+                            messageCount: newMessageCount,
+                            hasNewMessages: true,
+                            reason: "new-message"
+                          },
+                        }),
+                      );
+                      
+                      // Emetti anche reload-open-chat per compatibilità
                       document.dispatchEvent(
                         new CustomEvent("reload-open-chat", {
                           detail: {
@@ -447,7 +461,7 @@ const notificationsWorkerMiddleware = (store) => {
                         }),
                       );
 
-                      // Fetch notifica
+                      // Fetch notifica - IMPORTANTE: usa true per indicare che è una chat aperta
                       const isOpenChat = state.notifications.openChatIds.has(parseInt(notificationId));
                       store.dispatch(fetchNotificationById(notificationId, isOpenChat));
                     }
@@ -457,7 +471,7 @@ const notificationsWorkerMiddleware = (store) => {
                 }
               }
               break;
-              
+
           case "ready":
             console.log("[NotificationsWorker] Worker ready and initialized");
             break;

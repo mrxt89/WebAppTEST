@@ -287,16 +287,10 @@ export const useOpenChat = (notificationId, options = {}) => {
           // Notifica audio/browser se abilitato
           if (options.playSound !== false && notificationService) {
             const lastMessage = currentMessages[currentMessages.length - 1];
-            if (lastMessage && !isOwnMessage(lastMessage)) {
-              try {
-                notificationService.playNotificationSound();
-              } catch (e) {
-                console.error('Error playing notification sound:', e);
-              }
-            }
           }
+
         }
-        
+        console.log("useOpenChat - Aggiornamento dati:", updatedData);
         lastKnownMessageCountRef.current = newMessageCount;
         
         return updatedData;
@@ -469,6 +463,27 @@ export const useOpenChat = (notificationId, options = {}) => {
         refreshData({ force: true, playSound: false });
       }
     };
+    
+    useEffect(() => {
+      const handleOpenChatNewMessage = (event) => {
+        const { notificationId: eventNotificationId } = event.detail;
+        
+        if (parseInt(eventNotificationId) === parseInt(notificationId)) {
+          console.log(`[useOpenChat] Nuovo messaggio per chat aperta ${notificationId}`);
+          
+          // Forza un refresh completo dei dati
+          refreshData({ force: true, playSound: false }).then(() => {
+            console.log(`[useOpenChat] Dati aggiornati dopo nuovo messaggio`);
+          });
+        }
+      };
+      
+      document.addEventListener('open-chat-new-message', handleOpenChatNewMessage);
+      
+      return () => {
+        document.removeEventListener('open-chat-new-message', handleOpenChatNewMessage);
+      };
+    }, [notificationId, refreshData]);
     
     const handleReloadChat = (event) => {
       const { notificationId: eventNotificationId } = event.detail;

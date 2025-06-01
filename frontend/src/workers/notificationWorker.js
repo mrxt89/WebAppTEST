@@ -406,6 +406,8 @@ self.onmessage = (event) => {
         }
         break;
 
+      
+
       case "stop":
         console.log("[Worker] Ricevuto comando stop");
         isWorkerActive = false;
