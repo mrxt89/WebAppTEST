@@ -996,7 +996,7 @@ const notificationsSlice = createSlice({
       })
 
       // Fetch single notification by ID
-      .addCase(fetchNotificationById.fulfilled, (state, action) => {
+      .add.addCase(fetchNotificationById.fulfilled, (state, action) => {
         const notification = action.payload;
         const notificationId = notification.notificationId;
         
@@ -1005,9 +1005,86 @@ const notificationsSlice = createSlice({
           notification.isReadByUser = true;
         }
         
-        // Gestione openChatData (mantieni il codice esistente)
-        if (state.openChatIds.has(notificationId) && state.openChatData[notificationId]) {
-          // ... codice esistente per openChatData ...
+        // GESTIONE MIGLIORATA PER CHAT APERTE
+        if (state.openChatIds.has(notificationId)) {
+          const existingOpenChat = state.openChatData[notificationId];
+          
+          // Estrai i messaggi dalla notifica
+          let newMessages = [];
+          if (typeof notification.messages === 'string') {
+            try {
+              newMessages = JSON.parse(notification.messages);
+            } catch (e) {
+              console.error('Error parsing messages:', e);
+              newMessages = [];
+            }
+          } else if (Array.isArray(notification.messages)) {
+            newMessages = notification.messages;
+          }
+          
+          // Se abbiamo già dati aperti, confronta e aggiorna
+          if (existingOpenChat && existingOpenChat.messages) {
+            const existingMessages = Array.isArray(existingOpenChat.messages) 
+              ? existingOpenChat.messages 
+              : JSON.parse(existingOpenChat.messages || "[]");
+            
+            // Crea un Set di ID esistenti per evitare duplicati
+            const existingIds = new Set(existingMessages.map(m => m.messageId));
+            
+            // Filtra solo i nuovi messaggi
+            const messagesToAdd = newMessages.filter(m => !existingIds.has(m.messageId));
+            
+            if (messagesToAdd.length > 0) {
+              console.log(`📩 Aggiungendo ${messagesToAdd.length} nuovi messaggi alla chat ${notificationId}`);
+              
+              // Combina i messaggi esistenti con i nuovi
+              const allMessages = [...existingMessages, ...messagesToAdd];
+              
+              // Ordina per data
+              const sortedMessages = allMessages.sort((a, b) => 
+                new Date(a.tbCreated) - new Date(b.tbCreated)
+              );
+              
+              // Aggiorna openChatData
+              state.openChatData[notificationId] = {
+                ...notification,
+                messages: sortedMessages,
+                messageCount: sortedMessages.length,
+                totalMessageCount: notification.totalMessageCount || sortedMessages.length,
+                lastFullUpdate: Date.now()
+              };
+            } else {
+              // Solo aggiorna i metadati
+              state.openChatData[notificationId] = {
+                ...existingOpenChat,
+                ...notification,
+                messages: existingMessages, // Mantieni i messaggi esistenti
+                lastFullUpdate: Date.now()
+              };
+            }
+          } else {
+            // Prima volta che carichiamo questa chat aperta
+            state.openChatData[notificationId] = {
+              ...notification,
+              messages: newMessages,
+              lastFullUpdate: Date.now()
+            };
+          }
+          
+          // Aggiorna anche la paginazione se necessario
+          const totalCount = notification.totalMessageCount || notification.messageCount || newMessages.length;
+          const loadedCount = Array.isArray(state.openChatData[notificationId].messages) 
+            ? state.openChatData[notificationId].messages.length 
+            : 0;
+          
+          if (state.chatPagination[notificationId]) {
+            state.chatPagination[notificationId] = {
+              ...state.chatPagination[notificationId],
+              totalAvailable: totalCount,
+              totalLoaded: loadedCount,
+              hasMoreMessages: loadedCount < totalCount
+            };
+          }
         }
         
         // MODIFICA: Aggiorna la sidebar con riordinamento se necessario
