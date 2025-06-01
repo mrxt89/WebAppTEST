@@ -63,6 +63,7 @@ import {
   downloadNotificationAttachment,
   sendNotificationWithAttachments,
   removeUserFromChat,
+  fetchChatParticipants,
 } from "./notificationsActions";
 
 // Importa funzionalità da messageReactionsSlice
@@ -197,6 +198,19 @@ export const useNotifications = () => {
       pendingUpdatesRef.current.delete("load");
     });
   }, [dispatch, lastUpdateTime]);
+
+  const handleFetchChatParticipants = useCallback(
+    async (notificationId) => {
+      try {
+        const result = await dispatch(fetchChatParticipants(notificationId)).unwrap();
+        return result.participants;
+      } catch (error) {
+        console.error("Error fetching chat participants:", error);
+        return null;
+      }
+    },
+    [dispatch],
+  );
 
   const handleNotificationUpdate = useCallback(
     async (notificationId, highPriority = false) => {
@@ -1299,6 +1313,7 @@ export const useNotifications = () => {
     standaloneChats: Array.from(standaloneChats), // Convert Set to Array
     openChat,
     searchInNotifications: handleSearchInNotifications,
+    fetchChatParticipants: handleFetchChatParticipants,
     
     // NUOVO: Aggiungi openChatData
     openChatData,

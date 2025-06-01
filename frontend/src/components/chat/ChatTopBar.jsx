@@ -1,5 +1,5 @@
 // Frontend/src/components/chat/ChatTopBar.jsx
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   X,
   Minimize2,
@@ -85,6 +85,7 @@ const ChatTopBar = ({
   renderExtraButtons = null, // Prop per renderizzare pulsanti extra
   isStandalone = false, // Nuova prop per indicare se siamo in modalità standalone
   onRequestClose = null,
+  refreshParticipants = null, // Nuova prop per aggiornare i partecipanti
 }) => {
   const [isInfoVisible, setIsInfoVisible] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
@@ -102,6 +103,7 @@ const ChatTopBar = ({
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [waitingForMembersUpdate, setWaitingForMembersUpdate] = useState(false);
 
   const {
     notifications,
@@ -109,6 +111,7 @@ const ChatTopBar = ({
     updateChatTitle,
     fetchNotificationById,
     removeUserFromChat,
+    fetchChatParticipants,
   } = useNotifications();
   const infoDropdownRef = useRef(null);
   const infoButtonRef = useRef(null);
@@ -130,6 +133,23 @@ const ChatTopBar = ({
     searchText: "",
   });
 
+  // Funzione per caricare i partecipanti - SPOSTATA QUI
+  const loadParticipants = useCallback(async () => {
+    if (!notificationId) return;
+    
+    try {
+      // Usa fetchNotificationById per aggiornare i dati della chat
+      await fetchNotificationById(notificationId, true);
+      
+      // Se è disponibile refreshParticipants, chiamalo
+      if (typeof refreshParticipants === "function") {
+        refreshParticipants(notificationId);
+      }
+    } catch (error) {
+      console.error("Errore nel caricamento dei partecipanti:", error);
+    }
+  }, [notificationId, fetchNotificationById, refreshParticipants]);
+
   // useEffect per impostare il titolo modificato
   useEffect(() => {
     setEditedTitle(title || "");
@@ -148,6 +168,38 @@ const ChatTopBar = ({
       window.removeEventListener("resize", checkIsMobile);
     };
   }, []);
+
+  useEffect(() => {
+  console.log("TopBar: membersInfo aggiornato, numero membri:", membersInfo.length);
+  
+  // Se stavamo aspettando un aggiornamento membri dopo l'invio, resetta receivers
+  if (waitingForMembersUpdate && membersInfo.length > 0) {
+    console.log("TopBar: Reset receivers dopo aggiornamento membri");
+    setSelectedUsers([]);
+    if (typeof updateReceiversList === "function") {
+      updateReceiversList("");
+    }
+    setWaitingForMembersUpdate(false);
+  }
+}, [membersInfo, waitingForMembersUpdate, updateReceiversList]);
+
+// Aggiungi listener per l'evento di messaggio inviato
+useEffect(() => {
+  const handleMessageSent = (event) => {
+    const { notificationId: eventNotificationId } = event.detail;
+    
+    if (eventNotificationId === notificationId) {
+      console.log("TopBar: Messaggio inviato, in attesa di aggiornamento membri");
+      setWaitingForMembersUpdate(true);
+    }
+  };
+
+  document.addEventListener("chat-message-sent", handleMessageSent);
+  
+  return () => {
+    document.removeEventListener("chat-message-sent", handleMessageSent);
+  };
+}, [notificationId]);
 
   // Ottieni il colore della categoria o usa un valore predefinito
   const getCategoryColor = () => {
@@ -205,10 +257,9 @@ const ChatTopBar = ({
 
   // Aggiorna i receivers selezionati quando cambia receiversList
   useEffect(() => {
-    if (receiversList) {
-      setSelectedUsers(receiversList.split("-").filter(Boolean));
-    } else {
-      setSelectedUsers([]);
+    console.log("TopBar: receiversList aggiornato:", receiversList);
+    if (receiversList !== undefined) {
+      setSelectedUsers(receiversList ? receiversList.split("-").filter(Boolean) : []);
     }
   }, [receiversList]);
 
@@ -252,7 +303,90 @@ const ChatTopBar = ({
     }
   }, [isInfoVisible, activeTab, activeRecipientTab, hasLeftChat]);
 
+  useEffect(() => {
+    const handleReceiversUpdated = (event) => {
+      const { notificationId: eventNotificationId, receiversList: newReceiversList } = event.detail;
+      
+      if (eventNotificationId === notificationId) {
+        console.log("TopBar: Aggiornamento receivers da evento", newReceiversList);
+        setSelectedUsers(newReceiversList ? newReceiversList.split("-").filter(Boolean) : []);
+        
+        // Se siamo nella tab "add", potrebbe essere necessario resettare
+        if (activeTab === "add" && !newReceiversList) {
+          setActiveTab("info"); // Torna alla tab info dopo l'invio
+        }
+      }
+    };
   
+    document.addEventListener("receivers-updated", handleReceiversUpdated);
+    
+    return () => {
+      document.removeEventListener("receivers-updated", handleReceiversUpdated);
+    };
+  }, [notificationId, activeTab]);
+
+  useEffect(() => {
+    const handleUserRemovedFromChat = (event) => {
+      const { notificationId: eventNotificationId } = event.detail;
+      
+      if (eventNotificationId === notificationId) {
+        console.log("Utente rimosso dalla chat, aggiorno partecipanti");
+        loadParticipants();
+      }
+    };
+    
+    const handleChatStatusChanged = (event) => {
+      const { notificationId: eventNotificationId, action } = event.detail;
+      
+      if (eventNotificationId === notificationId && action === 'left') {
+        console.log("Utente ha lasciato la chat, aggiorno partecipanti");
+        loadParticipants();
+      }
+    };
+    
+    const handleMessageSent = (event) => {
+      const { notificationId: eventNotificationId } = event.detail;
+      
+      if (eventNotificationId === notificationId) {
+        // Dopo l'invio di un messaggio, aggiorna i partecipanti se la tab è aperta
+        if (isInfoVisible && activeTab === "members") {
+          setTimeout(() => {
+            loadParticipants();
+          }, 1000);
+        }
+      }
+    };
+    
+    const handleRefreshParticipants = (event) => {
+      const { notificationId: eventNotificationId } = event.detail;
+      
+      if (eventNotificationId === notificationId || !eventNotificationId) {
+        loadParticipants();
+      }
+    };
+  
+    // Aggiungi i listener
+    document.addEventListener("user-removed-from-chat", handleUserRemovedFromChat);
+    document.addEventListener("chat-status-changed", handleChatStatusChanged);
+    document.addEventListener("chat-message-sent", handleMessageSent);
+    document.addEventListener("refresh-participants", handleRefreshParticipants);
+    
+    return () => {
+      // Rimuovi i listener
+      document.removeEventListener("user-removed-from-chat", handleUserRemovedFromChat);
+      document.removeEventListener("chat-status-changed", handleChatStatusChanged);
+      document.removeEventListener("chat-message-sent", handleMessageSent);
+      document.removeEventListener("refresh-participants", handleRefreshParticipants);
+    };
+  }, [notificationId, isInfoVisible, activeTab, loadParticipants]);
+
+  // Aggiungo useEffect per aggiornare i partecipanti quando si apre la topbar
+  useEffect(() => {
+    if (isInfoVisible && notificationId) {
+      console.log("TopBar: Aggiornamento partecipanti al click su info");
+      fetchChatParticipants(notificationId);
+    }
+  }, [isInfoVisible, notificationId, fetchChatParticipants]);
 
   // Funzione per controllare lo stato online di un utente
   const getOnlineStatus = (user) => {
@@ -1315,18 +1449,23 @@ const ChatTopBar = ({
                         {/* Aggiungiamo il pulsante di rimozione */}
                         {!hasLeftChat && (
                           <div className="flex items-center ml-2">
-                            <button
-                              onClick={() =>
-                                removeUserFromChat(
-                                  notificationId,
-                                  member.userId,
-                                )
-                              }
-                              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
-                              title="Rimuovi dalla chat"
-                            >
-                              <UserMinus className="w-4 h-4" />
-                            </button>
+                              <button
+                                onClick={async () => {
+                                  const result = await removeUserFromChat(notificationId, member.userId);
+                                  if (result) {
+                                    // Triggera il refresh dei partecipanti dopo la rimozione
+                                    document.dispatchEvent(
+                                      new CustomEvent("refresh-participants", {
+                                        detail: { notificationId }
+                                      })
+                                    );
+                                  }
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
+                                title="Rimuovi dalla chat"
+                              >
+                                <UserMinus className="w-4 h-4" />
+                              </button>
                           </div>
                         )}
                       </div>

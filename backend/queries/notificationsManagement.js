@@ -1333,6 +1333,38 @@ async function removeUserFromChat(notificationId, adminUserId, userToRemoveId) {
   }
 }
 
+async function getChatParticipants(notificationId, userId) {
+  try {
+    let pool = await sql.connect(config.dbConfig);
+    const result = await pool.request()
+      .input('notificationId', sql.Int, notificationId)
+      .query(`
+        SELECT DISTINCT 
+          u.userId,
+          u.firstName,
+          u.lastName,
+          u.username,
+          u.lastOnline,
+          u.email,
+          u.phoneNumber,
+          u.role,
+          c.Description as companyName
+        FROM AR_NotificationDetails nd WITH (NOLOCK)
+        JOIN AR_Users u WITH (NOLOCK) ON u.userId = nd.receiverId
+        LEFT JOIN AR_Companies c WITH (NOLOCK) ON c.CompanyId = u.CompanyId 
+        WHERE nd.notificationId = @notificationId
+          AND nd.chatLeft = 0
+          AND u.userDisabled = 0
+        ORDER BY u.firstName, u.lastName
+      `);
+    
+    return result.recordset;
+  } catch (err) {
+    console.error('Error fetching chat participants:', err);
+    throw err;
+  }
+}
+
 
 
 module.exports = {
@@ -1379,5 +1411,6 @@ module.exports = {
   deleteMessage,
   getBatchReactions,
   getBatchPolls,
-  removeUserFromChat
+  removeUserFromChat,
+  getChatParticipants
 };

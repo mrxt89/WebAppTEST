@@ -287,122 +287,134 @@ const ChatBottomBar = ({
   }, [disabled, mentionIndex, message, localReceiversList, updateReceiversList, saveSelection]);
 
   // IMPORTANTE: Funzione per gestire l'invio con allegati - AGGIORNATA
-  const handleSendWithAttachments = async () => {
-    if (disabled) return;
 
-    // Verifica per nuovi messaggi
-    if (isNewMessage && !localReceiversList && notificationCategoryId <= 1) {
-      swal.fire("Errore", "Assicurati di aver selezionato almeno un destinatario", "error");
-      return;
+const handleSendWithAttachments = async () => {
+  if (disabled) return;
+
+  // Verifica per nuovi messaggi
+  if (isNewMessage && !localReceiversList && notificationCategoryId <= 1) {
+    swal.fire("Errore", "Assicurati di aver selezionato almeno un destinatario", "error");
+    return;
+  }
+
+  if (isNewMessage && !title) {
+    swal.fire("Errore", "Attenzione: il titolo è obbligatorio", "error");
+    return;
+  }
+
+  // Consenti l'invio se c'è un testo O almeno un allegato
+  if (message.trim() || attachments.length > 0) {
+    const notificationData = {
+      notificationId,
+      message: message.trim() || (attachments.length > 0 ? "Ha condiviso allegati" : ""),
+      responseOptionId: 3,
+      eventId: 0,
+      title,
+      notificationCategoryId,
+      receiversList: localReceiversList, // USA LO STATO LOCALE
+      replyToMessageId: replyToMessage ? replyToMessage.messageId : 0,
+    };
+
+    console.log("Invio con allegati - Dati notifica:", notificationData);
+
+    if (typeof setSending === "function") {
+      setSending(true);
     }
+    setLoading(true);
 
-    if (isNewMessage && !title) {
-      swal.fire("Errore", "Attenzione: il titolo è obbligatorio", "error");
-      return;
-    }
+    try {
+      let result;
 
-    // Consenti l'invio se c'è un testo O almeno un allegato
-    if (message.trim() || attachments.length > 0) {
-      const notificationData = {
-        notificationId,
-        message: message.trim() || (attachments.length > 0 ? "Ha condiviso allegati" : ""),
-        responseOptionId: 3,
-        eventId: 0,
-        title,
-        notificationCategoryId,
-        receiversList: localReceiversList, // USA LO STATO LOCALE
-        replyToMessageId: replyToMessage ? replyToMessage.messageId : 0,
-      };
+      // USA sendNotificationWithAttachments dal context
+      result = await sendNotificationWithAttachments(notificationData, attachments);
 
-      console.log("Invio con allegati - Dati notifica:", notificationData);
-
-      if (typeof setSending === "function") {
-        setSending(true);
-      }
-      setLoading(true);
-
-      try {
-        let result;
-
-        // USA sendNotificationWithAttachments dal context
-        result = await sendNotificationWithAttachments(notificationData, attachments);
-
-        if (result && (result.success || result.notificationId)) {
-          // Reset degli stati
+      if (result && (result.success || result.notificationId)) {
+        // IMPORTANTE: Reset SOLO dopo invio riuscito per chat esistenti
+        // Per nuovi messaggi, mantieni i destinatari finché non si chiude il modal
+        if (!isNewMessage) {
           if (typeof updateReceiversList === "function") {
             updateReceiversList("");
           }
-          setLocalReceiversList(""); // Reset stato locale
-          setMessage("");
-          setIsUpdatingContentEditable(true);
-          setAttachments([]);
+          setLocalReceiversList(""); // Reset stato locale solo per chat esistenti
+        }
+        
+        setMessage("");
+        setIsUpdatingContentEditable(true);
+        setAttachments([]);
 
-          // Resetta messaggio di risposta
-          if (typeof setReplyToMessage === "function") {
-            setReplyToMessage(null);
+        // Resetta messaggio di risposta
+        if (typeof setReplyToMessage === "function") {
+          setReplyToMessage(null);
+        }
+
+        setPlaceholderVisible(true);
+
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+
+        // Se è un nuovo messaggio, apri la nuova chat
+        if (isNewMessage && (result.notificationId > 0 || result.Success)) {
+          // IMPORTANTE: Prima di chiudere, resetta i destinatari
+          if (typeof updateReceiversList === "function") {
+            updateReceiversList("");
           }
-
-          setPlaceholderVisible(true);
-
-          if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-          }
-
-          if (inputRef.current) {
-            inputRef.current.focus();
-          }
-
-          // Se è un nuovo messaggio, apri la nuova chat
-          if (isNewMessage && (result.notificationId > 0 || result.Success)) {
-            if (onRequestClose) {
-              onRequestClose();
-              setTimeout(() => {
-                if (openChatModal) openChatModal(result.notificationId || result.id);
-              }, 100);
-            }
-          }
-
-          // Emetti eventi per forzare l'aggiornamento
-          document.dispatchEvent(
-            new CustomEvent("chat-message-sent", {
-              detail: {
-                notificationId: result.notificationId || notificationData.notificationId,
-                highPriority: true,
-              },
-            }),
-          );
-
-          // Forza reload della chat
-          document.dispatchEvent(
-            new CustomEvent("reload-open-chat", {
-              detail: {
-                notificationId: result.notificationId || notificationId,
-                reason: "message-sent",
-                forceComplete: true
-              },
-            }),
-          );
+          setLocalReceiversList("");
           
-          // Aggiorna gli allegati
-          if (refreshAttachments) {
+          if (onRequestClose) {
+            onRequestClose();
             setTimeout(() => {
-              refreshAttachments(result.notificationId || notificationId);
-            }, 500);
+              if (openChatModal) openChatModal(result.notificationId || result.id);
+            }, 100);
           }
         }
 
-        return result;
-      } catch (error) {
-        console.error("Error sending message with attachments:", error);
-        swal.fire("Errore", "Impossibile inviare il messaggio", "error");
-      } finally {
-        if (typeof setSending === "function") {
-          setSending(false);
+        // Emetti eventi per forzare l'aggiornamento
+        document.dispatchEvent(
+          new CustomEvent("chat-message-sent", {
+            detail: {
+              notificationId: result.notificationId || notificationData.notificationId,
+              highPriority: true,
+            },
+          }),
+        );
+
+        // Forza reload della chat
+        document.dispatchEvent(
+          new CustomEvent("reload-open-chat", {
+            detail: {
+              notificationId: result.notificationId || notificationId,
+              reason: "message-sent",
+              forceComplete: true
+            },
+          }),
+        );
+        
+        // Aggiorna gli allegati
+        if (refreshAttachments) {
+          setTimeout(() => {
+            refreshAttachments(result.notificationId || notificationId);
+          }, 500);
         }
-        setLoading(false);
       }
+
+      return result;
+    } catch (error) {
+      console.error("Error sending message with attachments:", error);
+      swal.fire("Errore", "Impossibile inviare il messaggio", "error");
+    } finally {
+      if (typeof setSending === "function") {
+        setSending(false);
+      }
+      setLoading(false);
     }
-  };
+  }
+};
+
 
   // Invio messaggio normale o con allegati - AGGIORNATA
   const handleSend = useCallback(async (msg = message) => {
