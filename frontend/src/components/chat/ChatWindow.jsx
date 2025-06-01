@@ -622,36 +622,6 @@ const ChatWindow = ({
     }
   }, [windowManager, notification, initialX, initialY, initialLoaded]);
 
-  // Gestione eventi
-  useEffect(() => {
-    const handleReloadOpenChat = (event) => {
-      const { notificationId: eventNotificationId } = event.detail;
-      
-      if (eventNotificationId === parseInt(notification.notificationId)) {
-        refreshData({ force: true });
-      }
-    };
-
-    const handleTitleUpdate = (event) => {
-      const { notificationId, newTitle } = event.detail;
-
-      if (notificationId && notification && notification.notificationId === parseInt(notificationId)) {
-        setChatTitle(newTitle);
-
-        if (windowManager?.updateTitle) {
-          windowManager.updateTitle(notificationId, newTitle);
-        }
-      }
-    };
-
-    document.addEventListener("reload-open-chat", handleReloadOpenChat);
-    document.addEventListener("chat-title-updated", handleTitleUpdate);
-
-    return () => {
-      document.removeEventListener("reload-open-chat", handleReloadOpenChat);
-      document.removeEventListener("chat-title-updated", handleTitleUpdate);
-    };
-  }, [notification, windowManager, refreshData]);
 
   // Segna come letto all'apertura
   useEffect(() => {

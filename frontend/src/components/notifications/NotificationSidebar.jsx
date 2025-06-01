@@ -873,65 +873,9 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
 
 
 
-  // NUOVO: Handler per l'evento force-count-refresh
-  useEffect(() => {
-    const handleForceCountRefresh = () => {
-      // Usa SEMPRE le notifiche non filtrate per il refresh forzato
-      const currentUnreadCount = notifications.filter(
-        notification => !notification.isReadByUser && 
-                       notification.archived !== 1 && 
-                       notification.archived !== "1"
-      ).length;
-      
-      console.log('[NotificationSidebar] Force refresh contatore:', currentUnreadCount);
-      
-      document.dispatchEvent(
-        new CustomEvent("unread-count-changed", {
-          detail: {
-            unreadCount: currentUnreadCount,
-            timestamp: Date.now(),
-            forced: true,
-            source: 'sidebar-forced'
-          }
-        })
-      );
-    };
-    
-    document.addEventListener("force-count-refresh", handleForceCountRefresh);
-    
-    return () => {
-      document.removeEventListener("force-count-refresh", handleForceCountRefresh);
-    };
-  }, [notifications]);
+ 
 
-  // NUOVO: Gestisci il cambio di visibilità
-  useEffect(() => {
-    // Se la sidebar è appena stata chiusa
-    if (prevVisibleRef.current === true && visible === false) {
-      // Calcola il contatore totale non filtrato
-      const totalUnreadCount = notifications.filter(
-        notification => !notification.isReadByUser && 
-                       notification.archived !== 1 && 
-                       notification.archived !== "1"
-      ).length;
-      
-      console.log('[NotificationSidebar] Sidebar appena chiusa, emetto contatore totale:', totalUnreadCount);
-      
-      // Emetti l'evento una sola volta
-      document.dispatchEvent(
-        new CustomEvent("unread-count-changed", {
-          detail: {
-            unreadCount: totalUnreadCount,
-            timestamp: Date.now(),
-            source: 'sidebar-just-closed'
-          }
-        })
-      );
-    }
-    
-    // Aggiorna il ref per il prossimo render
-    prevVisibleRef.current = visible;
-  }, [visible, notifications]);
+
 
   // Ottieni le categorie uniche
   const uniqueCategories = Object.values(
