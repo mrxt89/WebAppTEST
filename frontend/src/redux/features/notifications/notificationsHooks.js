@@ -47,10 +47,8 @@ import {
   initializeStandaloneChats,
   cleanupStandaloneChats,
   // NUOVO: Aggiungi questi import
-  selectOpenChatData,
   setOpenChatData,
   removeOpenChatData,
-  selectHasFullChatData,
 } from "./notificationsSlice";
 
 // Importa azioni worker e altre azioni
@@ -1278,14 +1276,6 @@ export const useNotifications = () => {
     [dispatch]
   );
 
-  // NUOVO: Funzione per verificare se abbiamo dati completi
-  const hasFullChatData = useCallback(
-    (notificationId) => {
-      const state = store.getState();
-      return selectHasFullChatData(state, notificationId);
-    },
-    []
-  );
 
   // NUOVO: Funzione per fermare il notification worker
   const stopNotificationWorker = useCallback(() => {
@@ -1315,7 +1305,6 @@ export const useNotifications = () => {
     getOpenChatData,
     updateOpenChatData,
     clearOpenChatData,
-    hasFullChatData,
 
     // Worker management
     initializeWorker,

@@ -1471,9 +1471,11 @@ router.delete('/messages/:messageId', authenticateToken, async (req, res) => {
 router.post('/messages/batch-reactions', authenticateToken, async (req, res) => {
   try {
     const { messageIds } = req.body;
+    // Togliamo i null e i undefined
+    const filteredMessageIds = messageIds.filter(id => id !== null && id !== undefined);
     const userId = req.user.UserId;
     // Verifica che messageIds sia un array valido
-    if (!Array.isArray(messageIds) || messageIds.length === 0) {
+    if (!Array.isArray(filteredMessageIds) || filteredMessageIds.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Parametro messageIds non valido o vuoto'
@@ -1481,7 +1483,7 @@ router.post('/messages/batch-reactions', authenticateToken, async (req, res) => 
     }
     
     // Chiama la funzione dal file delle query
-    const result = await getBatchReactions(messageIds, userId);
+    const result = await getBatchReactions(filteredMessageIds, userId);
     
     // Restituisci la mappa delle reazioni
     res.json({

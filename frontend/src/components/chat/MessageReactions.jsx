@@ -99,27 +99,7 @@ const MessageReactions = ({ messageId, notificationId, onReactionUpdated }) => {
       }
     }
   };
-
-  // Imposta l'intervallo di polling all'avvio
-  useEffect(() => {
-    if (messageId) {
-      // Carica le reazioni all'avvio
-      loadReactions();
-
-      // Imposta un intervallo per il polling (ogni 10 secondi)
-      pollingIntervalRef.current = setInterval(() => {
-        loadReactions(true);
-      }, 10000);
-    }
-
-    // Pulisci l'intervallo quando il componente si smonta
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-    };
-  }, [messageId]);
-
+  
   // Carica le reazioni anche quando cambia il refreshKey
   useEffect(() => {
     if (messageId && refreshKey > 0) {

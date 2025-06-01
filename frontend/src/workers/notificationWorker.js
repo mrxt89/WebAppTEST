@@ -3,53 +3,47 @@
 // Worker state
 let token = null;
 let apiBaseUrl = null;
-let currentUserId = null; // NUOVO: Memorizza l'ID utente passato dal thread principale
+let currentUserId = null;
 let isRequestInProgress = false;
 let pollingTimeout = null;
 let lastUpdateTime = Date.now();
-let notificationCache = []; // Cache to track changes
+let notificationCache = [];
 let forcedRefreshRequested = false;
-let highPriorityUpdate = false; // Flag per gli aggiornamenti ad alta priorità
-let debugEnabled = true; // Set to true to enable extensive logging
-let isOpenChat = false; // Flag per indicare se stiamo caricando per una chat aperta
-let isWorkerActive = true; // NUOVO: Flag per controllare se il worker è attivo
+let highPriorityUpdate = false;
+let debugEnabled = true;
+let isOpenChat = false;
+let isWorkerActive = true;
 let openChatIds = new Set();
-// Set per prevenire notifiche duplicate ravvicinate
 let recentNotifications = new Set();
-// Tracking per identificare quali notifiche hanno nuovi messaggi in un ciclo
 let notificationsWithNewMessages = new Set();
 
 // Constants
-const POLLING_INTERVAL = 15000; // 15 seconds
-const FORCED_REFRESH_INTERVAL = 500; // 500ms for forced refresh
-const REQUEST_TIMEOUT = 30000; // 30 seconds timeout for requests
-const THROTTLE_INTERVAL = 4000; // Minimo tempo tra richieste consecutive
+const POLLING_INTERVAL = 15000;
+const FORCED_REFRESH_INTERVAL = 500;
+const REQUEST_TIMEOUT = 30000;
+const THROTTLE_INTERVAL = 4000;
 
-// Tracking per limitare le richieste troppo frequenti
 let lastRequestTime = 0;
 
-// Log errors even when debug is disabled
 function logError(...args) {
   const timestamp = new Date().toISOString();
   console.error(`[NotificationWorker ERROR ${timestamp}]`, ...args);
 }
 
-// Check if notifications have changed by comparing with cache
+// MODIFICA: Migliorata la gestione dei cambiamenti per le chat aperte
 function haveNotificationsChanged(newNotifications) {
-  // Reset the set tracking which notifications have new messages
   notificationsWithNewMessages.clear();
 
   if (!notificationCache || notificationCache.length === 0) {
-    return true; // No cache, consider it changed
+    return true;
   }
 
   if (newNotifications.length !== notificationCache.length) {
-    return true; // Different number of notifications
+    return true;
   }
 
   let hasChanges = false;
 
-  // Compare each notification for changes
   for (let i = 0; i < newNotifications.length; i++) {
     const newNotif = newNotifications[i];
     const cachedNotif = notificationCache.find(
@@ -57,44 +51,37 @@ function haveNotificationsChanged(newNotifications) {
     );
 
     if (!cachedNotif) {
-      hasChanges = true; // New notification found
+      hasChanges = true;
       continue;
     }
 
-    // Check for messages using messageCount field
     const newMsgCount = newNotif.messageCount || 0;
     const cachedMsgCount = cachedNotif.messageCount || 0;
-
-    // Prendo dalla cache data ora dell'ultimo messaggio ricevuto (lastMessage)
     const newLastMessageDate = new Date(newNotif.lastMessage);
     const cachedLastMessageDate = new Date(cachedNotif.lastMessage);
 
-    // Se la data dell'ultimo messaggio è più recente di quella in cache, allora ho un nuovo messaggio
-    if (newLastMessageDate > cachedLastMessageDate) {
+    // IMPORTANTE: Se la chat è aperta, controlla sempre per nuovi messaggi
+    if (openChatIds.has(newNotif.notificationId)) {
+      if (newLastMessageDate > cachedLastMessageDate || newMsgCount > cachedMsgCount) {
+        console.log(`[Worker] Nuovi messaggi rilevati per chat aperta ${newNotif.notificationId}`);
+        notificationsWithNewMessages.add(newNotif.notificationId);
+        hasChanges = true;
+      }
+      newNotif.isReadByUser = true;
+    } else if (newLastMessageDate > cachedLastMessageDate) {
+      notificationsWithNewMessages.add(newNotif.notificationId);
       hasChanges = true;
     }
 
-    // Track which notifications have new messages
     if (newMsgCount > cachedMsgCount) {
       notificationsWithNewMessages.add(newNotif.notificationId);
       hasChanges = true;
     }
 
-    // MODIFICA CHIAVE: Se la chat è aperta, forza isReadByUser = true
-    if (openChatIds.has(newNotif.notificationId)) {
-      newNotif.isReadByUser = true;
-      // Se era non letto prima e ora è aperto, è un cambiamento
-      if (!cachedNotif.isReadByUser) {
-        hasChanges = true;
-      }
-    }
-
-    // Check for read status changes
     if (newNotif.isReadByUser !== cachedNotif.isReadByUser) {
-      hasChanges = true; // Read status changed
+      hasChanges = true;
     }
 
-    // Check for other status changes
     if (
       newNotif.pinned !== cachedNotif.pinned ||
       newNotif.favorite !== cachedNotif.favorite ||
@@ -103,52 +90,25 @@ function haveNotificationsChanged(newNotifications) {
       newNotif.isMuted !== cachedNotif.isMuted ||
       newNotif.lastMessage !== cachedNotif.lastMessage
     ) {
-      hasChanges = true; // Status changed
+      hasChanges = true;
     }
   }
 
-  // If forcedRefreshRequested is true, consider it changed regardless
   if (forcedRefreshRequested) {
-    forcedRefreshRequested = false; // Reset the flag
+    forcedRefreshRequested = false;
     return true;
   }
 
   return hasChanges;
 }
 
-// Extract last message details including sender info
-function extractLastMessageDetails(messages) {
-  try {
-    const parsedMessages = Array.isArray(messages)
-      ? messages
-      : JSON.parse(messages || "[]");
-    if (parsedMessages && parsedMessages.length > 0) {
-      const lastMessage = parsedMessages[parsedMessages.length - 1];
-      return {
-        text: lastMessage.message || "Nuovo messaggio",
-        senderId: lastMessage.senderId || lastMessage.SenderId || null,
-        senderName: lastMessage.senderName || lastMessage.SenderName || "Unknown"
-      };
-    }
-  } catch (e) {
-    logError("Error extracting message details:", e);
-  }
-  return {
-    text: "Nuovo messaggio",
-    senderId: null,
-    senderName: "Unknown"
-  };
-}
-
-// Main function to fetch notifications
+// MODIFICA: Migliore gestione delle chat aperte
 async function fetchNotifications(notificationIdToFetch = null) {
-  // NUOVO: Controlla se il worker è attivo
   if (!isWorkerActive) {
     console.log("[Worker] Worker non attivo, skip fetch");
     return;
   }
 
-  // Rate limit check - evita richieste troppo frequenti
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
 
@@ -157,7 +117,6 @@ async function fetchNotifications(notificationIdToFetch = null) {
     !highPriorityUpdate &&
     !notificationIdToFetch
   ) {
-    // Riprogramma per quando sarà passato l'intervallo minimo
     const waitTime = THROTTLE_INTERVAL - timeSinceLastRequest;
     if (pollingTimeout) {
       clearTimeout(pollingTimeout);
@@ -175,21 +134,17 @@ async function fetchNotifications(notificationIdToFetch = null) {
     return;
   }
 
-  // Aggiorna timestamp della richiesta
   lastRequestTime = now;
   isRequestInProgress = true;
 
   try {
     let url = `${apiBaseUrl}/notifications`;
 
-    // MODIFICA CHIAVE: Se è richiesta una notifica specifica, usa sempre openChat=true
-    // per ottenere TUTTI i messaggi
     if (notificationIdToFetch) {
       url = `${apiBaseUrl}/notifications/${notificationIdToFetch}?openChat=true&allMessages=true&t=${Date.now()}`;
       console.log(`🔄 Worker: Caricando dati completi per chat ${notificationIdToFetch}`);
     }
 
-    // Request with timeout
     const fetchPromise = fetch(url, {
       method: "GET",
       headers: {
@@ -200,23 +155,20 @@ async function fetchNotifications(notificationIdToFetch = null) {
       },
     });
 
-    // Create timeout promise
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error("Request timeout")), REQUEST_TIMEOUT);
     });
 
-    // Race between fetch and timeout
     const response = await Promise.race([fetchPromise, timeoutPromise]);
 
     if (!response.ok) {
-      // Handle authentication errors
       if (response.status === 401 || response.status === 403) {
         logError(`Auth error: ${response.status}`);
         self.postMessage({
           type: "auth_error",
           error: "Session expired",
         });
-        isWorkerActive = false; // NUOVO: Disattiva il worker su errore auth
+        isWorkerActive = false;
         return;
       }
       throw new Error(`Network response was not ok: ${response.status}`);
@@ -225,62 +177,53 @@ async function fetchNotifications(notificationIdToFetch = null) {
     let notifications;
 
     if (notificationIdToFetch) {
-      // Se abbiamo richiesto una notifica specifica, otteniamo un oggetto singolo
       const notification = await response.json();
-      
-      // MODIFICA: Log per debug
       const messageCount = Array.isArray(notification.messages) 
         ? notification.messages.length 
         : (typeof notification.messages === "string" ? JSON.parse(notification.messages || "[]").length : 0);
       
       console.log(`📨 Worker: Ricevuti ${messageCount} messaggi per chat ${notificationIdToFetch} (messageCount: ${notification.messageCount})`);
       
-      notifications = [notification]; // Lo convertiamo in array per compatibilità
+      notifications = [notification];
     } else {
-      // Altrimenti otteniamo l'array completo (solo per sidebar)
       notifications = await response.json();
     }
 
-    // Sort notifications by pin and date
     notifications.sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
       return new Date(b.lastMessage) - new Date(a.lastMessage);
     });
 
-    // Check if notifications have changed and track which ones have new messages
     const hasChanges = haveNotificationsChanged(notifications);
 
     if (hasChanges || highPriorityUpdate || notificationIdToFetch) {
       if (highPriorityUpdate) {
-        highPriorityUpdate = false; // Reset flag
+        highPriorityUpdate = false;
       }
 
-      // Track last update time
       lastUpdateTime = Date.now();
 
-      // Solo se ci sono nuovi messaggi, emetti un unico evento batch
-      // per evitare duplicazioni delle notifiche
+      // MODIFICA: Gestione migliorata per chat aperte
       if (notificationsWithNewMessages.size > 0) {
-        // Crea informazioni sulle notifiche con nuovi messaggi
+        const openChatMessages = [];
+        const closedChatMessages = [];
+
         const newMessagesInfo = notifications
           .filter((notification) =>
             notificationsWithNewMessages.has(notification.notificationId),
           )
           .map((notification) => {
-            // Trova la notifica in cache
             const cachedNotification = notificationCache.find(
               (n) => n.notificationId === notification.notificationId,
             );
 
-            // Calcola incremento messaggi
             const newMsgCount = notification.messageCount || 0;
             const cachedMsgCount = cachedNotification
               ? cachedNotification.messageCount || 0
               : 0;
             const increment = newMsgCount - cachedMsgCount;
 
-            // Estrai dettagli dell'ultimo messaggio
             let senderName = "Unknown";
             let messagePreview = "Nuovo messaggio";
             let senderId = null;
@@ -300,77 +243,85 @@ async function fetchNotifications(notificationIdToFetch = null) {
               logError(`Error parsing messages for notification ${notification.notificationId}:`, e);
             }
 
-            // Controlla se è un messaggio proprio usando currentUserId dal worker state
             const isOwnMessage = currentUserId && senderId && 
                                 (senderId === currentUserId || 
                                  senderId.toString() === currentUserId.toString() ||
                                  parseInt(senderId) === parseInt(currentUserId));
 
             if (isOwnMessage) {
-              console.log(`[Worker] Skipping own message notification for chat ${notification.notificationId} (senderId: ${senderId}, currentUserId: ${currentUserId})`);
+              console.log(`[Worker] Skipping own message notification for chat ${notification.notificationId}`);
               return null;
             }
 
-            // Controlla se questa notifica è stata mostrata di recente
             const notificationKey = `${notification.notificationId}_${Math.floor(Date.now() / 30000)}`;
             const isRecent = recentNotifications.has(notificationKey);
 
-            // Se non è recente, registrala
             if (!isRecent) {
               recentNotifications.add(notificationKey);
-
-              // Limita dimensioni del set
               if (recentNotifications.size > 100) {
                 const oldKeys = Array.from(recentNotifications).slice(0, 50);
                 oldKeys.forEach((key) => recentNotifications.delete(key));
               }
             }
 
-            return {
+            const info = {
               notificationId: notification.notificationId,
               newMessageCount: increment,
               senderName,
               messagePreview,
               isRecent,
-              senderId, // Includi senderId per ulteriori controlli
+              senderId,
+              isOpenChat: openChatIds.has(notification.notificationId)
             };
-          })
-          .filter(info => info !== null); // Rimuovi i null (messaggi propri)
 
-        // Invia un solo evento con tutte le informazioni sui nuovi messaggi
-        if (newMessagesInfo.length > 0) {
+            if (info.isOpenChat) {
+              openChatMessages.push(info);
+            } else {
+              closedChatMessages.push(info);
+            }
+
+            return info;
+          })
+          .filter(info => info !== null);
+
+        // IMPORTANTE: Invia prima gli aggiornamenti per le chat aperte
+        if (openChatMessages.length > 0) {
+          console.log(`[Worker] Inviando aggiornamenti per ${openChatMessages.length} chat aperte`);
           self.postMessage({
-            type: "new_message",
-            newMessagesInfo,
+            type: "open_chat_update",
+            updates: openChatMessages,
             timestamp: Date.now(),
           });
+        }
 
-          // Richiedi aggiornamento allegati per le notifiche con nuovi messaggi
-          const notificationIdsToUpdate = Array.from(
-            notificationsWithNewMessages,
-          );
-          if (notificationIdsToUpdate.length > 0) {
-            self.postMessage({
-              type: "attachments_update",
-              notificationIds: notificationIdsToUpdate.slice(0, 5), // Limita a 5 per non sovraccaricare
-              updateTime: Date.now(),
-            });
-          }
+        // Poi invia le notifiche per le chat chiuse
+        if (closedChatMessages.length > 0) {
+          self.postMessage({
+            type: "new_message",
+            newMessagesInfo: closedChatMessages,
+            timestamp: Date.now(),
+          });
+        }
+
+        // Richiedi aggiornamento allegati
+        const notificationIdsToUpdate = Array.from(notificationsWithNewMessages);
+        if (notificationIdsToUpdate.length > 0) {
+          self.postMessage({
+            type: "attachments_update",
+            notificationIds: notificationIdsToUpdate.slice(0, 5),
+            updateTime: Date.now(),
+          });
         }
       }
 
-      // Update cache with deep copy
       notificationCache = JSON.parse(JSON.stringify(notifications));
 
-      // Send updates to main thread
       self.postMessage({
         type: "notifications",
         notifications: notifications,
         updateTime: lastUpdateTime,
       });
 
-      // Invia richiesta di aggiornamento allegati
-      // solo se non abbiamo già inviato aggiornamenti specifici
       if (
         notificationsWithNewMessages.size === 0 &&
         notifications &&
@@ -390,7 +341,6 @@ async function fetchNotifications(notificationIdToFetch = null) {
       }
     }
   } catch (error) {
-    // Notify the React component of the error
     logError(`Error fetching notifications:`, error);
     self.postMessage({
       type: "error",
@@ -402,9 +352,7 @@ async function fetchNotifications(notificationIdToFetch = null) {
   }
 }
 
-// Schedule the next fetch based on current state
 function scheduleNextFetch() {
-  // NUOVO: Non schedulare se il worker non è attivo
   if (!isWorkerActive) {
     console.log("[Worker] Worker non attivo, skip scheduling");
     return;
@@ -414,14 +362,12 @@ function scheduleNextFetch() {
     clearTimeout(pollingTimeout);
   }
 
-  // Use shorter interval for forced refreshes
   let interval = forcedRefreshRequested
     ? FORCED_REFRESH_INTERVAL
     : POLLING_INTERVAL;
 
-  // Se è un aggiornamento ad alta priorità, riduci ulteriormente l'intervallo
   if (highPriorityUpdate) {
-    interval = 100; // Praticamente immediato
+    interval = 100;
   }
 
   pollingTimeout = setTimeout(() => {
@@ -431,45 +377,38 @@ function scheduleNextFetch() {
   }, interval);
 }
 
-// Handle messages from React component
 self.onmessage = (event) => {
   if (event.data) {
     const { type, data } = event.data;
 
     switch (type) {
       case "init":
-        // Initialize worker with token and URL
         token = data.token;
         apiBaseUrl = data.apiBaseUrl;
-        currentUserId = data.userId; // NUOVO: Ricevi l'ID utente dal thread principale
-        isWorkerActive = true; // NUOVO: Attiva il worker
+        currentUserId = data.userId;
+        isWorkerActive = true;
 
-        // Enable debug if requested
         if (data.debug) {
           debugEnabled = true;
         }
 
-        // Default to sidebar mode (isOpenChat = false)
         isOpenChat = data.isOpenChat || false;
 
         console.log("[Worker] Inizializzato e attivo con userId:", currentUserId);
 
-        // Start fetching immediately
         fetchNotifications();
         break;
 
-    case "update_open_chats":
-      // NUOVO: Aggiorna la lista delle chat aperte
-      if (data.openChatIds) {
-        openChatIds = new Set(data.openChatIds);
-        console.log("[Worker] Chat aperte aggiornate:", Array.from(openChatIds));
-      }
-      break;
+      case "update_open_chats":
+        if (data.openChatIds) {
+          openChatIds = new Set(data.openChatIds);
+          console.log("[Worker] Chat aperte aggiornate:", Array.from(openChatIds));
+        }
+        break;
 
       case "stop":
-        // Stop polling
         console.log("[Worker] Ricevuto comando stop");
-        isWorkerActive = false; // NUOVO: Disattiva il worker
+        isWorkerActive = false;
         if (pollingTimeout) {
           clearTimeout(pollingTimeout);
           pollingTimeout = null;
@@ -477,26 +416,18 @@ self.onmessage = (event) => {
         break;
 
       case "reload":
-        // Force immediate reload
         token = data.token || token;
         apiBaseUrl = data.apiBaseUrl || apiBaseUrl;
-        currentUserId = data.userId || currentUserId; // NUOVO: Aggiorna userId se fornito
+        currentUserId = data.userId || currentUserId;
 
-        // Imposta lo stato isOpenChat
         isOpenChat = data.isOpenChat || false;
-
-        // Set flag to force update regardless of change detection
         forcedRefreshRequested = true;
-
-        // Imposta il flag di alta priorità se specificato
         highPriorityUpdate = data.highPriority || false;
 
-        // Cancel any pending fetch and start immediately
         if (pollingTimeout) {
           clearTimeout(pollingTimeout);
         }
 
-        // Normale ritardo di aggiornamento forzato
         pollingTimeout = setTimeout(() => {
           if (isWorkerActive) {
             fetchNotifications();
@@ -506,42 +437,35 @@ self.onmessage = (event) => {
         break;
 
       case "fetch_notification":
-        // Fetch a specific notification with the full message history
         token = data.token || token;
         apiBaseUrl = data.apiBaseUrl || apiBaseUrl;
-        currentUserId = data.userId || currentUserId; // NUOVO: Aggiorna userId se fornito
+        currentUserId = data.userId || currentUserId;
 
-        // Imposta lo stato isOpenChat (di solito true per questa operazione)
         isOpenChat = data.isOpenChat || true;
 
-        // Cancel any pending fetch
         if (pollingTimeout) {
           clearTimeout(pollingTimeout);
         }
 
-        // Execute fetch immediately for the specified notification
         fetchNotifications(data.notificationId);
         break;
 
       case "update_user":
-        // NUOVO: Caso per aggiornare l'ID utente se cambia
         currentUserId = data.userId;
         console.log("[Worker] UserId aggiornato a:", currentUserId);
         break;
 
       case "debug":
-        // Toggle debug mode
         debugEnabled = data.enabled;
         break;
 
       case "ping":
-        // Ping to check worker is alive
         self.postMessage({
           type: "pong",
           timestamp: Date.now(),
           lastUpdateTime,
-          isActive: isWorkerActive, // NUOVO: Includi stato attivo
-          currentUserId: currentUserId // NUOVO: Includi userId corrente per debug
+          isActive: isWorkerActive,
+          currentUserId: currentUserId
         });
         break;
 
@@ -551,5 +475,4 @@ self.onmessage = (event) => {
   }
 };
 
-// Send initial ready message
 self.postMessage({ type: "ready", timestamp: Date.now() });

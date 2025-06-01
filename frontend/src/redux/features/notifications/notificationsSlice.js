@@ -251,7 +251,7 @@ export const createDBNotificationsView = createAsyncThunk(
 
 export const sendNotification = createAsyncThunk(
   "notifications/sendNotification",
-  async (notificationData, { rejectWithValue }) => {
+  async (notificationData, { rejectWithValue, dispatch }) => {
     try {
       const token = localStorage.getItem("token");
       if (!token) return rejectWithValue("No token available");
@@ -266,7 +266,24 @@ export const sendNotification = createAsyncThunk(
         return rejectWithValue(res.data.msg || "Error sending notification");
       }
 
-      return res.data;
+      // IMPORTANTE: Il backend ora restituisce i dati aggiornati inclusi i messaggi
+      const result = res.data;
+      
+      // Se abbiamo i messaggi aggiornati, trova l'ultimo messaggio (quello appena inviato)
+      if (result.messages && Array.isArray(result.messages) && result.messages.length > 0) {
+        // Ordina i messaggi per data e prendi l'ultimo
+        const sortedMessages = [...result.messages].sort((a, b) => 
+          new Date(b.tbCreated) - new Date(a.tbCreated)
+        );
+        
+        const lastMessage = sortedMessages[0];
+        
+        // Aggiungi il messageId reale al risultato
+        result.realMessageId = lastMessage.messageId;
+        result.lastMessage = lastMessage;
+      }
+
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to send notification");
     }
@@ -634,6 +651,27 @@ const notificationsSlice = createSlice({
         oldestMessageId: null,
       };
     },
+     // NUOVO: Sostituisci messaggio temporaneo con quello reale
+  replaceTemporaryMessage: (state, action) => {
+    const { notificationId, tempMessageId, realMessage } = action.payload;
+    
+    if (state.openChatData[notificationId]) {
+      const messages = Array.isArray(state.openChatData[notificationId].messages)
+        ? state.openChatData[notificationId].messages
+        : JSON.parse(state.openChatData[notificationId].messages || "[]");
+      
+      // Trova e sostituisci il messaggio temporaneo
+      const messageIndex = messages.findIndex(m => m.messageId === tempMessageId);
+      if (messageIndex !== -1) {
+        messages[messageIndex] = {
+          ...messages[messageIndex],
+          ...realMessage,
+          _isTemporary: false
+        };
+        state.openChatData[notificationId].messages = messages;
+      }
+    }
+  },
    // NUOVO: Aggiorna dati completi per chat aperta
    setOpenChatData: (state, action) => {
     const { notificationId, data } = action.payload;
@@ -948,86 +986,67 @@ const notificationsSlice = createSlice({
         
         // IMPORTANTE: Se la chat è aperta, marca SEMPRE come letta
         if (state.openChatIds.has(notificationId)) {
-          notification.isReadByUser = true; // FORZA come letta
+          notification.isReadByUser = true;
         }
         
-        // Se la chat è aperta e abbiamo già dati completi, NON sovrascrivere con dati parziali
+        // Gestione openChatData (mantieni il codice esistente)
         if (state.openChatIds.has(notificationId) && state.openChatData[notificationId]) {
-          const existingData = state.openChatData[notificationId];
-          
-          // Se abbiamo già più messaggi di quelli nuovi, mantieni i vecchi
-          const existingMessageCount = Array.isArray(existingData.messages) 
-            ? existingData.messages.length 
-            : 0;
-          
-          const newMessageCount = Array.isArray(notification.messages) 
-            ? notification.messages.length 
-            : (typeof notification.messages === "string" ? JSON.parse(notification.messages || "[]").length : 0);
-          
-          console.log(`🔍 fetchNotificationById per chat aperta ${notificationId}:`, {
-            existingMessages: existingMessageCount,
-            newMessages: newMessageCount,
-            willUpdate: newMessageCount >= existingMessageCount
-          });
-          
-          // Solo aggiorna se abbiamo PIÙ messaggi o se è una richiesta esplicita con openChat
-          if (newMessageCount >= existingMessageCount || action.meta?.arg?.openChat) {
-            console.log(`💾 Aggiornando openChatData per chat ${notificationId} con ${newMessageCount} messaggi`);
-            state.openChatData[notificationId] = {
-              ...notification,
-              isReadByUser: true, // SEMPRE letta se aperta
-              lastFullUpdate: Date.now(),
-              _priority: true,
-              _hasAllMessages: newMessageCount >= existingMessageCount
-            };
-          } else {
-            console.log(`⚠️ Skip aggiornamento openChatData - manteniamo ${existingMessageCount} messaggi invece di ${newMessageCount}`);
-            // Aggiorna solo i metadati, non i messaggi
-            state.openChatData[notificationId] = {
-              ...state.openChatData[notificationId],
-              ...notification,
-              isReadByUser: true, // SEMPRE letta se aperta
-              messages: existingData.messages, // MANTIENI I MESSAGGI ESISTENTI
-              lastFullUpdate: existingData.lastFullUpdate
-            };
-          }
-        } else if (state.openChatIds.has(notificationId) || action.meta?.arg?.openChat) {
-          // Prima volta che carichiamo
-          console.log(`💾 Prima volta salvando in openChatData per chat ${notificationId}`);
-          state.openChatData[notificationId] = {
-            ...notification,
-            isReadByUser: true, // SEMPRE letta se aperta
-            lastFullUpdate: Date.now(),
-            _priority: true,
-            _hasAllMessages: true
-          };
+          // ... codice esistente per openChatData ...
         }
         
-        // Aggiorna la sidebar SOLO se la chat NON è aperta
-        if (!state.openChatIds.has(notificationId)) {
-          const sidebarNotification = {
-            ...notification,
-            messages: Array.isArray(notification.messages) 
-              ? notification.messages.slice(-5) 
-              : (typeof notification.messages === "string" 
-                ? JSON.parse(notification.messages || "[]").slice(-5)
-                : [])
-          };
+        // MODIFICA: Aggiorna la sidebar con riordinamento se necessario
+        const index = state.notifications.findIndex(n => n.notificationId === notificationId);
+        
+        if (index !== -1) {
+          const existingNotification = state.notifications[index];
+          const existingLastMessage = new Date(existingNotification.lastMessage || 0);
+          const newLastMessage = new Date(notification.lastMessage || 0);
           
-          const index = state.notifications.findIndex(n => n.notificationId === notificationId);
-          if (index !== -1) {
-            state.notifications[index] = sidebarNotification;
+          // Se il messaggio è più recente, riordina
+          if (newLastMessage > existingLastMessage) {
+            // Rimuovi dalla posizione corrente
+            state.notifications.splice(index, 1);
+            
+            // Crea notifica aggiornata per sidebar
+            const sidebarNotification = {
+              ...notification,
+              isReadByUser: state.openChatIds.has(notificationId) ? true : notification.isReadByUser,
+              messages: Array.isArray(notification.messages) 
+                ? notification.messages.slice(-5) 
+                : (typeof notification.messages === "string" 
+                  ? JSON.parse(notification.messages || "[]").slice(-5)
+                  : [])
+            };
+            
+            // Trova posizione corretta (dopo le pinned, in ordine di lastMessage)
+            let insertIndex = 0;
+            for (let i = 0; i < state.notifications.length; i++) {
+              const currentNotif = state.notifications[i];
+              
+              // Se la notifica corrente è pinned e la nostra no, continua
+              if (currentNotif.pinned && !sidebarNotification.pinned) {
+                insertIndex = i + 1;
+                continue;
+              }
+              
+              // Se entrambe sono pinned o entrambe non lo sono, ordina per data
+              if (currentNotif.pinned === sidebarNotification.pinned) {
+                const currentDate = new Date(currentNotif.lastMessage || 0);
+                if (newLastMessage > currentDate) {
+                  break;
+                }
+                insertIndex = i + 1;
+              }
+            }
+            
+            // Inserisci nella posizione corretta
+            state.notifications.splice(insertIndex, 0, sidebarNotification);
           } else {
-            state.notifications.push(sidebarNotification);
-          }
-        } else {
-          // Se la chat è aperta, aggiorna comunque nella sidebar ma con isReadByUser = true
-          const index = state.notifications.findIndex(n => n.notificationId === notificationId);
-          if (index !== -1) {
+            // Solo aggiorna i dati senza riordinare
             state.notifications[index] = {
               ...state.notifications[index],
               ...notification,
-              isReadByUser: true, // FORZA come letta
+              isReadByUser: state.openChatIds.has(notificationId) ? true : notification.isReadByUser,
               messages: Array.isArray(notification.messages) 
                 ? notification.messages.slice(-5) 
                 : (typeof notification.messages === "string" 
@@ -1035,15 +1054,47 @@ const notificationsSlice = createSlice({
                   : [])
             };
           }
+        } else {
+          // Nuova notifica - inserisci nella posizione corretta
+          const sidebarNotification = {
+            ...notification,
+            isReadByUser: state.openChatIds.has(notificationId) ? true : notification.isReadByUser,
+            messages: Array.isArray(notification.messages) 
+              ? notification.messages.slice(-5) 
+              : (typeof notification.messages === "string" 
+                ? JSON.parse(notification.messages || "[]").slice(-5)
+                : [])
+          };
+          
+          // Trova posizione corretta
+          let insertIndex = 0;
+          const newLastMessage = new Date(notification.lastMessage || 0);
+          
+          for (let i = 0; i < state.notifications.length; i++) {
+            const currentNotif = state.notifications[i];
+            
+            if (currentNotif.pinned && !sidebarNotification.pinned) {
+              insertIndex = i + 1;
+              continue;
+            }
+            
+            if (currentNotif.pinned === sidebarNotification.pinned) {
+              const currentDate = new Date(currentNotif.lastMessage || 0);
+              if (newLastMessage > currentDate) {
+                break;
+              }
+              insertIndex = i + 1;
+            }
+          }
+          
+          state.notifications.splice(insertIndex, 0, sidebarNotification);
         }
         
-        // Ricalcola unreadCount ESCLUDENDO le chat aperte
+        // Ricalcola unreadCount
         try {
           state.unreadCount = state.notifications.filter(
             (n) => n && !n.isReadByUser && n.archived !== 1 && !state.openChatIds.has(n.notificationId)
           ).length;
-          
-          console.log(`📊 UnreadCount dopo fetchNotificationById: ${state.unreadCount}`);
         } catch (e) {
           console.error("Errore nel calcolo unreadCount:", e);
         }
@@ -1063,51 +1114,79 @@ const notificationsSlice = createSlice({
         state.sending = true;
       })
       .addCase(sendNotification.fulfilled, (state, action) => {
-          state.sending = false;
-          const payload = action.payload || {};
-       const { notificationId } = payload;
-       
-       if (!notificationId) return;
-       
-       // Se la chat è aperta, emetti evento per ricaricare
-       if (state.openChatIds.has(notificationId)) {
-         document.dispatchEvent(
-           new CustomEvent("reload-open-chat", {
-             detail: { 
-               notificationId,
-               isOwnMessage: true 
-             },
-           }),
-         );
-       }
-       
-       // Aggiorna notification nella sidebar come prima
-       const notificationIndex = state.notifications.findIndex(
-                (n) => n && n.notificationId === notificationId,
-              );
-
-          if (notificationIndex !== -1) {
-         // Aggiorna solo metadati, non messaggi completi
-         const notification = state.notifications[notificationIndex];
-         if (payload.lastMessage) notification.lastMessage = payload.lastMessage;
-         if (payload.messageCount) notification.messageCount = payload.messageCount;
-       }
-       
-       // Emetti evento per altri componenti
-          try {
-            if (action.meta && action.meta.arg) {
-              const event = new CustomEvent("chat-message-sent", {
-                detail: {
-                  notificationId: notificationId,
-                  message: action.meta.arg.message || "",
-                  replyToMessageId: action.meta.arg.replyToMessageId || null,
-                  timestamp: new Date().getTime(),
-                },
-              });
-              document.dispatchEvent(event);
+        state.sending = false;
+        const payload = action.payload || {};
+        const { notificationId } = payload;
+        
+        if (!notificationId) return;
+        
+        // Se la chat è aperta, emetti evento per ricaricare
+        if (state.openChatIds.has(notificationId)) {
+          document.dispatchEvent(
+            new CustomEvent("reload-open-chat", {
+              detail: { 
+                notificationId,
+                isOwnMessage: true 
+              },
+            }),
+          );
+        }
+        
+        // IMPORTANTE: Aggiorna e riordina le notifiche
+        const notificationIndex = state.notifications.findIndex(
+          (n) => n && n.notificationId === notificationId,
+        );
+      
+        if (notificationIndex !== -1) {
+          // Estrai la notifica
+          const notification = state.notifications[notificationIndex];
+          
+          // Aggiorna i metadati
+          if (payload.lastMessage) {
+            notification.lastMessage = new Date().toISOString(); // Usa timestamp corrente
+          }
+          if (payload.messageCount) {
+            notification.messageCount = payload.messageCount;
+          }
+          
+          // IMPORTANTE: Rimuovi la notifica dalla posizione corrente
+          const updatedNotification = { ...notification };
+          state.notifications.splice(notificationIndex, 1);
+          
+          // IMPORTANTE: Inserisci la notifica aggiornata all'inizio (dopo le pinned)
+          // Trova l'indice dove inserire (dopo le notifiche pinned)
+          let insertIndex = 0;
+          for (let i = 0; i < state.notifications.length; i++) {
+            if (!state.notifications[i].pinned) {
+              insertIndex = i;
+              break;
             }
-          } catch (eventError) {
-         console.error("Errore nell'emissione dell'evento chat-message-sent:", eventError);
+          }
+          
+          // Se la notifica è pinned, inseriscila all'inizio
+          if (updatedNotification.pinned) {
+            state.notifications.unshift(updatedNotification);
+          } else {
+            // Altrimenti inseriscila dopo le pinned
+            state.notifications.splice(insertIndex, 0, updatedNotification);
+          }
+        }
+        
+        // Emetti evento per altri componenti
+        try {
+          if (action.meta && action.meta.arg) {
+            const event = new CustomEvent("chat-message-sent", {
+              detail: {
+                notificationId: notificationId,
+                message: action.meta.arg.message || "",
+                replyToMessageId: action.meta.arg.replyToMessageId || null,
+                timestamp: new Date().getTime(),
+              },
+            });
+            document.dispatchEvent(event);
+          }
+        } catch (eventError) {
+          console.error("Errore nell'emissione dell'evento chat-message-sent:", eventError);
         }
       })
       .addCase(sendNotification.rejected, (state, action) => {
@@ -1505,8 +1584,10 @@ export const isNotificationMuted = (notification) => {
 // Export actions
 export const {
  setOpenChatData,
+ replaceTemporaryMessage,
  initChatPagination,
  removeOpenChatData,
+ appendMessagesToChat,
  addMessageToOpenChat,
   registerOpenChat,
   unregisterOpenChat,

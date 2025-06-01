@@ -252,6 +252,8 @@ const ChatTopBar = ({
     }
   }, [isInfoVisible, activeTab, activeRecipientTab, hasLeftChat]);
 
+  
+
   // Funzione per controllare lo stato online di un utente
   const getOnlineStatus = (user) => {
     if (!user || !user.lastOnline) return "offline";
@@ -348,7 +350,10 @@ const ChatTopBar = ({
         ? prevSelected.filter((id) => id !== userId)
         : [...prevSelected, userId];
 
-      updateReceiversList(updatedList.join("-"));
+      // IMPORTANTE: Chiama updateReceiversList con la stringa aggiornata
+      if (typeof updateReceiversList === "function") {
+        updateReceiversList(updatedList.join("-"));
+      }
       return updatedList;
     });
   };
@@ -645,10 +650,12 @@ const ChatTopBar = ({
 
   return (
     <div
-      className="relative flex flex-col shadow-sm z-10"
+      className="relative flex flex-col shadow-sm"
       style={{
-        background: `${categoryColor}15`, // Colore della categoria al 15% di opacità
-        borderBottom: `1px solid ${categoryColor}40`, // Bordo leggero con colore categoria al 40%
+        background: `${categoryColor}15`,
+        borderBottom: `1px solid ${categoryColor}40`,
+        zIndex: 1000,
+        position: 'relative'
       }}
     >
       {/* Top row with responsive layout */}
@@ -1005,19 +1012,20 @@ const ChatTopBar = ({
       <AnimatePresence>
         {isInfoVisible && !hasLeftChat && (
           <motion.div
-            ref={infoDropdownRef}
-            className={`absolute ${isMobile ? "left-0 right-0 mx-2" : "right-8"} top-full mt-1 bg-white rounded-lg shadow-lg z-20 overflow-hidden`}
-            initial={{ opacity: 0, y: -10, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: "auto" }}
-            exit={{ opacity: 0, y: -10, height: 0 }}
-            transition={{ duration: 0.2 }}
-            style={{
-              boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-              border: "1px solid rgba(0,0,0,0.05)",
-              width: isMobile ? "calc(100% - 16px)" : "350px",
-              maxHeight: "85vh",
-            }}
-          >
+              ref={infoDropdownRef}
+              className={`absolute ${isMobile ? "left-0 right-0 mx-2" : "right-8"} top-full mt-1 bg-white rounded-lg shadow-lg overflow-hidden`}
+              initial={{ opacity: 0, y: -10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{
+                boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                border: "1px solid rgba(0,0,0,0.05)",
+                width: isMobile ? "calc(100% - 16px)" : "350px",
+                maxHeight: "85vh",
+                zIndex: 1050 // IMPORTANTE: Aggiungi z-index alto per essere sopra altri elementi
+              }}
+            >
             {/* Tabs bar for navigation */}
             <div className="flex border-b">
               <button

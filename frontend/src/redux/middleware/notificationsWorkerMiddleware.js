@@ -508,8 +508,40 @@ const notificationsWorkerMiddleware = (store) => {
       initWorker();
     }
 
-    // NUOVO: Gestisci le azioni per tracciare le chat aperte/chiuse
-    if (action.type === "notifications/registerOpenChat") {
+    if (action.type === "notifications/sendNotification/fulfilled") {
+      const result = next(action);
+      
+      // Forza un refresh ad alta priorità dopo l'invio del messaggio
+      if (worker && isWorkerInitialized && action.payload?.notificationId) {
+        // Ottieni l'userId
+        let userId = null;
+        try {
+          const userStr = localStorage.getItem("user");
+          if (userStr) {
+            const userData = JSON.parse(userStr);
+            userId = userData.userId || userData.UserId || userData.id || userData.ID;
+          }
+        } catch (e) {
+          console.error("Error getting userId for reload:", e);
+        }
+
+        setTimeout(() => {
+          worker.postMessage({
+            type: "reload",
+            data: {
+              token: localStorage.getItem("token"),
+              apiBaseUrl: config.API_BASE_URL,
+              highPriority: true,
+              userId: userId,
+            },
+          });
+        }, 100);
+      }
+      
+      return result;
+    }
+
+    else if (action.type === "notifications/registerOpenChat") {
       const result = next(action);
       updateWorkerOpenChats();
       return result;
