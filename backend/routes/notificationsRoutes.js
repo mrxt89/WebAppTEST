@@ -47,6 +47,7 @@ const { getNotifications
         , getBatchReactions
         , getBatchPolls
         , removeUserFromChat
+        , getChatParticipants
       } = require('../queries/notificationsManagement');
 
 const {
@@ -1621,6 +1622,34 @@ router.post('/remove-user-from-chat', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Error removing user from chat:', err);
     res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+router.get('/notifications/:notificationId/participants', authenticateToken, async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    const userId = req.user.UserId;
+    
+    if (!notificationId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'NotificationId è obbligatorio' 
+      });
+    }
+    
+    const participants = await getChatParticipants(parseInt(notificationId), userId);
+    
+    res.json({
+      success: true,
+      participants,
+      count: participants.length
+    });
+  } catch (err) {
+    console.error('Error fetching chat participants:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Errore nel recupero dei partecipanti' 
+    });
   }
 });
 

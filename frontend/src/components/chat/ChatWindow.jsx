@@ -67,6 +67,7 @@ const ChatWindow = ({
     loadInitialData,
     loadMore,
     refreshData,
+    refreshParticipants,
     sendMessage,
     markAsInteracted,
     getCurrentUser,

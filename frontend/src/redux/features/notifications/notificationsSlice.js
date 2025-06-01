@@ -3,7 +3,7 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { enableMapSet } from "immer";
 import axios from "axios";
 import { config } from "../../../config";
-import { removeUserFromChat } from "./notificationsActions";
+import { removeUserFromChat, fetchChatParticipants } from "./notificationsActions";
 
 // Abilita il supporto per Map e Set in Immer
 enableMapSet();
@@ -914,6 +914,22 @@ const notificationsSlice = createSlice({
           state.chatPagination[notificationId].isLoadingMore = true;
         }
       })
+      .addCase(fetchChatParticipants.fulfilled, (state, action) => {
+        const { notificationId, participants } = action.payload;
+        
+        // Aggiorna openChatData se esiste
+        if (state.openChatData[notificationId]) {
+          state.openChatData[notificationId].membersInfo = participants;
+          state.openChatData[notificationId].participantsLastUpdate = Date.now();
+        }
+        
+        // Aggiorna anche la notifica nella lista se esiste
+        const notification = state.notifications.find(n => n.notificationId === notificationId);
+        if (notification) {
+          notification.membersInfo = participants;
+        }
+      })
+      
       .addCase(loadMoreMessages.fulfilled, (state, action) => {
         const { notificationId, newMessages, hasMoreMessages } = action.payload;
         

@@ -88,6 +88,35 @@ export const loadMoreMessages = createAsyncThunk(
   },
 );
 
+export const fetchChatParticipants = createAsyncThunk(
+  "notifications/fetchChatParticipants",
+  async (notificationId, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return rejectWithValue("No token available");
+
+      const response = await axios.get(
+        `${config.API_BASE_URL}/notifications/${notificationId}/participants`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!response.data) {
+        return rejectWithValue("No data received");
+      }
+
+      return {
+        notificationId,
+        participants: response.data
+      };
+    } catch (error) {
+      console.error("Error fetching chat participants:", error);
+      return rejectWithValue(error.message || "Failed to fetch chat participants");
+    }
+  }
+);
+
 export const batchFetchNotificationAttachments = createAsyncThunk(
   "notifications/batchFetchAttachments",
   async (notificationIds, { dispatch }) => {

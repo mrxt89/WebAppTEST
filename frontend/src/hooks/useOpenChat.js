@@ -29,7 +29,8 @@ import {
   removeUserFromChat,
   uploadNotificationAttachment,
   fetchNotificationAttachments,
-  refreshAttachments
+  refreshAttachments,
+  fetchChatParticipants
 } from '@/redux/features/notifications/notificationsActions';
 import notificationService from '@/services/notifications/NotificationService';
 import { config } from '@/config';
@@ -74,11 +75,66 @@ export const useOpenChat = (notificationId, options = {}) => {
   
   // Parse dei membri
   const membersInfo = useMemo(() => {
+    console.log("useOpenChat - Membri:", chatData?.membersInfo);
     if (!chatData?.membersInfo) return [];
-    return Array.isArray(chatData.membersInfo)
-      ? chatData.membersInfo
-      : JSON.parse(chatData.membersInfo || "[]");
+    
+    // Se è già un array, usalo direttamente
+    if (Array.isArray(chatData.membersInfo)) {
+      return chatData.membersInfo;
+    }
+    
+    // Se è un oggetto con participants, usa quello
+    if (chatData.membersInfo?.participants) {
+      return chatData.membersInfo.participants;
+    }
+    
+    // Se è una stringa, prova a fare il parse
+    if (typeof chatData.membersInfo === 'string') {
+      try {
+        const parsed = JSON.parse(chatData.membersInfo);
+        return parsed.participants || parsed;
+      } catch (e) {
+        console.error('Error parsing membersInfo:', e);
+        return [];
+      }
+    }
+    
+    return [];
   }, [chatData?.membersInfo]);
+
+  // Refresh dei partecipanti
+  const refreshParticipants = useCallback(async () => {
+    if (!notificationId) return;
+    
+    try {
+      const result = await dispatch(fetchChatParticipants(notificationId)).unwrap();
+      console.log("useOpenChat - Aggiornamento partecipanti:", result);
+      if (result && result.participants) {
+        // I dati vengono automaticamente aggiornati nello store
+        return result.participants;
+      }
+    } catch (error) {
+      console.error('Error refreshing participants:', error);
+      return null;
+    }
+  }, [dispatch, notificationId]);
+
+  useEffect(() => {
+    const handleParticipantsUpdate = (event) => {
+      const { notificationId: eventNotificationId } = event.detail;
+      
+      if (parseInt(eventNotificationId) === parseInt(notificationId)) {
+        console.log(`[useOpenChat] Aggiornamento partecipanti richiesto per chat ${notificationId}`);
+        refreshParticipants();
+      }
+    };
+    
+    document.addEventListener('chat-participants-update', handleParticipantsUpdate);
+    
+    return () => {
+      document.removeEventListener('chat-participants-update', handleParticipantsUpdate);
+    };
+  }, [notificationId, refreshParticipants]);
   
   // Calcola info sui messaggi
   const messageStats = useMemo(() => {
@@ -552,7 +608,8 @@ export const useOpenChat = (notificationId, options = {}) => {
     membersInfo,
     messageStats,
     hasFullData,
-    
+    refreshParticipants,
+
     // Stati nuovi messaggi
     hasNewMessages,
     newMessagesStartIndex,
