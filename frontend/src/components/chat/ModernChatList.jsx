@@ -5,36 +5,56 @@ import React, {
   useState,
   useCallback,
   useMemo,
-} from "react";
-import { cn } from "@/lib/utils";
-import { debounce } from "lodash";
-import "@/styles/ModernChatList.css";
-import {
+  memo,
+ } from "react";
+ import { cn } from "@/lib/utils";
+ import { debounce } from "lodash";
+ import "@/styles/ModernChatList.css";
+ import {
   ArrowBigDown,
   ChevronUp,
   ChevronDown,
   Loader2,
   Reply,
-} from "lucide-react";
-import FileViewer from "@/components/ui/fileViewer";
-import { swal } from "@/lib/common";
-import { motion, AnimatePresence } from "framer-motion";
-import { format, isToday, isYesterday } from "date-fns";
-import { it } from "date-fns/locale";
-import Modal from "react-modal";
-import EditMessageModal from "./EditMessageModal";
-import VersionHistoryModal from "./VersionHistoryModal";
-import ChatMessage from "./ChatMessage";
-import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import { useSelector, useDispatch } from "react-redux";
-import { selectOpenChatData } from "@/redux/features/notifications/notificationsSlice";
-import { loadMoreMessages } from "@/redux/features/notifications/notificationsActions";
-import axios from 'axios';
-import { config } from '@/config';
-
-Modal.setAppElement("#root");
-
-const ModernChatList = ({
+ } from "lucide-react";
+ import FileViewer from "@/components/ui/fileViewer";
+ import { swal } from "@/lib/common";
+ import { motion, AnimatePresence } from "framer-motion";
+ import { format, isToday, isYesterday } from "date-fns";
+ import { it } from "date-fns/locale";
+ import Modal from "react-modal";
+ import EditMessageModal from "./EditMessageModal";
+ import VersionHistoryModal from "./VersionHistoryModal";
+ import ChatMessage from "./ChatMessage";
+ import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
+ import { useSelector, useDispatch } from "react-redux";
+ import { selectOpenChatData } from "@/redux/features/notifications/notificationsSlice";
+ import { loadMoreMessages } from "@/redux/features/notifications/notificationsActions";
+ import axios from 'axios';
+ import { config } from '@/config';
+ 
+ Modal.setAppElement("#root");
+ 
+ // Componente per il divisore dei messaggi non letti
+ const UnreadMessagesDivider = memo(({ count, subtle = false, onClick }) => (
+  <div 
+    className={`new-messages-divider ${subtle ? 'subtle' : ''}`}
+    onClick={onClick}
+    style={{ cursor: 'pointer' }}
+  >
+    <div className="new-messages-divider-content">
+      <span className="pulse-dot" />
+      <span>
+        {count === 1 
+          ? '1 messaggio non letto' 
+          : `${count} messaggi non letti`
+        }
+      </span>
+    </div>
+  </div>
+ ));
+ 
+ const ModernChatList = ({
   messages = [],
   notificationId,
   chatListRef,
@@ -48,19 +68,19 @@ const ModernChatList = ({
   hasNewMessages,
   newMessagesStartIndex,
   onMarkAsInteracted,
-}) => {
+ }) => {
   const dispatch = useDispatch();
   
   // IMPORTANTE: Ottieni lo stato della paginazione da Redux
   const chatPagination = useSelector(state => 
     state.notifications.chatPagination[notificationId] || {}
   );
-
+ 
   // Ottieni dati completi da openChatData
   const openChatData = useSelector(state => 
     selectOpenChatData(state, parseInt(notificationId))
   );
-
+ 
   // Hook per funzionalità notifiche
   const {
     editMessage,
@@ -69,7 +89,7 @@ const ModernChatList = ({
     fetchNotificationById,
     toggleReadUnread,
   } = useNotifications();
-
+ 
   // Stati locali
   const [selectedFile, setSelectedFile] = useState(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -85,7 +105,12 @@ const ModernChatList = ({
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [messageReactionsCache, setMessageReactionsCache] = useState({});
   const [localHasNewMessages, setLocalHasNewMessages] = useState(false);
-
+  
+  // Stati per il divisore dei messaggi non letti
+  const [unreadMessagesDividerIndex, setUnreadMessagesDividerIndex] = useState(null);
+  const [showUnreadDivider, setShowUnreadDivider] = useState(false);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+ 
   // Refs
   const messagesEndRef = useRef(null);
   const scrollingToBottomRef = useRef(false);
@@ -97,12 +122,12 @@ const ModernChatList = ({
   const lastMessageCountRef = useRef(messages.length);
   const previousMessagesRef = useRef([]);
   const lastVisibleMessageRef = useRef(null);
-
+ 
   // Calcola il conteggio totale dei messaggi
   const totalMessageCount = useMemo(() => {
     return openChatData?.totalMessageCount || openChatData?.messageCount || messages.length;
   }, [openChatData, messages.length]);
-
+ 
   // Funzione per caricare più messaggi
   const handleLoadMoreMessages = useCallback(() => {
     const pagination = chatPagination || {};
@@ -166,7 +191,70 @@ const ModernChatList = ({
       pageSize: 25
     }));
   }, [dispatch, notificationId, chatPagination, messages, totalMessageCount]);
-
+ 
+  // Effetto per gestire il divisore dei messaggi non letti
+  useEffect(() => {
+    if (!notificationId || !messages || messages.length === 0) return;
+    
+    // Recupera l'ultimo messaggio letto dal localStorage
+    const lastRead = localStorage.getItem(`lastReadMessage_${notificationId}`);
+    if (!lastRead) {
+      // Se non c'è, salva l'ultimo messaggio come letto
+      if (messages.length > 0) {
+        const lastMessage = messages[messages.length - 1];
+        if (!lastMessage._isTemporary) {
+          localStorage.setItem(`lastReadMessage_${notificationId}`, lastMessage.messageId);
+        }
+      }
+      return;
+    }
+    
+    // Trova i messaggi non letti
+    const lastReadIndex = messages.findIndex(msg => msg.messageId === parseInt(lastRead));
+    if (lastReadIndex === -1 || lastReadIndex === messages.length - 1) {
+      setShowUnreadDivider(false);
+      return;
+    }
+    
+    // Calcola quanti messaggi non letti ci sono (escludi i propri)
+    const unreadMessages = messages.slice(lastReadIndex + 1).filter(msg => 
+      msg.selectedUser !== "1" && 
+      !msg._isTemporary && 
+      msg.senderId !== currentUserId
+    );
+    
+    if (unreadMessages.length > 0) {
+      setUnreadMessagesDividerIndex(lastReadIndex + 1);
+      setUnreadMessagesCount(unreadMessages.length);
+      setShowUnreadDivider(true);
+    } else {
+      setShowUnreadDivider(false);
+    }
+  }, [messages, notificationId, currentUserId]);
+ 
+  // Gestione click sul divisore per scrollare ai messaggi non letti
+  const handleDividerClick = useCallback(() => {
+    if (unreadMessagesDividerIndex !== null && chatListRef.current) {
+      const firstUnreadMessage = document.getElementById(`message-${messages[unreadMessagesDividerIndex]?.messageId}`);
+      if (firstUnreadMessage) {
+        firstUnreadMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Aggiungi timer di 10 secondi prima di far scomparire il divisore
+        setTimeout(() => {
+          const divider = document.querySelector('.new-messages-divider');
+          if (divider) {
+            divider.classList.add('fade-out');
+            setTimeout(() => {
+              setShowUnreadDivider(false);
+              setUnreadMessagesDividerIndex(null);
+              setUnreadMessagesCount(0);
+            }, 300);
+          }
+        }, 10000); // 10 secondi
+      }
+    }
+  }, [unreadMessagesDividerIndex, messages]);
+ 
   // Mantieni la posizione dello scroll dopo il caricamento di nuovi messaggi
   useEffect(() => {
     // Salva l'altezza dello scroll prima di aggiungere nuovi messaggi
@@ -183,7 +271,7 @@ const ModernChatList = ({
       }
     }
   }, [messages.length, chatPagination.isLoadingMore]);
-
+ 
   // Debug per verificare lo stato della paginazione
   useEffect(() => {
     console.log('📊 ModernChatList - Stato paginazione dettagliato:', {
@@ -197,7 +285,7 @@ const ModernChatList = ({
       shouldLoadMore: chatPagination?.hasMoreMessages && !chatPagination?.isLoadingMore
     });
   }, [chatPagination, notificationId, messages.length, totalMessageCount]);
-
+ 
   // Funzione per salvare l'ultimo messaggio visibile
   const saveLastVisibleMessage = useCallback(() => {
     if (!chatListRef.current) return;
@@ -215,7 +303,7 @@ const ModernChatList = ({
       }
     }
   }, []);
-
+ 
   // Funzione per ripristinare la posizione dello scroll
   const restoreScrollPosition = useCallback(() => {
     if (!chatListRef.current || !lastVisibleMessageRef.current) return;
@@ -225,24 +313,22 @@ const ModernChatList = ({
       messageElement.scrollIntoView({ block: 'center', behavior: 'auto' });
     }
   }, []);
-
+ 
   // Observer per tracciare i messaggi visibili
   useEffect(() => {
     if (!chatListRef?.current) return;
-
+ 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           const messageId = entry.target.id.replace("message-", "");
-
+ 
           if (entry.isIntersecting) {
             visibleMessagesRef.current.add(parseInt(messageId));
           } else {
             visibleMessagesRef.current.delete(parseInt(messageId));
           }
         });
-
-        
       },
       {
         root: chatListRef.current,
@@ -250,29 +336,29 @@ const ModernChatList = ({
         threshold: 0.1,
       },
     );
-
+ 
     document.querySelectorAll('[id^="message-"]').forEach((element) => {
       observer.observe(element);
     });
-
+ 
     return () => {
       observer.disconnect();
     };
   }, [chatListRef.current, messages]);
-
+ 
   // Funzione per pianificare il caricamento delle reazioni in batch
   const scheduleReactionsFetch = useCallback(
     debounce(() => {
       if (visibleMessagesRef.current.size === 0) return;
-
+ 
       const messageIds = Array.from(visibleMessagesRef.current).filter(
         (id) =>
           !messageReactionsCache[id] &&
           !pendingReactionsRequestsRef.current[id],
       );
-
+ 
       if (messageIds.length === 0) return;
-
+ 
       for (let i = 0; i < messageIds.length; i += reactionBatchSize) {
         const batch = messageIds.slice(i, i + reactionBatchSize);
         batchLoadReactions(batch);
@@ -280,7 +366,7 @@ const ModernChatList = ({
     }, 5000), // 5 secondi
     [messageReactionsCache],
   );
-
+ 
   // Carica le reazioni in batch
   const batchLoadReactions = useCallback(
     async (messageIds) => {
@@ -398,7 +484,7 @@ const ModernChatList = ({
     },
     [getMessageReactions],
   );
-
+ 
   // Ottieni le reazioni per un messaggio specifico
   const getReactionsForMessage = useCallback(
     (messageId) => {
@@ -409,32 +495,32 @@ const ModernChatList = ({
     },
     [messageReactionsCache],
   );
-
+ 
   // Ascolta gli eventi di aggiornamento reazioni
   useEffect(() => {
     const handleMessageReactionUpdated = (event) => {
       const { messageId } = event.detail || {};
-
+ 
       if (messageId) {
         fetchedReactionsRef.current.delete(messageId);
         delete pendingReactionsRequestsRef.current[messageId];
-
+ 
         setMessageReactionsCache((prevCache) => {
           const newCache = { ...prevCache };
           delete newCache[messageId];
           return newCache;
         });
-
+ 
         visibleMessagesRef.current.add(parseInt(messageId));
         scheduleReactionsFetch();
       }
     };
-
+ 
     document.addEventListener(
       "message-reaction-updated",
       handleMessageReactionUpdated,
     );
-
+ 
     return () => {
       document.removeEventListener(
         "message-reaction-updated",
@@ -442,24 +528,24 @@ const ModernChatList = ({
       );
     };
   }, [scheduleReactionsFetch]);
-
+ 
   // Aggiornamento periodico delle reazioni per i messaggi visibili
   useEffect(() => {
     if (!notificationId || hasLeftChat) return;
-
+ 
     const refreshVisibleReactions = async () => {
       const visibleIds = Array.from(visibleMessagesRef.current);
       if (visibleIds.length === 0) return;
-
+ 
       visibleIds.forEach((id) => {
         fetchedReactionsRef.current.delete(id);
         delete pendingReactionsRequestsRef.current[id];
       });
-
+ 
       try {
         const token = localStorage.getItem("token");
         if (!token) return;
-
+ 
         const response = await axios.post(
           `${config.API_BASE_URL}/messages/batch-reactions`,
           {
@@ -468,10 +554,10 @@ const ModernChatList = ({
           },
           { headers: { Authorization: `Bearer ${token}` } },
         );
-
+ 
         if (response.data && response.data.success) {
           const freshReactions = response.data.reactions || {};
-
+ 
           setMessageReactionsCache((prev) => ({
             ...prev,
             ...freshReactions,
@@ -481,18 +567,29 @@ const ModernChatList = ({
         console.error("Error refreshing reactions:", error);
       }
     };
-
+ 
     refreshVisibleReactions();
     const intervalId = setInterval(refreshVisibleReactions, 5000);
-
+ 
     return () => clearInterval(intervalId);
   }, [notificationId, hasLeftChat, currentUserId]);
-
+ 
   // Effetto per gestire i nuovi messaggi
   useEffect(() => {
     if (messages.length > previousMessagesRef.current.length) {
-      setLocalHasNewMessages(true);
+      const newMessages = messages.slice(previousMessagesRef.current.length);
+      const hasOtherUserMessages = newMessages.some(msg => 
+        msg.selectedUser !== "1" && 
+        !msg._isTemporary && 
+        msg.senderId !== currentUserId
+      );
       
+      // Mostra nuovi messaggi solo se NON sono tutti nostri
+      if (hasOtherUserMessages) {
+        setLocalHasNewMessages(true);
+      }
+      
+      // Auto-scroll solo se non ha scrollato manualmente
       if (!userHasScrolledRef.current) {
         scrollingToBottomRef.current = true;
         setTimeout(() => {
@@ -507,18 +604,18 @@ const ModernChatList = ({
     }
     
     previousMessagesRef.current = messages;
-  }, [messages]);
-
+  }, [messages, currentUserId]);
+ 
   // Gestione scroll
   useEffect(() => {
     if (!chatListRef.current) return;
-
+ 
     const handleScroll = () => {
       if (scrollingToBottomRef.current) return;
-
+ 
       const { scrollTop, scrollHeight, clientHeight } = chatListRef.current;
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-
+ 
       if (distanceFromBottom > 100) {
         userHasScrolledRef.current = true;
         setUserHasScrolled(true);
@@ -528,6 +625,27 @@ const ModernChatList = ({
         setUserHasScrolled(false);
         setShowScrollButton(false);
         setLocalHasNewMessages(false);
+        
+        // IMPORTANTE: Quando arriviamo in fondo, aggiorna l'ultimo messaggio letto
+        if (messages.length > 0 && showUnreadDivider) {
+          const lastMessage = messages[messages.length - 1];
+          if (!lastMessage._isTemporary) {
+            localStorage.setItem(`lastReadMessage_${notificationId}`, lastMessage.messageId);
+            
+            // Aggiungi timer di 10 secondi prima di far scomparire il divisore
+            setTimeout(() => {
+              const divider = document.querySelector('.new-messages-divider');
+              if (divider) {
+                divider.classList.add('fade-out');
+                setTimeout(() => {
+                  setShowUnreadDivider(false);
+                  setUnreadMessagesDividerIndex(null);
+                  setUnreadMessagesCount(0);
+                }, 300);
+              }
+            }, 10000); // 10 secondi
+          }
+        }
         
         // Marca come interagito quando arriviamo in fondo
         if (onMarkAsInteracted && (hasNewMessages || localHasNewMessages)) {
@@ -540,7 +658,7 @@ const ModernChatList = ({
         }
       }
     };
-
+ 
     const handleWheel = (e) => {
       if (e.deltaY < 0) {
         userHasScrolledRef.current = true;
@@ -548,18 +666,18 @@ const ModernChatList = ({
         setShowScrollButton(true);
       }
     };
-
+ 
     chatListRef.current.addEventListener("scroll", handleScroll, { passive: true });
     chatListRef.current.addEventListener("wheel", handleWheel, { passive: true });
-
+ 
     return () => {
       if (chatListRef.current) {
         chatListRef.current.removeEventListener("scroll", handleScroll);
         chatListRef.current.removeEventListener("wheel", handleWheel);
       }
     };
-  }, [hasNewMessages, localHasNewMessages, onMarkAsInteracted, notificationId, toggleReadUnread]);
-
+  }, [hasNewMessages, localHasNewMessages, onMarkAsInteracted, notificationId, toggleReadUnread, showUnreadDivider, messages]);
+ 
   // Scroll iniziale
   useEffect(() => {
     if (messages.length > 0 && !initialScrollDone && chatListRef.current) {
@@ -571,7 +689,7 @@ const ModernChatList = ({
       }, 100);
     }
   }, [messages.length, initialScrollDone]);
-
+ 
   // Auto-scroll per nuovi messaggi
   useEffect(() => {
     if (messages.length > 0) {
@@ -607,7 +725,7 @@ const ModernChatList = ({
       }
     }
   }, [hasNewMessages, localHasNewMessages, messages, currentUserId]);
-
+ 
   // Listener per chat-message-sent
   useEffect(() => {
     const handleMessageSent = (event) => {
@@ -621,6 +739,14 @@ const ModernChatList = ({
         setShowScrollButton(false);
         setLocalHasNewMessages(false);
         
+        // Aggiorna l'ultimo messaggio letto
+        if (messages.length > 0) {
+          const lastMessage = messages[messages.length - 1];
+          if (!lastMessage._isTemporary) {
+            localStorage.setItem(`lastReadMessage_${notificationId}`, lastMessage.messageId);
+          }
+        }
+        
         setTimeout(() => {
           if (chatListRef.current) {
             chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
@@ -631,14 +757,14 @@ const ModernChatList = ({
         }, 100);
       }
     };
-
+ 
     document.addEventListener("chat-message-sent", handleMessageSent);
     
     return () => {
       document.removeEventListener("chat-message-sent", handleMessageSent);
     };
-  }, [notificationId]);
-
+  }, [notificationId, messages]);
+ 
   // Listener per reload-open-chat
   useEffect(() => {
     const handleReloadOpenChat = async (event) => {
@@ -648,10 +774,9 @@ const ModernChatList = ({
         console.log(`Ricaricamento chat per: ${reason}`);
         
         // Salva la posizione corrente prima dell'aggiornamento
-        console.log("ModernChatList - fetchNotificationById:", fetchNotificationById);
         saveLastVisibleMessage();
         
-        // IMPORTANTE: Forza il ricaricamento dei dati
+        // Forza il ricaricamento dei dati
         if (fetchNotificationById) {
           try {
             console.log(`📥 ModernChatList: Ricaricando dati per ${reason}...`);
@@ -680,14 +805,14 @@ const ModernChatList = ({
         }
       }
     };
-  
+ 
     document.addEventListener("reload-open-chat", handleReloadOpenChat);
     
     return () => {
       document.removeEventListener("reload-open-chat", handleReloadOpenChat);
     };
   }, [notificationId, saveLastVisibleMessage, restoreScrollPosition, fetchNotificationById]);
-
+ 
   // Listener per new-message-received
   useEffect(() => {
     const handleNewMessage = async (event) => {
@@ -707,16 +832,16 @@ const ModernChatList = ({
         }
       }
     };
-
+ 
     document.addEventListener("new-message-received", handleNewMessage);
     
     return () => {
       document.removeEventListener("new-message-received", handleNewMessage);
     };
   }, [notificationId, fetchNotificationById]);
-
+ 
   useEffect(() => {
-    const handleOpenChatNewMessage = (event) => {
+    const handleOpenChatNewMessage = async (event) => {
       const { notificationId: eventNotificationId } = event.detail;
       
       if (parseInt(eventNotificationId) === parseInt(notificationId)) {
@@ -725,9 +850,13 @@ const ModernChatList = ({
         // Salva la posizione corrente
         saveLastVisibleMessage();
         
-        // Forza il refresh dei dati
+        // IMPORTANTE: Forza il refresh dei dati
         if (fetchNotificationById) {
-          fetchNotificationById(notificationId, true).then(() => {
+          try {
+            console.log(`📥 ModernChatList: Caricando nuovo messaggio...`);
+            await fetchNotificationById(parseInt(notificationId), true);
+            console.log(`✅ ModernChatList: Nuovo messaggio caricato`);
+            
             // Se l'utente non ha scrollato, vai in fondo
             if (!userHasScrolledRef.current) {
               setTimeout(() => {
@@ -739,7 +868,9 @@ const ModernChatList = ({
               // Altrimenti mostra l'indicatore di nuovi messaggi
               setLocalHasNewMessages(true);
             }
-          });
+          } catch (error) {
+            console.error('Errore nel caricamento del nuovo messaggio:', error);
+          }
         }
       }
     };
@@ -750,39 +881,7 @@ const ModernChatList = ({
       document.removeEventListener("open-chat-new-message", handleOpenChatNewMessage);
     };
   }, [notificationId, fetchNotificationById, saveLastVisibleMessage]);
-
-  // Effetto per gestire i nuovi messaggi
-useEffect(() => {
-  if (messages.length > previousMessagesRef.current.length) {
-    const newMessages = messages.slice(previousMessagesRef.current.length);
-    const hasOtherUserMessages = newMessages.some(msg => 
-      msg.selectedUser !== "1" && 
-      !msg._isTemporary && 
-      msg.senderId !== currentUserId
-    );
-    
-    // Mostra nuovi messaggi solo se NON sono tutti nostri
-    if (hasOtherUserMessages) {
-      setLocalHasNewMessages(true);
-    }
-    
-    // Auto-scroll solo se non ha scrollato manualmente
-    if (!userHasScrolledRef.current) {
-      scrollingToBottomRef.current = true;
-      setTimeout(() => {
-        if (chatListRef.current) {
-          chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
-          setTimeout(() => {
-            scrollingToBottomRef.current = false;
-          }, 500);
-        }
-      }, 100);
-    }
-  }
-  
-  previousMessagesRef.current = messages;
-}, [messages, currentUserId]);
-
+ 
   // Gestione filtri
   useEffect(() => {
     const handleFilterApplied = (event) => {
@@ -793,34 +892,34 @@ useEffect(() => {
         setCurrentHighlightedIndex(0);
       }
     };
-
+ 
     const handleFilterReset = () => {
       setHighlightedMessageIds(new Set());
       setIsHighlightActive(false);
       setCurrentHighlightedIndex(0);
     };
-
+ 
     const handleSearchResultSelected = (event) => {
       const { messageId } = event.detail;
-
+ 
       if (messageId && chatListRef.current) {
         const messageElement = document.getElementById(`message-${messageId}`);
-
+ 
         if (messageElement) {
           const containerRect = chatListRef.current.getBoundingClientRect();
           const messageRect = messageElement.getBoundingClientRect();
-
+ 
           const scrollTop =
             messageRect.top -
             containerRect.top +
             chatListRef.current.scrollTop -
             80;
-
+ 
           chatListRef.current.scrollTo({
             top: scrollTop,
             behavior: "smooth",
           });
-
+ 
           messageElement.classList.add("current-highlight");
           setTimeout(() => {
             messageElement.classList.remove("current-highlight");
@@ -828,38 +927,38 @@ useEffect(() => {
         }
       }
     };
-
+ 
     document.addEventListener("chat-filter-applied", handleFilterApplied);
     document.addEventListener("chat-reset-filters", handleFilterReset);
     document.addEventListener("chat-search-result-selected", handleSearchResultSelected);
-
+ 
     return () => {
       document.removeEventListener("chat-filter-applied", handleFilterApplied);
       document.removeEventListener("chat-reset-filters", handleFilterReset);
       document.removeEventListener("chat-search-result-selected", handleSearchResultSelected);
     };
   }, []);
-
+ 
   // Funzione per scrollare a un messaggio specifico (per le risposte)
   const scrollToMessage = useCallback((targetMessageId) => {
     if (!chatListRef.current) return;
-
+ 
     const messageElement = document.getElementById(`message-${targetMessageId}`);
     if (messageElement) {
       const containerRect = chatListRef.current.getBoundingClientRect();
       const messageRect = messageElement.getBoundingClientRect();
-
+ 
       const scrollTop =
         messageRect.top -
         containerRect.top +
         chatListRef.current.scrollTop -
         80;
-
+ 
       chatListRef.current.scrollTo({
         top: scrollTop,
         behavior: "smooth",
       });
-
+ 
       // Evidenzia il messaggio temporaneamente
       messageElement.classList.add("highlight-reply-target");
       setTimeout(() => {
@@ -867,7 +966,7 @@ useEffect(() => {
       }, 2000);
     }
   }, []);
-
+ 
   // Handler funzioni
   const handleScrollToBottom = useCallback(() => {
     if (chatListRef.current) {
@@ -877,6 +976,17 @@ useEffect(() => {
       setShowScrollButton(false);
       setLocalHasNewMessages(false);
       
+      // Aggiorna l'ultimo messaggio letto
+      if (messages.length > 0) {
+        const lastMessage = messages[messages.length - 1];
+        if (!lastMessage._isTemporary) {
+          localStorage.setItem(`lastReadMessage_${notificationId}`, lastMessage.messageId);
+          setShowUnreadDivider(false);
+          setUnreadMessagesDividerIndex(null);
+          setUnreadMessagesCount(0);
+        }
+      }
+      
       if (onMarkAsInteracted && (hasNewMessages || localHasNewMessages)) {
         onMarkAsInteracted();
       }
@@ -885,8 +995,8 @@ useEffect(() => {
         scrollingToBottomRef.current = false;
       }, 500);
     }
-  }, [hasNewMessages, localHasNewMessages, onMarkAsInteracted]);
-
+  }, [hasNewMessages, localHasNewMessages, onMarkAsInteracted, messages, notificationId]);
+ 
   const handleOpenEditModal = useCallback((messageId, messageText) => {
     const messageToEdit = messages.find(m => m.messageId === messageId);
     if (messageToEdit) {
@@ -894,12 +1004,12 @@ useEffect(() => {
       setShowEditModal(true);
     }
   }, [messages]);
-
+ 
   const handleMessageEdited = useCallback((notificationId) => {
     setShowEditModal(false);
     // Il messaggio è già stato aggiornato tramite Redux
   }, []);
-
+ 
   const handleViewVersionHistory = useCallback(async (messageId) => {
     setLoadingVersions(true);
     try {
@@ -918,11 +1028,11 @@ useEffect(() => {
       setLoadingVersions(false);
     }
   }, [getMessageVersionHistory]);
-
+ 
   const handleMessageSelect = useCallback((messageId, messageText) => {
     console.log('Message selected:', messageId, messageText);
   }, []);
-
+ 
   // Raggruppa messaggi per data
   const groupMessagesByDate = useCallback((messages) => {
     if (!Array.isArray(messages)) return {};
@@ -946,41 +1056,19 @@ useEffect(() => {
     
     return groups;
   }, []);
-
+ 
   const renderDateSeparator = (date) => (
     <div className="chat-date-separator sticky top-0 z-10 bg-white/80 backdrop-blur-sm">
       <span>{date}</span>
     </div>
   );
-
-  // Calcola se mostrare l'indicatore di nuovi messaggi
-  const shouldShowNewIndicator = useCallback((message, index) => {
-    // Non mostrare mai l'indicatore per i propri messaggi
-    const isOwnMessage = message.selectedUser == "1" || 
-                        message._isTemporary === true ||
-                        message.senderId == currentUserId;
-    
-    if (isOwnMessage) return false;
-    
-    // Verifica che ci siano effettivamente nuovi messaggi da altri utenti
-    const newMessagesFromOthers = messages.slice(newMessagesStartIndex || 0).filter(msg => 
-      msg.selectedUser !== "1" && 
-      !msg._isTemporary && 
-      msg.senderId !== currentUserId
-    );
-    
-    // Mostra solo se ci sono nuovi messaggi da altri e questo è il primo
-    return (hasNewMessages || localHasNewMessages) && 
-           newMessagesFromOthers.length > 0 && 
-           index === newMessagesStartIndex;
-  }, [hasNewMessages, localHasNewMessages, newMessagesStartIndex, currentUserId, messages]);
-
+ 
   // Trova il messaggio originale per una risposta
   const findOriginalMessage = useCallback((replyToMessageId) => {
     if (!replyToMessageId) return null;
     return messages.find(msg => msg.messageId === replyToMessageId);
   }, [messages]);
-
+ 
   return (
     <div className="flex-1 flex flex-col relative h-full">
       {/* Barra di navigazione filtri */}
@@ -990,7 +1078,7 @@ useEffect(() => {
             <span className="font-medium">
               {highlightedMessageIds.size} messaggi trovati
             </span>
-
+ 
             {highlightedMessageIds.size > 0 && (
               <div className="flex items-center gap-2">
                 <button
@@ -1026,7 +1114,7 @@ useEffect(() => {
                 </button>
               </div>
             )}
-
+ 
             <button
               onClick={() => {
                 document.dispatchEvent(new CustomEvent("chat-reset-filters"));
@@ -1038,7 +1126,7 @@ useEffect(() => {
           </div>
         </div>
       )}
-
+ 
       {/* Lista messaggi */}
       <div className="flex-1 overflow-y-auto chat-list-container" ref={chatListRef}>
         {/* PULSANTE CARICA PIÙ MESSAGGI - USA REDUX */}
@@ -1056,7 +1144,7 @@ useEffect(() => {
             </button>
           </div>
         )}
-
+ 
         {/* Indicatore caricamento in alto quando si caricano messaggi precedenti */}
         {chatPagination.isLoadingMore && (
           <div className="flex justify-center items-center py-4 bg-gray-50">
@@ -1064,7 +1152,7 @@ useEffect(() => {
             <span className="ml-2 text-sm text-gray-600">Caricamento messaggi precedenti...</span>
           </div>
         )}
-
+ 
         <AnimatePresence>
           {messages.length === 0 ? (
             <div className="text-center text-gray-500 mt-10">
@@ -1077,15 +1165,16 @@ useEffect(() => {
                 
                 {dateMessages.map((message, index) => {
                   const globalIndex = messages.indexOf(message);
-                  const showNewIndicator = shouldShowNewIndicator(message, globalIndex);
-                  const originalMessage = findOriginalMessage(message.replyToMessageId);
                   
                   return (
-                    <div key={message.messageId}>
-                      {showNewIndicator && (
-                        <div className="new-messages-indicator">
-                          <span>Nuovi messaggi</span>
-                        </div>
+                    <React.Fragment key={message.messageId}>
+                      {/* Mostra il divisore se siamo all'indice giusto */}
+                      {showUnreadDivider && globalIndex === unreadMessagesDividerIndex && (
+                        <UnreadMessagesDivider 
+                          count={unreadMessagesCount}
+                          subtle={unreadMessagesCount <= 3}
+                          onClick={handleDividerClick}
+                        />
                       )}
                       
                       <div
@@ -1094,15 +1183,14 @@ useEffect(() => {
                           highlightedMessageIds.has(message.messageId) ? "highlighted-message bg-yellow-50" : ""
                         )}
                       >
-                        
                         <ChatMessage
                           message={{
                             ...message,
                             reactions: getReactionsForMessage(message.messageId)
                           }}
                           messages={messages}
-                          isNew={(hasNewMessages || localHasNewMessages) && globalIndex >= (newMessagesStartIndex || messages.length)}
-                          isFirstNew={showNewIndicator}
+                          isNew={globalIndex >= unreadMessagesDividerIndex && showUnreadDivider}
+                          isFirstNew={false} // Non usiamo più questo
                           isFromCurrentUser={message.selectedUser == "1" || message._isTemporary === true || message.senderId == currentUserId}
                           currentUserId={currentUserId}
                           users={users}
@@ -1117,23 +1205,23 @@ useEffect(() => {
                           onReplyClick={scrollToMessage}
                         />
                       </div>
-                    </div>
+                    </React.Fragment>
                   );
                 })}
               </React.Fragment>
             ))
           )}
         </AnimatePresence>
-
+ 
         <div ref={messagesEndRef} />
       </div>
-
+ 
       {/* Pulsante scroll bottom con indicatore nuovi messaggi */}
-      {(showScrollButton || hasNewMessages || localHasNewMessages) && (
+      {(showScrollButton || (hasNewMessages || localHasNewMessages) && showUnreadDivider) && (
         <motion.button
           className={cn(
             "absolute bottom-6 right-4 rounded-full p-3 shadow-lg transition-all duration-200",
-            (hasNewMessages || localHasNewMessages)
+            ((hasNewMessages || localHasNewMessages) && showUnreadDivider)
               ? "bg-red-500 text-white hover:bg-red-600 ring-2 ring-red-300 ring-opacity-50"
               : "bg-blue-500 text-white hover:bg-blue-600"
           )}
@@ -1147,7 +1235,7 @@ useEffect(() => {
           <ArrowBigDown className="h-6 w-6" />
         </motion.button>
       )}
-
+ 
       {/* Visualizzatore file */}
       {selectedFile && (
         <FileViewer
@@ -1155,7 +1243,7 @@ useEffect(() => {
           onClose={() => setSelectedFile(null)}
         />
       )}
-
+ 
       {/* Modal modifica messaggio */}
       <EditMessageModal
         isOpen={showEditModal}
@@ -1165,7 +1253,7 @@ useEffect(() => {
         messages={messages}
         onMessageUpdated={handleMessageEdited}
       />
-
+ 
       {/* Modal cronologia versioni */}
       <VersionHistoryModal
         isOpen={showVersionHistory}
@@ -1175,6 +1263,6 @@ useEffect(() => {
       />
     </div>
   );
-};
-
-export default ModernChatList;
+ };
+ 
+ export default ModernChatList;

@@ -220,10 +220,18 @@ const ChatWindow = ({
   }, [onMinimize, notification]);
 
   const handleClose = useCallback(() => {
+    // Salva l'ultimo messaggio letto quando chiudi la chat
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (!lastMessage._isTemporary) {
+        localStorage.setItem(`lastReadMessage_${notification.notificationId}`, lastMessage.messageId);
+      }
+    }
+    
     if (onClose && notification?.notificationId) {
       onClose(notification.notificationId);
     }
-  }, [onClose, notification]);
+  }, [onClose, notification, messages]);
 
   const handleActivate = useCallback(() => {
     if (windowManager?.activateWindow && notification?.notificationId) {
