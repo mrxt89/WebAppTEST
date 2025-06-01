@@ -648,23 +648,45 @@ const ModernChatList = ({
         console.log(`Ricaricamento chat per: ${reason}`);
         
         // Salva la posizione corrente prima dell'aggiornamento
+        console.log("ModernChatList - fetchNotificationById:", fetchNotificationById);
         saveLastVisibleMessage();
+        
+        // IMPORTANTE: Forza il ricaricamento dei dati
+        if (fetchNotificationById) {
+          try {
+            console.log(`📥 ModernChatList: Ricaricando dati per ${reason}...`);
+            await fetchNotificationById(parseInt(notificationId), true);
+            console.log(`✅ ModernChatList: Dati ricaricati con successo`);
+          } catch (error) {
+            console.error('Errore nel ricaricamento dati:', error);
+          }
+        }
         
         // Per modifiche messaggi, attendi un momento per permettere all'aggiornamento di completarsi
         if (reason === 'message-edited') {
           setTimeout(() => {
             restoreScrollPosition();
           }, 300);
+        } else if (reason === 'new-message') {
+          // Per nuovi messaggi, scorri in fondo se l'utente non ha scrollato
+          setTimeout(() => {
+            if (!userHasScrolledRef.current && chatListRef.current) {
+              chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+            } else {
+              // Altrimenti mostra l'indicatore di nuovi messaggi
+              setLocalHasNewMessages(true);
+            }
+          }, 100);
         }
       }
     };
-
+  
     document.addEventListener("reload-open-chat", handleReloadOpenChat);
     
     return () => {
       document.removeEventListener("reload-open-chat", handleReloadOpenChat);
     };
-  }, [notificationId, saveLastVisibleMessage, restoreScrollPosition]);
+  }, [notificationId, saveLastVisibleMessage, restoreScrollPosition, fetchNotificationById]);
 
   // Listener per new-message-received
   useEffect(() => {

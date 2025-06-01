@@ -996,7 +996,7 @@ const notificationsSlice = createSlice({
       })
 
       // Fetch single notification by ID
-      .add.addCase(fetchNotificationById.fulfilled, (state, action) => {
+      .addCase(fetchNotificationById.fulfilled, (state, action) => {
         const notification = action.payload;
         const notificationId = notification.notificationId;
         

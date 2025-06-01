@@ -87,6 +87,8 @@ const ChatWindow = ({
     playSound: true
   });
 
+  
+
   // Hook per funzionalità aggiuntive non coperte da useOpenChat
   const {
     toggleReadUnread,
