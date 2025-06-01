@@ -13,6 +13,7 @@ const axiosInstance = axios.create({
 // Flag per evitare loop di refresh
 let isRefreshing = false;
 let failedQueue = [];
+let isForceLogoutInProgress = false;
 
 const processQueue = (error, token = null) => {
   failedQueue.forEach(prom => {
@@ -26,10 +27,34 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
+// Funzione per forzare il logout
+const forceLogoutFromAxios = async (reason = "Sessione scaduta") => {
+  if (isForceLogoutInProgress) return;
+  isForceLogoutInProgress = true;
+
+  try {
+    // Emetti evento per il logout forzato
+    window.dispatchEvent(new CustomEvent("force-logout", { 
+      detail: { reason } 
+    }));
+  } finally {
+    isForceLogoutInProgress = false;
+  }
+};
+
 // Request interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
+    const tokenExpiryTime = localStorage.getItem('tokenExpiryTime');
+    
+    // Verifica se il token è scaduto prima di fare la richiesta
+    if (tokenExpiryTime && Date.now() > parseInt(tokenExpiryTime)) {
+      console.log('🔒 Token scaduto prima della richiesta');
+      forceLogoutFromAxios("La tua sessione è scaduta. Effettua nuovamente il login.");
+      return Promise.reject(new Error('Token expired'));
+    }
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -40,90 +65,65 @@ axiosInstance.interceptors.request.use(
   }
 );
 
-// Response interceptor con refresh token
+// Response interceptor con gestione migliorata
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Se è un errore di token scaduto e non è già un retry
-    if (error.response?.status === 401 && 
-        error.response?.data?.error === 'TOKEN_EXPIRED' && 
-        !originalRequest._retry) {
+    // Se è un errore 401 o 403, forza il logout immediato
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      console.log('🔒 Errore di autenticazione ricevuto dal server');
       
-      if (isRefreshing) {
-        // Se stiamo già refreshando, metti in coda
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        }).then(token => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return axiosInstance(originalRequest);
-        }).catch(err => {
-          return Promise.reject(err);
-        });
-      }
+      // Se è un errore specifico di token scaduto, prova il refresh
+      if (error.response?.status === 401 && 
+          error.response?.data?.error === 'TOKEN_EXPIRED' && 
+          !originalRequest._retry &&
+          !isRefreshing) {
+        
+        originalRequest._retry = true;
+        isRefreshing = true;
 
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const currentToken = localStorage.getItem('token');
-        const response = await axios.post(
-          `${config.API_BASE_URL}/refresh-token`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${currentToken}`
+        try {
+          const currentToken = localStorage.getItem('token');
+          const response = await axios.post(
+            `${config.API_BASE_URL}/refresh-token`,
+            {},
+            {
+              headers: {
+                Authorization: `Bearer ${currentToken}`
+              }
             }
+          );
+
+          const { accessToken } = response.data;
+          localStorage.setItem('token', accessToken);
+          
+          // Aggiorna anche il tempo di scadenza se il server lo fornisce
+          if (response.data.expiresIn) {
+            const newExpiryTime = Date.now() + (response.data.expiresIn * 60 * 1000);
+            localStorage.setItem('tokenExpiryTime', newExpiryTime.toString());
           }
-        );
-
-        const { accessToken } = response.data;
-        localStorage.setItem('token', accessToken);
-        
-        // Aggiorna il token per tutte le richieste in coda
-        processQueue(null, accessToken);
-        
-        // Riprova la richiesta originale
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-        return axiosInstance(originalRequest);
-        
-      } catch (refreshError) {
-        processQueue(refreshError, null);
-        
-        // Solo se il refresh fallisce completamente, vai al login
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        
-        await swal.fire({
-          title: 'Sessione scaduta',
-          text: 'La tua sessione è scaduta. Effettua nuovamente il login.',
-          icon: 'warning',
-          confirmButtonText: 'OK'
-        });
-        
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
+          
+          processQueue(null, accessToken);
+          
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return axiosInstance(originalRequest);
+          
+        } catch (refreshError) {
+          processQueue(refreshError, null);
+          
+          // Il refresh è fallito, forza il logout
+          forceLogoutFromAxios("La tua sessione è scaduta. Effettua nuovamente il login.");
+          return Promise.reject(refreshError);
+        } finally {
+          isRefreshing = false;
+        }
+      } else {
+        // Per tutti gli altri errori 401/403, forza il logout immediato
+        forceLogoutFromAxios("Errore di autenticazione. Effettua nuovamente il login.");
+        return Promise.reject(error);
       }
-    }
-
-    // Per altri errori 401/403, comportamento normale
-    if ((error.response?.status === 401 || error.response?.status === 403) && 
-        !originalRequest._retry) {
-      
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      
-      await swal.fire({
-        title: 'Accesso negato',
-        text: 'Non hai i permessi per accedere a questa risorsa.',
-        icon: 'error',
-        confirmButtonText: 'OK'
-      });
-      
-      window.location.href = '/login';
     }
 
     return Promise.reject(error);

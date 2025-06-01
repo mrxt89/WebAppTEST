@@ -244,6 +244,8 @@ export const AuthProvider = ({ children }) => {
       setIsDBNotificationsViewExecuted(false);
       setSessionTimeout(user.sessionDurationMinutes);
 
+      console.log(`🔑 Token impostato con durata: ${user.sessionDurationMinutes} minuti`);
+
       axiosInstance.defaults.headers.common["Authorization"] =
         `Bearer ${accessToken}`;
 
