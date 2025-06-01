@@ -513,13 +513,13 @@ export const useOpenChat = (notificationId, options = {}) => {
    
    document.addEventListener('new_message', handleNewMessage);
    document.addEventListener('open-chat-new-message', handleOpenChatNewMessage);
-   document.addEventListener('reload-open-chat', handleReloadChat);
+   //document.addEventListener('reload-open-chat', handleReloadChat);
    document.addEventListener('chat-message-sent', handleMessageSent);
    
    return () => {
      document.removeEventListener('new_message', handleNewMessage);
      document.removeEventListener('open-chat-new-message', handleOpenChatNewMessage);
-     document.removeEventListener('reload-open-chat', handleReloadChat);
+     //document.removeEventListener('reload-open-chat', handleReloadChat);
      document.removeEventListener('chat-message-sent', handleMessageSent);
      
      if (newMessageTimeoutRef.current) {
