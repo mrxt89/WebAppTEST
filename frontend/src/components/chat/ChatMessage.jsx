@@ -435,25 +435,7 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
   return (
     <>
       {/* Indicatore "Nuovi messaggi" - NON mostrarlo se è dall'utente corrente */}
-      {isFirstNew && !isFromCurrentUser && (
-        <motion.div 
-          className="flex items-center justify-center my-4"
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          <div className="relative flex items-center">
-            <div className="absolute inset-0 bg-blue-400 opacity-20 blur-xl"></div>
-            <div className="relative flex items-center bg-gradient-to-r from-blue-100 to-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-medium shadow-sm border border-blue-200">
-              <span className="relative flex h-2 w-2 mr-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-              </span>
-              Nuovi messaggi
-            </div>
-          </div>
-        </motion.div>
-      )}
+
       
       {/* Messaggio */}
       <motion.div
