@@ -23,7 +23,11 @@ async function getUserNotificationsPaginated(userId, options = {}) {
     filterFavorites = false,
     filterMuted = false,
     filterUnreadOnly = false,
-    categoryId = null
+    categoryId = null,
+    filterMentioned = false,
+    filterMessagesSent = false,
+    filterLeftChats = false,
+    completedFilter = 'all' // completed, all, active
   } = options;
 
   try {
@@ -37,7 +41,11 @@ async function getUserNotificationsPaginated(userId, options = {}) {
       .input('FilterFavorites', sql.Bit, filterFavorites)
       .input('FilterMuted', sql.Bit, filterMuted)
       .input('FilterUnreadOnly', sql.Bit, filterUnreadOnly)
-      .input('CategoryId', sql.Int, categoryId);
+      .input('CategoryId', sql.Int, categoryId)
+      .input('FilterMentioned', sql.Bit, filterMentioned)
+      .input('FilterMessagesSent', sql.Bit, filterMessagesSent)
+      .input('FilterLeftChats', sql.Bit, filterLeftChats)
+      .input('CompletedFilter', sql.NVarChar(255), completedFilter);
     
     let result = await request.execute('GetUserNotificationsPaginated');
     
