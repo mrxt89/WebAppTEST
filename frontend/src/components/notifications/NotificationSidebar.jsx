@@ -338,6 +338,59 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     };
   }, [visible, updateSingleNotificationInPlace]);
 
+  useEffect(() => {
+    if (!visible) return;
+  
+    // Handler specifico per i nuovi messaggi dal worker
+    const handleNewMessageFromWorker = async (event) => {
+      const { newMessagesInfo } = event.detail || {};
+      
+      if (newMessagesInfo && Array.isArray(newMessagesInfo)) {
+        console.log('📨 NotificationSidebar: Nuovi messaggi dal worker:', newMessagesInfo);
+        
+        // Per ogni nuovo messaggio, aggiorna la notifica specifica
+        for (const messageInfo of newMessagesInfo) {
+          const { notificationId } = messageInfo;
+          
+          // Verifica se questa notifica è attualmente visibile nella sidebar
+          const notificationExists = notifications.some(n => n.notificationId === notificationId);
+          
+          if (notificationExists && notificationId) {
+            console.log(`🔄 Aggiornamento notifica ${notificationId} nella sidebar`);
+            
+            // Salva la posizione prima dell'aggiornamento
+            saveNotificationPosition(notificationId);
+            
+            try {
+              // Fetch i dati aggiornati per questa notifica
+              const updatedNotification = await fetchNotificationById(notificationId, true);
+              
+              if (updatedNotification) {
+                // Usa l'azione per aggiornare solo questa notifica
+                updateSingleNotification(notificationId, updatedNotification);
+                
+                // Ripristina la posizione dopo l'aggiornamento
+                setTimeout(() => {
+                  restoreScrollToNotification(notificationId);
+                }, 50);
+              }
+            } catch (error) {
+              console.error(`Errore aggiornamento notifica ${notificationId}:`, error);
+            }
+          }
+        }
+      }
+    };
+  
+    // IMPORTANTE: Ascolta l'evento 'new_message' che viene emesso dal worker
+    document.addEventListener('new_message', handleNewMessageFromWorker);
+  
+    return () => {
+      document.removeEventListener('new_message', handleNewMessageFromWorker);
+    };
+  }, [visible, notifications, fetchNotificationById, updateSingleNotification, saveNotificationPosition, restoreScrollToNotification]);
+  
+
   // Carica prima pagina quando la sidebar diventa visibile
   useEffect(() => {
     if (visible && !hasLoadedInitial.current) {
