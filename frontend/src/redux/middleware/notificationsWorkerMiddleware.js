@@ -222,6 +222,10 @@ const notificationsWorkerMiddleware = (store) => {
           newMessageCount,
           senderName,
           messagePreview,
+          unreadCount,
+          metadata,
+          updates,
+          timestamp
         } = event.data;
         
         switch (type) {
@@ -230,34 +234,31 @@ const notificationsWorkerMiddleware = (store) => {
             localStorage.removeItem("user");
             document.dispatchEvent(new CustomEvent("session-expired"));
             break;
-
+      
           case "notifications":
             const now = Date.now();
             if (now - lastNotificationUpdate < UPDATE_THROTTLE_MS) {
               return;
             }
-
+      
             lastNotificationUpdate = now;
-
+      
             if (newNotifications) {
               try {
                 const currentState = store.getState();
                 const currentNotifications = currentState.notifications?.notifications || [];
                 const openChatIds = currentState.notifications?.openChatIds || new Set();
                 
-                // NON aggiornare openChatData dal worker
                 const hasChanges = hasNotificationChanges(currentNotifications, newNotifications);
                 
                 if (hasChanges) {
-                  // Aggiorna solo la sidebar, non openChatData
                   store.dispatch({
                     type: "notifications/updateFromWorker",
                     payload: newNotifications.map(notif => {
-                      // Se la chat è aperta, mantieni solo metadati nella sidebar
                       if (openChatIds.has(notif.notificationId)) {
                         return {
                           ...notif,
-                          messages: [] // Non includere messaggi per chat aperte
+                          messages: []
                         };
                       }
                       return notif;
@@ -273,7 +274,70 @@ const notificationsWorkerMiddleware = (store) => {
               }
             }
             break;
-
+      
+          case "unread_count_update":
+            // NUOVO: Aggiorna solo il contatore unread
+            store.dispatch({
+              type: "notifications/updateUnreadCount",
+              payload: unreadCount
+            });
+            
+            // Emetti evento per aggiornare l'header
+            document.dispatchEvent(
+              new CustomEvent("unread-count-changed", {
+                detail: {
+                  unreadCount,
+                  timestamp,
+                  source: "worker-update"
+                },
+              }),
+            );
+            break;
+      
+          case "partial_notifications_update":
+            // NUOVO: Aggiornamento parziale per notifiche paginate
+            if (metadata && newNotifications) {
+              const currentState = store.getState();
+              const currentPage = currentState.notifications?.notificationsPagination?.currentPage || 1;
+              
+              // Aggiorna solo se siamo alla prima pagina
+              if (currentPage === 1) {
+                store.dispatch({
+                  type: "notifications/updatePaginatedNotifications",
+                  payload: {
+                    notifications: newNotifications,
+                    metadata,
+                    source: "worker"
+                  }
+                });
+              }
+            }
+            break;
+      
+          case "open_chat_update":
+            // Gestione aggiornamenti per chat aperte
+            if (updates && updates.length > 0) {
+              console.log(`[Middleware] Ricevuti aggiornamenti per ${updates.length} chat aperte`);
+              
+              updates.forEach(update => {
+                // Fetch completo per ogni chat aperta con nuovi messaggi
+                store.dispatch(fetchNotificationById(parseInt(update.notificationId), true));
+                
+                // Emetti eventi per aggiornare UI
+                document.dispatchEvent(
+                  new CustomEvent("open-chat-new-message", {
+                    detail: {
+                      notificationId: parseInt(update.notificationId),
+                      messageCount: update.newMessageCount,
+                      hasNewMessages: true,
+                      reason: "new-message"
+                    },
+                  }),
+                );
+              });
+            }
+            break;
+      
           case "error":
             console.error("Worker error:", workerError);
             if (localStorage.getItem("token")) {
@@ -283,7 +347,7 @@ const notificationsWorkerMiddleware = (store) => {
               });
             }
             break;
-
+      
           case "new_message":
             console.log("🚨 NEW_MESSAGE EVENT RICEVUTO:", event.data);
             if (event.data.newMessagesInfo) {
@@ -292,26 +356,24 @@ const notificationsWorkerMiddleware = (store) => {
                 if (!state?.notifications?.notifications) {
                   return;
                 }
-
-                // NUOVO: Controlla se "Non disturbare" è attivo
+      
                 const doNotDisturbEnabled = localStorage.getItem("doNotDisturbEnabled") === "true";
                 
                 if (doNotDisturbEnabled) {
                   console.log("⚠️ Non disturbare attivo - skip notifiche web/audio");
                 }
-
-                // Ottieni l'ID dell'utente corrente
+      
                 let currentUserId = null;
                 try {
                   const userStr = localStorage.getItem("user");
                   if (userStr) {
                     const userData = JSON.parse(userStr);
-                    currentUserId = userData.userId || userData.UserId || userData.id || userData.ID;
+                    currentUserId = userData.userId || userData.UserId || userData.id;
                   }
                 } catch (e) {
                   console.error("Errore recupero userId:", e);
                 }
-
+      
                 event.data.newMessagesInfo.forEach((messageInfo) => {
                   const {
                     notificationId,
@@ -320,28 +382,23 @@ const notificationsWorkerMiddleware = (store) => {
                     messagePreview,
                     isRecent,
                     isOwnMessage,
-                    isOpenChat, // USA QUESTO VALORE DAL WORKER
+                    isOpenChat,
                   } = messageInfo;
-
-                  // SKIP se è un proprio messaggio
+      
                   if (isOwnMessage) {
                     console.log(`Skipping notification for own message in chat ${notificationId}`);
                     return;
                   }
-
-                  // IMPORTANTE: Verifica LOCALMENTE se la chat è aperta
+      
                   const isActuallyOpen = state.notifications.openChatIds.has(parseInt(notificationId));
                   
                   console.log(`📊 Chat ${notificationId} - Worker dice: ${isOpenChat}, Redux dice: ${isActuallyOpen}`);
-
-                  // Se la chat è VERAMENTE aperta secondo Redux
+      
                   if (isActuallyOpen) {
                     console.log(`🔄 Middleware: Chat ${notificationId} è aperta, ricaricando dati completi...`);
                     
-                    // IMPORTANTE: Usa fetchNotificationById per ottenere TUTTI i messaggi
                     store.dispatch(fetchNotificationById(parseInt(notificationId), true));
                     
-                    // Emetti anche l'evento per notificare useOpenChat
                     document.dispatchEvent(
                       new CustomEvent("open-chat-new-message", {
                         detail: {
@@ -353,7 +410,6 @@ const notificationsWorkerMiddleware = (store) => {
                       }),
                     );
                     
-                    // Emetti anche reload-open-chat per compatibilità
                     document.dispatchEvent(
                       new CustomEvent("reload-open-chat", {
                         detail: {
@@ -365,10 +421,9 @@ const notificationsWorkerMiddleware = (store) => {
                       }),
                     );
                     
-                    return; // IMPORTANTE: Non processare come nuova notifica
+                    return;
                   }
-
-                  // Se arriviamo qui, la chat NON è aperta
+      
                   const notification = state.notifications.notifications?.find(
                     (n) => n.notificationId === parseInt(notificationId),
                   );
@@ -376,21 +431,21 @@ const notificationsWorkerMiddleware = (store) => {
                   if (!notification) {
                     return;
                   }
-
+      
                   const notificationCache = (window._notificationCache = window._notificationCache || {});
                   const now = Date.now();
-
+      
                   if (
                     notificationCache[notificationId] &&
                     now - notificationCache[notificationId].timestamp < 30000
                   ) {
                     return;
                   }
-
+      
                   if (!currentUserId) {
                     currentUserId = -1;
                   }
-
+      
                   if (!isRecent) {
                     console.log("🔔 Nuovo messaggio non recente, tentativo notifica:", {
                       notificationId,
@@ -400,10 +455,8 @@ const notificationsWorkerMiddleware = (store) => {
                       permission: Notification.permission,
                       doNotDisturbEnabled
                     });
-
-                    // MODIFICA CHIAVE: Controlla "Non disturbare" prima di mostrare notifiche
+      
                     if (!doNotDisturbEnabled) {
-                      // SEMPRE tenta di mostrare una notifica web se i permessi sono OK
                       if ("Notification" in window && Notification.permission === "granted") {
                         const webNotificationsEnabled = localStorage.getItem('webNotificationsEnabled') === 'true';
                         
@@ -418,7 +471,7 @@ const notificationsWorkerMiddleware = (store) => {
                               requireInteraction: true,
                               silent: false
                             });
-
+      
                             webNotification.onclick = () => {
                               console.log("Notifica cliccata");
                               window.focus();
@@ -435,7 +488,7 @@ const notificationsWorkerMiddleware = (store) => {
                               
                               webNotification.close();
                             };
-
+      
                             setTimeout(() => {
                               try {
                                 webNotification.close();
@@ -454,8 +507,7 @@ const notificationsWorkerMiddleware = (store) => {
                       } else {
                         console.log("⚠️ Permessi notifica non concessi o API non disponibile");
                       }
-
-                      // Usa anche NotificationService se disponibile (per suoni e notifiche in-app)
+      
                       if (window.notificationService && typeof window.notificationService.notifyNewMessage === 'function') {
                         console.log("📢 Chiamata a NotificationService.notifyNewMessage");
                         window.notificationService.notifyNewMessage(
@@ -467,19 +519,16 @@ const notificationsWorkerMiddleware = (store) => {
                     } else {
                       console.log("🔕 Non disturbare attivo - notifica salvata ma non mostrata");
                       
-                      // IMPORTANTE: Registra comunque che c'è stata una notifica durante DND
                       if (window.notificationService && window.notificationService.dndNotifiedChatIds) {
                         window.notificationService.dndNotifiedChatIds.add(notificationId);
                       }
                     }
-
-                    // Aggiorna cache
+      
                     notificationCache[notificationId] = {
                       timestamp: now,
                       messageCount: newMessageCount,
                     };
-
-                    // Emetti evento solo per aggiornamento UI (non notifiche)
+      
                     document.dispatchEvent(
                       new CustomEvent("unread-count-changed", {
                         detail: {
@@ -488,8 +537,7 @@ const notificationsWorkerMiddleware = (store) => {
                         },
                       }),
                     );
-
-                    // Fetch notifica
+      
                     store.dispatch(fetchNotificationById(notificationId, false));
                   }
                 });
@@ -498,14 +546,26 @@ const notificationsWorkerMiddleware = (store) => {
               }
             }
             break;
-
+      
           case "ready":
             console.log("[NotificationsWorker] Worker ready and initialized");
             break;
-
+      
           case "pong":
             console.log("[NotificationsWorker] Received pong response");
             break;
+      
+          case "attachments_update":
+            // Gestione aggiornamento allegati
+            if (event.data.notificationIds && Array.isArray(event.data.notificationIds)) {
+              event.data.notificationIds.forEach(notificationId => {
+                store.dispatch(fetchNotificationAttachments(notificationId));
+              });
+            }
+            break;
+      
+          default:
+            console.warn("[NotificationsWorker] Unknown message type:", type);
         }
       };
 

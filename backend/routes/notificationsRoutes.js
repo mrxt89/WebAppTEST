@@ -5,6 +5,7 @@ const path = require('path');
 const FileService = require('../services/fileService');
 const { getNotifications
         , getUserNotifications
+        , getUserNotificationsPaginated
         , getNotificationById
         , getNotificationResponseOptions
         , markNotificationAsReceived
@@ -67,6 +68,45 @@ router.get('/get-notifications', async (req, res) => {
   } catch (err) {
     console.error('Error fetching notifications:', err);
     res.status(500).send('Server error');
+  }
+});
+
+// Nuova route per notifiche paginate
+router.get('/notifications/paginated', authenticateToken, async (req, res) => {
+  const userId = req.user.UserId;
+  const {
+    page = 1,
+    pageSize = 20,
+    searchText,
+    filterArchived,
+    filterFavorites,
+    filterMuted,
+    filterUnreadOnly,
+    categoryId
+  } = req.query;
+  
+  try {
+    const result = await getUserNotificationsPaginated(userId, {
+      pageNumber: parseInt(page),
+      pageSize: parseInt(pageSize),
+      searchText,
+      filterArchived: filterArchived === 'true',
+      filterFavorites: filterFavorites === 'true',
+      filterMuted: filterMuted === 'true',
+      filterUnreadOnly: filterUnreadOnly === 'true',
+      categoryId: categoryId ? parseInt(categoryId) : null
+    });
+    
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    console.error('Error fetching paginated notifications:', err);
+    res.status(500).json({ 
+      success: false,
+      error: 'Server error' 
+    });
   }
 });
 

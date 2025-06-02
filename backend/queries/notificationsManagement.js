@@ -13,6 +13,57 @@ async function getNotifications() {
   }
 }
 
+// Nuova funzione per notifiche paginate
+async function getUserNotificationsPaginated(userId, options = {}) {
+  const {
+    pageNumber = 1,
+    pageSize = 20,
+    searchText = null,
+    filterArchived = false,
+    filterFavorites = false,
+    filterMuted = false,
+    filterUnreadOnly = false,
+    categoryId = null
+  } = options;
+
+  try {
+    let pool = await sql.connect(config.dbConfig);
+    let request = pool.request()
+      .input('userId', sql.Int, userId)
+      .input('PageNumber', sql.Int, pageNumber)
+      .input('PageSize', sql.Int, pageSize)
+      .input('SearchText', sql.NVarChar(255), searchText)
+      .input('FilterArchived', sql.Bit, filterArchived)
+      .input('FilterFavorites', sql.Bit, filterFavorites)
+      .input('FilterMuted', sql.Bit, filterMuted)
+      .input('FilterUnreadOnly', sql.Bit, filterUnreadOnly)
+      .input('CategoryId', sql.Int, categoryId);
+    
+    let result = await request.execute('GetUserNotificationsPaginated');
+    
+    // Estrai i tre set di risultati
+    const unreadCount = result.recordsets[0][0].totalUnreadCount;
+    const notifications = result.recordsets[1].map(notification => {
+      if (notification.messages) {
+        notification.messages = typeof notification.messages === 'string' 
+          ? JSON.parse(notification.messages) 
+          : notification.messages;
+      }
+      return notification;
+    });
+    const metadata = result.recordsets[2][0];
+    
+    return {
+      unreadCount,
+      notifications,
+      metadata
+    };
+  } catch (err) {
+    console.error('Error fetching paginated notifications:', err);
+    throw err;
+  }
+}
+
 async function getUserNotifications(userId, searchText = null) {
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -196,16 +247,16 @@ async function markNotificationAsRead(notificationId, userId, isReadByUser) {
       .input('isReadByUser', sql.Bit, isReadByUser)
       .query(`
         UPDATE AR_NotificationDetails WITH (ROWLOCK)
-        SET isReadByUser = @isReadByUser,
-            isReadByReceiver = CASE 
-              WHEN @isReadByUser = 1 AND isReadByReceiver = 0 THEN 1 
-              ELSE isReadByReceiver 
-            END,
-            ReceiverReadedDate = CASE 
-              WHEN @isReadByUser = 1 AND isReadByReceiver = 0 THEN GETDATE() 
-              ELSE ReceiverReadedDate 
-            END,
-            received = 1
+        SET   isReadByUser = @isReadByUser
+              , isReadByReceiver = CASE 
+                WHEN @isReadByUser = 1 AND isReadByReceiver = 0 THEN 1 
+                ELSE isReadByReceiver 
+                END
+              , ReceiverReadedDate = CASE 
+                WHEN @isReadByUser = 1 AND isReadByReceiver = 0 THEN GETDATE() 
+                ELSE ReceiverReadedDate 
+                END
+              , received = 1
         WHERE notificationId = @notificationId 
           AND receiverId = @userId;
 
@@ -1370,6 +1421,7 @@ async function getChatParticipants(notificationId, userId) {
 module.exports = {
   getNotifications,
   getUserNotifications,
+  getUserNotificationsPaginated,
   searchInNotifications,
   getNotificationById,
   getNotificationResponseOptions,
