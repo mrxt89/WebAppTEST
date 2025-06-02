@@ -6,37 +6,38 @@ import React, {
   useCallback,
   useMemo,
   memo,
- } from "react";
- import { cn } from "@/lib/utils";
- import { debounce } from "lodash";
- import "@/styles/ModernChatList.css";
- import {
+} from "react";
+import { cn } from "@/lib/utils";
+import { debounce } from "lodash";
+import "@/styles/ModernChatList.css";
+import {
   ArrowBigDown,
   ChevronUp,
   ChevronDown,
   Loader2,
   Reply,
- } from "lucide-react";
- import FileViewer from "@/components/ui/fileViewer";
- import { swal } from "@/lib/common";
- import { motion, AnimatePresence } from "framer-motion";
- import { format, isToday, isYesterday } from "date-fns";
- import { it } from "date-fns/locale";
- import Modal from "react-modal";
- import EditMessageModal from "./EditMessageModal";
- import VersionHistoryModal from "./VersionHistoryModal";
- import ChatMessage from "./ChatMessage";
- import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
- import { useSelector, useDispatch } from "react-redux";
- import { selectOpenChatData } from "@/redux/features/notifications/notificationsSlice";
- import { loadMoreMessages } from "@/redux/features/notifications/notificationsActions";
- import axios from 'axios';
- import { config } from '@/config';
- 
- Modal.setAppElement("#root");
- 
- // Componente per il divisore dei messaggi non letti
- const UnreadMessagesDivider = memo(({ count, subtle = false, onClick }) => (
+} from "lucide-react";
+import FileViewer from "@/components/ui/fileViewer";
+import { swal } from "@/lib/common";
+import { motion, AnimatePresence } from "framer-motion";
+import { format, isToday, isYesterday } from "date-fns";
+import { it } from "date-fns/locale";
+import Modal from "react-modal";
+import EditMessageModal from "./EditMessageModal";
+import VersionHistoryModal from "./VersionHistoryModal";
+import ChatMessage from "./ChatMessage";
+import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
+import { useSelector, useDispatch } from "react-redux";
+import { selectOpenChatData } from "@/redux/features/notifications/notificationsSlice";
+import { loadMoreMessages } from "@/redux/features/notifications/notificationsActions";
+import axios from 'axios';
+import { config } from '@/config';
+import { useOpenChat } from "@/hooks/useOpenChat";
+
+Modal.setAppElement("#root");
+
+// Componente per il divisore dei messaggi non letti
+const UnreadMessagesDivider = memo(({ count, subtle = false, onClick }) => (
   <div 
     className={`new-messages-divider ${subtle ? 'subtle' : ''}`}
     onClick={onClick}
@@ -52,9 +53,9 @@ import React, {
       </span>
     </div>
   </div>
- ));
- 
- const ModernChatList = ({
+));
+
+const ModernChatList = ({
   messages = [],
   notificationId,
   chatListRef,
@@ -68,19 +69,26 @@ import React, {
   hasNewMessages,
   newMessagesStartIndex,
   onMarkAsInteracted,
- }) => {
+}) => {
   const dispatch = useDispatch();
-  
+  const {
+    removeMessageLocally,
+    updateMessageColorLocally,
+    updateMessageLocally,
+    refreshData,
+  } = useOpenChat(notificationId, {
+    autoRefresh: false, // Disabilita auto-refresh perché è già gestito dal componente padre
+  });
   // IMPORTANTE: Ottieni lo stato della paginazione da Redux
   const chatPagination = useSelector(state => 
     state.notifications.chatPagination[notificationId] || {}
   );
- 
+
   // Ottieni dati completi da openChatData
   const openChatData = useSelector(state => 
     selectOpenChatData(state, parseInt(notificationId))
   );
- 
+
   // Hook per funzionalità notifiche
   const {
     editMessage,
@@ -89,7 +97,7 @@ import React, {
     fetchNotificationById,
     toggleReadUnread,
   } = useNotifications();
- 
+
   // Stati locali
   const [selectedFile, setSelectedFile] = useState(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -110,7 +118,7 @@ import React, {
   const [unreadMessagesDividerIndex, setUnreadMessagesDividerIndex] = useState(null);
   const [showUnreadDivider, setShowUnreadDivider] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
- 
+
   // Refs
   const messagesEndRef = useRef(null);
   const scrollingToBottomRef = useRef(false);
@@ -122,12 +130,12 @@ import React, {
   const lastMessageCountRef = useRef(messages.length);
   const previousMessagesRef = useRef([]);
   const lastVisibleMessageRef = useRef(null);
- 
+
   // Calcola il conteggio totale dei messaggi
   const totalMessageCount = useMemo(() => {
     return openChatData?.totalMessageCount || openChatData?.messageCount || messages.length;
   }, [openChatData, messages.length]);
- 
+
   // Funzione per caricare più messaggi
   const handleLoadMoreMessages = useCallback(() => {
     const pagination = chatPagination || {};
@@ -191,7 +199,7 @@ import React, {
       pageSize: 25
     }));
   }, [dispatch, notificationId, chatPagination, messages, totalMessageCount]);
- 
+
   // Effetto per gestire il divisore dei messaggi non letti
   useEffect(() => {
     if (!notificationId || !messages || messages.length === 0) return;
@@ -231,7 +239,7 @@ import React, {
       setShowUnreadDivider(false);
     }
   }, [messages, notificationId, currentUserId]);
- 
+
   // Gestione click sul divisore per scrollare ai messaggi non letti
   const handleDividerClick = useCallback(() => {
     if (unreadMessagesDividerIndex !== null && chatListRef.current) {
@@ -254,7 +262,7 @@ import React, {
       }
     }
   }, [unreadMessagesDividerIndex, messages]);
- 
+
   // Mantieni la posizione dello scroll dopo il caricamento di nuovi messaggi
   useEffect(() => {
     // Salva l'altezza dello scroll prima di aggiungere nuovi messaggi
@@ -271,7 +279,7 @@ import React, {
       }
     }
   }, [messages.length, chatPagination.isLoadingMore]);
- 
+
   // Debug per verificare lo stato della paginazione
   useEffect(() => {
     console.log('📊 ModernChatList - Stato paginazione dettagliato:', {
@@ -285,7 +293,7 @@ import React, {
       shouldLoadMore: chatPagination?.hasMoreMessages && !chatPagination?.isLoadingMore
     });
   }, [chatPagination, notificationId, messages.length, totalMessageCount]);
- 
+
   // Funzione per salvare l'ultimo messaggio visibile
   const saveLastVisibleMessage = useCallback(() => {
     if (!chatListRef.current) return;
@@ -303,7 +311,7 @@ import React, {
       }
     }
   }, []);
- 
+
   // Funzione per ripristinare la posizione dello scroll
   const restoreScrollPosition = useCallback(() => {
     if (!chatListRef.current || !lastVisibleMessageRef.current) return;
@@ -313,16 +321,16 @@ import React, {
       messageElement.scrollIntoView({ block: 'center', behavior: 'auto' });
     }
   }, []);
- 
+
   // Observer per tracciare i messaggi visibili
   useEffect(() => {
     if (!chatListRef?.current) return;
- 
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           const messageId = entry.target.id.replace("message-", "");
- 
+
           if (entry.isIntersecting) {
             visibleMessagesRef.current.add(parseInt(messageId));
           } else {
@@ -336,29 +344,29 @@ import React, {
         threshold: 0.1,
       },
     );
- 
+
     document.querySelectorAll('[id^="message-"]').forEach((element) => {
       observer.observe(element);
     });
- 
+
     return () => {
       observer.disconnect();
     };
   }, [chatListRef.current, messages]);
- 
+
   // Funzione per pianificare il caricamento delle reazioni in batch
   const scheduleReactionsFetch = useCallback(
     debounce(() => {
       if (visibleMessagesRef.current.size === 0) return;
- 
+
       const messageIds = Array.from(visibleMessagesRef.current).filter(
         (id) =>
           !messageReactionsCache[id] &&
           !pendingReactionsRequestsRef.current[id],
       );
- 
+
       if (messageIds.length === 0) return;
- 
+
       for (let i = 0; i < messageIds.length; i += reactionBatchSize) {
         const batch = messageIds.slice(i, i + reactionBatchSize);
         batchLoadReactions(batch);
@@ -366,7 +374,7 @@ import React, {
     }, 5000), // 5 secondi
     [messageReactionsCache],
   );
- 
+
   // Carica le reazioni in batch
   const batchLoadReactions = useCallback(
     async (messageIds) => {
@@ -484,7 +492,7 @@ import React, {
     },
     [getMessageReactions],
   );
- 
+
   // Ottieni le reazioni per un messaggio specifico
   const getReactionsForMessage = useCallback(
     (messageId) => {
@@ -495,32 +503,32 @@ import React, {
     },
     [messageReactionsCache],
   );
- 
+
   // Ascolta gli eventi di aggiornamento reazioni
   useEffect(() => {
     const handleMessageReactionUpdated = (event) => {
       const { messageId } = event.detail || {};
- 
+
       if (messageId) {
         fetchedReactionsRef.current.delete(messageId);
         delete pendingReactionsRequestsRef.current[messageId];
- 
+
         setMessageReactionsCache((prevCache) => {
           const newCache = { ...prevCache };
           delete newCache[messageId];
           return newCache;
         });
- 
+
         visibleMessagesRef.current.add(parseInt(messageId));
         scheduleReactionsFetch();
       }
     };
- 
+
     document.addEventListener(
       "message-reaction-updated",
       handleMessageReactionUpdated,
     );
- 
+
     return () => {
       document.removeEventListener(
         "message-reaction-updated",
@@ -528,24 +536,24 @@ import React, {
       );
     };
   }, [scheduleReactionsFetch]);
- 
+
   // Aggiornamento periodico delle reazioni per i messaggi visibili
   useEffect(() => {
     if (!notificationId || hasLeftChat) return;
- 
+
     const refreshVisibleReactions = async () => {
       const visibleIds = Array.from(visibleMessagesRef.current);
       if (visibleIds.length === 0) return;
- 
+
       visibleIds.forEach((id) => {
         fetchedReactionsRef.current.delete(id);
         delete pendingReactionsRequestsRef.current[id];
       });
- 
+
       try {
         const token = localStorage.getItem("token");
         if (!token) return;
- 
+
         const response = await axios.post(
           `${config.API_BASE_URL}/messages/batch-reactions`,
           {
@@ -554,10 +562,10 @@ import React, {
           },
           { headers: { Authorization: `Bearer ${token}` } },
         );
- 
+        console.log("🔄 ModernChatList: Aggiornamento reazioni visibili:", response.data);
         if (response.data && response.data.success) {
           const freshReactions = response.data.reactions || {};
- 
+
           setMessageReactionsCache((prev) => ({
             ...prev,
             ...freshReactions,
@@ -567,13 +575,13 @@ import React, {
         console.error("Error refreshing reactions:", error);
       }
     };
- 
+
     refreshVisibleReactions();
     const intervalId = setInterval(refreshVisibleReactions, 5000);
- 
+
     return () => clearInterval(intervalId);
   }, [notificationId, hasLeftChat, currentUserId]);
- 
+
   // Effetto per gestire i nuovi messaggi
   useEffect(() => {
     if (messages.length > previousMessagesRef.current.length) {
@@ -605,17 +613,17 @@ import React, {
     
     previousMessagesRef.current = messages;
   }, [messages, currentUserId]);
- 
+
   // Gestione scroll
   useEffect(() => {
     if (!chatListRef.current) return;
- 
+
     const handleScroll = () => {
       if (scrollingToBottomRef.current) return;
- 
+
       const { scrollTop, scrollHeight, clientHeight } = chatListRef.current;
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
- 
+
       if (distanceFromBottom > 100) {
         userHasScrolledRef.current = true;
         setUserHasScrolled(true);
@@ -658,7 +666,7 @@ import React, {
         }
       }
     };
- 
+
     const handleWheel = (e) => {
       if (e.deltaY < 0) {
         userHasScrolledRef.current = true;
@@ -666,10 +674,10 @@ import React, {
         setShowScrollButton(true);
       }
     };
- 
+
     chatListRef.current.addEventListener("scroll", handleScroll, { passive: true });
     chatListRef.current.addEventListener("wheel", handleWheel, { passive: true });
- 
+
     return () => {
       if (chatListRef.current) {
         chatListRef.current.removeEventListener("scroll", handleScroll);
@@ -677,7 +685,7 @@ import React, {
       }
     };
   }, [hasNewMessages, localHasNewMessages, onMarkAsInteracted, notificationId, toggleReadUnread, showUnreadDivider, messages]);
- 
+
   // Scroll iniziale
   useEffect(() => {
     if (messages.length > 0 && !initialScrollDone && chatListRef.current) {
@@ -689,7 +697,7 @@ import React, {
       }, 100);
     }
   }, [messages.length, initialScrollDone]);
- 
+
   // Auto-scroll per nuovi messaggi
   useEffect(() => {
     if (messages.length > 0) {
@@ -725,7 +733,7 @@ import React, {
       }
     }
   }, [hasNewMessages, localHasNewMessages, messages, currentUserId]);
- 
+
   // Listener per chat-message-sent
   useEffect(() => {
     const handleMessageSent = (event) => {
@@ -757,14 +765,14 @@ import React, {
         }, 100);
       }
     };
- 
+
     document.addEventListener("chat-message-sent", handleMessageSent);
     
     return () => {
       document.removeEventListener("chat-message-sent", handleMessageSent);
     };
   }, [notificationId, messages]);
- 
+
   // Listener per reload-open-chat
   useEffect(() => {
     const handleReloadOpenChat = async (event) => {
@@ -805,14 +813,14 @@ import React, {
         }
       }
     };
- 
+
     document.addEventListener("reload-open-chat", handleReloadOpenChat);
     
     return () => {
       document.removeEventListener("reload-open-chat", handleReloadOpenChat);
     };
   }, [notificationId, saveLastVisibleMessage, restoreScrollPosition, fetchNotificationById]);
- 
+
   // Listener per new-message-received
   useEffect(() => {
     const handleNewMessage = async (event) => {
@@ -832,14 +840,14 @@ import React, {
         }
       }
     };
- 
+
     document.addEventListener("new-message-received", handleNewMessage);
     
     return () => {
       document.removeEventListener("new-message-received", handleNewMessage);
     };
   }, [notificationId, fetchNotificationById]);
- 
+
   useEffect(() => {
     const handleOpenChatNewMessage = async (event) => {
       const { notificationId: eventNotificationId } = event.detail;
@@ -881,84 +889,192 @@ import React, {
       document.removeEventListener("open-chat-new-message", handleOpenChatNewMessage);
     };
   }, [notificationId, fetchNotificationById, saveLastVisibleMessage]);
- 
+
+  // NUOVO: Listener per eventi di eliminazione messaggio
+  useEffect(() => {
+    const handleMessageDeleted = async (event) => {
+      const { notificationId: eventNotificationId, messageId } = event.detail;
+      
+      if (eventNotificationId === parseInt(notificationId)) {
+        console.log(`📥 ModernChatList: Messaggio ${messageId} eliminato`);
+        
+        // Usa la funzione da useOpenChat direttamente
+        if (removeMessageLocally) {
+          console.log("🔄 ModernChatList: Rimuovendo messaggio localmente");
+          removeMessageLocally(messageId);
+          
+          // Forza un refresh dopo un delay per sincronizzare con il server
+          setTimeout(() => {
+            console.log("🔄 ModernChatList: Forzando refresh dopo eliminazione");
+            refreshData({ force: true, delay: 1000 });
+          }, 500);
+        } else {
+          console.error("❌ ModernChatList: removeMessageLocally non disponibile");
+        }
+      }
+    };
+
+    document.addEventListener("message-deleted", handleMessageDeleted);
+    
+    return () => {
+      document.removeEventListener("message-deleted", handleMessageDeleted);
+    };
+  }, [notificationId, removeMessageLocally, refreshData]);
+
+  // MODIFICA: Listener per eventi di cambio colore messaggio - usa useOpenChat direttamente
+  useEffect(() => {
+    const handleMessageColorChanged = async (event) => {
+      const { notificationId: eventNotificationId, messageId, color } = event.detail;
+      
+      if (eventNotificationId === parseInt(notificationId)) {
+        console.log(`📥 ModernChatList: Colore messaggio ${messageId} cambiato a ${color}`);
+        
+        // Usa la funzione da useOpenChat direttamente
+        if (updateMessageColorLocally) {
+          console.log("🔄 ModernChatList: Aggiornando colore localmente");
+          updateMessageColorLocally(messageId, color);
+          
+          // Forza un refresh dopo un delay per sincronizzare con il server
+          setTimeout(() => {
+            console.log("🔄 ModernChatList: Forzando refresh dopo cambio colore");
+            refreshData({ force: true, delay: 1000 });
+          }, 500);
+        } else {
+          console.error("❌ ModernChatList: updateMessageColorLocally non disponibile");
+        }
+      }
+    };
+
+    document.addEventListener("message-color-changed", handleMessageColorChanged);
+    
+    return () => {
+      document.removeEventListener("message-color-changed", handleMessageColorChanged);
+    };
+  }, [notificationId, updateMessageColorLocally, refreshData]);
+
+   // NUOVO: Listener per l'evento message-updated
+   useEffect(() => {
+    const handleMessageUpdated = async (event) => {
+      const { notificationId: eventNotificationId, messageId } = event.detail;
+      
+      if (eventNotificationId === parseInt(notificationId)) {
+        console.log(`📥 ModernChatList: Messaggio ${messageId} aggiornato`);
+        
+        // Forza un refresh per ottenere i dati aggiornati dal server
+        if (refreshData) {
+          console.log("🔄 ModernChatList: Forzando refresh dopo modifica");
+          refreshData({ force: true, delay: 500 });
+        }
+      }
+    };
+
+    document.addEventListener("message-updated", handleMessageUpdated);
+    
+    return () => {
+      document.removeEventListener("message-updated", handleMessageUpdated);
+    };
+  }, [notificationId, refreshData]);
+
+  
+
   // Gestione filtri
   useEffect(() => {
     const handleFilterApplied = (event) => {
-      const { messageIds } = event.detail;
+      const { messageIds, targetNotificationId } = event.detail;
+      
+      // Verifica che l'evento sia per questa chat
+      if (targetNotificationId !== parseInt(notificationId)) return;
+      
       if (Array.isArray(messageIds)) {
         setHighlightedMessageIds(new Set(messageIds));
         setIsHighlightActive(true);
         setCurrentHighlightedIndex(0);
+        
+        // Scroll al primo risultato
+        if (messageIds.length > 0) {
+          setTimeout(() => {
+            const firstMessageElement = document.getElementById(`message-${messageIds[0]}`);
+            if (firstMessageElement) {
+              firstMessageElement.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }, 100);
+        }
       }
     };
- 
+  
     const handleFilterReset = () => {
       setHighlightedMessageIds(new Set());
       setIsHighlightActive(false);
       setCurrentHighlightedIndex(0);
     };
- 
+  
     const handleSearchResultSelected = (event) => {
       const { messageId } = event.detail;
- 
+  
       if (messageId && chatListRef.current) {
+        // Assicurati che l'elemento esista
         const messageElement = document.getElementById(`message-${messageId}`);
- 
+  
         if (messageElement) {
+          // Calcola la posizione di scroll
           const containerRect = chatListRef.current.getBoundingClientRect();
           const messageRect = messageElement.getBoundingClientRect();
- 
+  
           const scrollTop =
             messageRect.top -
             containerRect.top +
             chatListRef.current.scrollTop -
-            80;
- 
+            containerRect.height / 2 +
+            messageRect.height / 2;
+  
+          // Scrolla smooth al messaggio
           chatListRef.current.scrollTo({
             top: scrollTop,
             behavior: "smooth",
           });
- 
+  
+          // Aggiungi classe di evidenziazione temporanea
           messageElement.classList.add("current-highlight");
           setTimeout(() => {
             messageElement.classList.remove("current-highlight");
           }, 2000);
+        } else {
+          console.warn(`Elemento con ID message-${messageId} non trovato`);
         }
       }
     };
- 
+  
     document.addEventListener("chat-filter-applied", handleFilterApplied);
     document.addEventListener("chat-reset-filters", handleFilterReset);
     document.addEventListener("chat-search-result-selected", handleSearchResultSelected);
- 
+  
     return () => {
       document.removeEventListener("chat-filter-applied", handleFilterApplied);
       document.removeEventListener("chat-reset-filters", handleFilterReset);
       document.removeEventListener("chat-search-result-selected", handleSearchResultSelected);
     };
-  }, []);
- 
+  }, [notificationId]);
+
   // Funzione per scrollare a un messaggio specifico (per le risposte)
   const scrollToMessage = useCallback((targetMessageId) => {
     if (!chatListRef.current) return;
- 
+
     const messageElement = document.getElementById(`message-${targetMessageId}`);
     if (messageElement) {
       const containerRect = chatListRef.current.getBoundingClientRect();
       const messageRect = messageElement.getBoundingClientRect();
- 
+
       const scrollTop =
         messageRect.top -
         containerRect.top +
         chatListRef.current.scrollTop -
         80;
- 
+
       chatListRef.current.scrollTo({
         top: scrollTop,
         behavior: "smooth",
       });
- 
+
       // Evidenzia il messaggio temporaneamente
       messageElement.classList.add("highlight-reply-target");
       setTimeout(() => {
@@ -966,7 +1082,7 @@ import React, {
       }, 2000);
     }
   }, []);
- 
+
   // Handler funzioni
   const handleScrollToBottom = useCallback(() => {
     if (chatListRef.current) {
@@ -996,7 +1112,7 @@ import React, {
       }, 500);
     }
   }, [hasNewMessages, localHasNewMessages, onMarkAsInteracted, messages, notificationId]);
- 
+
   const handleOpenEditModal = useCallback((messageId, messageText) => {
     const messageToEdit = messages.find(m => m.messageId === messageId);
     if (messageToEdit) {
@@ -1004,12 +1120,14 @@ import React, {
       setShowEditModal(true);
     }
   }, [messages]);
- 
+
   const handleMessageEdited = useCallback((notificationId) => {
     setShowEditModal(false);
-    // Il messaggio è già stato aggiornato tramite Redux
+    
+    // Il messaggio è già stato aggiornato dal modal che ha emesso l'evento
+    // Non c'è bisogno di fare nulla qui perché il listener sopra gestirà il refresh
   }, []);
- 
+
   const handleViewVersionHistory = useCallback(async (messageId) => {
     setLoadingVersions(true);
     try {
@@ -1028,11 +1146,11 @@ import React, {
       setLoadingVersions(false);
     }
   }, [getMessageVersionHistory]);
- 
+
   const handleMessageSelect = useCallback((messageId, messageText) => {
     console.log('Message selected:', messageId, messageText);
   }, []);
- 
+
   // Raggruppa messaggi per data
   const groupMessagesByDate = useCallback((messages) => {
     if (!Array.isArray(messages)) return {};
@@ -1056,19 +1174,19 @@ import React, {
     
     return groups;
   }, []);
- 
+
   const renderDateSeparator = (date) => (
     <div className="chat-date-separator sticky top-0 z-10 bg-white/80 backdrop-blur-sm">
       <span>{date}</span>
     </div>
   );
- 
+
   // Trova il messaggio originale per una risposta
   const findOriginalMessage = useCallback((replyToMessageId) => {
     if (!replyToMessageId) return null;
     return messages.find(msg => msg.messageId === replyToMessageId);
   }, [messages]);
- 
+
   return (
     <div className="flex-1 flex flex-col relative h-full">
       {/* Barra di navigazione filtri */}
@@ -1078,7 +1196,7 @@ import React, {
             <span className="font-medium">
               {highlightedMessageIds.size} messaggi trovati
             </span>
- 
+
             {highlightedMessageIds.size > 0 && (
               <div className="flex items-center gap-2">
                 <button
@@ -1114,7 +1232,7 @@ import React, {
                 </button>
               </div>
             )}
- 
+
             <button
               onClick={() => {
                 document.dispatchEvent(new CustomEvent("chat-reset-filters"));
@@ -1126,7 +1244,7 @@ import React, {
           </div>
         </div>
       )}
- 
+
       {/* Lista messaggi */}
       <div className="flex-1 overflow-y-auto chat-list-container" ref={chatListRef}>
         {/* PULSANTE CARICA PIÙ MESSAGGI - USA REDUX */}
@@ -1144,7 +1262,7 @@ import React, {
             </button>
           </div>
         )}
- 
+
         {/* Indicatore caricamento in alto quando si caricano messaggi precedenti */}
         {chatPagination.isLoadingMore && (
           <div className="flex justify-center items-center py-4 bg-gray-50">
@@ -1152,7 +1270,7 @@ import React, {
             <span className="ml-2 text-sm text-gray-600">Caricamento messaggi precedenti...</span>
           </div>
         )}
- 
+
         <AnimatePresence>
           {messages.length === 0 ? (
             <div className="text-center text-gray-500 mt-10">
@@ -1212,10 +1330,10 @@ import React, {
             ))
           )}
         </AnimatePresence>
- 
+
         <div ref={messagesEndRef} />
       </div>
- 
+
       {/* Pulsante scroll bottom con indicatore nuovi messaggi */}
       {(showScrollButton || (hasNewMessages || localHasNewMessages) && showUnreadDivider) && (
         <motion.button
@@ -1223,7 +1341,7 @@ import React, {
             "absolute bottom-6 right-4 rounded-full p-3 shadow-lg transition-all duration-200",
             ((hasNewMessages || localHasNewMessages) && showUnreadDivider)
               ? "bg-red-500 text-white hover:bg-red-600 ring-2 ring-red-300 ring-opacity-50"
-              : "bg-blue-500 text-white hover:bg-blue-600"
+              : "bg-blue-500 text-white hover:bg-blue-600 z-50"
           )}
           onClick={handleScrollToBottom}
           initial={{ scale: 0.8, opacity: 0 }}
@@ -1235,7 +1353,7 @@ import React, {
           <ArrowBigDown className="h-6 w-6" />
         </motion.button>
       )}
- 
+
       {/* Visualizzatore file */}
       {selectedFile && (
         <FileViewer
@@ -1243,7 +1361,7 @@ import React, {
           onClose={() => setSelectedFile(null)}
         />
       )}
- 
+
       {/* Modal modifica messaggio */}
       <EditMessageModal
         isOpen={showEditModal}
@@ -1252,8 +1370,9 @@ import React, {
         users={users}
         messages={messages}
         onMessageUpdated={handleMessageEdited}
+        notificationId={notificationId}
       />
- 
+
       {/* Modal cronologia versioni */}
       <VersionHistoryModal
         isOpen={showVersionHistory}
@@ -1263,6 +1382,6 @@ import React, {
       />
     </div>
   );
- };
- 
- export default ModernChatList;
+};
+
+export default ModernChatList;

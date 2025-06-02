@@ -12,6 +12,7 @@ import { useNotifications } from "@/redux/features/notifications/notificationsHo
 import { swal } from "@/lib/common";
 import EmojiPicker from "./Emoji-picker";
 import "@/styles/chat-components.css";
+import { useOpenChat } from "@/hooks/useOpenChat";
 
 Modal.setAppElement("#root");
 
@@ -21,6 +22,7 @@ const EditMessageModal = ({
   message,
   onMessageUpdated,
   users = [],
+  notificationId
 }) => {
   const { users: contextUsers } = useNotifications();
   const [loadedUsers, setLoadedUsers] = useState(users || []);
@@ -29,7 +31,9 @@ const EditMessageModal = ({
   const [error, setError] = useState(null);
   const [mentionSuggestions, setMentionSuggestions] = useState([]);
   const [mentionIndex, setMentionIndex] = useState(null);
-  const [cursorPosition, setCursorPosition] = useState(null);
+  const { updateMessageLocally } = useOpenChat(notificationId || message?.notificationId, {
+    autoRefresh: false
+  });
 
   const textareaRef = useRef(null);
 
@@ -140,38 +144,43 @@ const EditMessageModal = ({
     try {
       setSubmitting(true);
       setError(null);
-
+  
       if (!editedMessage.trim()) {
         setError("Il messaggio non può essere vuoto");
         return;
       }
-
-      // Non modificare se il messaggio non è cambiato
+  
       if (editedMessage === message.message) {
         onClose();
         return;
       }
-
+  
+      // IMPORTANTE: Prima aggiorna localmente
+      if (updateMessageLocally) {
+        console.log("🔄 EditMessageModal: Aggiornando messaggio localmente");
+        updateMessageLocally(message.messageId, editedMessage);
+      }
+  
+      // Poi chiama l'API
       const result = await editMessage(message.messageId, editedMessage);
-
+  
       if (result && result.success) {
-        // Emetti l'evento di aggiornamento con l'ID della notifica
-        const event = new CustomEvent("message-updated", {
-          detail: {
-            notificationId: result.notificationId,
-            messageId: message.messageId,
-          },
-        });
-        document.dispatchEvent(event);
-
-        // Chiama la callback se esiste
-        if (typeof onMessageUpdated === "function") {
-          onMessageUpdated(result.notificationId);
-        }
-
-        // Chiudi il modale
+        // Chiudi subito il modale
         onClose();
-
+        
+        // Poi forza un refresh completo dopo un breve delay
+        setTimeout(() => {
+          document.dispatchEvent(
+            new CustomEvent("reload-open-chat", {
+              detail: {
+                notificationId: result.notificationId || notificationId || message?.notificationId,
+                reason: 'message-edited',
+                forceComplete: true
+              },
+            }),
+          );
+        }, 300);
+  
         // Feedback positivo all'utente
         swal.fire({
           title: "Messaggio aggiornato",
@@ -191,7 +200,7 @@ const EditMessageModal = ({
         error.message ||
           "Si è verificato un errore durante la modifica del messaggio",
       );
-
+  
       swal.fire({
         title: "Errore",
         text:

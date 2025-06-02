@@ -6,9 +6,8 @@ class NotificationService {
     this.audioContext = null;
     this.decodedAudioData = null;
     this.audioInitialized = false;
-    this.pendingNotifications = []; // Coda per notifiche prima dell'inizializzazione
+    this.pendingNotifications = [];
     this.notificationsEnabled = this.getNotificationSetting();
-    // Se non è mai stato impostato, mettilo a true di default
     if (localStorage.getItem('notificationsEnabled') === null) {
       localStorage.setItem('notificationsEnabled', 'true');
       this.notificationsEnabled = true;
@@ -16,31 +15,30 @@ class NotificationService {
     this.soundEnabled = this.getSoundSetting();
     this.webNotificationsEnabled = this.getWebNotificationSetting();
     this.lastNotificationTime = Date.now();
-    this.notificationsThrottleMs = 3000; // Non notificare più spesso di ogni 3 secondi
+    this.notificationsThrottleMs = 3000;
     this.focusedTabTitle = document.title;
     this.unreadCount = 0;
     this.isWindowFocused = document.hasFocus();
     this.titleInterval = null;
-    this.soundInitPromise = null; // Promise per tracciare l'inizializzazione audio
+    this.soundInitPromise = null;
     this.doNotDisturbEnabled = this.getDoNotDisturbSetting();
-    this.notificationTimeoutMs = 15000; // Timeout di 15 secondi per le notifiche push
-    this.activeNotifications = new Map(); // Mappa per tracciare le notifiche attive e i loro timer
-
-    // Aggiungi questo per la gestione delle notifiche multiple
-    this.notifiedChatIds = new Set(); // Set per tenere traccia delle chat già notificate
-
-    // NUOVO: Set per tenere traccia delle notifiche ricevute durante "Non disturbare"
+    this.notificationTimeoutMs = 15000;
+    this.activeNotifications = new Map();
+    this.notifiedChatIds = new Set();
     this.dndNotifiedChatIds = new Set();
+    
+    // NUOVO: Struttura per aggregare notifiche multiple per chat
+    this.pendingNotificationsByChat = new Map();
+    this.notificationAggregationTimeout = null;
+    this.NOTIFICATION_AGGREGATION_DELAY = 2000; // 2 secondi per aggregare messaggi
 
     this.resetNotifiedChatsInterval = setInterval(() => {
-      this.notifiedChatIds.clear(); // Resetta ogni minuto
+      this.notifiedChatIds.clear();
     }, 60000);
 
-    // Imposta gli event listeners per il focus della finestra
     window.addEventListener("focus", this.handleWindowFocus);
     window.addEventListener("blur", this.handleWindowBlur);
 
-    // Inizializza l'audio su più eventi per aumentare la probabilità di successo
     document.addEventListener("click", this.initAudio.bind(this), {
       once: true,
     });
@@ -51,48 +49,36 @@ class NotificationService {
       once: true,
     });
 
-    // Precarica il suono subito (anche se non potrà essere riprodotto finché l'utente non interagisce)
     this.soundInitPromise = this.preloadSound();
 
-    // Verifica ogni 2 secondi se ci sono notifiche in coda
     this.processPendingInterval = setInterval(() => {
       this.processPendingNotifications();
     }, 2000);
 
-    // Inizializzazione del suono tramite interazione con la pagina
     this.initAudioViaInteraction();
 
-    // Richiedi il permesso per le notifiche web se non già fatto
     if (this.webNotificationsEnabled) {
       this.requestNotificationPermission();
     }
 
-    // NUOVO: Ascolta l'evento di modifica dello stato "Non disturbare"
     document.addEventListener(
       "doNotDisturbChanged",
       this.handleDndChange.bind(this),
     );
   }
 
-  // NUOVO: Handler per gli eventi di cambiamento di "Non disturbare"
   handleDndChange(event) {
     const { enabled } = event.detail;
 
-    // Se stiamo disattivando la modalità "Non disturbare"
     if (!enabled) {
-      // Pulisci l'elenco delle chat notificate durante questo periodo
       this.dndNotifiedChatIds.clear();
-
-      // Per sicurezza, pulisci anche la lista delle notifiche normali
       this.notifiedChatIds.clear();
 
-      // Notifica altri componenti che possono essere interessati
       const resetEvent = new CustomEvent("forceNotificationReset");
       document.dispatchEvent(resetEvent);
     }
   }
 
-  // Getter e setter per le impostazioni memorizzate in localStorage
   getNotificationSetting() {
     return localStorage.getItem("notificationsEnabled") !== "false";
   }
@@ -115,12 +101,10 @@ class NotificationService {
     this.soundEnabled = enabled;
   }
 
-  // CORREZIONE: Implementazione completa di setWebNotificationSetting
   setWebNotificationSetting(enabled) {
     localStorage.setItem("webNotificationsEnabled", enabled);
     this.webNotificationsEnabled = enabled;
 
-    // Se stiamo abilitando le notifiche web, verifica che abbiamo il permesso
     if (
       enabled &&
       "Notification" in window &&
@@ -129,7 +113,6 @@ class NotificationService {
       this.requestNotificationPermission();
     }
 
-    // Emetti un evento per notificare il cambiamento
     const event = new CustomEvent("webNotificationSettingChanged", {
       detail: { enabled },
     });
@@ -146,7 +129,6 @@ class NotificationService {
     localStorage.setItem("doNotDisturbEnabled", enabled);
     this.doNotDisturbEnabled = enabled;
 
-    // Emetti un evento per aggiornare l'UI
     const event = new CustomEvent("doNotDisturbChanged", {
       detail: { enabled },
     });
@@ -155,41 +137,23 @@ class NotificationService {
     return enabled;
   }
 
-  // Verifica lo stato "Non disturbare" corrente
   isInDoNotDisturbMode() {
     return this.doNotDisturbEnabled;
   }
 
-  // Versione corretta e completa di resetService per NotificationService.js
-
-  /**
-   * Resetta completamente il servizio di notifica
-   * Da utilizzare quando si disattiva la modalità "Non disturbare"
-   */
   resetService() {
-    // Pulisci le chat notificate durante la modalità "Non disturbare"
     this.dndNotifiedChatIds = new Set();
-
-    // Reset anche delle notifiche regolari per sicurezza
     this.notifiedChatIds = new Set();
-
-    // Svuota la coda di notifiche pendenti
     this.pendingNotifications = [];
-
-    // Ripristina altre impostazioni se necessario
     this.unreadCount = 0;
-
-    // Riaggiorna il titolo della finestra
     this.resetTitle();
 
-    // Riavvia l'audio se necessario
     if (this.audioContext && this.audioContext.state === "suspended") {
       this.audioContext.resume().catch((err) => {
         console.warn("Error resuming audio context:", err);
       });
     }
 
-    // Forza il ricaricamento delle notifiche
     const refreshEvent = new CustomEvent("refreshNotifications", {
       detail: {
         timestamp: Date.now(),
@@ -198,7 +162,6 @@ class NotificationService {
     });
     document.dispatchEvent(refreshEvent);
 
-    // Emetti un evento per notificare l'avvenuto reset
     const resetEvent = new CustomEvent("notificationServiceReset", {
       detail: {
         timestamp: Date.now(),
@@ -209,10 +172,6 @@ class NotificationService {
     return true;
   }
 
-  /**
-   * Versione corretta di requestNotificationPermission che evita la ricorsione infinita
-   * Sostituisci il metodo esistente con questo
-   */
   requestNotificationPermission() {
     if (!("Notification" in window)) {
       console.warn(
@@ -221,12 +180,9 @@ class NotificationService {
       return Promise.resolve(false);
     }
 
-    // Se il permesso è già concesso, non fare nulla di più
     if (Notification.permission === "granted") {
-      // Imposta direttamente la variabile locale invece di chiamare il metodo
       this.webNotificationsEnabled = true;
       localStorage.setItem("webNotificationsEnabled", "true");
-
       return Promise.resolve(true);
     }
 
@@ -240,7 +196,6 @@ class NotificationService {
     return Notification.requestPermission().then((permission) => {
       const granted = permission === "granted";
 
-      // Imposta direttamente la variabile locale invece di richiamare il metodo
       this.webNotificationsEnabled = granted;
       localStorage.setItem(
         "webNotificationsEnabled",
@@ -248,7 +203,6 @@ class NotificationService {
       );
 
       if (granted) {
-        // Mostra una notifica di test per confermare che tutto funziona
         setTimeout(() => {
           try {
             const notification = new Notification("Notifiche attivate", {
@@ -256,7 +210,6 @@ class NotificationService {
               icon: "/icons/app-icon.png",
             });
 
-            // Auto-chiude dopo 3 secondi
             setTimeout(() => notification.close(), 3000);
           } catch (e) {
             console.error(
@@ -271,9 +224,7 @@ class NotificationService {
     });
   }
 
-  // Inizializzazione tramite interazione con la pagina
   initAudioViaInteraction() {
-    // Crea un element invisibile che cattura l'interazione
     const interactionElement = document.createElement("div");
     interactionElement.style.position = "fixed";
     interactionElement.style.top = "0";
@@ -284,7 +235,6 @@ class NotificationService {
     interactionElement.style.opacity = "0";
     interactionElement.style.cursor = "pointer";
 
-    // Aggiungi event handler che inizializza l'audio
     const handleInteraction = () => {
       this.initAudio();
       document.body.removeChild(interactionElement);
@@ -293,7 +243,6 @@ class NotificationService {
     interactionElement.addEventListener("click", handleInteraction);
     interactionElement.addEventListener("touchstart", handleInteraction);
 
-    // Aggiungi l'elemento al body solo dopo che la pagina è completamente caricata
     if (document.readyState === "complete") {
       document.body.appendChild(interactionElement);
     } else {
@@ -302,7 +251,6 @@ class NotificationService {
       });
     }
 
-    // Rimuovi automaticamente dopo 10 secondi se l'utente non interagisce
     setTimeout(() => {
       if (document.body.contains(interactionElement)) {
         document.body.removeChild(interactionElement);
@@ -310,7 +258,6 @@ class NotificationService {
     }, 10000);
   }
 
-  // Gestisce il focus della finestra
   handleWindowFocus = () => {
     this.isWindowFocused = true;
     this.resetTitle();
@@ -325,12 +272,10 @@ class NotificationService {
     this.isWindowFocused = false;
   };
 
-  // Ripristina il titolo originale della finestra
   resetTitle() {
     document.title = this.focusedTabTitle;
   }
 
-  // Modifica il titolo della finestra per mostrare i nuovi messaggi
   startTitleNotification() {
     if (this.titleInterval) return;
 
@@ -343,14 +288,10 @@ class NotificationService {
     }, 1000);
   }
 
-  /**
-   * Fixed initAudio method for proper audio initialization
-   */
   async initAudio() {
     if (this.audioInitialized) return Promise.resolve(true);
 
     try {
-      // Create a new AudioContext
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (!AudioContext) {
         console.warn("Web Audio API not supported in this browser");
@@ -359,21 +300,17 @@ class NotificationService {
 
       this.audioContext = new AudioContext();
 
-      // Resume context if needed (autoplay policy)
       if (this.audioContext.state === "suspended") {
         await this.audioContext.resume();
       }
 
-      // If we've already loaded the buffer, decode it
       if (this.audioBuffer) {
         await this.decodeBuffer();
       } else {
-        // Otherwise reload the sound
         await this.preloadSound();
       }
 
       this.audioInitialized = true;
-      // Process any notifications in queue
       this.processPendingNotifications();
 
       return true;
@@ -383,10 +320,8 @@ class NotificationService {
     }
   }
 
-  // Precarica il suono di notifica
   async preloadSound() {
     try {
-      // Qui manca la richiesta fetch per ottenere il file audio
       const response = await fetch(this.audioUrl);
 
       if (!response.ok) {
@@ -396,7 +331,6 @@ class NotificationService {
       const arrayBuffer = await response.arrayBuffer();
       this.audioBuffer = arrayBuffer;
 
-      // Se l'AudioContext è già inizializzato, decodifica il buffer
       if (this.audioContext) {
         await this.decodeBuffer();
       }
@@ -408,7 +342,6 @@ class NotificationService {
     }
   }
 
-  // Decodifica il buffer audio in formato utilizzabile
   async decodeBuffer() {
     if (!this.audioContext || !this.audioBuffer) {
       console.warn("Cannot decode audio: context or buffer not available");
@@ -416,7 +349,6 @@ class NotificationService {
     }
 
     try {
-      // Utilizzo di promisify per il metodo decodeAudioData
       this.decodedAudioData = await new Promise((resolve, reject) => {
         this.audioContext.decodeAudioData(
           this.audioBuffer.slice(0),
@@ -432,10 +364,7 @@ class NotificationService {
     }
   }
 
-  // Mostra una notifica "locale" all'interno dell'applicazione
   showInAppNotification(title, message, onClick) {
-    // Implementazione di una notifica toast all'interno dell'app
-    // Emette un evento personalizzato che può essere intercettato dai componenti React
     const event = new CustomEvent("inAppNotification", {
       detail: {
         title,
@@ -448,12 +377,7 @@ class NotificationService {
     document.dispatchEvent(event);
   }
 
-  /**
-   * Metodo per riavviare il sistema di notifiche
-   * Utile quando si verificano problemi
-   */
   restartNotificationSystem() {
-    // Ripulisci le notifiche attive
     this.activeNotifications.forEach((data, id) => {
       clearTimeout(data.timerId);
       if (data.notification) {
@@ -466,18 +390,14 @@ class NotificationService {
     });
     this.activeNotifications.clear();
 
-    // Reset tracciamento chat notificate
     this.notifiedChatIds.clear();
     this.dndNotifiedChatIds.clear();
 
-    // Svuota la coda pending
     this.pendingNotifications = [];
 
-    // Reset conteggio non letti
     this.unreadCount = 0;
     this.resetTitle();
 
-    // Riprova a inizializzare l'audio
     if (this.audioContext && this.audioContext.state === "suspended") {
       this.audioContext.resume().catch((e) => {
         console.warn("NotificationService: Error resuming audio context", e);
@@ -490,34 +410,81 @@ class NotificationService {
   }
 
   /**
-   * Implementazione corretta di showWebNotification per garantire la visualizzazione delle notifiche
+   * NUOVO: Metodo per aggregare e mostrare notifiche
    */
-  showWebNotification(title, message, notificationId) {
+  aggregateAndShowNotification(notificationId, senderName, messagePreview, senderId) {
+    if (!notificationId) return;
+
+    // Aggiungi alla mappa di aggregazione
+    if (!this.pendingNotificationsByChat.has(notificationId)) {
+      this.pendingNotificationsByChat.set(notificationId, {
+        senderName,
+        messages: [],
+        lastSenderId: senderId,
+        firstMessageTime: Date.now()
+      });
+    }
+
+    const chatData = this.pendingNotificationsByChat.get(notificationId);
+    chatData.messages.push(messagePreview);
+    chatData.lastSenderId = senderId;
+
+    // Cancella il timeout precedente se esiste
+    if (this.notificationAggregationTimeout) {
+      clearTimeout(this.notificationAggregationTimeout);
+    }
+
+    // Imposta un nuovo timeout per mostrare le notifiche aggregate
+    this.notificationAggregationTimeout = setTimeout(() => {
+      this.showAggregatedNotifications();
+    }, this.NOTIFICATION_AGGREGATION_DELAY);
+  }
+
+  /**
+   * NUOVO: Mostra le notifiche aggregate
+   */
+  showAggregatedNotifications() {
+    this.pendingNotificationsByChat.forEach((chatData, notificationId) => {
+      const messageCount = chatData.messages.length;
+      let title, body;
+
+      if (messageCount === 1) {
+        title = `Nuovo messaggio da ${chatData.senderName}`;
+        body = chatData.messages[0];
+      } else {
+        title = `${messageCount} nuovi messaggi da ${chatData.senderName}`;
+        body = `${chatData.messages[chatData.messages.length - 1]}`;
+      }
+
+      // Mostra la notifica web aggregata
+      this.showWebNotification(title, body, notificationId, messageCount);
+    });
+
+    // Pulisci la mappa dopo aver mostrato le notifiche
+    this.pendingNotificationsByChat.clear();
+  }
+
+  /**
+   * Versione migliorata di showWebNotification che gestisce l'aggregazione
+   */
+  showWebNotification(title, message, notificationId, messageCount = 1) {
     console.log("NOTIFICATION DEBUG: Tentativo di mostrare notifica", {
       title,
       message,
       notificationId,
+      messageCount
     });
 
-    // Controllo basilare per permessi
     if (!("Notification" in window)) {
       console.warn("NotificationService: Notifiche non supportate dal browser");
       return false;
     }
 
-    // Verifica permessi prima di continuare
     if (Notification.permission !== "granted") {
       console.warn("NotificationService: Permesso notifiche non concesso");
-      Notification.requestPermission().then((permission) => {
-        if (permission === "granted") {
-          // Richiama questa funzione se il permesso viene concesso
-          this.showWebNotification(title, message, notificationId);
-        }
-      });
       return false;
     }
 
-    // Verifica impostazioni interne
     if (!this.webNotificationsEnabled) {
       console.warn(
         "NotificationService: Notifiche web disabilitate nelle impostazioni",
@@ -525,7 +492,6 @@ class NotificationService {
       return false;
     }
 
-    // Controllo per chat mute
     if (notificationId && this.isChatMuted(notificationId)) {
       console.log(
         `NotificationService: Notifica bloccata per chat silenziata: ${notificationId}`,
@@ -533,7 +499,6 @@ class NotificationService {
       return false;
     }
 
-    // Verifica modalità Non Disturbare
     if (this.doNotDisturbEnabled) {
       console.log(
         "NotificationService: Modalità Non Disturbare attiva, notifica bloccata",
@@ -545,79 +510,79 @@ class NotificationService {
     }
 
     try {
-      // Creazione della notifica con requireInteraction e tag per garantire persistenza
+      // NON chiudere notifiche esistenti se hanno lo stesso tag
+      // Il browser gestirà automaticamente la sostituzione grazie al tag
+      const existingNotification = this.activeNotifications.get(notificationId);
+      if (existingNotification && existingNotification.timerId) {
+        clearTimeout(existingNotification.timerId);
+      }
+
+      // Creazione della notifica con requireInteraction per mantenerla visibile
       const options = {
         body: message,
         icon: "/icons/app-icon.png",
-        tag: `chat-${notificationId}`, // Aggiunto tag per consolidare notifiche multiple
-        requireInteraction: true, // Forza la notifica a rimanere visibile
-        silent: true, // Gestiremo il suono separatamente
+        badge: "/icons/app-icon.png",
+        tag: `chat-${notificationId}`,
+        requireInteraction: true, // IMPORTANTE: La notifica resta finché non interagita
+        silent: false, // Abilita il suono di sistema
+        renotify: true, // Permette di ri-notificare con lo stesso tag
+        data: {
+          notificationId: notificationId,
+          messageCount: messageCount,
+          timestamp: Date.now()
+        }
       };
 
       const notification = new Notification(title, options);
 
-      // Gestione click con log e garanzia di apertura chat
+      // Gestione click sulla notifica
       notification.onclick = () => {
         console.log("Notifica cliccata per chat:", notificationId);
-      
+        
         try {
-          // Focus sulla finestra principale
+          // Focus sulla finestra
           window.focus();
-      
-          // CORREZIONE: Importa e usa callOpenChatModal dal modulo corretto
-          import('@/redux/features/notifications/notificationsSlice').then(module => {
-            if (module.callOpenChatModal) {
-              console.log("Apertura chat con callOpenChatModal importato");
-              module.callOpenChatModal(notificationId);
-            } else {
-              console.error("callOpenChatModal non trovato nel modulo");
-              // Fallback: naviga direttamente alla chat
+          
+          // Prova prima con la funzione globale se disponibile
+          if (typeof window.openChatModal === "function") {
+            window.openChatModal(notificationId);
+          } else {
+            // Altrimenti importa il modulo
+            import('@/redux/features/notifications/notificationsSlice').then(module => {
+              if (module.callOpenChatModal) {
+                console.log("Apertura chat con callOpenChatModal");
+                module.callOpenChatModal(notificationId);
+              } else {
+                // Fallback navigazione diretta
+                window.location.href = `/chat/${notificationId}`;
+              }
+            }).catch(error => {
+              console.error("Errore durante import:", error);
               window.location.href = `/chat/${notificationId}`;
-            }
-          }).catch(error => {
-            console.error("Errore durante import del modulo:", error);
-            // Fallback
-            window.location.href = `/chat/${notificationId}`;
-          });
-      
+            });
+          }
+          
         } catch (clickError) {
           console.error("Errore durante apertura chat:", clickError);
-          // Fallback semplice
-          try {
-            window.location.href = `/chat/${notificationId}`;
-          } catch (e) {
-            console.error("Fallback navigazione fallito:", e);
-          }
+          window.location.href = `/chat/${notificationId}`;
         }
-      
-        // Chiudi sempre la notifica
+        
+        // Chiudi la notifica dopo il click
         notification.close();
       };
 
-      // Imposta un timeout più lungo (2 minuti)
-      const timerId = setTimeout(() => {
-        try {
-          notification.close();
-        } catch (e) {
-          console.warn("Error closing notification:", e);
-        }
-
-        if (this.activeNotifications) {
-          this.activeNotifications.delete(notificationId);
-        }
-      }, 120000); // 2 minuti
-
-      // Aggiungi alla mappa delle notifiche attive per poterle gestire
-      if (this.activeNotifications) {
-        this.activeNotifications.set(notificationId, {
-          notification,
-          timerId,
-          timestamp: Date.now(),
-        });
-      }
+      // NON impostare NESSUN timeout automatico per la chiusura
+      // La notifica rimarrà visibile finché l'utente non interagisce
+      
+      // Salva riferimento alla notifica attiva SENZA timer
+      this.activeNotifications.set(notificationId, {
+        notification,
+        timestamp: Date.now()
+        // NOTA: Nessun timerId qui!
+      });
 
       console.log(
-        `NotificationService: Notifica web mostrata con successo: ${title} (durata: 2 minuti)`,
+        `NotificationService: Notifica web mostrata con successo: ${title} (persistente)`,
       );
       return true;
     } catch (error) {
@@ -629,17 +594,14 @@ class NotificationService {
     }
   }
 
-  // Nuovo metodo per segnare una notifica come ricevuta
   markNotificationAsReceived(notificationId) {
     if (!notificationId) return;
 
     try {
-      // Cerca nel contesto globale delle notifiche per la funzione
       if (
         window.notificationsContext &&
         typeof window.notificationsContext.markMessageAsReceived === "function"
       ) {
-        // Trova l'ID del messaggio più recente
         const notification = window.notificationsContext.notifications.find(
           (n) => n.notificationId === parseInt(notificationId),
         );
@@ -665,8 +627,6 @@ class NotificationService {
         }
       }
 
-      // Se non troviamo la funzione nel contesto o non possiamo usarla,
-      // mettiamo un log per debug ma non blocchiamo il flusso
       console.warn(
         "Impossibile segnare il messaggio come ricevuto automaticamente: contesto non disponibile",
       );
@@ -680,26 +640,20 @@ class NotificationService {
     }
   }
 
-  // Processa le notifiche in coda
   processPendingNotifications() {
-    // Verifica che la coda non sia vuota
     if (!this.pendingNotifications || this.pendingNotifications.length === 0) {
       return;
     }
 
-    // Filtra le notifiche in coda, rimuovendo quelle da chat silenziate
     const nonMutedNotifications = this.pendingNotifications.filter((item) => {
-      // Se c'è un notificationId, verifica se è silenziato
       if (item.notificationId) {
         const isMuted = this.isChatMuted(item.notificationId);
         if (isMuted) {
           return false;
         }
-        // Se questa chat è già stata notificata, salta
         if (this.notifiedChatIds.has(item.notificationId)) {
           return false;
         }
-        // NUOVO: Se questa chat è stata notificata durante "Non disturbare", salta
         if (this.dndNotifiedChatIds.has(item.notificationId)) {
           return false;
         }
@@ -707,54 +661,42 @@ class NotificationService {
       return true;
     });
 
-    // Se dopo il filtraggio non ci sono notifiche da processare, esci
     if (nonMutedNotifications.length === 0) {
       this.pendingNotifications = [];
       return;
     }
 
-    // Processa tutte le notifiche non silenziate rimaste in coda
     nonMutedNotifications.forEach((item) => {
-      // Marca la chat come notificata
       if (item.notificationId) {
         this.notifiedChatIds.add(item.notificationId);
       }
 
-      // Mostra notifica in-app
       if (this.notificationsEnabled) {
         this.showInAppNotification(item.title, item.message, item.onClick);
       }
 
-      // Mostra anche come notifica web se abilitata
       if (this.webNotificationsEnabled && item.notificationId) {
         this.showWebNotification(item.title, item.message, item.notificationId);
       }
     });
 
-    // Svuota la coda
     this.pendingNotifications = [];
   }
 
-  // metodo per controllare se una chat è silenziata
   isChatMuted(notificationId) {
     if (!notificationId) return false;
 
-    // Converte in numero se è una stringa
     const notifId = parseInt(notificationId);
 
-    // Verifica nel contesto globale delle notifiche
     if (window.notificationsContext) {
-      // Se c'è una funzione isNotificationMuted, usala direttamente
       if (
         typeof window.notificationsContext.isNotificationMuted === "function"
       ) {
         try {
-          // Cerca la notifica prima di passarla alla funzione
           const notification = window.notificationsContext.notifications.find(
             (n) => n.notificationId === notifId,
           );
 
-          // Se la notifica esiste, verifica il silenziamento
           if (notification) {
             const isMuted =
               window.notificationsContext.isNotificationMuted(notification);
@@ -766,7 +708,6 @@ class NotificationService {
         }
       }
 
-      // In alternativa cerca la notifica direttamente nell'array
       if (
         window.notificationsContext.notifications &&
         Array.isArray(window.notificationsContext.notifications)
@@ -776,17 +717,13 @@ class NotificationService {
         );
 
         if (notification) {
-          // Controlla direttamente la proprietà isMuted
           if (notification.isMuted) {
-            // Se non c'è data di scadenza, è silenziata per sempre
             if (!notification.muteExpiryDate) return true;
 
-            // Controlla se la data di scadenza è passata
             const now = new Date();
             const expiryDate = new Date(notification.muteExpiryDate);
 
             if (now > expiryDate) {
-              // La data di scadenza è passata
               return false;
             }
 
@@ -798,29 +735,23 @@ class NotificationService {
       }
     }
 
-    // Fallback: controlla il localStorage
     try {
       const mutedChats = JSON.parse(localStorage.getItem("mutedChats") || "{}");
 
-      // Controlla sia la versione stringa che quella numerica dell'ID
       const chatInfo = mutedChats[notificationId] || mutedChats[notifId];
 
       if (!chatInfo || !chatInfo.isMuted) {
         return false;
       }
 
-      // Se non c'è data di scadenza, è silenziata per sempre
       if (!chatInfo.expiryDate) {
         return true;
       }
 
-      // Controlla se la data di scadenza è passata
       const now = new Date();
       const expiryDate = new Date(chatInfo.expiryDate);
 
       if (now > expiryDate) {
-        // La data di scadenza è passata, rimuovi dal localStorage
-
         delete mutedChats[notificationId];
         localStorage.setItem("mutedChats", JSON.stringify(mutedChats));
         return false;
@@ -833,37 +764,29 @@ class NotificationService {
     }
   }
 
-  /**
-   * Metodo per verificare se è disponibile un nuovo messaggio basandosi su timestamp
-   * Questo metodo è più affidabile del controllo sullo stato di lettura
-   */
   isNewMessage(message, notificationId) {
     if (!message || !message.timestamp || !notificationId) {
       return false;
     }
 
     try {
-      // Controlla se il messaggio è recente (ultimi 10 minuti)
       const messageTime = new Date(message.timestamp);
       const now = new Date();
       const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
 
       if (messageTime < tenMinutesAgo) {
-        return false; // Messaggio troppo vecchio
+        return false;
       }
 
-      // Controlla se questo messaggio è già stato notificato
       const notifiedKey = `notified_${notificationId}_${message.messageId}`;
       const alreadyNotified = localStorage.getItem(notifiedKey);
 
       if (alreadyNotified) {
-        return false; // Già notificato
+        return false;
       }
 
-      // Imposta il flag per evitare future notifiche per questo messaggio
       localStorage.setItem(notifiedKey, Date.now().toString());
 
-      // Pulisci notifiche vecchie (ultimi 100 messaggi)
       this.cleanUpOldNotifications();
 
       return true;
@@ -873,14 +796,10 @@ class NotificationService {
     }
   }
 
-  /**
-   * Pulisce le notifiche vecchie per evitare di riempire localStorage
-   */
   cleanUpOldNotifications() {
     try {
       const notificationKeys = [];
 
-      // Raccogli tutte le chiavi delle notifiche
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith("notified_")) {
@@ -891,10 +810,8 @@ class NotificationService {
         }
       }
 
-      // Ordina per timestamp (più vecchio prima)
       notificationKeys.sort((a, b) => a.time - b.time);
 
-      // Se ci sono più di 100 notifiche, rimuovi le più vecchie
       if (notificationKeys.length > 100) {
         const toRemove = notificationKeys.slice(
           0,
@@ -910,7 +827,7 @@ class NotificationService {
   }
 
   /**
-   * Corretto metodo notifyNewMessage senza chiamata al suono
+   * Metodo migliorato per notificare nuovi messaggi con aggregazione
    */
   notifyNewMessage(message, senderName, notificationId, senderId = null) {
     if (!message || !senderName || !notificationId) {
@@ -947,11 +864,11 @@ class NotificationService {
 
     const shouldShowVisualNotification = !this.isWindowFocused;
 
-    this.notifiedChatIds.add(notificationId);
     this.unreadCount++;
 
-    // Riproduci il suono se abilitato
-    if (this.soundEnabled && this.audioInitialized && this.decodedAudioData) {
+    // Riproduci il suono se abilitato (solo una volta per sessione di notifiche)
+    if (this.soundEnabled && this.audioInitialized && this.decodedAudioData && 
+        !this.pendingNotificationsByChat.has(notificationId)) {
       try {
         const source = this.audioContext.createBufferSource();
         source.buffer = this.decodedAudioData;
@@ -959,7 +876,6 @@ class NotificationService {
         source.start(0);
       } catch (error) {
         console.error("Errore nella riproduzione del suono:", error);
-        // Prova a reinizializzare l'audio
         this.initAudio();
       }
     }
@@ -970,7 +886,6 @@ class NotificationService {
 
     const trimmedMessage =
       message.length > 60 ? message.substring(0, 60) + "..." : message;
-    const title = `Nuovo messaggio da ${senderName}`;
 
     const onClick = () => {
       if (typeof window.openChatModal === "function") {
@@ -978,36 +893,24 @@ class NotificationService {
       }
     };
 
-    if (shouldShowVisualNotification) {
-      if (
-        this.webNotificationsEnabled &&
-        Notification.permission === "granted"
-      ) {
-        this.showWebNotification(title, trimmedMessage, notificationId);
-      }
+    // Usa il sistema di aggregazione invece di mostrare subito la notifica
+    this.aggregateAndShowNotification(notificationId, senderName, trimmedMessage, senderId);
 
-      if (this.notificationsEnabled) {
-        this.showInAppNotification(title, trimmedMessage, onClick);
-      }
-    } else {
-      if (this.notificationsEnabled) {
-        this.showInAppNotification(title, trimmedMessage, onClick);
-      }
+    // Mostra sempre notifica in-app
+    if (this.notificationsEnabled) {
+      this.showInAppNotification(`Nuovo messaggio da ${senderName}`, trimmedMessage, onClick);
     }
   }
-  // Gestisce notifiche di tipo sistema (non messaggi)
+
   notifySystem(title, message, onClick = null) {
-    // Controlli di sicurezza
     if (this.doNotDisturbEnabled) {
       return;
     }
 
     if (!this.notificationsEnabled) return;
 
-    // Notifica in-app
     this.showInAppNotification(title, message, onClick);
 
-    // Notifica desktop se abilitata
     if (this.webNotificationsEnabled && Notification.permission === "granted") {
       try {
         const notification = new Notification(title, {
@@ -1016,7 +919,6 @@ class NotificationService {
           requireInteraction: false,
         });
 
-        // Gestione click
         if (onClick && typeof onClick === "function") {
           notification.onclick = () => {
             window.focus();
@@ -1025,7 +927,6 @@ class NotificationService {
           };
         }
 
-        // Auto-chiusura
         setTimeout(() => notification.close(), 8000);
 
         return true;
@@ -1040,7 +941,6 @@ class NotificationService {
     return false;
   }
 
-  // Pulisce le risorse quando il servizio viene eliminato
   destroy() {
     window.removeEventListener("focus", this.handleWindowFocus);
     window.removeEventListener("blur", this.handleWindowBlur);
@@ -1055,31 +955,53 @@ class NotificationService {
       this.processPendingInterval = null;
     }
 
-    // Pulisci l'intervallo che resetta il set di chat notificate
     if (this.resetNotifiedChatsInterval) {
       clearInterval(this.resetNotifiedChatsInterval);
       this.resetNotifiedChatsInterval = null;
     }
 
-    // Rimuovi l'event listener per doNotDisturbChanged
+    if (this.notificationAggregationTimeout) {
+      clearTimeout(this.notificationAggregationTimeout);
+      this.notificationAggregationTimeout = null;
+    }
+
     document.removeEventListener("doNotDisturbChanged", this.handleDndChange);
 
-    // Chiudi l'AudioContext se esiste
     if (this.audioContext && this.audioContext.state !== "closed") {
       this.audioContext.close().catch((err) => {
         console.error("Error closing AudioContext:", err);
       });
     }
 
-    // Chiudi tutte le notifiche attive
     this.activeNotifications.forEach((data, id) => {
-      clearTimeout(data.timerId);
+      if (data.timerId) {
+        clearTimeout(data.timerId);
+      }
       if (data.notification) {
         data.notification.close();
       }
     });
 
     this.activeNotifications.clear();
+  }
+
+  // NUOVO: Metodo helper per riprodurre il suono di test
+  playNotificationSound() {
+    if (!this.soundEnabled || !this.audioInitialized || !this.decodedAudioData) {
+      console.warn("Cannot play sound: not initialized or disabled");
+      return false;
+    }
+
+    try {
+      const source = this.audioContext.createBufferSource();
+      source.buffer = this.decodedAudioData;
+      source.connect(this.audioContext.destination);
+      source.start(0);
+      return true;
+    } catch (error) {
+      console.error("Error playing notification sound:", error);
+      return false;
+    }
   }
 }
 

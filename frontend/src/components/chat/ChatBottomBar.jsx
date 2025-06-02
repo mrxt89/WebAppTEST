@@ -304,6 +304,33 @@ const handleSendWithAttachments = async () => {
 
   // Consenti l'invio se c'è un testo O almeno un allegato
   if (message.trim() || attachments.length > 0) {
+    // Crea e mostra lo spinner
+    const spinner = document.createElement('div');
+    spinner.id = 'message-sending-spinner';
+    spinner.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      flex-direction: column;
+      color: white;
+      font-size: 1.2rem;
+    `;
+    
+    spinner.innerHTML = `
+      <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mb-4"></div>
+      <div>Invio messaggio in corso...</div>
+    `;
+    
+    document.body.appendChild(spinner);
+    document.body.style.overflow = 'hidden';
+
     const notificationData = {
       notificationId,
       message: message.trim() || (attachments.length > 0 ? "Ha condiviso allegati" : ""),
@@ -311,7 +338,7 @@ const handleSendWithAttachments = async () => {
       eventId: 0,
       title,
       notificationCategoryId,
-      receiversList: localReceiversList, // USA LO STATO LOCALE
+      receiversList: localReceiversList,
       replyToMessageId: replyToMessage ? replyToMessage.messageId : 0,
     };
 
@@ -325,24 +352,21 @@ const handleSendWithAttachments = async () => {
     try {
       let result;
 
-      // USA sendNotificationWithAttachments dal context
       result = await sendNotificationWithAttachments(notificationData, attachments);
 
       if (result && (result.success || result.notificationId)) {
         // IMPORTANTE: Reset SOLO dopo invio riuscito per chat esistenti
-        // Per nuovi messaggi, mantieni i destinatari finché non si chiude il modal
         if (!isNewMessage) {
           if (typeof updateReceiversList === "function") {
             updateReceiversList("");
           }
-          setLocalReceiversList(""); // Reset stato locale solo per chat esistenti
+          setLocalReceiversList("");
         }
         
         setMessage("");
         setIsUpdatingContentEditable(true);
         setAttachments([]);
 
-        // Resetta messaggio di risposta
         if (typeof setReplyToMessage === "function") {
           setReplyToMessage(null);
         }
@@ -357,9 +381,7 @@ const handleSendWithAttachments = async () => {
           inputRef.current.focus();
         }
 
-        // Se è un nuovo messaggio, apri la nuova chat
         if (isNewMessage && (result.notificationId > 0 || result.Success)) {
-          // IMPORTANTE: Prima di chiudere, resetta i destinatari
           if (typeof updateReceiversList === "function") {
             updateReceiversList("");
           }
@@ -373,7 +395,6 @@ const handleSendWithAttachments = async () => {
           }
         }
 
-        // Emetti eventi per forzare l'aggiornamento
         document.dispatchEvent(
           new CustomEvent("chat-message-sent", {
             detail: {
@@ -383,7 +404,6 @@ const handleSendWithAttachments = async () => {
           }),
         );
 
-        // Forza reload della chat
         document.dispatchEvent(
           new CustomEvent("reload-open-chat", {
             detail: {
@@ -394,7 +414,6 @@ const handleSendWithAttachments = async () => {
           }),
         );
         
-        // Aggiorna gli allegati
         if (refreshAttachments) {
           setTimeout(() => {
             refreshAttachments(result.notificationId || notificationId);
@@ -407,6 +426,13 @@ const handleSendWithAttachments = async () => {
       console.error("Error sending message with attachments:", error);
       swal.fire("Errore", "Impossibile inviare il messaggio", "error");
     } finally {
+      // Rimuovi lo spinner
+      const spinner = document.getElementById('message-sending-spinner');
+      if (spinner) {
+        spinner.remove();
+      }
+      document.body.style.overflow = '';
+
       if (typeof setSending === "function") {
         setSending(false);
       }
@@ -440,6 +466,33 @@ const handleSendWithAttachments = async () => {
     }
 
     if (msg.trim()) {
+      // Crea e mostra lo spinner
+      const spinner = document.createElement('div');
+      spinner.id = 'message-sending-spinner';
+      spinner.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        flex-direction: column;
+        color: white;
+        font-size: 1.2rem;
+      `;
+      
+      spinner.innerHTML = `
+        <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mb-4"></div>
+        <div>Invio messaggio in corso...</div>
+      `;
+      
+      document.body.appendChild(spinner);
+      document.body.style.overflow = 'hidden';
+
       const notificationData = {
         notificationId,
         message: msg,
@@ -447,7 +500,7 @@ const handleSendWithAttachments = async () => {
         eventId: 0,
         title,
         notificationCategoryId,
-        receiversList: localReceiversList, // USA LO STATO LOCALE
+        receiversList: localReceiversList,
         replyToMessageId: replyToMessage ? replyToMessage.messageId : 0,
       };
 
@@ -461,7 +514,6 @@ const handleSendWithAttachments = async () => {
       try {
         let result;
 
-        // Usa la funzione passata come prop o dal context
         if (typeof onSend === "function") {
           result = await onSend(notificationData);
         } else {
@@ -469,11 +521,10 @@ const handleSendWithAttachments = async () => {
         }
 
         if (result) {
-          // Reset stati
           if (typeof updateReceiversList === "function") {
             updateReceiversList("");
           }
-          setLocalReceiversList(""); // Reset stato locale
+          setLocalReceiversList("");
           setMessage("");
           setIsUpdatingContentEditable(true);
 
@@ -487,7 +538,6 @@ const handleSendWithAttachments = async () => {
             inputRef.current.focus();
           }
 
-          // Forza aggiornamento notifiche
           if (fetchNotificationById) {
             setTimeout(() => {
               fetchNotificationById(notificationId, true);
@@ -500,6 +550,13 @@ const handleSendWithAttachments = async () => {
         console.error("Error sending message:", error);
         swal.fire("Errore", "Impossibile inviare il messaggio", "error");
       } finally {
+        // Rimuovi lo spinner
+        const spinner = document.getElementById('message-sending-spinner');
+        if (spinner) {
+          spinner.remove();
+        }
+        document.body.style.overflow = '';
+
         if (typeof setSending === "function") {
           setSending(false);
         }

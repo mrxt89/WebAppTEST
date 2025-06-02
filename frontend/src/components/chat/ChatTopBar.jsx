@@ -569,30 +569,32 @@ useEffect(() => {
   // Modifico la funzione handleFilterMessages per gestire tutti i tipi di filtri
   const handleFilterMessages = async (filters) => {
     if (!notificationId) return;
-
+  
     try {
       // Aggiorna i filtri attivi
       setActiveFilters((prev) => ({
         ...prev,
         ...filters,
       }));
-
+  
       // Costruisci l'oggetto dei filtri da inviare
       const filterParams = {
         ...activeFilters,
         ...filters,
       };
-
+  
       const result = await filterMessages(notificationId, filterParams);
-
+  
       if (result) {
-        // Emetti un evento personalizzato che verrà catturato dalla chat per evidenziare i messaggi
+        // Emetti evento con il notificationId corretto
         const event = new CustomEvent("chat-filter-applied", {
           detail: {
-            messageIds: result.filteredMessages.map((m) => m.messageId),
-            totalFound: result.totalFound,
-            targetNotificationId: notificationId,
-            activeFilters: filterParams, // Includi i filtri attivi nell'evento
+            messageIds: result.filteredMessages 
+              ? result.filteredMessages.map((m) => m.messageId)
+              : result.map((m) => m.messageId), // Gestisci entrambi i formati di risposta
+            totalFound: result.totalFound || result.length,
+            targetNotificationId: parseInt(notificationId), // Assicurati che sia un numero
+            activeFilters: filterParams,
           },
         });
         document.dispatchEvent(event);
