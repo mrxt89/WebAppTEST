@@ -82,6 +82,10 @@ router.get('/notifications/paginated', authenticateToken, async (req, res) => {
     filterFavorites,
     filterMuted,
     filterUnreadOnly,
+    filterMentioned,
+    filterMessagesSent, 
+    filterLeftChats,
+    completedFilter,
     categoryId
   } = req.query;
   
@@ -94,6 +98,10 @@ router.get('/notifications/paginated', authenticateToken, async (req, res) => {
       filterFavorites: filterFavorites === 'true',
       filterMuted: filterMuted === 'true',
       filterUnreadOnly: filterUnreadOnly === 'true',
+      filterMentioned: filterMentioned === 'true',
+      filterMessagesSent: filterMessagesSent === 'true',
+      filterLeftChats: filterLeftChats === 'true',
+      completedFilter: completedFilter, // completedFilter, all, active
       categoryId: categoryId ? parseInt(categoryId) : null
     });
     
