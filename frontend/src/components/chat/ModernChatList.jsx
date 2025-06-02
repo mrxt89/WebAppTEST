@@ -140,14 +140,6 @@ const ModernChatList = ({
   const handleLoadMoreMessages = useCallback(() => {
     const pagination = chatPagination || {};
     
-    console.log('🔍 handleLoadMoreMessages chiamato:', {
-      notificationId,
-      pagination,
-      hasMessages: messages.length,
-      totalMessageCount,
-      localMessagesIds: messages.map(m => m.messageId).slice(0, 5)
-    });
-    
     // Previeni chiamate multiple o se non ci sono più messaggi
     if (pagination.isLoadingMore) {
       console.log('⏸️ Caricamento già in corso, skip');

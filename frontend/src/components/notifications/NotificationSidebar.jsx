@@ -65,7 +65,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     refreshNotifications,
     getStats,
     isEmpty,
-    updateSingleNotification // NUOVO: funzione per aggiornare singola notifica
+    updateSingleNotification
   } = useNotificationsPagination();
 
   // Hook per i filtri
@@ -96,7 +96,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     unarchiveChat,
     toggleMuteChat,
     isNotificationMuted,
-    fetchNotificationById, // NUOVO: per aggiornare singola notifica
+    fetchNotificationById,
   } = useNotifications();
 
   // Stati locali
@@ -107,7 +107,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
   const [isDocumentSearchVisible, setIsDocumentSearchVisible] = useState(false);
   const [archivedUnreadCount, setArchivedUnreadCount] = useState(0);
   const [optimisticUpdates, setOptimisticUpdates] = useState({});
-  const [updatingNotifications, setUpdatingNotifications] = useState(new Set()); // NUOVO: traccia notifiche in aggiornamento
+  const [updatingNotifications, setUpdatingNotifications] = useState(new Set());
 
   // Stati per la ricerca documenti
   const [documentTab, setDocumentTab] = useState("customers");
@@ -124,8 +124,8 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
   const sidebarRef = useRef(null);
   const filterExpandedRef = useRef(null);
   const scrollContainerRef = useRef(null);
-  const scrollPositionRef = useRef(0); // NUOVO: traccia posizione scroll
-  const notificationPositionsRef = useRef(new Map()); // NUOVO: traccia posizione notifiche
+  const scrollPositionRef = useRef(0);
+  const notificationPositionsRef = useRef(new Map());
   
   // IMPORTANTE: useRef per evitare chiamate duplicate
   const loadingRef = useRef(false);
@@ -220,7 +220,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     }
   }, []);
 
-  // NUOVO: Funzione per aggiornare singola notifica senza ricaricare tutto
+  // SOLUZIONE: Funzione migliorata per aggiornare singola notifica
   const updateSingleNotificationInPlace = useCallback(async (notificationId) => {
     try {
       setUpdatingNotifications(prev => new Set(prev).add(notificationId));
@@ -268,14 +268,31 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     }
   }, []);
 
-  // NUOVO: Ascolta eventi di aggiornamento notifiche solo per aggiornamenti specifici
+  // SOLUZIONE PRINCIPALE: Ascolta nuovi messaggi e aggiorna la notifica specifica
   useEffect(() => {
     if (!visible) return;
 
+    // Handler per nuovi messaggi
+    const handleNewMessage = async (event) => {
+      const { newMessagesInfo } = event.detail || {};
+      
+      if (newMessagesInfo && Array.isArray(newMessagesInfo)) {
+        console.log('📨 NotificationSidebar: Nuovi messaggi ricevuti:', newMessagesInfo);
+        
+        // Per ogni nuovo messaggio, aggiorna la notifica corrispondente
+        for (const messageInfo of newMessagesInfo) {
+          const { notificationId } = messageInfo;
+          if (notificationId) {
+            await updateSingleNotificationInPlace(notificationId);
+          }
+        }
+      }
+    };
+
+    // Handler generico per aggiornamenti notifiche
     const handleNotificationUpdate = async (event) => {
       const { notificationId } = event.detail || {};
       if (notificationId) {
-        // Aggiorna solo la notifica specifica
         await updateSingleNotificationInPlace(notificationId);
       }
     };
@@ -284,18 +301,6 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
       const { notificationId } = event.detail || {};
       if (notificationId) {
         await updateSingleNotificationInPlace(notificationId);
-      }
-    };
-
-    const handleNewMessage = async (event) => {
-      const { notificationId } = event.detail || {};
-      if (notificationId) {
-        await updateSingleNotificationInPlace(notificationId);
-      } else {
-        // Solo se non abbiamo un ID specifico, ricarica la prima pagina
-        saveScrollPosition();
-        await loadFirstPage(filters);
-        restoreScrollPosition();
       }
     };
 
@@ -314,22 +319,24 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     };
 
     // Ascolta tutti gli eventi che potrebbero modificare le notifiche
+    document.addEventListener('new_message', handleNewMessage);
     document.addEventListener('notification-updated', handleNotificationUpdate);
     document.addEventListener('chat-status-changed', handleChatStatusChanged);
-    document.addEventListener('new-message-received', handleNewMessage);
+    document.addEventListener('new-message-received', handleNotificationUpdate);
     document.addEventListener('read-status-changed', handleReadStatusChanged);
     document.addEventListener('chat-message-sent', handleChatMessageSent);
     document.addEventListener('chat-title-updated', handleNotificationUpdate);
 
     return () => {
+      document.removeEventListener('new_message', handleNewMessage);
       document.removeEventListener('notification-updated', handleNotificationUpdate);
       document.removeEventListener('chat-status-changed', handleChatStatusChanged);
-      document.removeEventListener('new-message-received', handleNewMessage);
+      document.removeEventListener('new-message-received', handleNotificationUpdate);
       document.removeEventListener('read-status-changed', handleReadStatusChanged);
       document.removeEventListener('chat-message-sent', handleChatMessageSent);
       document.removeEventListener('chat-title-updated', handleNotificationUpdate);
     };
-  }, [visible, updateSingleNotificationInPlace, filters, loadFirstPage, saveScrollPosition, restoreScrollPosition]);
+  }, [visible, updateSingleNotificationInPlace]);
 
   // Carica prima pagina quando la sidebar diventa visibile
   useEffect(() => {
@@ -498,14 +505,8 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
         })
       );
 
-      // Aggiorna lo stato locale
-      setNotifications(prev => 
-        prev.map(notification => 
-          notification.notificationId === parseInt(notificationId)
-            ? { ...notification, isReadByUser: !isRead }
-            : notification
-        )
-      );
+      // Aggiorna lo stato locale usando updateSingleNotificationInPlace
+      await updateSingleNotificationInPlace(notificationId);
       
     } catch (error) {
       console.error("Error toggling read status:", error);
@@ -948,17 +949,11 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
 
   // Listener per aggiornamento stato letto/non letto
   useEffect(() => {
-    const handleReadStatusChanged = (event) => {
+    const handleReadStatusChanged = async (event) => {
       const { notificationId, isRead } = event.detail;
       
-      // Aggiorna lo stato locale
-      setNotifications(prev => 
-        prev.map(notification => 
-          notification.notificationId === notificationId
-            ? { ...notification, isReadByUser: isRead }
-            : notification
-        )
-      );
+      // Aggiorna lo stato locale usando updateSingleNotificationInPlace
+      await updateSingleNotificationInPlace(notificationId);
     };
 
     document.addEventListener('notification-read-status-changed', handleReadStatusChanged);
@@ -966,7 +961,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     return () => {
       document.removeEventListener('notification-read-status-changed', handleReadStatusChanged);
     };
-  }, []);
+  }, [updateSingleNotificationInPlace]);
 
   return (
     <div

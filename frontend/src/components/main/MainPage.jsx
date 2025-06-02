@@ -432,20 +432,7 @@ const openChatModal = async (notificationId) => {
     };
   }, []);
 
-  // Ascolta l'evento unread-count-changed per aggiornare il contatore
-  useEffect(() => {
-    const handleUnreadCountChanged = () => {
-      forceLoadNotifications();
-    };
 
-    document.addEventListener("unread-count-changed", handleUnreadCountChanged);
-    return () => {
-      document.removeEventListener(
-        "unread-count-changed",
-        handleUnreadCountChanged,
-      );
-    };
-  }, [forceLoadNotifications]);
 
   // Handler per gestire gli aggiornamenti di stato delle chat
   useEffect(() => {

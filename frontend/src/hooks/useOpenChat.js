@@ -632,17 +632,27 @@ export const useOpenChat = (notificationId, options = {}) => {
     }
   }, [refreshData, isLoadingMore, isRefreshing, options.autoRefresh]);
   
-  // Effect per gestire il focus della finestra
+  // Effect per gestire il focus della finestra e il caricamento dei messaggi
   useEffect(() => {
-    const handleFocus = () => {
+    const handleFocus = async () => {
       if (!isRefreshing && !isLoadingMore) {
-        refreshData();
+        // Prima carica i messaggi precedenti se necessario
+        if (messageStats.hasMoreMessages && !isLoadingMore) {
+          await loadMore();
+        }
+        // Poi aggiorna i dati
+        await refreshData();
       }
     };
     
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       if (!document.hidden && !isRefreshing && !isLoadingMore) {
-        refreshData();
+        // Prima carica i messaggi precedenti se necessario
+        if (messageStats.hasMoreMessages && !isLoadingMore) {
+          await loadMore();
+        }
+        // Poi aggiorna i dati
+        await refreshData();
       }
     };
     
@@ -653,7 +663,7 @@ export const useOpenChat = (notificationId, options = {}) => {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [refreshData, isRefreshing, isLoadingMore]);
+  }, [refreshData, isRefreshing, isLoadingMore, messageStats, loadMore]);
   
   // Funzioni per gestione chat
   const chatActions = useMemo(() => ({
