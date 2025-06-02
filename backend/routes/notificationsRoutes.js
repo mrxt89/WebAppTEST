@@ -101,7 +101,7 @@ router.get('/notifications/paginated', authenticateToken, async (req, res) => {
       filterMentioned: filterMentioned === 'true',
       filterMessagesSent: filterMessagesSent === 'true',
       filterLeftChats: filterLeftChats === 'true',
-      completedFilter: completedFilter, // completedFilter, all, active
+      completedFilter: completedFilter, // completed, all, active
       categoryId: categoryId ? parseInt(categoryId) : null
     });
     

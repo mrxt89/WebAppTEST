@@ -294,14 +294,13 @@ const notificationsWorkerMiddleware = (store) => {
             );
             break;
       
-          case "partial_notifications_update":
-            // NUOVO: Aggiornamento parziale per notifiche paginate
-            if (metadata && newNotifications) {
-              const currentState = store.getState();
-              const currentPage = currentState.notifications?.notificationsPagination?.currentPage || 1;
-              
-              // Aggiorna solo se siamo alla prima pagina
-              if (currentPage === 1) {
+            case "partial_notifications_update":
+              // NUOVO: Aggiornamento parziale per notifiche paginate
+              if (metadata && newNotifications) {
+                const currentState = store.getState();
+                const currentPage = currentState.notifications?.notificationsPagination?.currentPage || 1;
+                
+                // MODIFICA: Aggiorna sempre le notifiche paginate, non solo alla prima pagina
                 store.dispatch({
                   type: "notifications/updatePaginatedNotifications",
                   payload: {
@@ -310,9 +309,32 @@ const notificationsWorkerMiddleware = (store) => {
                     source: "worker"
                   }
                 });
+                
+                // NUOVO: Emetti un evento per forzare l'aggiornamento della sidebar
+                if (newNotifications && newNotifications.length > 0) {
+                  // Trova quali notifiche hanno nuovi messaggi
+                  const notificationsWithNewMessages = newNotifications.filter(n => {
+                    const currentNotif = currentState.notifications?.paginatedNotifications?.find(
+                      pn => pn.notificationId === n.notificationId
+                    );
+                    return !currentNotif || 
+                           n.messageCount > (currentNotif.messageCount || 0) ||
+                           new Date(n.lastMessage) > new Date(currentNotif.lastMessage || 0);
+                  });
+                  
+                  if (notificationsWithNewMessages.length > 0) {
+                    document.dispatchEvent(
+                      new CustomEvent("sidebar-notifications-update", {
+                        detail: {
+                          notifications: notificationsWithNewMessages,
+                          timestamp: Date.now()
+                        }
+                      })
+                    );
+                  }
+                }
               }
-            }
-            break;
+              break;
       
           case "open_chat_update":
             // Gestione aggiornamenti per chat aperte

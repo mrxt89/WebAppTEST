@@ -660,6 +660,7 @@ const notificationsSlice = createSlice({
         oldestMessageId: null,
       };
     },
+    
     appendPaginatedNotifications: (state, action) => {
       const { notifications, metadata } = action.payload;
       
@@ -1130,6 +1131,54 @@ const notificationsSlice = createSlice({
       
       state.loading = false;
       state.error = null;
+    })
+    .addCase("notifications/updatePaginatedNotifications", (state, action) => {
+      const { notifications: updatedNotifications, source } = action.payload;
+      
+      if (!updatedNotifications || !Array.isArray(updatedNotifications)) return;
+      
+      // Aggiorna le notifiche esistenti nelle paginatedNotifications
+      updatedNotifications.forEach(updatedNotif => {
+        const index = state.paginatedNotifications.findIndex(
+          n => n.notificationId === updatedNotif.notificationId
+        );
+        
+        if (index !== -1) {
+          // Aggiorna la notifica esistente
+          state.paginatedNotifications[index] = {
+            ...state.paginatedNotifications[index],
+            ...updatedNotif,
+            // Assicurati che isReadByUser sia aggiornato correttamente
+            isReadByUser: state.openChatIds.has(updatedNotif.notificationId) 
+              ? true 
+              : updatedNotif.isReadByUser
+          };
+        } else if (state.notificationsPagination.currentPage === 1) {
+          // Se siamo alla prima pagina e la notifica non esiste, potrebbe essere una nuova
+          // Inseriscila all'inizio
+          state.paginatedNotifications.unshift({
+            ...updatedNotif,
+            isReadByUser: state.openChatIds.has(updatedNotif.notificationId) 
+              ? true 
+              : updatedNotif.isReadByUser
+          });
+          
+          // Mantieni solo il numero massimo di notifiche per pagina
+          if (state.paginatedNotifications.length > state.notificationsPagination.pageSize) {
+            state.paginatedNotifications = state.paginatedNotifications.slice(
+              0, 
+              state.notificationsPagination.pageSize
+            );
+          }
+        }
+      });
+      
+      // Riordina le notifiche (pinned prima, poi per data)
+      state.paginatedNotifications.sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return new Date(b.lastMessage) - new Date(a.lastMessage);
+      });
     })
     .addCase(fetchPaginatedNotifications.rejected, (state, action) => {
       state.loading = false;
