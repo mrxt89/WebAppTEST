@@ -57,7 +57,6 @@ const Header = ({
   useEffect(() => {
     const handleUnreadCountChanged = (event) => {
       if (event.detail && typeof event.detail.unreadCount === 'number') {
-        console.log('[Header] Aggiornamento unreadCount da evento:', event.detail);
         
         // Se l'evento viene dalla sidebar chiusa o è un refresh forzato, aggiorna sempre
         if (event.detail.source === 'sidebar-closed' || event.detail.forced) {

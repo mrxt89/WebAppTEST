@@ -452,7 +452,7 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
       {/* Messaggio */}
       <motion.div
         ref={messageRef}
-        className={`flex p-2 mb-2 relative ${(isOwnMessage || isOwnMessage == '1') ? 'justify-end' : 'justify-start'} ${isSearchResult ? 'bg-yellow-50' : ''}`}
+        className={`flex p-2 mx-2 mb-2 relative ${(isOwnMessage || isOwnMessage == '1') ? 'justify-end' : 'justify-start'} ${isSearchResult ? 'bg-yellow-50' : ''}`}
         initial={isNew ? { opacity: 0, y: 20 } : false}
         animate={isNew ? { opacity: 1, y: 0 } : false}
         exit={{ opacity: 0, y: -20 }}

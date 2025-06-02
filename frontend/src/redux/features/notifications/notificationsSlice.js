@@ -627,6 +627,15 @@ const notificationsSlice = createSlice({
   name: "notifications",
   initialState: {
     notifications: [],
+    paginatedNotifications: [],
+    notificationsPagination: {
+      currentPage: 1,
+      pageSize: 20,
+      totalPages: 0,
+      totalNotifications: 0,
+      hasMore: false,
+      isLoadingMore: false
+    },
     openChatData: {}, // NUOVO: Storage per dati completi delle chat aperte
     chatPagination: {},
     unreadCount: 0,
@@ -650,6 +659,66 @@ const notificationsSlice = createSlice({
         isLoadingMore: false,
         oldestMessageId: null,
       };
+    },
+    appendPaginatedNotifications: (state, action) => {
+      const { notifications, metadata } = action.payload;
+      
+      // Evita duplicati
+      const existingIds = new Set(state.paginatedNotifications.map(n => n.notificationId));
+      const newNotifications = notifications.filter(n => !existingIds.has(n.notificationId));
+      
+      state.paginatedNotifications = [...state.paginatedNotifications, ...newNotifications];
+      state.notificationsPagination = {
+        ...state.notificationsPagination,
+        ...metadata,
+        isLoadingMore: false
+      };
+    },
+    updatePaginatedNotification: (state, action) => {
+      const { notificationId, updates } = action.payload;
+      
+      // Trova e aggiorna la notifica nelle notifiche paginate
+      const index = state.paginatedNotifications.findIndex(
+        n => n.notificationId === notificationId
+      );
+      
+      if (index !== -1) {
+        state.paginatedNotifications[index] = {
+          ...state.paginatedNotifications[index],
+          ...updates
+        };
+      }
+      
+      // Aggiorna anche nelle notifiche normali se presente
+      const normalIndex = state.notifications.findIndex(
+        n => n.notificationId === notificationId
+      );
+      
+      if (normalIndex !== -1) {
+        state.notifications[normalIndex] = {
+          ...state.notifications[normalIndex],
+          ...updates
+        };
+      }
+    },
+    resetPaginatedNotifications: (state) => {
+      state.paginatedNotifications = [];
+      state.notificationsPagination = {
+        currentPage: 1,
+        pageSize: 20,
+        totalPages: 0,
+        totalNotifications: 0,
+        hasMore: false,
+        isLoadingMore: false
+      };
+    },
+    
+    setLoadingMore: (state, action) => {
+      state.notificationsPagination.isLoadingMore = action.payload;
+    },
+    
+    updateUnreadCount: (state, action) => {
+      state.unreadCount = action.payload;
     },
     // NUOVO: Sostituisci messaggio temporaneo con quello reale
     replaceTemporaryMessage: (state, action) => {
@@ -1033,6 +1102,40 @@ const notificationsSlice = createSlice({
 
   extraReducers: (builder) => {
     builder
+    // Gestisci fetch paginato
+    .addCase(fetchPaginatedNotifications.pending, (state, action) => {
+      if (!action.meta.arg.append) {
+        state.loading = true;
+      }
+    })
+    .addCase(fetchPaginatedNotifications.fulfilled, (state, action) => {
+      const { unreadCount, notifications, metadata, append } = action.payload;
+      
+      state.unreadCount = unreadCount;
+      
+      if (append) {
+        // Aggiungi alle esistenti
+        const existingIds = new Set(state.paginatedNotifications.map(n => n.notificationId));
+        const newNotifications = notifications.filter(n => !existingIds.has(n.notificationId));
+        state.paginatedNotifications = [...state.paginatedNotifications, ...newNotifications];
+      } else {
+        // Sostituisci
+        state.paginatedNotifications = notifications;
+      }
+      
+      state.notificationsPagination = {
+        ...metadata,
+        isLoadingMore: false
+      };
+      
+      state.loading = false;
+      state.error = null;
+    })
+    .addCase(fetchPaginatedNotifications.rejected, (state, action) => {
+      state.loading = false;
+      state.notificationsPagination.isLoadingMore = false;
+      state.error = action.payload;
+    })
     .addCase(loadMoreMessages.pending, (state, action) => {
         const notificationId = action.meta.arg.notificationId;
         if (state.chatPagination[notificationId]) {
@@ -1799,6 +1902,45 @@ export const isNotificationMuted = (notification) => {
   return now < expiryDate;
 };
 
+// Nuovo thunk per caricamento paginato
+export const fetchPaginatedNotifications = createAsyncThunk(
+  "notifications/fetchPaginated",
+  async ({ page = 1, filters = {}, append = false }, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return rejectWithValue("No token available");
+
+      const params = new URLSearchParams({
+        page,
+        pageSize: 20,
+        ...Object.entries(filters).reduce((acc, [key, value]) => {
+          if (value !== null && value !== undefined && value !== '') {
+            acc[key] = value;
+          }
+          return acc;
+        }, {})
+      });
+
+      const response = await axios.get(
+        `${config.API_BASE_URL}/notifications/paginated?${params}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache",
+          },
+        }
+      );
+
+      return {
+        ...response.data,
+        append
+      };
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 // Export actions
 export const {
  setOpenChatData,
@@ -1823,7 +1965,11 @@ export const {
   updateMessageInOpenChat,
   removeMessageLocally,
   updateMessageColorLocally,
-  refreshData
+  refreshData,
+  appendPaginatedNotifications,
+  resetPaginatedNotifications,
+  setLoadingMore,
+  updatePaginatedNotification
 } = notificationsSlice.actions;
 
 export default notificationsSlice.reducer;
