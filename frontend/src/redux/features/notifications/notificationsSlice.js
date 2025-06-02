@@ -651,27 +651,152 @@ const notificationsSlice = createSlice({
         oldestMessageId: null,
       };
     },
-     // NUOVO: Sostituisci messaggio temporaneo con quello reale
-  replaceTemporaryMessage: (state, action) => {
-    const { notificationId, tempMessageId, realMessage } = action.payload;
-    
-    if (state.openChatData[notificationId]) {
-      const messages = Array.isArray(state.openChatData[notificationId].messages)
-        ? state.openChatData[notificationId].messages
-        : JSON.parse(state.openChatData[notificationId].messages || "[]");
+    // NUOVO: Sostituisci messaggio temporaneo con quello reale
+    replaceTemporaryMessage: (state, action) => {
+      const { notificationId, tempMessageId, realMessage } = action.payload;
       
-      // Trova e sostituisci il messaggio temporaneo
-      const messageIndex = messages.findIndex(m => m.messageId === tempMessageId);
-      if (messageIndex !== -1) {
-        messages[messageIndex] = {
-          ...messages[messageIndex],
-          ...realMessage,
-          _isTemporary: false
-        };
-        state.openChatData[notificationId].messages = messages;
+      if (state.openChatData[notificationId]) {
+        const messages = Array.isArray(state.openChatData[notificationId].messages)
+          ? state.openChatData[notificationId].messages
+          : JSON.parse(state.openChatData[notificationId].messages || "[]");
+        
+        // Trova e sostituisci il messaggio temporaneo
+        const messageIndex = messages.findIndex(m => m.messageId === tempMessageId);
+        if (messageIndex !== -1) {
+          messages[messageIndex] = {
+            ...messages[messageIndex],
+            ...realMessage,
+            _isTemporary: false
+          };
+          state.openChatData[notificationId].messages = messages;
+        }
       }
-    }
-  },
+    },
+    // NUOVO: Aggiorna messaggio modificato in openChatData
+    updateMessageInOpenChat: (state, action) => {
+      const { notificationId, messageId, updatedMessage } = action.payload;
+      
+      if (state.openChatData[notificationId]) {
+        const messages = Array.isArray(state.openChatData[notificationId].messages)
+          ? state.openChatData[notificationId].messages
+          : JSON.parse(state.openChatData[notificationId].messages || "[]");
+        
+        // Trova e aggiorna il messaggio
+        const messageIndex = messages.findIndex(m => m.messageId === messageId);
+        if (messageIndex !== -1) {
+          messages[messageIndex] = {
+            ...messages[messageIndex],
+            message: updatedMessage,
+            isEdited: "1",
+            lastEditedAt: new Date().toISOString()
+          };
+          
+          // IMPORTANTE: Aggiorna openChatData con i messaggi modificati
+          state.openChatData[notificationId] = {
+            ...state.openChatData[notificationId],
+            messages: messages,
+            lastUpdate: Date.now() // Aggiungi timestamp di aggiornamento
+          };
+        }
+      }
+      
+      // Aggiorna anche la notifica nella sidebar se necessario
+      const notification = state.notifications.find(n => n.notificationId === notificationId);
+      if (notification) {
+        const messages = Array.isArray(notification.messages) 
+          ? notification.messages 
+          : (typeof notification.messages === 'string' ? JSON.parse(notification.messages || '[]') : []);
+        
+        const messageIndex = messages.findIndex(m => m.messageId === messageId);
+        if (messageIndex !== -1) {
+          messages[messageIndex] = {
+            ...messages[messageIndex],
+            message: updatedMessage,
+            isEdited: "1",
+            lastEditedAt: new Date().toISOString()
+          };
+          notification.messages = messages;
+        }
+      }
+    },
+    // NUOVO: Rimuovi messaggio da openChatData
+    removeMessageFromOpenChat: (state, action) => {
+      const { notificationId, messageId } = action.payload;
+      
+      if (state.openChatData[notificationId]) {
+        const messages = Array.isArray(state.openChatData[notificationId].messages)
+          ? state.openChatData[notificationId].messages
+          : JSON.parse(state.openChatData[notificationId].messages || "[]");
+        
+        // Filtra via il messaggio eliminato
+        const filteredMessages = messages.filter(m => m.messageId !== messageId);
+        
+        state.openChatData[notificationId].messages = filteredMessages;
+        state.openChatData[notificationId].messageCount = filteredMessages.length;
+        
+        // Aggiorna anche il totalMessageCount
+        if (state.openChatData[notificationId].totalMessageCount) {
+          state.openChatData[notificationId].totalMessageCount--;
+        }
+      }
+      
+      // IMPORTANTE: Aggiorna anche la notifica nella sidebar
+      const notification = state.notifications.find(n => n.notificationId === notificationId);
+      if (notification) {
+        // Aggiorna il conteggio messaggi
+        if (notification.messageCount) {
+          notification.messageCount--;
+        }
+        
+        // Se il messaggio eliminato era l'ultimo, aggiorna lastMessage
+        const messages = Array.isArray(notification.messages) 
+          ? notification.messages 
+          : (typeof notification.messages === 'string' ? JSON.parse(notification.messages || '[]') : []);
+        
+        const filteredSidebarMessages = messages.filter(m => m.messageId !== messageId);
+        
+        if (filteredSidebarMessages.length > 0) {
+          const lastMsg = filteredSidebarMessages[filteredSidebarMessages.length - 1];
+          notification.lastMessage = lastMsg.tbCreated;
+        }
+        
+        // Mantieni solo gli ultimi 5 messaggi per la sidebar
+        notification.messages = filteredSidebarMessages.slice(-5);
+      }
+    },
+    
+    // NUOVO: Aggiorna colore messaggio in openChatData
+    updateMessageColorInOpenChat: (state, action) => {
+      const { notificationId, messageId, color } = action.payload;
+      
+      if (state.openChatData[notificationId]) {
+        const messages = Array.isArray(state.openChatData[notificationId].messages)
+          ? state.openChatData[notificationId].messages
+          : JSON.parse(state.openChatData[notificationId].messages || "[]");
+        
+        // Trova e aggiorna il messaggio
+        const messageIndex = messages.findIndex(m => m.messageId === messageId);
+        if (messageIndex !== -1) {
+          messages[messageIndex].messageColor = color;
+          state.openChatData[notificationId].messages = messages;
+        }
+      }
+      
+      // IMPORTANTE: Aggiorna anche la notifica nella sidebar se necessario
+      const notification = state.notifications.find(n => n.notificationId === notificationId);
+      if (notification) {
+        const messages = Array.isArray(notification.messages) 
+          ? notification.messages 
+          : (typeof notification.messages === 'string' ? JSON.parse(notification.messages || '[]') : []);
+        
+        const messageIndex = messages.findIndex(m => m.messageId === messageId);
+        if (messageIndex !== -1) {
+          messages[messageIndex].messageColor = color;
+          notification.messages = messages;
+        }
+      }
+    },
+
    // NUOVO: Aggiorna dati completi per chat aperta
    setOpenChatData: (state, action) => {
     const { notificationId, data } = action.payload;
@@ -1693,6 +1818,12 @@ export const {
   unregisterStandaloneChat,
   initializeStandaloneChats,
   cleanupStandaloneChats,
+  removeMessageFromOpenChat,
+  updateMessageColorInOpenChat,
+  updateMessageInOpenChat,
+  removeMessageLocally,
+  updateMessageColorLocally,
+  refreshData
 } = notificationsSlice.actions;
 
 export default notificationsSlice.reducer;

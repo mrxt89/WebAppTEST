@@ -504,29 +504,41 @@ const openChatModal = async (notificationId) => {
       return;
     }
 
+    console.log(`[MainPage] Minimizzando chat ${notification.notificationId}`);
+
+    // 1. Prima di tutto, aggiorna il window manager
     if (windowManager?.toggleMinimize) {
       windowManager.toggleMinimize(notification.notificationId);
+      console.log(`[MainPage] WindowManager minimizzazione completata per ${notification.notificationId}`);
     }
 
+    // 2. Aggiungi alle chat minimizzate se non è già presente
     setMinimizedChats((prevMinimized) => {
-      if (
-        !prevMinimized.some(
-          (chat) => chat.notificationId === notification.notificationId,
-        )
-      ) {
+      const isAlreadyMinimized = prevMinimized.some(
+        (chat) => chat.notificationId === notification.notificationId,
+      );
+      
+      if (!isAlreadyMinimized) {
+        console.log(`[MainPage] Aggiunta chat ${notification.notificationId} alle minimizzate`);
         return [...prevMinimized, notification];
       }
+      
+      console.log(`[MainPage] Chat ${notification.notificationId} già nelle minimizzate`);
       return prevMinimized;
     });
 
+    // 3. Assicurati che rimanga in openChats (necessario per il rendering)
     setOpenChats((prevChats) => {
-      if (
-        !prevChats.some(
-          (chat) => chat.notificationId === notification.notificationId,
-        )
-      ) {
+      const existingChat = prevChats.find(
+        (chat) => chat.notificationId === notification.notificationId,
+      );
+      
+      if (!existingChat) {
+        console.log(`[MainPage] Aggiunta chat ${notification.notificationId} alle aperte`);
         return [...prevChats, notification];
       }
+      
+      console.log(`[MainPage] Chat ${notification.notificationId} già nelle aperte`);
       return prevChats;
     });
   };
@@ -541,33 +553,48 @@ const openChatModal = async (notificationId) => {
       return;
     }
 
+    console.log(`[MainPage] Ripristinando chat ${notification.notificationId}`);
+
+    // 1. Prima di tutto, aggiorna il window manager
     if (windowManager?.toggleMinimize) {
       windowManager.toggleMinimize(notification.notificationId);
+      console.log(`[MainPage] WindowManager ripristino completato per ${notification.notificationId}`);
     }
 
+    // 2. Rimuovi dalle chat minimizzate
     setMinimizedChats((prevMinimized) => {
-      return prevMinimized.filter(
+      const filtered = prevMinimized.filter(
         (chat) => chat.notificationId !== notification.notificationId,
       );
+      console.log(`[MainPage] Chat ${notification.notificationId} rimossa dalle minimizzate`);
+      return filtered;
     });
 
+    // 3. Assicurati che sia in openChats e aggiornata
     setOpenChats((prevChats) => {
-      if (
-        !prevChats.some(
-          (chat) => chat.notificationId === notification.notificationId,
-        )
-      ) {
+      const existingChatIndex = prevChats.findIndex(
+        (chat) => chat.notificationId === notification.notificationId,
+      );
+      
+      if (existingChatIndex !== -1) {
+        // Aggiorna la chat esistente
+        const updatedChats = [...prevChats];
+        updatedChats[existingChatIndex] = notification;
+        console.log(`[MainPage] Chat ${notification.notificationId} aggiornata nelle aperte`);
+        return updatedChats;
+      } else {
+        // Aggiungi se non esiste
+        console.log(`[MainPage] Chat ${notification.notificationId} aggiunta alle aperte`);
         return [...prevChats, notification];
       }
-      return prevChats.map((chat) =>
-        chat.notificationId === notification.notificationId
-          ? notification
-          : chat,
-      );
     });
 
+    // 4. Attiva la finestra
     if (windowManager?.activateWindow) {
-      windowManager.activateWindow(notification.notificationId);
+      setTimeout(() => {
+        windowManager.activateWindow(notification.notificationId);
+        console.log(`[MainPage] Finestra ${notification.notificationId} attivata`);
+      }, 100);
     }
   };
 

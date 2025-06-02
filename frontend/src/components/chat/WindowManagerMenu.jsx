@@ -45,7 +45,11 @@ const WindowManagerMenu = ({
   };
 
   const handleMinimizeToggle = () => {
-    // Usa openChats come fonte di verità per lo stato delle chat
+    console.log('[WindowManagerMenu] handleMinimizeToggle chiamato');
+    console.log('openChats:', openChats.map(c => ({ id: c.notificationId, title: c.title })));
+    console.log('minimizedChats:', minimizedChats.map(c => ({ id: c.notificationId, title: c.title })));
+    
+    // Trova le chat visibili (in openChats ma non in minimizedChats)
     const visibleChats = openChats.filter(
       (chat) =>
         !minimizedChats.some(
@@ -53,32 +57,50 @@ const WindowManagerMenu = ({
         ),
     );
 
+    console.log('visibleChats:', visibleChats.map(c => ({ id: c.notificationId, title: c.title })));
+
     if (visibleChats.length > 0) {
       // Minimizza tutte le chat visibili
-      visibleChats.forEach((chat) => {
-        // Aggiorna il window manager
-        if (windowManager?.toggleMinimize) {
-          windowManager.toggleMinimize(chat.notificationId);
-        }
-        // Aggiorna lo stato delle chat minimizzate
-        if (onMinimizeChat) {
-          onMinimizeChat(chat);
-        }
+      console.log('[WindowManagerMenu] Minimizzando tutte le chat visibili');
+      visibleChats.forEach((chat, index) => {
+        setTimeout(() => {
+          console.log(`[WindowManagerMenu] Minimizzando chat ${chat.notificationId}`);
+          
+          // Aggiorna il window manager
+          if (windowManager?.toggleMinimize) {
+            windowManager.toggleMinimize(chat.notificationId);
+          }
+          
+          // Aggiorna lo stato delle chat minimizzate
+          if (onMinimizeChat) {
+            onMinimizeChat(chat);
+          }
+        }, index * 50); // Piccolo delay per evitare conflitti
       });
-    } else {
+    } else if (minimizedChats.length > 0) {
       // Ripristina tutte le chat minimizzate
-      minimizedChats.forEach((chat) => {
-        // Aggiorna il window manager
-        if (windowManager?.toggleMinimize) {
-          windowManager.toggleMinimize(chat.notificationId);
-        }
-        // Ripristina la chat
-        if (restoreChat) {
-          restoreChat(chat);
-        }
+      console.log('[WindowManagerMenu] Ripristinando tutte le chat minimizzate');
+      minimizedChats.forEach((chat, index) => {
+        setTimeout(() => {
+          console.log(`[WindowManagerMenu] Ripristinando chat ${chat.notificationId}`);
+          
+          // Aggiorna il window manager
+          if (windowManager?.toggleMinimize) {
+            windowManager.toggleMinimize(chat.notificationId);
+          }
+          
+          // Ripristina la chat
+          if (restoreChat) {
+            restoreChat(chat);
+          }
+        }, index * 50); // Piccolo delay per evitare conflitti
       });
     }
-    onClose();
+    
+    // Chiudi il menu dopo l'operazione
+    setTimeout(() => {
+      onClose();
+    }, 200);
   };
 
   return (

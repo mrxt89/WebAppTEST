@@ -247,7 +247,7 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
             },
           },
         );
-
+        console.log("🔄 ChatMessage: Risposta eliminazione messaggio. Response:", response)
         if (response.data && response.data.success) {
           swal.fire({
             icon: 'success',
@@ -256,7 +256,17 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
             timer: 1500,
             showConfirmButton: false,
           });
-
+  
+          // IMPORTANTE: Emetti evento con notificationId
+          document.dispatchEvent(
+            new CustomEvent('message-deleted', {
+              detail: {
+                notificationId: parseInt(notificationId),
+                messageId: message.messageId
+              }
+            })
+          );
+  
           // Forza il ricaricamento
           document.dispatchEvent(
             new CustomEvent('reload-open-chat', {
@@ -368,6 +378,8 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
   // Ottieni il colore del testo in base al contrasto
   const getContrastTextColor = (bgColor) => {
     if (!bgColor) return "#000000";
+    // Testo sempre nero
+    return "#000000";
     const r = parseInt(bgColor.slice(1, 3), 16);
     const g = parseInt(bgColor.slice(3, 5), 16);
     const b = parseInt(bgColor.slice(5, 7), 16);
@@ -471,7 +483,7 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
           {/* Bubble messaggio */}
           <div className="flex items-center gap-2">
             {/* Bandierina per messaggi colorati */}
-            {(!isOwnMessage || isOwnMessage == '0') && message.messageColor && (
+            { message.messageColor && (
               <span
                 className="message-flag animate-flag"
                 style={{ color: message.messageColor }}
@@ -561,6 +573,7 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
                   >
                     <MessageColorPicker
                       messageId={message.messageId}
+                      notificationId={notificationId} // IMPORTANTE: Passa notificationId
                       onClose={() => setShowColorPicker(false)}
                     />
                   </div>

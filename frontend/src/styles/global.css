@@ -2308,3 +2308,18 @@ button:disabled {
 .dark-theme .new-messages-divider-content {
   background: #128C7E;
 }
+.message-flag {
+  font-size: 16px;
+  margin-right: 8px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+.animate-flag {
+  animation: wave 2s ease-in-out infinite;
+}
+
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
+}

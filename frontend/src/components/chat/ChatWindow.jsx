@@ -82,12 +82,11 @@ const ChatWindow = ({
     reopen,
     close,
     uploadAttachment,
+
   } = useOpenChat(notification?.notificationId, {
     autoRefresh: !isStandalone,
     playSound: true
   });
-
-  
 
   // Hook per funzionalità aggiuntive non coperte da useOpenChat
   const {
@@ -150,35 +149,43 @@ const ChatWindow = ({
     [isStandalone, standaloneData?.responseOptions, hookResponseOptions]
   );
 
-   // Funzione dedicata per il caricamento degli utenti
- const loadUsers = useCallback(async () => {
-  if (!shouldFetchUsers()) return;
 
-  try {
-    const fetchedUsers = await fetchUsers();
-    if (Array.isArray(fetchedUsers) && fetchedUsers.length > 0) {
-      updateUsers(fetchedUsers);
-      setChatUsers(fetchedUsers);
+  // NUOVO: Handler per marcare come interagito
+  const handleMarkAsInteracted = useCallback(() => {
+    console.log("[ChatWindow] Marcando come interagito");
+    markAsInteracted();
+  }, [markAsInteracted]);
+
+
+  // Funzione dedicata per il caricamento degli utenti
+  const loadUsers = useCallback(async () => {
+    if (!shouldFetchUsers()) return;
+
+    try {
+      const fetchedUsers = await fetchUsers();
+      if (Array.isArray(fetchedUsers) && fetchedUsers.length > 0) {
+        updateUsers(fetchedUsers);
+        setChatUsers(fetchedUsers);
+      }
+    } catch (error) {
+      console.error("Errore nel caricamento degli utenti:", error);
     }
-  } catch (error) {
-    console.error("Errore nel caricamento degli utenti:", error);
-  }
-}, [fetchUsers, shouldFetchUsers, updateUsers]);
+  }, [fetchUsers, shouldFetchUsers, updateUsers]);
 
-   // Effetto per il caricamento iniziale degli utenti
- useEffect(() => {
-  if (notification?.notificationId) {
-    loadUsers();
-  }
-}, [notification?.notificationId, loadUsers]);
+  // Effetto per il caricamento iniziale degli utenti
+  useEffect(() => {
+    if (notification?.notificationId) {
+      loadUsers();
+    }
+  }, [notification?.notificationId, loadUsers]);
 
- // Funzione di utilità per filtrare gli utenti disabilitati in modo sicuro
- const getFilteredUsers = useCallback(() => {
-  const usersToFilter = chatUsers.length > 0 ? chatUsers : memoizedUsers;
-  return Array.isArray(usersToFilter)
-    ? usersToFilter.filter((user) => user && !user.userDisabled)
-    : [];
-}, [chatUsers, memoizedUsers]);
+  // Funzione di utilità per filtrare gli utenti disabilitati in modo sicuro
+  const getFilteredUsers = useCallback(() => {
+    const usersToFilter = chatUsers.length > 0 ? chatUsers : memoizedUsers;
+    return Array.isArray(usersToFilter)
+      ? usersToFilter.filter((user) => user && !user.userDisabled)
+      : [];
+  }, [chatUsers, memoizedUsers]);
 
   // Caricamento iniziale dei dati
   useEffect(() => {
@@ -215,6 +222,7 @@ const ChatWindow = ({
 
   const handleMinimize = useCallback(() => {
     if (onMinimize && notification) {
+      console.log(`[ChatWindow] Minimizzando chat ${notification.notificationId}`);
       onMinimize(notification);
     }
   }, [onMinimize, notification]);
@@ -272,8 +280,6 @@ const ChatWindow = ({
         
         // Marca come interagito per rimuovere indicatore nuovi messaggi
         markAsInteracted();
-        
-       
       }
 
       return result;
@@ -584,7 +590,7 @@ const ChatWindow = ({
     }
   }, [size, windowManager, notification]);
 
-  // Inizializzazione posizione/dimensione finestra
+  // CORREZIONE: Sincronizza stato minimized con windowManager
   useEffect(() => {
     if (windowManager && notification && !initialLoaded) {
       const windowId = notification.notificationId;
@@ -606,10 +612,17 @@ const ChatWindow = ({
           height: windowState.height || 700,
         };
 
+        // IMPORTANTE: Sincronizza stato minimizzato
         setIsMinimized(windowState.isMinimized || false);
         setIsMaximized(windowState.isMaximized || false);
 
         setInitialLoaded(true);
+        
+        console.log(`[ChatWindow] Stato finestra sincronizzato:`, {
+          windowId,
+          isMinimized: windowState.isMinimized,
+          isMaximized: windowState.isMaximized
+        });
       }
 
       if (windowManager.getZIndex) {
@@ -622,6 +635,38 @@ const ChatWindow = ({
     }
   }, [windowManager, notification, initialX, initialY, initialLoaded]);
 
+  // NUOVO: Effect per ascoltare cambiamenti di stato del windowManager
+  useEffect(() => {
+    if (!windowManager || !notification) return;
+
+    const windowId = notification.notificationId;
+    const checkWindowState = () => {
+      const windowState = windowManager.windowStates?.[windowId];
+      if (windowState) {
+        const newIsMinimized = windowState.isMinimized || false;
+        const newIsMaximized = windowState.isMaximized || false;
+        
+        // Aggiorna solo se lo stato è cambiato
+        if (newIsMinimized !== isMinimized) {
+          console.log(`[ChatWindow] Aggiornamento stato minimized: ${isMinimized} -> ${newIsMinimized}`);
+          setIsMinimized(newIsMinimized);
+        }
+        
+        if (newIsMaximized !== isMaximized) {
+          console.log(`[ChatWindow] Aggiornamento stato maximized: ${isMaximized} -> ${newIsMaximized}`);
+          setIsMaximized(newIsMaximized);
+        }
+      }
+    };
+
+    // Controlla immediatamente
+    checkWindowState();
+
+    // Controlla periodicamente per sincronizzazione
+    const interval = setInterval(checkWindowState, 100);
+
+    return () => clearInterval(interval);
+  }, [windowManager, notification, isMinimized, isMaximized]);
 
   // Segna come letto all'apertura
   useEffect(() => {
@@ -630,7 +675,9 @@ const ChatWindow = ({
     }
   }, [notification?.notificationId, chatData?.isReadByUser, toggleReadUnread]);
 
+  // IMPORTANTE: Return null se minimizzata o non c'è notification
   if (!notification || isMinimized) {
+    
     return null;
   }
 
@@ -700,6 +747,7 @@ const ChatWindow = ({
           closingUser_Name={chatData?.closingUser_Name}
           closingDate={chatData?.closingDate}
           hasNewMessages={hasNewMessages}
+          onMarkAsInteracted={handleMarkAsInteracted}
           reopenChat={async () => {
             const res = await reopen();
             if (res) {

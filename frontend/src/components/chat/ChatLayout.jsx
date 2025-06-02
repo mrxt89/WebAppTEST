@@ -40,11 +40,13 @@ const ChatLayout = ({
   hasNewMessages,
   reopenChat,
   closeChat,
-  // NUOVI PROPS PER LA PAGINAZIONE:
   onLoadMore,
   hasMoreMessages,
   isLoadingMore,
   totalMessageCount,
+  onMessageDeleted,
+  onMessageColorChanged,
+  onMarkAsInteracted,
 }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
@@ -235,6 +237,8 @@ const ChatLayout = ({
               isClosed={isClosed}
               closingUser_Name={closingUser_Name}
               closingDate={closingDate}
+              onMarkAsInteracted={onMarkAsInteracted}
+              currentUserId={messages[0]?.selectedUser || users[0]?.userId || 0}
             />
           )}
         </div>

@@ -1075,11 +1075,79 @@ export const useNotifications = () => {
     [dispatch],
   );
 
+    // NUOVO: Funzione per ottenere dati chat aperta
+    const getOpenChatData = useCallback(
+      (notificationId) => {
+        return openChatData[notificationId];
+      },
+      [openChatData]
+    );
+
   const handleFilterMessages = useCallback(
-    (notificationId, filter) => {
-      return dispatch(filterMessages({ notificationId, ...filter })).unwrap();
+    async (notificationId, filter) => {
+      try {
+        // Prima ottieni i dati della chat corrente
+        const chatData = getOpenChatData(notificationId);
+        
+        if (!chatData || !chatData.messages) {
+          console.error("Nessun dato chat disponibile per la ricerca");
+          return { filteredMessages: [], totalFound: 0 };
+        }
+  
+        // Estrai i messaggi
+        let messages = [];
+        if (Array.isArray(chatData.messages)) {
+          messages = chatData.messages;
+        } else if (typeof chatData.messages === 'string') {
+          try {
+            messages = JSON.parse(chatData.messages);
+          } catch (e) {
+            console.error("Errore nel parsing dei messaggi:", e);
+            messages = [];
+          }
+        }
+  
+        console.log(`🔍 Ricerca locale tra ${messages.length} messaggi`);
+  
+        // Filtra localmente i messaggi
+        let filteredMessages = [...messages];
+  
+        // Filtro per testo
+        if (filter.searchText && filter.searchText.trim()) {
+          const searchTerm = filter.searchText.toLowerCase().trim();
+          filteredMessages = filteredMessages.filter(message => {
+            if (!message.message) return false;
+            return message.message.toLowerCase().includes(searchTerm);
+          });
+        }
+  
+        // Filtro per colore
+        if (filter.color) {
+          filteredMessages = filteredMessages.filter(message => 
+            message.messageColor === filter.color
+          );
+        }
+  
+        // Filtro per tipo (sondaggi)
+        if (filter.messageType === 'polls') {
+          filteredMessages = filteredMessages.filter(message => 
+            message.pollId || (message.message && message.message.includes('**Sondaggio creato**'))
+          );
+        }
+  
+        console.log(`✅ Trovati ${filteredMessages.length} messaggi che corrispondono ai criteri`);
+  
+        return {
+          filteredMessages: filteredMessages,
+          totalFound: filteredMessages.length
+        };
+  
+      } catch (error) {
+        console.error("Errore nel filtraggio dei messaggi:", error);
+        throw error;
+      }
     },
-    [dispatch],
+    [getOpenChatData]
   );
 
   // Nuove funzioni per i sondaggi
@@ -1266,13 +1334,7 @@ export const useNotifications = () => {
     [dispatch],
   );
 
-  // NUOVO: Funzione per ottenere dati chat aperta
-  const getOpenChatData = useCallback(
-    (notificationId) => {
-      return openChatData[notificationId];
-    },
-    [openChatData]
-  );
+
 
   // NUOVO: Funzione per aggiornare openChatData
   const updateOpenChatData = useCallback(

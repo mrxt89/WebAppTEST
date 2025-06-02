@@ -31,29 +31,46 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
     setError("");
 
     try {
-      const filteredMessages = await filterMessages(notificationId, {
+      console.log("🔍 Ricerca messaggi con termine:", term);
+      
+      const response = await filterMessages(notificationId, {
         searchText: term,
       });
 
-      if (!filteredMessages) {
+      console.log("📝 Risposta filterMessages:", response);
+
+      // Gestisci la risposta in base alla struttura restituita
+      let filteredMessages = [];
+      
+      if (response) {
+        if (response.filteredMessages) {
+          filteredMessages = response.filteredMessages;
+        } else if (Array.isArray(response)) {
+          filteredMessages = response;
+        } else if (response.messages) {
+          filteredMessages = response.messages;
+        }
+      }
+
+      console.log("✅ Messaggi filtrati:", filteredMessages.length);
+
+      if (filteredMessages.length === 0) {
         setResults([]);
         setError("Nessun risultato trovato");
+        setCurrentIndex(-1);
         return;
       }
 
       setResults(filteredMessages);
-
-      // Reset dell'indice corrente
-      if (filteredMessages.length > 0) {
-        setCurrentIndex(0);
-        // Seleziona il primo risultato
+      setCurrentIndex(0);
+      
+      // Seleziona il primo risultato
+      if (filteredMessages[0]?.messageId) {
         onResultSelected(filteredMessages[0].messageId);
-      } else {
-        setCurrentIndex(-1);
-        setError("Nessun risultato trovato");
       }
     } catch (error) {
-      console.error("Errore durante la ricerca:", error);
+      console.error("❌ Errore durante la ricerca:", error);
+      setResults([]);
       setError("Errore durante la ricerca");
     } finally {
       setLoading(false);
@@ -78,7 +95,10 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
 
     const newIndex = (currentIndex + 1) % results.length;
     setCurrentIndex(newIndex);
-    onResultSelected(results[newIndex].messageId);
+    
+    if (results[newIndex]?.messageId) {
+      onResultSelected(results[newIndex].messageId);
+    }
   };
 
   const navigatePrevious = () => {
@@ -86,7 +106,10 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
 
     const newIndex = (currentIndex - 1 + results.length) % results.length;
     setCurrentIndex(newIndex);
-    onResultSelected(results[newIndex].messageId);
+    
+    if (results[newIndex]?.messageId) {
+      onResultSelected(results[newIndex].messageId);
+    }
   };
 
   // Gestione scorciatoie da tastiera
@@ -94,11 +117,12 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
     if (e.key === "Escape") {
       onClose();
     } else if (e.key === "Enter") {
-      // Se premiamo Enter e stiamo effettuando una nuova ricerca
-      if (searchTerm !== results[currentIndex]?.message) {
+      e.preventDefault();
+      // Se non abbiamo ancora risultati, cerca
+      if (results.length === 0 && searchTerm.trim().length >= 2) {
         searchMessages(searchTerm);
-      } else {
-        // Altrimenti navighiamo al prossimo risultato
+      } else if (results.length > 0) {
+        // Altrimenti naviga al prossimo risultato
         navigateNext();
       }
     } else if (e.key === "ArrowDown") {
@@ -110,8 +134,23 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
     }
   };
 
+  // Gestione del reset della ricerca
+  const handleReset = () => {
+    setSearchTerm("");
+    setResults([]);
+    setCurrentIndex(-1);
+    setError("");
+    
+    // Emetti evento per resettare evidenziazioni
+    document.dispatchEvent(
+      new CustomEvent("chat-reset-filters", {
+        detail: { targetNotificationId: notificationId }
+      })
+    );
+  };
+
   return (
-    <div className="absolute top-16 right-4 z-50 flex items-center bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden min-w-[300px]">
+    <div className="absolute top-16 right-4 z-[60] flex items-center bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden min-w-[300px]">
       <div className="relative flex-1">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
           {loading ? (
@@ -131,7 +170,7 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
         />
         {searchTerm && (
           <button
-            onClick={() => setSearchTerm("")}
+            onClick={handleReset}
             className="absolute inset-y-0 right-10 flex items-center pr-2 text-gray-400 hover:text-gray-600"
           >
             <X className="h-4 w-4" />
@@ -142,39 +181,47 @@ const ImprovedSearchBar = ({ notificationId, onResultSelected, onClose }) => {
       {/* Indicatore risultati e navigazione */}
       <div className="flex items-center px-2 border-l border-gray-200 h-full">
         {results.length > 0 ? (
-          <span className="text-xs text-gray-500 mx-2">
-            {currentIndex + 1}/{results.length}
-          </span>
-        ) : error ? (
+          <>
+            <span className="text-xs text-gray-500 mx-2">
+              {currentIndex + 1}/{results.length}
+            </span>
+            <div className="flex">
+              <button
+                onClick={navigatePrevious}
+                disabled={results.length === 0}
+                className={`p-1 rounded ${
+                  results.length > 0
+                    ? "text-gray-600 hover:bg-gray-100"
+                    : "text-gray-300 cursor-not-allowed"
+                }`}
+                title="Risultato precedente (↑)"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </button>
+              <button
+                onClick={navigateNext}
+                disabled={results.length === 0}
+                className={`p-1 rounded ${
+                  results.length > 0
+                    ? "text-gray-600 hover:bg-gray-100"
+                    : "text-gray-300 cursor-not-allowed"
+                }`}
+                title="Risultato successivo (↓)"
+              >
+                <ArrowDown className="h-4 w-4" />
+              </button>
+            </div>
+          </>
+        ) : error && searchTerm.length >= 2 ? (
           <span className="text-xs text-red-500 mx-2">{error}</span>
+        ) : searchTerm.length > 0 && searchTerm.length < 2 ? (
+          <span className="text-xs text-gray-400 mx-2">Min. 2 caratteri</span>
         ) : null}
-        <div className="flex">
-          <button
-            onClick={navigatePrevious}
-            disabled={results.length === 0}
-            className={`p-1 rounded ${
-              results.length > 0
-                ? "text-gray-600 hover:bg-gray-100"
-                : "text-gray-300 cursor-not-allowed"
-            }`}
-          >
-            <ArrowUp className="h-4 w-4" />
-          </button>
-          <button
-            onClick={navigateNext}
-            disabled={results.length === 0}
-            className={`p-1 rounded ${
-              results.length > 0
-                ? "text-gray-600 hover:bg-gray-100"
-                : "text-gray-300 cursor-not-allowed"
-            }`}
-          >
-            <ArrowDown className="h-4 w-4" />
-          </button>
-        </div>
+        
         <button
           onClick={onClose}
           className="p-1 rounded text-gray-500 hover:bg-gray-100 ml-1"
+          title="Chiudi ricerca (Esc)"
         >
           <X className="h-4 w-4" />
         </button>

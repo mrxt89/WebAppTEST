@@ -3,7 +3,7 @@ import React from "react";
 import { X } from "lucide-react";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 
-const MessageColorPicker = ({ messageId, onClose }) => {
+const MessageColorPicker = ({ messageId, notificationId, onClose }) => {
   const { setMessageColor, clearMessageColor } = useNotifications();
 
   // Colori predefiniti
@@ -18,6 +18,29 @@ const MessageColorPicker = ({ messageId, onClose }) => {
   const handleColorSelect = async (color) => {
     try {
       await setMessageColor(messageId, color);
+      
+      // IMPORTANTE: Emetti evento con notificationId
+      document.dispatchEvent(
+        new CustomEvent('message-color-changed', {
+          detail: {
+            notificationId: parseInt(notificationId),
+            messageId: messageId,
+            color: color
+          }
+        })
+      );
+      
+      // Forza il ricaricamento
+      document.dispatchEvent(
+        new CustomEvent('reload-open-chat', {
+          detail: {
+            notificationId: parseInt(notificationId),
+            reason: 'message-color-changed',
+            forceComplete: true
+          }
+        })
+      );
+      
       onClose();
     } catch (error) {
       console.error("Errore nell'impostazione del colore:", error);
@@ -27,6 +50,29 @@ const MessageColorPicker = ({ messageId, onClose }) => {
   const handleClearColor = async () => {
     try {
       await clearMessageColor(messageId);
+      
+      // IMPORTANTE: Emetti evento con notificationId
+      document.dispatchEvent(
+        new CustomEvent('message-color-changed', {
+          detail: {
+            notificationId: parseInt(notificationId),
+            messageId: messageId,
+            color: null
+          }
+        })
+      );
+      
+      // Forza il ricaricamento
+      document.dispatchEvent(
+        new CustomEvent('reload-open-chat', {
+          detail: {
+            notificationId: parseInt(notificationId),
+            reason: 'message-color-cleared',
+            forceComplete: true
+          }
+        })
+      );
+      
       onClose();
     } catch (error) {
       console.error("Errore nella rimozione del colore:", error);
