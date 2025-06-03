@@ -1,7 +1,7 @@
 // src/components/notifications/NotificationSidebar.jsx
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
-import { useNotificationsPagination, useNotificationFilters, useNotificationSearch } from "@/hooks/useNotificationsPagination";
+import { useNotificationsPagination, useNotificationFilters } from "@/hooks/useNotificationsPagination";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import { useDispatch } from "react-redux";
 import { 
@@ -82,15 +82,9 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     hasActiveFilters
   } = useNotificationFilters();
 
-  // Hook per la ricerca con debounce
-  const {
-    searchTerm,
-    isSearching,
-    handleSearch,
-    clearSearch
-  } = useNotificationSearch((value) => {
-    updateFilter('searchText', value);
-  });
+  // MODIFICA: Gestione manuale della ricerca senza debounce automatico
+  const [localSearchTerm, setLocalSearchTerm] = useState(filters.searchText || "");
+  const [isSearching, setIsSearching] = useState(false);
 
   // Hook per le azioni sulle notifiche
   const {
@@ -131,6 +125,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
   const scrollContainerRef = useRef(null);
   const scrollPositionRef = useRef(0);
   const notificationPositionsRef = useRef(new Map());
+  const searchInputRef = useRef(null);
   
   // IMPORTANTE: useRef per evitare chiamate duplicate
   const loadingRef = useRef(false);
@@ -272,6 +267,70 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
       scrollContainerRef.current.scrollTop = scrollPositionRef.current;
     }
   }, []);
+
+  // MODIFICA: Funzione per eseguire la ricerca manualmente
+  const executeSearch = useCallback(async () => {
+    const trimmedSearchTerm = localSearchTerm.trim();
+    
+    // Se il termine di ricerca è vuoto, pulisci il filtro
+    if (!trimmedSearchTerm) {
+      updateFilter('searchText', '');
+      return;
+    }
+
+    // Solo se c'è un termine di ricerca valido
+    setIsSearching(true);
+    hasLoadedInitial.current = false;
+    loadingRef.current = true;
+    setShouldObserve(false);
+    
+    // Aggiorna il filtro con il nuovo termine di ricerca
+    updateFilter('searchText', trimmedSearchTerm);
+    
+    try {
+      await loadFirstPage({ ...filters, searchText: trimmedSearchTerm });
+    } finally {
+      setIsSearching(false);
+      loadingRef.current = false;
+      hasLoadedInitial.current = true;
+      setShouldObserve(true);
+    }
+  }, [localSearchTerm, filters, updateFilter, loadFirstPage]);
+
+  // MODIFICA: Handler per il cambio del testo di ricerca (solo aggiorna lo stato locale)
+  const handleSearchInputChange = useCallback((e) => {
+    setLocalSearchTerm(e.target.value);
+  }, []);
+
+  // MODIFICA: Handler per il tasto Enter
+  const handleSearchKeyPress = useCallback((e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      executeSearch();
+    }
+  }, [executeSearch]);
+
+  // MODIFICA: Handler per il pulsante di clear
+  const handleClearSearch = useCallback(() => {
+    setLocalSearchTerm('');
+    updateFilter('searchText', '');
+    
+    // Ricarica le notifiche senza filtro di ricerca
+    hasLoadedInitial.current = false;
+    loadingRef.current = true;
+    setShouldObserve(false);
+    
+    loadFirstPage({ ...filters, searchText: '' }).finally(() => {
+      loadingRef.current = false;
+      hasLoadedInitial.current = true;
+      setShouldObserve(true);
+    });
+  }, [filters, updateFilter, loadFirstPage]);
+
+  // MODIFICA: Sincronizza localSearchTerm con filters.searchText quando cambiano i filtri
+  useEffect(() => {
+    setLocalSearchTerm(filters.searchText || '');
+  }, [filters.searchText]);
 
   // SOLUZIONE PRINCIPALE: Ascolta nuovi messaggi e aggiorna la notifica specifica
   useEffect(() => {
@@ -428,7 +487,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     }
   }, [isIntersecting, hasMore, isLoadingMore, visible, filters, loadNextPage, isDocumentSearchVisible, shouldObserve]);
 
-  // Ricarica quando cambiano i filtri (tranne searchText che ha il suo debounce)
+  // Ricarica quando cambiano i filtri (MA NON searchText che ora è gestito manualmente)
   useEffect(() => {
     if (!visible) return;
     
@@ -453,23 +512,8 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     filters.completedFilter,
     filters.categoryId,
     visible
+    // NOTA: NON includere filters.searchText qui
   ]);
-
-  // Gestisci ricerca con debounce
-  useEffect(() => {
-    if (!visible || filters.searchText === undefined) return;
-    
-    // Reset e ricarica con nuovo searchText
-    hasLoadedInitial.current = false;
-    loadingRef.current = true;
-    setShouldObserve(false);
-    
-    loadFirstPage(filters).finally(() => {
-      loadingRef.current = false;
-      hasLoadedInitial.current = true;
-      setShouldObserve(true);
-    });
-  }, [filters.searchText, visible]);
 
   // NUOVO: Reset quando la sidebar viene chiusa
   useEffect(() => {
@@ -1154,10 +1198,12 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
           <div className="px-2 mb-2 w-100">
             <div className="relative w-full">
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder={isSearching ? "Ricerca in corso..." : "Cerca notifiche..."}
-                value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
+                value={localSearchTerm}
+                onChange={handleSearchInputChange}
+                onKeyPress={handleSearchKeyPress}
                 className={`w-full p-2 pl-9 pr-9 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                   isSearching ? "bg-gray-50" : ""
                 }`}
@@ -1171,9 +1217,9 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                   <Search className="w-4 h-4 text-gray-400" />
                 )}
               </div>
-              {searchTerm && (
+              {localSearchTerm && (
                 <button
-                  onClick={clearSearch}
+                  onClick={handleClearSearch}
                   className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
                   id="notification-search-clear"
                   disabled={isSearching}
@@ -1182,6 +1228,12 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 </button>
               )}
             </div>
+            {/* MODIFICA: Aggiungi istruzioni per l'utente */}
+            {localSearchTerm && localSearchTerm !== filters.searchText && (
+              <div className="mt-1 text-xs text-gray-500 px-1">
+                Premi Invio per cercare
+              </div>
+            )}
           </div>
   
           <div className="flex items-center justify-center w-100 z-50 px-2 mb-1">
