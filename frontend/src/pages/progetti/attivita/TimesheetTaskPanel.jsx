@@ -1,5 +1,5 @@
 // TimesheetTaskPanel.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -52,7 +52,6 @@ const TimesheetTaskPanel = ({
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectTasks, setProjectTasks] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [initialized, setInitialized] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -61,10 +60,24 @@ const TimesheetTaskPanel = ({
   const [usersLoading, setUsersLoading] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [showContent, setShowContent] = useState(false);
+  
+  // Stati per paginazione
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalProjects, setTotalProjects] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  
+  // Refs per evitare chiamate duplicate
+  const loadingRef = useRef(false);
+  const abortControllerRef = useRef(null);
+  const scrollAreaRef = useRef(null);
 
   const { user } = useAuth();
   const projectActions = useProjectActions();
   const { fetchUsers } = useNotifications();
+
+  const PAGE_SIZE = 20; // Numero di progetti per pagina
 
   // Carica gli utenti quando il pannello viene aperto
   useEffect(() => {
@@ -104,28 +117,68 @@ const TimesheetTaskPanel = ({
   // Reset stato quando si chiude
   useEffect(() => {
     if (!isOpen) {
+      // Annulla eventuali richieste in corso
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      
       setShowForm(false);
       setSelectedProject(null);
       setProjectTasks([]);
-      setInitialized(false);
       setSearchText("");
       setSelectedStatus("all");
       setSelectedCategory("all");
       setSelectedCategoryDetail("all");
       setIsClosing(false);
+      setCurrentPage(0);
+      setUserProjects([]);
+      setHasMore(true);
+      setTotalPages(0);
+      setTotalProjects(0);
+      loadingRef.current = false;
     }
   }, [isOpen]);
 
-  // Carica progetti all'apertura
-  useEffect(() => {
-    if (!isOpen || initialized) return;
+  // Carica progetti all'apertura con paginazione
+  const loadUserProjects = useCallback(async (page = 0, append = false) => {
+    // Evita chiamate duplicate
+    if (loadingRef.current) return;
+    
+    // Se non ci sono più pagine da caricare
+    if (append && !hasMore) return;
+    
+    try {
+      loadingRef.current = true;
+      setLoading(!append);
+      setLoadingMore(append);
+      
+      // Crea nuovo AbortController per questa richiesta
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      
+      // Costruisci i filtri
+      const filters = {
+        status: selectedStatus !== "all" ? selectedStatus : undefined,
+        category: selectedCategory !== "all" ? selectedCategory : undefined,
+        categoryDetail: selectedCategoryDetail !== "all" ? selectedCategoryDetail : undefined,
+        searchText: searchText || undefined,
+      };
+      
+      // Rimuovi i campi undefined
+      Object.keys(filters).forEach(key => filters[key] === undefined && delete filters[key]);
+      
+      const result = await projectActions.getUserMemberProjectsPaginated(
+        page, 
+        PAGE_SIZE, 
+        filters,
+        abortControllerRef.current.signal
+      );
 
-    const loadUserProjects = async () => {
-      try {
-        setLoading(true);
-        const projects = await projectActions.getUserMemberProjects();
-
-        const filteredProjects = projects.filter(
+      if (result) {
+        const filteredProjects = result.items.filter(
           (project) =>
             project.Status !== "COMPLETATO" &&
             (project.Role === "ADMIN" ||
@@ -133,40 +186,70 @@ const TimesheetTaskPanel = ({
               project.Role === "USER"),
         );
 
-        setUserProjects(filteredProjects);
-        setInitialized(true);
-      } catch (error) {
+        if (append) {
+          setUserProjects(prev => [...prev, ...filteredProjects]);
+        } else {
+          setUserProjects(filteredProjects);
+        }
+        
+        setCurrentPage(page);
+        setTotalPages(result.totalPages);
+        setTotalProjects(result.total);
+        setHasMore(page < result.totalPages - 1);
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
         console.error("Error loading user projects:", error);
         toast({
           title: "Errore",
           description: "Impossibile caricare i progetti",
           variant: "destructive",
         });
-      } finally {
-        setLoading(false);
       }
-    };
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [selectedStatus, selectedCategory, selectedCategoryDetail, searchText, projectActions]);
 
-    loadUserProjects();
-  }, [isOpen, initialized, projectActions]);
+  // Carica progetti quando si apre il pannello o cambiano i filtri
+  useEffect(() => {
+    if (isOpen && showContent) {
+      loadUserProjects(0, false);
+    }
+  }, [isOpen, showContent, selectedStatus, selectedCategory, selectedCategoryDetail]);
 
-  // Estrai valori unici per i filtri
-  const uniqueStatuses = [...new Set(userProjects.map(p => p.StatusDescription))];
+  // Debounce per la ricerca
+  useEffect(() => {
+    if (!isOpen || !showContent) return;
+    
+    const debounceTimer = setTimeout(() => {
+      loadUserProjects(0, false);
+    }, 500);
+    
+    return () => clearTimeout(debounceTimer);
+  }, [searchText]);
+
+  // Gestione scroll infinito
+  const handleScroll = useCallback((e) => {
+    if (loadingMore || !hasMore) return;
+    
+    const element = e.target;
+    const scrollTop = element.scrollTop;
+    const scrollHeight = element.scrollHeight;
+    const clientHeight = element.clientHeight;
+    
+    // Se siamo vicini al fondo (100px), carica più progetti
+    if (scrollHeight - scrollTop - clientHeight < 100) {
+      loadUserProjects(currentPage + 1, true);
+    }
+  }, [loadingMore, hasMore, currentPage, loadUserProjects]);
+
+  // Estrai valori unici per i filtri dai progetti caricati
+  const uniqueStatuses = [...new Set(userProjects.map(p => p.StatusDescription).filter(Boolean))];
   const uniqueCategories = [...new Set(userProjects.map(p => p.Category).filter(Boolean))];
   const uniqueCategoryDetails = [...new Set(userProjects.map(p => p.CategoryDetail).filter(Boolean))];
-
-  // Filtra progetti
-  const filteredProjects = userProjects.filter(project => {
-    const matchesSearch = searchText === "" || 
-      project.Description?.toLowerCase().includes(searchText.toLowerCase()) ||
-      project.Name?.toLowerCase().includes(searchText.toLowerCase());
-    
-    const matchesStatus = selectedStatus === "all" || project.StatusDescription === selectedStatus;
-    const matchesCategory = selectedCategory === "all" || project.Category === selectedCategory;
-    const matchesCategoryDetail = selectedCategoryDetail === "all" || project.CategoryDetail === selectedCategoryDetail;
-
-    return matchesSearch && matchesStatus && matchesCategory && matchesCategoryDetail;
-  });
 
   // Reset filtri
   const resetFilters = () => {
@@ -269,7 +352,7 @@ const TimesheetTaskPanel = ({
     if (position === "right") {
       return {
         position: "fixed",
-        top: 100,
+        top: 80,
         right: 0,
         bottom: 0,
         width: defaultWidth,
@@ -334,7 +417,7 @@ const TimesheetTaskPanel = ({
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-50 to-white"
+              className="flex items-center justify-between p-3 border-b bg-gradient-to-r from-blue-50 to-white"
             >
               <div className="flex items-center gap-3">
                 {showForm && (
@@ -357,7 +440,7 @@ const TimesheetTaskPanel = ({
                   <p className="text-sm text-gray-500">
                     {showForm 
                       ? `Crea attività in: ${selectedProject?.Name}`
-                      : "Scegli un progetto per creare una nuova attività"
+                      : `${totalProjects} progetti disponibili`
                     }
                   </p>
                 </div>
@@ -388,27 +471,18 @@ const TimesheetTaskPanel = ({
                 transition={{ delay: 0.2 }}
                 className="flex-1 overflow-hidden flex flex-col"
               >
-                {loading ? (
+                {loading && userProjects.length === 0 ? (
                   <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
                       <Loader2 className="h-10 w-10 animate-spin text-blue-600 mx-auto mb-4" />
                       <p className="text-gray-500">Caricamento in corso...</p>
                     </div>
                   </div>
-                ) : userProjects.length === 0 ? (
-                  <div className="flex-1 flex items-center justify-center p-6">
-                    <div className="text-center">
-                      <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">
-                        Non sei membro di nessun progetto con permessi sufficienti per creare attività.
-                      </p>
-                    </div>
-                  </div>
                 ) : !showForm ? (
-                  <div className="flex-1 flex flex-col">
+                  <div className="flex-1 flex flex-col h-full">
                     {/* Filtri */}
-                    <div className="p-4 border-b bg-gray-50">
-                      <div className="space-y-3">
+                    <div className="p-3 border-b bg-gray-50">
+                      <div className="space-y-1">
                         <div className="flex gap-2">
                           <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
@@ -476,82 +550,67 @@ const TimesheetTaskPanel = ({
                     </div>
 
                     {/* Lista progetti */}
-                    <ScrollArea className="flex-1">
-                      <div className="p-4 space-y-3">
-                        {filteredProjects.length === 0 ? (
-                          <div className="text-center py-8">
-                            <FolderOpen className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                            <p className="text-gray-500">
-                              Nessun progetto trovato con i filtri selezionati
-                            </p>
-                          </div>
-                        ) : (
-                          filteredProjects.map((project) => (
-                            <motion.div
-                              key={project.ProjectID}
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ duration: 0.2 }}
-                            >
-                              <Card
-                                className="cursor-pointer hover:shadow-md transition-shadow"
-                                onClick={() => handleProjectSelect(project.ProjectID)}
-                              >
-                                <CardContent className="p-4">
-                                  <div className="flex items-start justify-between mb-2">
-                                    <div>
-                                      <h3 className="font-semibold text-lg">
-                                        {project.Name}
-                                      </h3>
-                                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                                        {project.Description}
-                                      </p>
-                                    </div>
-                                    <ChevronRight className="h-5 w-5 text-gray-400 mt-1" />
-                                  </div>
-
-                                  <div className="flex flex-wrap gap-2 mt-3">
-                                    <Badge
-                                      variant="secondary"
-                                      className="bg-blue-100 text-blue-700"
-                                    >
-                                      <Hash className="h-3 w-3 mr-1" />
-                                      {project.Role}
-                                    </Badge>
-                                    
-                                    <Badge
-                                      variant="secondary"
-                                      className="bg-gray-100 text-gray-700"
-                                    >
-                                      {project.Status}
-                                    </Badge>
-                                    
-                                    {project.Category && (
-                                      <Badge
-                                        variant="secondary"
-                                        className="bg-green-100 text-green-700"
-                                      >
-                                        <Tag className="h-3 w-3 mr-1" />
-                                        {project.Category}
-                                      </Badge>
-                                    )}
-                                    
-                                    {project.CategoryDetail && (
-                                      <Badge
-                                        variant="secondary"
-                                        className="bg-purple-100 text-purple-700"
-                                      >
-                                        {project.CategoryDetail}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </motion.div>
-                          ))
-                        )}
-                      </div>
-                    </ScrollArea>
+                    <div className="flex-1 overflow-hidden">
+                      <ScrollArea 
+                        ref={scrollAreaRef}
+                        className="h-full"
+                        onScroll={handleScroll}
+                      >
+                        <div className="p-4 space-y-1">
+                          {userProjects.length === 0 && !loading ? (
+                            <div className="text-center py-8">
+                              <FolderOpen className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                              <p className="text-gray-500">
+                                Nessun progetto trovato con i filtri selezionati
+                              </p>
+                            </div>
+                          ) : (
+                            <>
+                              {userProjects.map((project) => (
+                                <motion.div
+                                  key={project.ProjectID}
+                                  initial={{ opacity: 0, y: 20 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                >
+                                  <Card
+                                    className="cursor-pointer hover:shadow-md transition-shadow"
+                                    onClick={() => handleProjectSelect(project.ProjectID)}
+                                  >
+                                    <CardContent className="p-2">
+                                      <div className="flex items-start justify-between mb-2">
+                                        <div className="flex-1">
+                                          <h3 className="font-semibold text-lg">
+                                            {project.Name}
+                                            <Badge variant="" className="text-sm mx-3 bg-blue-100 text-blue-700" >{project.StatusDescription} </Badge>
+                                          </h3>
+                                          <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                            {project.Description}
+                                          </p>
+                                        </div>
+                                        <ChevronRight className="h-5 w-5 text-gray-400 mt-1 flex-shrink-0" />
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                </motion.div>
+                              ))}
+                              
+                              {loadingMore && (
+                                <div className="flex justify-center py-4">
+                                  <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                                </div>
+                              )}
+                              
+                              {!hasMore && userProjects.length > 0 && (
+                                <div className="text-center py-4 text-sm text-gray-500">
+                                  Hai visualizzato tutti i progetti
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex-1 overflow-hidden">

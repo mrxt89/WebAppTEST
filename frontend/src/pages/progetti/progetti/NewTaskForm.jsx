@@ -188,7 +188,7 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
     ) {
       swal.fire(
         "Attenzione",
-        "Compila i campi obbligatori (Titolo, Data Inizio, Data Scadenza e Responsabile)",
+        "Campi obbligatori (Titolo, Data Inizio, Data Scadenza e Responsabile)",
         "warning",
       );
       return;

@@ -631,6 +631,32 @@ const useProjectActions = () => {
     }
   };
 
+  const getUserMemberProjectsPaginated = async (page = 0, pageSize = 20, filters = {}, signal) => {
+    try {
+      setLoading(true);
+      const url = `${config.API_BASE_URL}/projects/user/member/paginated?page=${page}&pageSize=${pageSize}&filters=${encodeURIComponent(JSON.stringify(filters))}`;
+      
+      const data = await makeRequest(url, { signal });
+      
+      if (data) {
+        return {
+          items: data.items,
+          total: data.total,
+          totalPages: data.totalPages,
+          page: data.page
+        };
+      }
+      return { items: [], total: 0, totalPages: 0, page: 0 };
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error("Error fetching user member projects:", error);
+      }
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     projects,
     loading,
@@ -665,6 +691,7 @@ const useProjectActions = () => {
     projectStatuses,
     fetchProjectStatuses,
     getUserMemberProjects,
+    getUserMemberProjectsPaginated,
   };
 };
 

@@ -486,6 +486,97 @@ ORDER BY p.Name
   }
 };
 
+const getUserMemberProjectsPaginated = async (userId, page = 0, pageSize = 20, filters = {}) => {
+    try {
+      let pool = await sql.connect(config.dbConfig);
+      const offset = page * pageSize;
+      
+      // Costruisci la query con filtri
+      let whereClause = `
+        WHERE pm.UserID = @UserId
+        AND p.Disabled = 0
+      `;
+      
+      const request = pool.request()
+        .input('UserId', sql.Int, userId)
+        .input('Offset', sql.Int, offset)
+        .input('PageSize', sql.Int, pageSize);
+      
+      // Aggiungi filtri
+      if (filters.status) {
+        whereClause += ` AND ps.StatusDescription = @Status`;
+        request.input('Status', sql.NVarChar(100), filters.status);
+      }
+      
+      if (filters.category) {
+        whereClause += ` AND pc.Description = @Category`;
+        request.input('Category', sql.NVarChar(200), filters.category);
+      }
+      
+      if (filters.categoryDetail) {
+        whereClause += ` AND pcd.Description = @CategoryDetail`;
+        request.input('CategoryDetail', sql.NVarChar(200), filters.categoryDetail);
+      }
+      
+      if (filters.searchText) {
+        whereClause += ` AND (p.Name LIKE @SearchText OR p.Description LIKE @SearchText)`;
+        request.input('SearchText', sql.NVarChar(100), `%${filters.searchText}%`);
+      }
+      
+      // Query per contare il totale
+      const countQuery = `
+        SELECT COUNT(*) as Total
+        FROM MA_Projects p
+        JOIN MA_ProjectMembers pm ON p.ProjectID = pm.ProjectID
+        JOIN MA_ProjectStatus ps ON ps.Id = p.Status
+        LEFT JOIN MA_ProjectCategories pc ON pc.CompanyId = p.CompanyId AND pc.ProjectCategoryId = p.ProjectCategoryId
+        LEFT JOIN MA_ProjectCategoriesDetail pcd ON pcd.ProjectCategoryId = pc.ProjectCategoryId AND pcd.Line = p.ProjectCategoryDetailLine
+        ${whereClause}
+      `;
+      
+      // Query per i dati paginati
+      const dataQuery = `
+        SELECT p.ProjectID
+          , p.Name
+          , p.Description
+          , p.Status
+          , ps.StatusDescription
+          , ps.HexColor 
+          , pm.Role
+          , pm.ProjectMemberID
+          , ISNULL(pc.Description,'') AS Category
+          , ISNULL(pcd.Description,'') AS CategoryDetail
+        FROM MA_Projects p
+        JOIN MA_ProjectMembers pm ON p.ProjectID = pm.ProjectID
+        JOIN MA_ProjectStatus ps ON ps.Id = p.Status
+        LEFT JOIN MA_ProjectCategories pc ON pc.CompanyId = p.CompanyId AND pc.ProjectCategoryId = p.ProjectCategoryId
+        LEFT JOIN MA_ProjectCategoriesDetail pcd ON pcd.ProjectCategoryId = pc.ProjectCategoryId AND pcd.Line = p.ProjectCategoryDetailLine
+        ${whereClause}
+        ORDER BY p.Name
+        OFFSET @Offset ROWS
+        FETCH NEXT @PageSize ROWS ONLY
+      `;
+      
+      // Esegui entrambe le query
+      const countResult = await request.query(countQuery);
+      const total = countResult.recordset[0].Total;
+      
+      const dataResult = await request.query(dataQuery);
+      
+      return {
+        items: dataResult.recordset,
+        total: total,
+        page: page,
+        pageSize: pageSize,
+        totalPages: Math.ceil(total / pageSize)
+      };
+    } catch (err) {
+      console.error('Error in getUserMemberProjectsPaginated:', err);
+      throw err;
+    }
+  };
+  
+
 module.exports = {
     getPaginatedProjects,
     getProjectById,
@@ -504,5 +595,6 @@ module.exports = {
     getUserTasks,
     updateProjectMemberRole,
     getProjectStatuses,
-    getUserMemberProjects
+    getUserMemberProjects,
+    getUserMemberProjectsPaginated
 };
