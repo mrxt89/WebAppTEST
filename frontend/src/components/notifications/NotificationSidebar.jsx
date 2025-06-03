@@ -719,29 +719,51 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     
     saveNotificationPosition(notificationId);
     
+    const newFavoriteStatus = !currentFavoriteStatus;
+    
+    // Aggiornamento ottimistico immediato
     setOptimisticUpdates(prev => ({
       ...prev,
-      [notificationId]: { favorite: !currentFavoriteStatus }
+      [notificationId]: { favorite: newFavoriteStatus }
+    }));
+    
+    // Aggiorna immediatamente anche in Redux
+    dispatch(updatePaginatedNotification({
+      notificationId,
+      updates: { favorite: newFavoriteStatus }
     }));
     
     try {
-      await toggleFavorite(notificationId, !currentFavoriteStatus);
+      // Chiamata API per persistere il cambiamento
+      await toggleFavorite(notificationId, newFavoriteStatus);
       
-      setOptimisticUpdates(prev => {
-        const newUpdates = { ...prev };
-        delete newUpdates[notificationId];
-        return newUpdates;
-      });
-      
-      await updateSingleNotificationInPlace(notificationId);
+      // Rimuovi l'aggiornamento ottimistico dopo un breve delay
+      setTimeout(() => {
+        setOptimisticUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[notificationId];
+          return newUpdates;
+        });
+        
+        // Ripristina la posizione dello scroll
+        restoreScrollToNotification(notificationId);
+      }, 300);
       
     } catch (error) {
       console.error("Error toggling favorite:", error);
+      
+      // In caso di errore, ripristina lo stato originale
       setOptimisticUpdates(prev => {
         const newUpdates = { ...prev };
         delete newUpdates[notificationId];
         return newUpdates;
       });
+      
+      // Ripristina anche in Redux
+      dispatch(updatePaginatedNotification({
+        notificationId,
+        updates: { favorite: currentFavoriteStatus }
+      }));
     }
   };
 
@@ -1204,8 +1226,8 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 value={localSearchTerm}
                 onChange={handleSearchInputChange}
                 onKeyPress={handleSearchKeyPress}
-                className={`w-full p-2 pl-9 pr-9 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  isSearching ? "bg-gray-50" : ""
+                className={`w-full p-2.5 pl-10 pr-10 text-sm border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+                  isSearching ? "bg-gray-50" : "bg-white hover:border-gray-300"
                 }`}
                 id="notification-search-input"
                 disabled={isSearching}
@@ -1213,14 +1235,14 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none w-100 justify-content-end px-2.5">
                 {isSearching ? (
                   <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Search className="w-4 h-4 text-gray-400" />
-                )}
+                ) : !localSearchTerm ? (
+                  <Search className="w-4 h-4 text-gray-400 transition-colors duration-200" />
+                ) : null}
               </div>
               {localSearchTerm && (
                 <button
                   onClick={handleClearSearch}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors duration-200"
                   id="notification-search-clear"
                   disabled={isSearching}
                 >
@@ -1228,10 +1250,11 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 </button>
               )}
             </div>
-            {/* MODIFICA: Aggiungi istruzioni per l'utente */}
             {localSearchTerm && localSearchTerm !== filters.searchText && (
-              <div className="mt-1 text-xs text-gray-500 px-1">
-                Premi Invio per cercare
+              <div className="mt-1.5 text-xs text-gray-500 px-1 flex items-center">
+                <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full text-xs font-medium">
+                  Premi Invio per cercare
+                </span>
               </div>
             )}
           </div>
@@ -1297,35 +1320,37 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 zIndex: 100,
                 width: window.innerWidth < 768 ? "95vw" : "calc(100% - 0.5rem)",
                 position: "absolute",
-                top: "95px",
-                right: window.innerWidth < 768 ? "0px" : "340px",
+                top: "85px",
+                right: window.innerWidth < 768 ? "0px" : "345px",
                 backgroundColor: "#ffffff",
                 borderRadius: "0.5rem",
-                maxHeight: "80vh",
+                maxHeight: "75vh",
                 overflowY: "auto",
+                backdropFilter: "blur(8px)",
+                boxShadow: "0 2px 10px rgba(0, 0, 0, 0.05)"
               }}
             >
-              <div className="flex items-center justify-between mb-3 pb-2 border-b">
-                <h3 className="text-sm font-semibold">Filtri notifiche</h3>
+              <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
+                <h3 className="text-xs font-semibold text-gray-800">Filtri notifiche</h3>
                 <button
-                  className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors duration-200"
                   onClick={toggleFilterExpansion}
                   id="notification-filter-close"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-  
-              <div className="mb-4">
+
+              <div className="mb-3">
                 <DoNotDisturbToggle />
               </div>
-  
-              <div className="mb-4">
-                <h4 className="text-xs font-medium text-gray-500 mb-2">Filtri principali</h4>
+
+              <div className="mb-3">
+                <h4 className="text-xs font-medium text-gray-600 mb-2">Filtri principali</h4>
                 <div className="grid grid-cols-2 gap-2">
                   <div
-                    className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filters.filterUnreadOnly ? "bg-blue-50 border border-blue-200" : "hover:bg-gray-50 border border-transparent"
+                    className={`flex items-center space-x-1.5 p-1.5 rounded-md cursor-pointer transition-all duration-200 ${
+                      filters.filterUnreadOnly ? "bg-blue-50 border border-blue-200 shadow-sm" : "hover:bg-gray-50 border border-transparent"
                     }`}
                     onClick={() => updateFilter('filterUnreadOnly', !filters.filterUnreadOnly)}
                   >
@@ -1337,106 +1362,106 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                         e.stopPropagation();
                         updateFilter('filterUnreadOnly', e.target.checked);
                       }}
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                      className="w-3.5 h-3.5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 transition-colors duration-200"
                     />
                     <label
                       htmlFor="notification-unread-switch"
-                      className="text-sm cursor-pointer"
+                      className="text-xs cursor-pointer font-medium"
                       onClick={(e) => e.stopPropagation()}
                     >
                       Solo non lette
                     </label>
                   </div>
-  
+
                   <div
-                    className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filters.filterFavorites ? "bg-yellow-50 border border-yellow-200 text-yellow-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
+                    className={`flex items-center space-x-1.5 p-1.5 rounded-md cursor-pointer transition-all duration-200 ${
+                      filters.filterFavorites ? "bg-yellow-50 border border-yellow-200 text-yellow-700 shadow-sm" : "hover:bg-gray-50 border border-transparent text-gray-700"
                     }`}
                     onClick={() => updateFilter('filterFavorites', !filters.filterFavorites)}
                     id="notification-favorites-filter"
                   >
                     <Star className={`w-4 h-4 ${filters.filterFavorites ? "fill-yellow-500 text-yellow-500" : ""}`} />
-                    <span className="text-sm">Preferiti</span>
+                    <span className="text-sm font-medium">Preferiti</span>
                   </div>
                 </div>
               </div>
-  
-              <div className="mb-4">
-                <h4 className="text-xs font-medium text-gray-500 mb-2">Tipo di notifiche</h4>
-                <div className="grid grid-cols-2 gap-2">
+
+              <div className="mb-5">
+                <h4 className="text-xs font-medium text-gray-600 mb-3">Tipo di notifiche</h4>
+                <div className="grid grid-cols-2 gap-3">
                   <div
-                    className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filters.filterMentioned ? "bg-indigo-50 border border-indigo-200 text-indigo-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
+                    className={`flex items-center space-x-2 p-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
+                      filters.filterMentioned ? "bg-indigo-50 border border-indigo-200 text-indigo-700 shadow-sm" : "hover:bg-gray-50 border border-transparent text-gray-700"
                     }`}
                     onClick={() => updateFilter('filterMentioned', !filters.filterMentioned)}
                     id="notification-mentioned-filter"
                   >
                     <AtSign className="w-4 h-4" />
-                    <span className="text-sm">Menzioni</span>
+                    <span className="text-sm font-medium">Menzioni</span>
                   </div>
-  
+
                   <div
-                    className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filters.filterMessagesSent ? "bg-green-50 border border-green-200 text-green-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
+                    className={`flex items-center space-x-2 p-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
+                      filters.filterMessagesSent ? "bg-green-50 border border-green-200 text-green-700 shadow-sm" : "hover:bg-gray-50 border border-transparent text-gray-700"
                     }`}
                     onClick={() => updateFilter('filterMessagesSent', !filters.filterMessagesSent)}
                     id="notification-sent-filter"
                   >
                     <Send className="w-4 h-4" />
-                    <span className="text-sm">Miei messaggi</span>
+                    <span className="text-sm font-medium">Miei messaggi</span>
                   </div>
                 </div>
               </div>
-  
-              <div className="mb-4">
-                <h4 className="text-xs font-medium text-gray-500 mb-2">Stato</h4>
-                <div className="grid grid-cols-2 gap-2">
+
+              <div className="mb-5">
+                <h4 className="text-xs font-medium text-gray-600 mb-3">Stato</h4>
+                <div className="grid grid-cols-2 gap-3">
                   <div
-                    className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filters.filterLeftChats ? "bg-amber-50 border border-amber-200 text-amber-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
+                    className={`flex items-center space-x-2 p-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
+                      filters.filterLeftChats ? "bg-amber-50 border border-amber-200 text-amber-700 shadow-sm" : "hover:bg-gray-50 border border-transparent text-gray-700"
                     }`}
                     onClick={() => updateFilter('filterLeftChats', !filters.filterLeftChats)}
                     id="notification-left-chats-filter"
                   >
                     <LogOut className="w-4 h-4" />
-                    <span className="text-sm">Abbandonate</span>
+                    <span className="text-sm font-medium">Abbandonate</span>
                   </div>
-  
+
                   <div
-                    className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filters.filterArchived ? "bg-purple-50 border border-purple-200 text-purple-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
+                    className={`flex items-center space-x-2 p-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
+                      filters.filterArchived ? "bg-purple-50 border border-purple-200 text-purple-700 shadow-sm" : "hover:bg-gray-50 border border-transparent text-gray-700"
                     }`}
                     onClick={handleToggleArchivedFilter}
                     id="notification-archived-chats-filter"
                   >
                     <Archive className="w-4 h-4" />
-                    <span className="text-sm">Archiviate</span>
+                    <span className="text-sm font-medium">Archiviate</span>
                     {archivedUnreadCount > 0 && !filters.filterArchived && (
                       <span className="flex items-center justify-center ml-1 bg-red-500 text-white text-xs font-semibold h-5 w-5 rounded-full">
                         {archivedUnreadCount}
                       </span>
                     )}
                   </div>
-  
+
                   <div
-                    className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      filters.filterMuted ? "bg-rose-50 border border-rose-200 text-rose-700" : "hover:bg-gray-50 border border-transparent text-gray-700"
+                    className={`flex items-center space-x-2 p-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
+                      filters.filterMuted ? "bg-rose-50 border border-rose-200 text-rose-700 shadow-sm" : "hover:bg-gray-50 border border-transparent text-gray-700"
                     }`}
                     onClick={() => updateFilter('filterMuted', !filters.filterMuted)}
                     id="notification-muted-filter"
                   >
                     <BellOff className="w-4 h-4" />
-                    <span className="text-sm">Silenziate</span>
+                    <span className="text-sm font-medium">Silenziate</span>
                   </div>
                 </div>
               </div>
-  
-              <div className="mb-4">
-                <label className="text-xs font-medium text-gray-500 mb-2 block">Stato completamento</label>
-                <div className="flex justify-between bg-white border border-gray-200 rounded-lg p-0.5" id="notification-completion-filter">
+
+              <div className="mb-5">
+                <label className="text-xs font-medium text-gray-600 mb-3 block">Stato completamento</label>
+                <div className="flex justify-between bg-white border border-gray-200 rounded-lg p-1" id="notification-completion-filter">
                   <button
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      filters.completedFilter === "all" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"
+                    className={`flex-1 py-2 text-xs font-medium rounded-md transition-all duration-200 ${
+                      filters.completedFilter === "all" ? "bg-blue-100 text-blue-700 shadow-sm" : "text-gray-600 hover:bg-gray-50"
                     }`}
                     onClick={() => handleCompletedFilterChange("all")}
                     id="notification-filter-all"
@@ -1444,8 +1469,8 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                     Tutte
                   </button>
                   <button
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      filters.completedFilter === "active" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"
+                    className={`flex-1 py-2 text-xs font-medium rounded-md transition-all duration-200 ${
+                      filters.completedFilter === "active" ? "bg-blue-100 text-blue-700 shadow-sm" : "text-gray-600 hover:bg-gray-50"
                     }`}
                     onClick={() => handleCompletedFilterChange("active")}
                     id="notification-filter-active"
@@ -1453,8 +1478,8 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                     Attive
                   </button>
                   <button
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      filters.completedFilter === "completed" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"
+                    className={`flex-1 py-2 text-xs font-medium rounded-md transition-all duration-200 ${
+                      filters.completedFilter === "completed" ? "bg-blue-100 text-blue-700 shadow-sm" : "text-gray-600 hover:bg-gray-50"
                     }`}
                     onClick={() => handleCompletedFilterChange("completed")}
                     id="notification-filter-completed"
@@ -1463,10 +1488,10 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                   </button>
                 </div>
               </div>
-  
-              <div className="mt-4 pt-3 border-t border-gray-100 text-center">
+
+              <div className="mt-5 pt-4 border-t border-gray-100 text-center">
                 <button
-                  className="w-full py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg"
+                  className="w-full py-2.5 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-all duration-200"
                   onClick={resetFilters}
                 >
                   Reimposta tutti i filtri

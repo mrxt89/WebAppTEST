@@ -1345,6 +1345,33 @@ JOIN	(SELECT	m.messageId,
   }
 }
 
+async function getReadReceipts(messageId, userId) {
+  try {
+    let pool = await sql.connect(config.dbConfig);
+    const result = await pool.request()
+      .input('messageId', sql.Int, messageId)
+      .input('userId', sql.Int, userId)
+      .query(`
+        SELECT	CONCAT(TC.firstName, ' ', TC.lastName) AS Name
+            , TA.isReadByReceiver
+            , TA.ReceiverReadedDate
+        FROM	AR_NotificationDetails (NOLOCK) TA
+        JOIN	(	SELECT	notificationId, message, tbCreated
+              FROM	AR_NotificationDetails (NOLOCK) T0
+              WHERE	messageId = @messageId
+            ) TB
+        ON		TB.message = TA.message AND TB.tbCreated = TA.tbCreated AND TB.notificationId = TA.notificationId
+        JOIN	AR_Users (NOLOCK) TC ON TC.userId = TA.receiverId
+        WHERE	TA.receiverId != @userId
+      `);
+
+    return result.recordset;
+  } catch (error) {
+    console.error('Error getting read receipts:', error);
+    throw error;
+  }
+}
+
 async function getBatchPolls(notificationId, messageIds, userId) {
   try {
     if (!Array.isArray(messageIds) || messageIds.length === 0) {
@@ -1472,5 +1499,6 @@ module.exports = {
   getBatchReactions,
   getBatchPolls,
   removeUserFromChat,
-  getChatParticipants
+  getChatParticipants,
+  getReadReceipts
 };

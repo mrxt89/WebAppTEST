@@ -85,8 +85,8 @@ import TasksLegend from "./TasksLegend";
 import TeamMemberWithRole from "./TeamMemberWithRole";
 import useProjectCustomersActions from "../../../hooks/useProjectCustomersActions";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import NewTaskForm from "./NewTaskForm";
-import TaskDetailsDialog from "./TaskDetailsDialog";
+import NewTaskPanel from "./NewTaskPanel"; // Aggiungi questo import
+import TaskDetailsPanel from "./TaskDetailsPanel";
 import ProjectArticlesTab from "./articoli/ProjectArticlesTab";
 import ProjectAttachmentsTab from "./ProjectAttachmentsTab";
 import ProjectTeamSection from "./ProjectTeamSection";
@@ -360,24 +360,23 @@ const ProjectOverview = ({ project }) => (
 );
 
 // Componente per il dettaglio del progetto incorporato
-const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedProject }) => {
+const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedProject, leftPanelWidth }) => {
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
-  const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
+  const [isAddTaskPanelOpen, setIsAddTaskPanelOpen] = useState(false);
   const [editedProject, setEditedProject] = useState(null);
   const [newMember, setNewMember] = useState({ userId: "", role: "USER" });
   const { users, loading: loadingUsers, fetchUsers } = useUsers();
   const [selectedTask, setSelectedTask] = useState(null);
-  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [taskPanelPosition, setTaskPanelPosition] = useState("right"); // nuova variabile
+  const [taskPanelActiveTab, setTaskPanelActiveTab] = useState("information"); // invece di taskDialogActiveTab
   const [activeTab, setActiveTab] = useState("overview"); // Inizia con la panoramica
   // Stato per gestire la vista delle attività (kanban o tabella)
   const [tasksViewMode, setTasksViewMode] = useState("kanban");
-  const [userSearchQuery, setUserSearchQuery] = useState("");
-  // Stato per mantenere la tab attiva nel TaskDetailsDialog
-  const [taskDialogActiveTab, setTaskDialogActiveTab] = useState("information");
 
   // Aggiungiamo i refs necessari
   const isMounted = useRef(true);
@@ -567,6 +566,26 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     };
   }, []);
 
+  useEffect(() => {
+    const handleResize = () => {
+      // Calcola la posizione ottimale basata sullo spazio disponibile
+      const containerWidth = window.innerWidth;
+      const leftPanelPixels = (leftPanelWidth / 100) * containerWidth;
+      const rightPanelSpace = containerWidth - leftPanelPixels;
+      
+      // Se c'è poco spazio a destra o siamo su mobile, usa bottom
+      if (rightPanelSpace < 700 || window.innerWidth < 1200) {
+        setTaskPanelPosition("bottom");
+      } else {
+        setTaskPanelPosition("right");
+      }
+    };
+  
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [leftPanelWidth]);
+
   // Carica il progetto all'avvio
   useEffect(() => {
     isMounted.current = true;
@@ -663,52 +682,49 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         AssignedTo: parseInt(taskData.AssignedTo),
         AdditionalAssignees: taskData.AdditionalAssignees,
       };
-
+  
       const result = await addUpdateProjectTask(formattedTask);
       if (result.success) {
-        setIsAddTaskDialogOpen(false);
         await loadProject();
         swal.fire("Successo", "Attività aggiunta con successo", "success");
+        return result; // Importante: restituisci il risultato per il pannello
       }
+      return { success: false };
     } catch (error) {
       console.error("Error adding task:", error);
       swal.fire("Errore", "Errore nell'aggiunta dell'attività", "error");
+      throw error; // Propaga l'errore per il pannello
     }
   };
 
   const handleTaskUpdate = useCallback(
     async (taskData, shouldCloseModal = false) => {
       if (!isMounted.current) return { success: false };
-
+  
       try {
-        preventDialogOpen.current = true; // Previeni l'apertura del modale durante l'aggiornamento
-
-        // Prepariamo i dati per l'API assicurandoci di avere tutti i campi necessari
+        preventDialogOpen.current = true;
+  
         const completeTaskData = {
           ...taskData,
           ProjectID: parseInt(projectId),
         };
-
-        // Assicuriamoci che AssignedTo sia un numero
+  
         if (typeof completeTaskData.AssignedTo === "string") {
           completeTaskData.AssignedTo = parseInt(completeTaskData.AssignedTo);
         }
-
-        // Assicuriamoci che tutti i campi siano nel formato corretto
+  
         if (
           completeTaskData.DueDate &&
           typeof completeTaskData.DueDate === "string"
         ) {
-          // Manteniamo il formato corretto della data
           if (!completeTaskData.DueDate.includes("T")) {
             completeTaskData.DueDate = completeTaskData.DueDate + "T00:00:00";
           }
         }
-
+  
         const result = await addUpdateProjectTask(completeTaskData);
-
+  
         if (result.success && isMounted.current) {
-          // Prima aggiorna il progetto localmente
           setProject((prev) => ({
             ...prev,
             tasks: prev.tasks.map((t) =>
@@ -717,20 +733,17 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
                 : t,
             ),
           }));
-
-          // Gestisci la chiusura del modale e l'aggiornamento del task selezionato
+  
           if (
             shouldCloseModal ||
             completeTaskData.Status !== selectedTask?.Status
           ) {
-            setIsTaskDialogOpen(false);
+            setIsTaskPanelOpen(false); // invece di setIsTaskDialogOpen
             setSelectedTask(null);
           } else if (selectedTask?.TaskID === completeTaskData.TaskID) {
-            // Se non chiudiamo il modale, aggiorna il task selezionato
             setSelectedTask((prev) => ({ ...prev, ...completeTaskData }));
           }
-
-          // Mostra una notifica di successo solo se richiesta
+  
           if (shouldCloseModal) {
             swal.fire({
               title: "Successo",
@@ -741,12 +754,9 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
               showConfirmButton: false,
             });
           }
-
-          // Aggiorna il progetto in background solo dopo aver gestito l'UI
-          // Passa lo stato della tab attiva nel refresh
+  
           await loadProject(true);
-
-          // Restituisci un oggetto di successo con il task aggiornato
+  
           return { success: true, task: { ...completeTaskData } };
         }
         return { success: false };
@@ -762,7 +772,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         return { success: false };
       } finally {
         setTimeout(() => {
-          preventDialogOpen.current = false; // Riabilita l'apertura del modale dopo l'aggiornamento
+          preventDialogOpen.current = false;
         }, 300);
       }
     },
@@ -809,15 +819,14 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
   };
 
   const handleTaskClick = (task) => {
-    // Usa preventDialogOpen per evitare l'apertura non voluta durante le modifiche inline
     if (!preventDialogOpen.current) {
       setSelectedTask(task);
-      setIsTaskDialogOpen(true);
+      setIsTaskPanelOpen(true); // invece di setIsTaskDialogOpen
     }
   };
 
-  const handleTaskDialogTabChange = (tabValue) => {
-    setTaskDialogActiveTab(tabValue);
+  const handleTaskPanelTabChange = (tabValue) => {
+    setTaskPanelActiveTab(tabValue);
   };
 
   const handleAddComment = async (taskId, comment) => {
@@ -1053,32 +1062,17 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
             {/* Tab Attività */}
             <TabsContent value="tasks" className="h-full flex flex-col">
               <div className="flex justify-between items-center mb-1">
-                {
-                  <Dialog
-                    open={isAddTaskDialogOpen}
-                    onOpenChange={setIsAddTaskDialogOpen}
-                  >
-                    <DialogTrigger asChild>
-                      <Button>Aggiungi Attività</Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Nuova Attività</DialogTitle>
-                      </DialogHeader>
-                      <NewTaskForm
-                        onSubmit={handleAddTask}
-                        onCancel={() => setIsAddTaskDialogOpen(false)}
-                        projectTasks={project.tasks || []}
-                      />
-                    </DialogContent>
-                    {/* Componente per cambiare vista */}
-                    <TasksViewToggler
-                      viewMode={tasksViewMode}
-                      setViewMode={setTasksViewMode}
-                      tasks={project.tasks || []}
-                    />
-                  </Dialog>
-                }
+                {/* Sostituisci il Dialog con un semplice Button */}
+                <Button onClick={() => setIsAddTaskPanelOpen(true)}>
+                  Aggiungi Attività
+                </Button>
+                
+                {/* Componente per cambiare vista */}
+                <TasksViewToggler
+                  viewMode={tasksViewMode}
+                  setViewMode={setTasksViewMode}
+                  tasks={project.tasks || []}
+                />
               </div>
 
               <div className="flex-1 min-h-0 overflow-hidden" style={{ height: "calc(100vh - 110px)" }} id="project-management-split-view-content3">
@@ -1178,13 +1172,13 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
       </div>
 
       {/* Dialogs */}
-      <TaskDetailsDialog
+      <TaskDetailsPanel
         project={project}
         task={selectedTask}
         tasks={project.tasks}
-        isOpen={isTaskDialogOpen}
+        isOpen={isTaskPanelOpen}
         onClose={() => {
-          setIsTaskDialogOpen(false);
+          setIsTaskPanelOpen(false);
           setSelectedTask(null);
           loadProject(true);
         }}
@@ -1192,8 +1186,23 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         onUpdate={handleTaskUpdate}
         assignableUsers={users}
         refreshProject={(callback) => loadProject(true, callback)}
-        activeTabOnReopen={taskDialogActiveTab}
-        onTabChange={handleTaskDialogTabChange}
+        activeTabOnReopen={taskPanelActiveTab}
+        onTabChange={handleTaskPanelTabChange}
+        position={taskPanelPosition}
+        defaultWidth={600}
+        minWidth={500}
+        maxWidth={900}
+      />
+
+      {/* Panel creazione nuova attività */}
+      <NewTaskPanel
+        isOpen={isAddTaskPanelOpen}
+        onClose={() => setIsAddTaskPanelOpen(false)}
+        onTaskCreated={handleAddTask}
+        projectTasks={project.tasks || []}
+        projectId={projectId}
+        position={taskPanelPosition}
+        defaultWidth={500}
       />
 
       <ProjectEditModalWithTemplate
@@ -2021,6 +2030,7 @@ const ProjectManagementSplitView = () => {
             projectId={selectedProjectId} 
             refreshAllProjects={refreshAllProjects}
             resetSelectedProject={resetSelectedProject}
+            leftPanelWidth={leftPanelWidth}
           />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
@@ -2035,7 +2045,10 @@ const ProjectManagementSplitView = () => {
           </div>
         )}
       </div>
+   
+    
     </div>
+    
   );
 };
 

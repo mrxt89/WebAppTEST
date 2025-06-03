@@ -49,6 +49,7 @@ const { getNotifications
         , getBatchPolls
         , removeUserFromChat
         , getChatParticipants
+        , getReadReceipts
       } = require('../queries/notificationsManagement');
 
 const {
@@ -1545,6 +1546,27 @@ router.post('/messages/batch-reactions', authenticateToken, async (req, res) => 
     res.status(500).json({
       success: false,
       message: 'Errore nel recupero delle reazioni in batch',
+      error: error.message
+    });
+  }
+});
+
+// Route per prendere gli utenti che hanno letto e ricevuto un messaggio 
+router.get('/messages/:messageId/read-receipts', authenticateToken, async (req, res) => {
+  const { messageId } = req.params;
+  const userId = req.user.UserId;
+
+  try {
+    const readReceipts = await getReadReceipts(messageId, userId);
+    res.json({
+      success: true,
+      readReceipts
+    });
+  } catch (error) {
+    console.error('Error getting read receipts:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero dei read receipts',
       error: error.message
     });
   }
