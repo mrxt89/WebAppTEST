@@ -49,7 +49,7 @@ import {
 } from "lucide-react";
 import { swal } from "../../../lib/common";
 import TimeEntryDialog from "./TimeEntryDialog";
-import TimesheetTaskDialog from "../attivita/TimesheetTaskDialog";
+import TimesheetTaskPanel from "../attivita/TimesheetTaskPanel";
 import useTimeTracking from "../../../hooks/useTimeTracking";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 
@@ -81,7 +81,7 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
   const [selectedUserId, setSelectedUserId] = useState(currentUserId);
   const [availableTasks, setAvailableTasks] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(false);
   const [dialogConfig, setDialogConfig] = useState({
     preselectedTaskId: null,
     availableTasks: [],
@@ -473,7 +473,7 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
             <div className="flex items-center gap-4">
               <Button
                 variant="outline"
-                onClick={() => setIsTaskDialogOpen(true)}
+                onClick={() => setIsTaskPanelOpen(true)}
                 className="text-sm flex items-center gap-2 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200"
               >
                 <Plus className="h-4 w-4" />
@@ -823,11 +823,13 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
         dialogConfig={dialogConfig}
       />
 
-      {/* Dialog per creare nuova attività */}
-      <TimesheetTaskDialog
-        isOpen={isTaskDialogOpen}
-        onClose={() => setIsTaskDialogOpen(false)}
+      {/* Panel per creare nuova attività */}
+      <TimesheetTaskPanel
+        isOpen={isTaskPanelOpen}
+        onClose={() => setIsTaskPanelOpen(false)}
         onTaskCreated={loadWeekData}
+        position={window.innerWidth < 768 ? "bottom" : "right"}
+        defaultWidth={600}
       />
 
       {/* Stile CSS per la tabella fixed */}

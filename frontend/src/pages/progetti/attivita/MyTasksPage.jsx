@@ -20,8 +20,8 @@ import {
 } from "lucide-react";
 import TasksViewToggler from "./TasksViewToggler";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
-import TaskDetailsDialog from "../progetti/TaskDetailsDialog";
-import TimesheetTaskDialog from "./TimesheetTaskDialog";
+import NewTaskPanel from "../progetti/NewTaskPanel";
+import TaskDetailsPanel from "../progetti/TaskDetailsPanel";
 import MyTasksFilters from "./MyTasksFilters";
 import MyTasksList from "./MyTasksList";
 import MyTasksKanban from "./MyTasksKanban";
@@ -38,8 +38,9 @@ const MyTasksPage = () => {
   const [filteredTasks, setFilteredTasks] = useState([]);
   const [viewMode, setViewMode] = useState("list");
   const [selectedTask, setSelectedTask] = useState(null);
-  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
-  const [isCreateTaskDialogOpen, setIsCreateTaskDialogOpen] = useState(false); // Nuovo stato per il dialog di creazione
+  const [isCreateTaskPanelOpen, setIsCreateTaskPanelOpen] = useState(false);
+  const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(false); // Cambiato da isTaskDialogOpen
+  const [taskPanelPosition, setTaskPanelPosition] = useState("right"); // Posizione del pannello
   const [filtersVisible, setFiltersVisible] = useState(true);
   const [preventDialogOpen, setPreventDialogOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState({});
@@ -100,6 +101,21 @@ const MyTasksPage = () => {
 
     init();
   }, []);
+
+    // Rileva la larghezza dello schermo per adattare la posizione del pannello
+    useEffect(() => {
+      const handleResize = () => {
+        if (window.innerWidth < 768) {
+          setTaskPanelPosition("bottom");
+        } else {
+          setTaskPanelPosition("right");
+        }
+      };
+  
+      handleResize();
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
   // Applica i filtri e l'ordinamento alle attività
   const applyFilters = useCallback(
@@ -385,7 +401,7 @@ const MyTasksPage = () => {
   const handleTaskClick = (task) => {
     if (!preventDialogOpen) {
       setSelectedTask(task);
-      setIsTaskDialogOpen(true);
+      setIsTaskPanelOpen(true);
     }
   };
 
@@ -517,18 +533,20 @@ const MyTasksPage = () => {
   };
 
   return (
-    <div className="p-6 mx-auto space-y-6">
-      {/* Header con titolo, tabs e toggles */}
+    <div className="p-6 mx-auto space-y-6 relative">
+      {/* Header con titolo e pulsante creazione */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Le mie attività</h1>
-
-        {/* Pulsante "Crea attività" sempre visibile nella parte superiore della pagina */}
-        <Button onClick={() => setIsCreateTaskDialogOpen(true)} className="">
+  
+        <Button 
+          onClick={() => setIsCreateTaskPanelOpen(true)} 
+          className=""
+        >
           <Plus className="h-4 w-4 mr-2" />
           Crea nuova attività
         </Button>
       </div>
-
+  
       <div className="flex items-center gap-2">
         {/* Tabs per passare tra attività e timesheet */}
         <Tabs
@@ -551,7 +569,7 @@ const MyTasksPage = () => {
                 <span>Ore lavorate</span>
               </TabsTrigger>
             </TabsList>
-
+  
             {activeTab === "tasks" && (
               <TasksViewToggler
                 className="flex items-center gap-2"
@@ -562,9 +580,9 @@ const MyTasksPage = () => {
               />
             )}
           </div>
-
+  
           <TabsContent value="tasks" className="space-y-6">
-            {/* Contenuto della tab attività */}
+            {/* Filtri (mostra/nascondi in base a filtersVisible) */}
             {filtersVisible && (
               <MyTasksFilters
                 filters={filters}
@@ -572,11 +590,11 @@ const MyTasksPage = () => {
                 onResetFilters={resetFilters}
                 hasActiveFilters={hasActiveFilters()}
                 uniqueProjects={getUniqueProjects()}
-                allUsers={users} // Passaggio degli utenti per il filtro coinvolgimento
+                allUsers={users}
               />
             )}
-
-            {/* Visualizzazione attività (lista, kanban, timeline o statistiche) */}
+  
+            {/* Visualizzazione attività */}
             <Card className="flex-1">
               <CardContent className="p-4" id="tasksContent">
                 {loading ? (
@@ -617,7 +635,7 @@ const MyTasksPage = () => {
                         onFilterChange={handleColumnFilterChange}
                       />
                     )}
-
+  
                     {viewMode === "kanban" && (
                       <MyTasksKanban
                         tasks={filteredTasks}
@@ -627,7 +645,7 @@ const MyTasksPage = () => {
                         isOwnTask={isOwnTask}
                       />
                     )}
-
+  
                     {viewMode === "timeline" && (
                       <MyTasksTimelineView
                         tasks={filteredTasks}
@@ -637,7 +655,7 @@ const MyTasksPage = () => {
                         isOwnTask={isOwnTask}
                       />
                     )}
-
+  
                     {viewMode === "statistics" && (
                       <TasksStatistics
                         tasks={filteredTasks}
@@ -649,7 +667,7 @@ const MyTasksPage = () => {
               </CardContent>
             </Card>
           </TabsContent>
-
+  
           <TabsContent value="timesheet">
             {/* Contenuto del timesheet */}
             <MyTasksTimeTracking
@@ -660,36 +678,51 @@ const MyTasksPage = () => {
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* Dialog per i dettagli del task */}
-      {selectedTask && (
-        <TaskDetailsDialog
-          project={{
-            ProjectID: selectedTask.ProjectID,
-            AdminPermission: selectedTask.AdminPermission,
-          }}
-          task={selectedTask}
-          tasks={tasks.filter((t) => t.ProjectID === selectedTask.ProjectID)}
-          isOpen={isTaskDialogOpen}
-          onClose={() => {
-            setIsTaskDialogOpen(false);
-            setSelectedTask(null);
-            loadTasks();
-          }}
-          onAddComment={handleAddComment}
-          onUpdate={handleTaskUpdate}
-          assignableUsers={users}
-          refreshProject={loadTasks}
-        />
-      )}
-
-      {/* Dialog per la creazione di nuove attività */}
-      <TimesheetTaskDialog
-        isOpen={isCreateTaskDialogOpen}
-        onClose={() => setIsCreateTaskDialogOpen(false)}
-        onTaskCreated={loadTasks}
-        users={users}
+  
+      {/* Pannello dettagli task (invece del dialog) */}
+      <TaskDetailsPanel
+        project={{
+          ProjectID: selectedTask?.ProjectID,
+          AdminPermission: selectedTask?.AdminPermission,
+        }}
+        task={selectedTask}
+        tasks={tasks.filter((t) => t.ProjectID === selectedTask?.ProjectID)}
+        isOpen={isTaskPanelOpen}
+        onClose={() => {
+          setIsTaskPanelOpen(false);
+          setSelectedTask(null);
+          loadTasks();
+        }}
+        onAddComment={handleAddComment}
+        onUpdate={handleTaskUpdate}
+        assignableUsers={users}
+        refreshProject={loadTasks}
+        position={taskPanelPosition}
+        defaultWidth={600}
+        minWidth={400}
+        maxWidth={1200}
       />
+  
+        {/* Pannello creazione nuova attività */}
+        <NewTaskPanel
+              isOpen={isCreateTaskPanelOpen}
+              onClose={() => setIsCreateTaskPanelOpen(false)}
+              onTaskCreated={async (taskData) => {
+                try {
+                  // Usa la funzione esistente per creare l'attività
+                  const result = await addUpdateProjectTask(taskData);
+                  if (result.success) {
+                    await loadTasks();
+                    setIsCreateTaskPanelOpen(false);
+                  }
+                } catch (error) {
+                  console.error("Error creating task:", error);
+                }
+              }}
+              projectTasks={tasks}
+              position={taskPanelPosition} // Usa la stessa posizione
+              defaultWidth={500}
+            />
     </div>
   );
 };

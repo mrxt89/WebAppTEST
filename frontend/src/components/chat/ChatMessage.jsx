@@ -22,7 +22,8 @@ import {
   ChevronUp,
   RotateCcw,
   Paperclip,
-  Loader2
+  Loader2,
+  Info
 } from 'lucide-react';
 import FileViewer from '@/components/ui/fileViewer';
 import { swal } from '@/lib/common';
@@ -42,7 +43,7 @@ const ChatMessage = memo(({
   isFirstNew = false,
   currentUserId,
   users = [],
-  messages = [], // Aggiungiamo messages per trovare il messaggio originale
+  messages = [],
   onReply,
   onEditMessage,
   onViewVersionHistory,
@@ -54,7 +55,7 @@ const ChatMessage = memo(({
   filterColor = null,
   notificationId,
   disabled = false,
-  isFromCurrentUser = false // Nuovo prop per indicare se è un messaggio dell'utente corrente
+  isFromCurrentUser = false
 }) => {
   // Se il messaggio non ha un ID, non renderizziamo nulla
   if (!message || !message.messageId) {
@@ -67,10 +68,14 @@ const ChatMessage = memo(({
   const [showFullMessage, setShowFullMessage] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [loadingReactions, setLoadingReactions] = useState({});
+  const [showReadInfo, setShowReadInfo] = useState(false);
+  const [readInfo, setReadInfo] = useState(null);
+  const [loadingReadInfo, setLoadingReadInfo] = useState(false);
   
   const messageRef = useRef(null);
   const actionsRef = useRef(null);
   const colorPickerRef = useRef(null);
+  const readInfoRef = useRef(null);
   
   const { 
     downloadNotificationAttachment,
@@ -81,7 +86,7 @@ const ChatMessage = memo(({
   } = useNotifications();
 
   // Trova il messaggio originale per una risposta
-const findOriginalMessage = useCallback((replyToMessageId) => {
+  const findOriginalMessage = useCallback((replyToMessageId) => {
     if (!replyToMessageId || replyToMessageId === "0") return null;
     return messages?.find(msg => msg.messageId == replyToMessageId);
   }, [messages]);
@@ -91,7 +96,6 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
     const messageElement = document.getElementById(`message-${messageId}`);
     if (messageElement) {
       messageElement.scrollIntoView({ behavior: "smooth", block: "center" });
-      // Aggiungi animazione di evidenziazione
       messageElement.classList.add("highlight-message");
       setTimeout(() => {
         messageElement.classList.remove("highlight-message");
@@ -99,7 +103,9 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
     }
   }, []);
 
-  const originalMessage = findOriginalMessage(message.replyToMessageId);  // Raggruppa le reazioni per tipo
+  const originalMessage = findOriginalMessage(message.replyToMessageId);
+  
+  // Raggruppa le reazioni per tipo
   const groupReactionsByType = (reactions) => {
     const grouped = {};
     if (!reactions || !Array.isArray(reactions) || reactions.length === 0) {
@@ -116,10 +122,7 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
     return grouped;
   };
   
-  
-  // CORREZIONE PRINCIPALE: Determina se il messaggio è dell'utente corrente
-  // Controlliamo selectedUser == "1" (stringa) come nel vecchio codice
-  // IMPORTANTE: Anche i messaggi temporanei devono essere riconosciuti come propri
+  // Determina se il messaggio è dell'utente corrente
   const isOwnMessage = message.selectedUser == "1" || 
                       message._isTemporary === true || 
                       (message.senderId && message.senderId === currentUserId) ||
@@ -161,21 +164,45 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
     
     try {
       const date = new Date(timestamp);
-      const now = new Date();
-      const diffMinutes = differenceInMinutes(now, date);
-      
-      if (diffMinutes < 1) return 'Ora';
-      if (diffMinutes < 60) return `${diffMinutes} min fa`;
-      if (isToday(date)) return format(date, 'HH:mm');
-      if (isYesterday(date)) return `Ieri alle ${format(date, 'HH:mm')}`;
-      
-      return format(date, 'dd/MM/yyyy HH:mm', { locale: it });
+      return format(date, 'dd/MM/yy HH:mm', { locale: it });
     } catch (error) {
       return '';
     }
   };
+
+  // Carica informazioni di lettura
+  const loadReadInfo = useCallback(async () => {
+    if (!message.messageId || loadingReadInfo) return;
+
+    setLoadingReadInfo(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `${config.API_BASE_URL}/messages/${message.messageId}/read-receipts`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data && response.data.success) {
+        setReadInfo(response.data.readReceipts);
+      }
+    } catch (error) {
+      console.error('Error loading read info:', error);
+    } finally {
+      setLoadingReadInfo(false);
+    }
+  }, [message.messageId, loadingReadInfo]);
+
+  // Handler per mostrare/nascondere info lettura
+  const handleToggleReadInfo = useCallback(async () => {
+    if (!showReadInfo && !readInfo) {
+      await loadReadInfo();
+    }
+    setShowReadInfo(!showReadInfo);
+  }, [showReadInfo, readInfo, loadReadInfo]);
   
-  // Gestione click esterno per nascondere azioni/reazioni
+  // Gestione click esterno per nascondere azioni/reazioni/readInfo
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (actionsRef.current && !actionsRef.current.contains(event.target)) {
@@ -183,6 +210,9 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
       }
       if (colorPickerRef.current && !colorPickerRef.current.contains(event.target)) {
         setShowColorPicker(false);
+      }
+      if (readInfoRef.current && !readInfoRef.current.contains(event.target)) {
+        setShowReadInfo(false);
       }
     };
     
@@ -218,11 +248,6 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
     return processed;
   };
   
-  // Gestione modifica messaggio - RIMOSSA perché gestita dal modal
-  const handleEditMessage = async () => {
-    // Non serve più, gestito dal modal
-  };
-  
   // Gestione eliminazione messaggio
   const handleDeleteMessage = async () => {
     const result = await swal.fire({
@@ -247,7 +272,7 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
             },
           },
         );
-        console.log("🔄 ChatMessage: Risposta eliminazione messaggio. Response:", response)
+        
         if (response.data && response.data.success) {
           swal.fire({
             icon: 'success',
@@ -257,7 +282,6 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
             showConfirmButton: false,
           });
   
-          // IMPORTANTE: Emetti evento con notificationId
           document.dispatchEvent(
             new CustomEvent('message-deleted', {
               detail: {
@@ -267,7 +291,6 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
             })
           );
   
-          // Forza il ricaricamento
           document.dispatchEvent(
             new CustomEvent('reload-open-chat', {
               detail: {
@@ -295,14 +318,12 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
       setLoadingReactions(prev => ({ ...prev, [reactionType]: true }));
       await toggleMessageReaction(message.messageId, reactionType);
       
-      // Trigger update event
       document.dispatchEvent(
         new CustomEvent('message-reaction-updated', {
           detail: { messageId: message.messageId, notificationId },
         })
       );
 
-      // Forza il ricaricamento
       document.dispatchEvent(
         new CustomEvent('reload-open-chat', {
           detail: {
@@ -378,13 +399,7 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
   // Ottieni il colore del testo in base al contrasto
   const getContrastTextColor = (bgColor) => {
     if (!bgColor) return "#000000";
-    // Testo sempre nero
     return "#000000";
-    const r = parseInt(bgColor.slice(1, 3), 16);
-    const g = parseInt(bgColor.slice(3, 5), 16);
-    const b = parseInt(bgColor.slice(5, 7), 16);
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    return luminance > 0.5 ? "#000000" : "#FFFFFF";
   };
 
   // Helper per evidenziare le menzioni nel testo
@@ -422,10 +437,8 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
   const renderMessageText = (messageText, usernameMention, isEdited) => {
     if (!messageText) return "";
 
-    // Prima decodifica tutte le entità HTML nel testo del messaggio
     const decodedText = decodeHTMLEntities(messageText);
 
-    // Poi dividi per interruzioni di riga e renderizza
     const renderedText = decodedText.split("\n").map((line, i) => {
       const processedLine = highlightMentions(line, usernameMention);
 
@@ -446,9 +459,6 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
   
   return (
     <>
-      {/* Indicatore "Nuovi messaggi" - NON mostrarlo se è dall'utente corrente */}
-
-      
       {/* Messaggio */}
       <motion.div
         ref={messageRef}
@@ -465,7 +475,7 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
         )}
         
         <div className="flex flex-col max-w-[70%]">
-          {/* Reply preview - CORRETTO con click per scrollare */}
+          {/* Reply preview */}
           {originalMessage && (
             <div 
               className="message-quote cursor-pointer mb-1" 
@@ -543,7 +553,6 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
                       onColorSelect={() => setShowColorPicker(!showColorPicker)}
                       onEdit={() => {
                         if (onEditMessage) {
-                          // Chiama direttamente onEditMessage che aprirà il modal
                           onEditMessage(message.messageId, message.message);
                           setShowActions(false);
                         }
@@ -573,14 +582,14 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
                   >
                     <MessageColorPicker
                       messageId={message.messageId}
-                      notificationId={notificationId} // IMPORTANTE: Passa notificationId
+                      notificationId={notificationId}
                       onClose={() => setShowColorPicker(false)}
                     />
                   </div>
                 )}
               </AnimatePresence>
               
-              {/* Contenuto messaggio - SENZA editing inline */}
+              {/* Contenuto messaggio */}
               <div style={{ paddingTop: "15px", paddingBottom: "10px", fontSize: "1rem" }}>
                 {isPollMessage ? (
                   <PollModal 
@@ -644,7 +653,7 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
                 </div>
               )}
               
-              {/* Usa MessageReactions component CON CACHE */}
+              {/* Reazioni */}
               {message.reactions ? (
                 <div className={`message-reactions flex flex-wrap gap-1 mt-1`}>
                   {Object.entries(groupReactionsByType(message.reactions)).map(([reactionType, reactors]) => {
@@ -683,17 +692,64 @@ const findOriginalMessage = useCallback((replyToMessageId) => {
                 />
               )}
               
-              {/* Indicatore messaggio letto (per messaggi propri) */}
+              {/* Indicatore messaggio letto con click per info dettagliate */}
               <div className="absolute bottom-1 right-2 text-xs text-gray-500">
-                {( isOwnMessage || isOwnMessage == '1') && (
-                  <>
-                    {message.isReadByUser ? (
-                      <CheckCheck className="h-3 w-3 text-white" title="Letto" />
-                    ) : (
-                      <Check className="h-3 w-3 text-white/70" title="Inviato" />
-                    )}
+                {(isOwnMessage || isOwnMessage == '1') && (
+                  <div className="relative">
+                    <button
+                      onClick={handleToggleReadInfo}
+                      className="hover:bg-white/20 rounded p-0.5 transition-colors"
+                      title="Clicca per vedere chi ha letto"
+                    >
+                      {message.isReadByUser ? (
+                        <CheckCheck className="h-3 w-3 text-white" />
+                      ) : (
+                        <Check className="h-3 w-3 text-white/70" />
+                      )}
+                    </button>
                     
-                  </>
+                    {/* Popup info lettura */}
+                    <AnimatePresence>
+                      {showReadInfo && (
+                        <motion.div
+                          ref={readInfoRef}
+                          initial={{ opacity: 0, scale: 0.95, y: 5 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95, y: 5 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute bottom-full right-0 mb-2 bg-white rounded-lg shadow-lg border border-gray-200 p-3 min-w-[200px] w-fit max-w-[300px] z-50"
+                        >
+                          <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                            <Info className="h-3 w-3" />
+                            Letto da:
+                          </div>
+                          
+                          {loadingReadInfo ? (
+                            <div className="flex items-center justify-center py-2">
+                              <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                            </div>
+                          ) : readInfo && readInfo.length > 0 ? (
+                            <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                              {readInfo.map((reader, index) => (
+                                <div key={index} className="flex items-center justify-between text-xs whitespace-nowrap">
+                                  <span className="text-gray-700 font-medium">
+                                    {reader.Name || 'Utente'}
+                                  </span>
+                                  <span className="text-gray-500 ml-4">
+                                    {formatTimestamp(reader.ReceiverReadedDate)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-500 italic">
+                              Nessuno ha ancora letto
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 )}
               </div>
               
