@@ -12,7 +12,7 @@ import WindowManagerMenu from "../chat/WindowManagerMenu";
 import { useToast } from "../ui/use-toast";
 import { Toaster } from "../ui/toaster";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import NewMessageModal from "../chat/NewMessageModal";
+import NewMessageWindow from "../chat/NewMessageWindow";
 import { config } from "../../config";
 import Header from "./Header";
 import NotificationConsentModal from "../notifications/NotificationConsentModal";
@@ -56,6 +56,8 @@ const MainPage = () => {
     forceLoadNotifications,
   } = useNotifications();
 
+  const [newMessageWindows, setNewMessageWindows] = useState([]);
+  
   // Window manager hook
   const windowManager = useWindowManager();
   const {
@@ -87,7 +89,7 @@ const MainPage = () => {
   const [openChats, setOpenChats] = useState([]);
   const [minimizedChats, setMinimizedChats] = useState([]);
   const [windowManagerMenuOpen, setWindowManagerMenuOpen] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
 
   // Inizializza il worker Redux all'avvio
   useEffect(() => {
@@ -172,19 +174,38 @@ const MainPage = () => {
 
   // Evento listener per l'apertura del modale nuovo messaggio
   useEffect(() => {
-    const handleOpenNewMessageModal = () => {
-      setIsModalOpen(true);
+    const handleOpenNewMessageModal = (event) => {
+      const props = event.detail || {};
+      
+      const newWindowId = `new-message-${Date.now()}`;
+      
+      // Crea la finestra nel window manager
+      if (windowManager?.createWindow) {
+        windowManager.createWindow(
+          newWindowId,
+          props.defaultTitle || "Nuovo messaggio",
+          { 
+            x: 150 + (newMessageWindows.length * 30), 
+            y: 150 + (newMessageWindows.length * 30), 
+            width: 900, 
+            height: 700 
+          }
+        );
+      }
+      
+      // Aggiungi la finestra alla lista con tutti i dati necessari
+      setNewMessageWindows(prev => [...prev, { 
+        id: newWindowId,
+        ...props 
+      }]);
     };
-
+  
     document.addEventListener("openNewMessageModal", handleOpenNewMessageModal);
-
+  
     return () => {
-      document.removeEventListener(
-        "openNewMessageModal",
-        handleOpenNewMessageModal,
-      );
+      document.removeEventListener("openNewMessageModal", handleOpenNewMessageModal);
     };
-  }, []);
+  }, [newMessageWindows.length, windowManager]);
 
   // NUOVO: Effect per gestire reload delle chat aperte
 useEffect(() => {
@@ -915,10 +936,8 @@ const openChatModal = async (notificationId) => {
   };
 
   const handleOpenChat = async (notificationId) => {
-    if (isModalOpen) {
-      setIsModalOpen(false);
-    }
-
+    // Rimuovi completamente il check per isModalOpen
+    
     setTimeout(async () => {
       try {
         openChatModal(notificationId);
@@ -961,12 +980,6 @@ const openChatModal = async (notificationId) => {
     setWindowManagerMenuOpen(!windowManagerMenuOpen);
   };
 
-  const closeNewMessageModal = () => {
-    setIsModalOpen(false);
-    setTimeout(() => {
-      document.dispatchEvent(new CustomEvent("reset-new-message-modal"));
-    }, 100);
-  };
 
   const showWindowControls = openChats.length > 0;
 
@@ -1064,19 +1077,53 @@ const openChatModal = async (notificationId) => {
           </div>
         )}
 
-        <MinimizedChatsDock
-          minimizedChats={minimizedChats}
-          onRestoreChat={restoreChat}
-          onCloseChat={closeChatModal}
-          notifications={notifications}
-        />
+          <MinimizedChatsDock
+            minimizedChats={minimizedChats}
+            onRestoreChat={restoreChat}
+            onCloseChat={closeChatModal}
+            notifications={notifications}
+            newMessageWindows={newMessageWindows.filter(w => 
+              windowManager?.windowStates?.[w.id]?.isMinimized
+            )}
+            onRestoreNewMessage={(windowId) => {
+              if (windowManager?.toggleMinimize) {
+                windowManager.toggleMinimize(windowId);
+              }
+            }}
+            onCloseNewMessage={(windowId) => {
+              if (windowManager?.closeWindow) {
+                windowManager.closeWindow(windowId);
+              }
+              setNewMessageWindows(prev => prev.filter(w => w.id !== windowId));
+            }}
+          />
 
-        <NewMessageModal
-          isOpen={isModalOpen}
-          onRequestClose={closeNewMessageModal}
-          sidebarVisible={sidebarVisible}
-          openChatModal={handleOpenChat}
-        />
+        {Array.isArray(newMessageWindows) && newMessageWindows.length > 0 && (
+          newMessageWindows.map((window) => (
+            <NewMessageWindow
+              key={window.id}
+              windowId={window.id}
+              onClose={() => {
+                if (windowManager?.closeWindow) {
+                  windowManager.closeWindow(window.id);
+                }
+                setNewMessageWindows(prev => prev.filter(w => w.id !== window.id));
+              }}
+              onMinimize={() => {
+                if (windowManager?.toggleMinimize) {
+                  windowManager.toggleMinimize(window.id);
+                }
+              }}
+              windowManager={windowManager}
+              openChatModal={handleOpenChat}
+              type={window.type}
+              notificationCategoryId={window.notificationCategoryId}
+              defaultTitle={window.defaultTitle}
+              defaultReceivers={window.defaultReceivers}
+              metadata={window.metadata}
+            />
+          ))
+        )}
 
         <WikiHelper />
         <NotificationConsentModal />

@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import useAdminActions from "../../hooks/useAdminActions";
-import NewMessageModal from "../../components/chat/NewMessageModal";
 
 // Tab content components
 import UsersTab from "./tabs/UsersTab";
@@ -239,14 +238,7 @@ const AdminDashboard = () => {
         </Tabs>
       </main>
 
-      {/* New Message Modal */}
-      {isModalOpen && (
-        <NewMessageModal
-          isOpen={isModalOpen}
-          onRequestClose={() => setIsModalOpen(false)}
-          {...modalProps}
-        />
-      )}
+
     </div>
   );
 };
