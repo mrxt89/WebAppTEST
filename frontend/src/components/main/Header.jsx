@@ -1,3 +1,4 @@
+// src/components/main/Header.jsx
 import { memo, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -7,25 +8,67 @@ import { WikiButton } from "@/components/wiki";
 
 // Componente memoizzato per il pulsante notifiche
 const NotificationButton = memo(({ unreadCount, toggleSidebar }) => {
+  // Stato locale per gestire il contatore con transizioni fluide
+  const [displayCount, setDisplayCount] = useState(unreadCount);
+  const [pendingCount, setPendingCount] = useState(null);
+  
+  // Aggiorna displayCount quando cambia unreadCount da Redux
+  useEffect(() => {
+    // Se non c'è un conteggio pendente, usa il valore Redux
+    if (pendingCount === null) {
+      setDisplayCount(unreadCount);
+    }
+  }, [unreadCount, pendingCount]);
+  
+  // Gestisci gli eventi di aggiornamento
+  useEffect(() => {
+    const handleUnreadCountChanged = (event) => {
+      if (event.detail && typeof event.detail.unreadCount === 'number') {
+        console.log('[NotificationButton] Evento ricevuto:', event.detail);
+        
+        // Se è un aggiornamento forzato (da toggle read/unread)
+        if (event.detail.forced && event.detail.source?.includes('sidebar-toggle')) {
+          setPendingCount(event.detail.unreadCount);
+          setDisplayCount(event.detail.unreadCount);
+          
+          // Mantieni il valore pendente per 3 secondi
+          setTimeout(() => {
+            setPendingCount(null);
+          }, 3000);
+        }
+        // Altri eventi forzati
+        else if (event.detail.forced) {
+          setDisplayCount(event.detail.unreadCount);
+        }
+      }
+    };
+    
+    document.addEventListener("unread-count-changed", handleUnreadCountChanged);
+    
+    return () => {
+      document.removeEventListener("unread-count-changed", handleUnreadCountChanged);
+    };
+  }, []);
+  
   return (
     <button
       onClick={toggleSidebar}
       className="relative p-2 text-white hover:bg-[var(--secondary)] rounded-full transition-colors"
       id="notification-button"
-      aria-label={`Notifiche${unreadCount > 0 ? ` (${unreadCount} non lette)` : ""}`}
+      aria-label={`Notifiche${displayCount > 0 ? ` (${displayCount} non lette)` : ""}`}
     >
       <i className="fas fa-message text-xl"></i>
-      {unreadCount > 0 && (
+      {displayCount > 0 && (
         <span
           className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-h-5 min-w-5 h-auto w-auto px-1 flex items-center justify-center animate-pulse"
           id="notification-counter"
           aria-live="polite"
           style={{
-            fontSize: unreadCount > 99 ? "0.6rem" : "0.75rem",
-            padding: unreadCount > 99 ? "0 2px" : "0",
+            fontSize: displayCount > 99 ? "0.6rem" : "0.75rem",
+            padding: displayCount > 99 ? "0 2px" : "0",
           }}
         >
-          {unreadCount > 99 ? "99+" : unreadCount}
+          {displayCount > 99 ? "99+" : displayCount}
         </span>
       )}
     </button>
@@ -49,67 +92,8 @@ const Header = ({
 }) => {
   const navigate = useNavigate();
   
-  // MODIFICA CHIAVE: Usa Redux per ottenere unreadCount direttamente
+  // Usa Redux per ottenere unreadCount direttamente
   const reduxUnreadCount = useSelector(selectUnreadCount);
-  const [localUnreadCount, setLocalUnreadCount] = useState(reduxUnreadCount);
-
-  // NUOVO: Ascolta gli eventi di aggiornamento del contatore
-  useEffect(() => {
-    const handleUnreadCountChanged = (event) => {
-      if (event.detail && typeof event.detail.unreadCount === 'number') {
-        
-        // Se l'evento viene dalla sidebar chiusa o è un refresh forzato, aggiorna sempre
-        if (event.detail.source === 'sidebar-closed' || event.detail.forced) {
-          setLocalUnreadCount(event.detail.unreadCount);
-        } 
-        // Altrimenti aggiorna solo se il contatore è maggiore di 0 o se viene dalla sidebar filtrata mentre è aperta
-        else if (event.detail.unreadCount > 0 || event.detail.source === 'sidebar-filtered') {
-          setLocalUnreadCount(event.detail.unreadCount);
-        }
-        // Se il contatore è 0 ma non viene dalla sidebar, mantieni il valore Redux
-        else {
-          console.log('[Header] Ignorando contatore 0, mantengo valore Redux:', reduxUnreadCount);
-        }
-      }
-    };
-  
-    const handleReadStatusChanged = (event) => {
-      if (event.detail && typeof event.detail.unreadCount === 'number') {
-        console.log('[Header] Aggiornamento unreadCount da read-status:', event.detail.unreadCount);
-        setLocalUnreadCount(event.detail.unreadCount);
-      }
-    };
-  
-    const handleNotificationsUpdated = () => {
-      console.log('[Header] Notifiche aggiornate, usando valore Redux:', reduxUnreadCount);
-      // Usa direttamente il valore Redux quando le notifiche vengono aggiornate
-      setLocalUnreadCount(reduxUnreadCount);
-    };
-  
-    // Ascolta tutti gli eventi che potrebbero cambiare il contatore
-    document.addEventListener("unread-count-changed", handleUnreadCountChanged);
-    document.addEventListener("read-status-changed", handleReadStatusChanged);
-    document.addEventListener("notifications-updated", handleNotificationsUpdated);
-    document.addEventListener("new-message-received", handleNotificationsUpdated);
-    document.addEventListener("chat-message-sent", handleNotificationsUpdated);
-  
-    return () => {
-      document.removeEventListener("unread-count-changed", handleUnreadCountChanged);
-      document.removeEventListener("read-status-changed", handleReadStatusChanged);
-      document.removeEventListener("notifications-updated", handleNotificationsUpdated);
-      document.removeEventListener("new-message-received", handleNotificationsUpdated);
-      document.removeEventListener("chat-message-sent", handleNotificationsUpdated);
-    };
-  }, [reduxUnreadCount]);
-
-  // NUOVO: Sincronizza con Redux quando cambia
-  useEffect(() => {
-    console.log('[Header] Redux unreadCount cambiato:', reduxUnreadCount);
-    // Aggiorna solo se Redux ha un valore valido (>= 0)
-    if (reduxUnreadCount >= 0) {
-      setLocalUnreadCount(reduxUnreadCount);
-    }
-  }, [reduxUnreadCount]);
 
   // Funzione per gestire l'apertura del dropdown e la chiusura della sidebar
   const handleDropdownToggle = () => {
@@ -128,7 +112,7 @@ const Header = ({
     toggleDropdown();
   };
 
-  // NUOVO: Forza un refresh del contatore quando la sidebar viene aperta
+  // Forza un refresh del contatore quando la sidebar viene aperta
   const handleToggleSidebar = () => {
     toggleSidebar();
   };
@@ -156,7 +140,7 @@ const Header = ({
             {/* Notifications Section */}
             <div className="flex items-center space-x-4">
               <NotificationButton
-                unreadCount={localUnreadCount}
+                unreadCount={reduxUnreadCount}
                 toggleSidebar={handleToggleSidebar}
               />
             </div>

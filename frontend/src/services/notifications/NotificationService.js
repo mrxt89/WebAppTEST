@@ -467,132 +467,194 @@ class NotificationService {
   /**
    * Versione migliorata di showWebNotification che gestisce l'aggregazione
    */
-  showWebNotification(title, message, notificationId, messageCount = 1) {
-    console.log("NOTIFICATION DEBUG: Tentativo di mostrare notifica", {
-      title,
-      message,
-      notificationId,
-      messageCount
-    });
+/**
+ * Versione migliorata di showWebNotification che gestisce l'aggregazione
+ */
+showWebNotification(title, message, notificationId, messageCount = 1) {
+  console.log("NOTIFICATION DEBUG: Tentativo di mostrare notifica", {
+    title,
+    message,
+    notificationId,
+    messageCount
+  });
 
-    if (!("Notification" in window)) {
-      console.warn("NotificationService: Notifiche non supportate dal browser");
-      return false;
+  if (!("Notification" in window)) {
+    console.warn("NotificationService: Notifiche non supportate dal browser");
+    return false;
+  }
+
+  if (Notification.permission !== "granted") {
+    console.warn("NotificationService: Permesso notifiche non concesso");
+    return false;
+  }
+
+  if (!this.webNotificationsEnabled) {
+    console.warn(
+      "NotificationService: Notifiche web disabilitate nelle impostazioni",
+    );
+    return false;
+  }
+
+  if (notificationId && this.isChatMuted(notificationId)) {
+    console.log(
+      `NotificationService: Notifica bloccata per chat silenziata: ${notificationId}`,
+    );
+    return false;
+  }
+
+  if (this.doNotDisturbEnabled) {
+    console.log(
+      "NotificationService: Modalità Non Disturbare attiva, notifica bloccata",
+    );
+    if (notificationId) {
+      this.dndNotifiedChatIds.add(notificationId);
     }
+    return false;
+  }
 
-    if (Notification.permission !== "granted") {
-      console.warn("NotificationService: Permesso notifiche non concesso");
-      return false;
-    }
-
-    if (!this.webNotificationsEnabled) {
-      console.warn(
-        "NotificationService: Notifiche web disabilitate nelle impostazioni",
-      );
-      return false;
-    }
-
-    if (notificationId && this.isChatMuted(notificationId)) {
-      console.log(
-        `NotificationService: Notifica bloccata per chat silenziata: ${notificationId}`,
-      );
-      return false;
-    }
-
-    if (this.doNotDisturbEnabled) {
-      console.log(
-        "NotificationService: Modalità Non Disturbare attiva, notifica bloccata",
-      );
-      if (notificationId) {
-        this.dndNotifiedChatIds.add(notificationId);
-      }
-      return false;
-    }
-
-    try {
-      // NON chiudere notifiche esistenti se hanno lo stesso tag
-      // Il browser gestirà automaticamente la sostituzione grazie al tag
-      const existingNotification = this.activeNotifications.get(notificationId);
-      if (existingNotification && existingNotification.timerId) {
+  try {
+    // Chiudi eventuali notifiche esistenti per la stessa chat
+    const existingNotification = this.activeNotifications.get(notificationId);
+    if (existingNotification) {
+      // Cancella solo il timer, NON chiudere la notifica
+      if (existingNotification.timerId) {
         clearTimeout(existingNotification.timerId);
       }
+    }
 
-      // Creazione della notifica con requireInteraction per mantenerla visibile
-      const options = {
+    // Creazione della notifica con requireInteraction per mantenerla visibile
+    const options = {
+      body: message,
+      icon: "/icons/app-icon.png",
+      badge: "/icons/app-icon.png",
+      tag: `chat-${notificationId}`,
+      requireInteraction: true, // IMPORTANTE: La notifica resta finché non interagita
+      silent: false, // Abilita il suono di sistema
+      renotify: true, // Permette di ri-notificare con lo stesso tag
+      vibrate: [200, 100, 200], // Vibrazione su dispositivi mobili
+      data: {
+        notificationId: notificationId,
+        messageCount: messageCount,
+        timestamp: Date.now()
+      }
+    };
+
+    const notification = new Notification(title, options);
+
+    // Gestione click sulla notifica
+    notification.onclick = () => {
+      console.log("Notifica cliccata per chat:", notificationId);
+      
+      try {
+        // Focus sulla finestra
+        window.focus();
+        
+        // Prova prima con la funzione globale se disponibile
+        if (typeof window.openChatModal === "function") {
+          window.openChatModal(notificationId);
+        } else {
+          // Altrimenti importa il modulo
+          import('@/redux/features/notifications/notificationsSlice').then(module => {
+            if (module.callOpenChatModal) {
+              console.log("Apertura chat con callOpenChatModal");
+              module.callOpenChatModal(notificationId);
+            } else {
+              // Fallback navigazione diretta
+              window.location.href = `/chat/${notificationId}`;
+            }
+          }).catch(error => {
+            console.error("Errore durante import:", error);
+            window.location.href = `/chat/${notificationId}`;
+          });
+        }
+        
+      } catch (clickError) {
+        console.error("Errore durante apertura chat:", clickError);
+        window.location.href = `/chat/${notificationId}`;
+      }
+      
+      // Chiudi la notifica dopo il click
+      notification.close();
+    };
+
+    // Gestione chiusura notifica
+    notification.onclose = () => {
+      console.log("Notifica chiusa per chat:", notificationId);
+      // Rimuovi dalla mappa delle notifiche attive
+      this.activeNotifications.delete(notificationId);
+    };
+
+    // Gestione errore notifica
+    notification.onerror = (error) => {
+      console.error("Errore notifica:", error);
+      this.activeNotifications.delete(notificationId);
+    };
+
+    // NON impostare NESSUN timeout automatico per la chiusura
+    // La notifica rimarrà visibile finché l'utente non interagisce
+    
+    // Salva riferimento alla notifica attiva SENZA timer di chiusura automatica
+    this.activeNotifications.set(notificationId, {
+      notification,
+      timestamp: Date.now()
+      // NOTA: Nessun timerId qui! Non vogliamo chiusura automatica
+    });
+
+    console.log(
+      `NotificationService: Notifica web mostrata con successo: ${title} (persistente)`,
+    );
+    return true;
+  } catch (error) {
+    console.error(
+      "NotificationService: Errore durante la visualizzazione della notifica:",
+      error,
+    );
+    return false;
+  }
+}
+
+// IMPORTANTE: Modifica anche il metodo notifySystem per non chiudere automaticamente
+notifySystem(title, message, onClick = null) {
+  if (this.doNotDisturbEnabled) {
+    return;
+  }
+
+  if (!this.notificationsEnabled) return;
+
+  this.showInAppNotification(title, message, onClick);
+
+  if (this.webNotificationsEnabled && Notification.permission === "granted") {
+    try {
+      const notification = new Notification(title, {
         body: message,
         icon: "/icons/app-icon.png",
-        badge: "/icons/app-icon.png",
-        tag: `chat-${notificationId}`,
-        requireInteraction: true, // IMPORTANTE: La notifica resta finché non interagita
-        silent: false, // Abilita il suono di sistema
-        renotify: true, // Permette di ri-notificare con lo stesso tag
-        data: {
-          notificationId: notificationId,
-          messageCount: messageCount,
-          timestamp: Date.now()
-        }
-      };
-
-      const notification = new Notification(title, options);
-
-      // Gestione click sulla notifica
-      notification.onclick = () => {
-        console.log("Notifica cliccata per chat:", notificationId);
-        
-        try {
-          // Focus sulla finestra
-          window.focus();
-          
-          // Prova prima con la funzione globale se disponibile
-          if (typeof window.openChatModal === "function") {
-            window.openChatModal(notificationId);
-          } else {
-            // Altrimenti importa il modulo
-            import('@/redux/features/notifications/notificationsSlice').then(module => {
-              if (module.callOpenChatModal) {
-                console.log("Apertura chat con callOpenChatModal");
-                module.callOpenChatModal(notificationId);
-              } else {
-                // Fallback navigazione diretta
-                window.location.href = `/chat/${notificationId}`;
-              }
-            }).catch(error => {
-              console.error("Errore durante import:", error);
-              window.location.href = `/chat/${notificationId}`;
-            });
-          }
-          
-        } catch (clickError) {
-          console.error("Errore durante apertura chat:", clickError);
-          window.location.href = `/chat/${notificationId}`;
-        }
-        
-        // Chiudi la notifica dopo il click
-        notification.close();
-      };
-
-      // NON impostare NESSUN timeout automatico per la chiusura
-      // La notifica rimarrà visibile finché l'utente non interagisce
-      
-      // Salva riferimento alla notifica attiva SENZA timer
-      this.activeNotifications.set(notificationId, {
-        notification,
-        timestamp: Date.now()
-        // NOTA: Nessun timerId qui!
+        requireInteraction: true, // CAMBIATO: da false a true
+        silent: false,
+        vibrate: [200, 100, 200]
       });
 
-      console.log(
-        `NotificationService: Notifica web mostrata con successo: ${title} (persistente)`,
-      );
+      if (onClick && typeof onClick === "function") {
+        notification.onclick = () => {
+          window.focus();
+          onClick();
+          notification.close();
+        };
+      }
+
+      // RIMOSSO: setTimeout per chiusura automatica
+      // NON chiudere automaticamente dopo 8 secondi
+
       return true;
     } catch (error) {
       console.error(
-        "NotificationService: Errore durante la visualizzazione della notifica:",
+        "NotificationService: Error showing web notification:",
         error,
       );
-      return false;
     }
   }
+
+  return false;
+}
 
   markNotificationAsReceived(notificationId) {
     if (!notificationId) return;

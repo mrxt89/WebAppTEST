@@ -4,7 +4,12 @@ import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { useNotificationsPagination, useNotificationFilters, useNotificationSearch } from "@/hooks/useNotificationsPagination";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import { useDispatch } from "react-redux";
-import { updatePaginatedNotification } from "@/redux/features/notifications/notificationsSlice";
+import { 
+  updatePaginatedNotification, 
+  updateUnreadCount,
+  setPendingUnreadCount,
+  clearPendingUnreadCount 
+} from "@/redux/features/notifications/notificationsSlice";
 import { swal } from "@/lib/common";
 import {
   Plus,
@@ -522,6 +527,45 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     
     if (notification && notification.notificationId && openChatModal) {
       saveScrollPosition();
+      
+      // Se la notifica non è letta, aggiornala immediatamente
+      if (!notification.isReadByUser) {
+        // Aggiornamento ottimistico immediato
+        setOptimisticUpdates(prev => ({
+          ...prev,
+          [notification.notificationId]: { isReadByUser: true }
+        }));
+        
+        // Aggiorna il contatore nell'header
+        const newUnreadCount = Math.max(0, unreadCount - 1);
+        document.dispatchEvent(
+          new CustomEvent('unread-count-changed', {
+            detail: {
+              unreadCount: newUnreadCount,
+              notificationId: parseInt(notification.notificationId),
+              forced: true,
+              source: 'sidebar-click-open'
+            }
+          })
+        );
+        
+        // Aggiorna lo stato nel Redux store
+        dispatch(updatePaginatedNotification({
+          notificationId: notification.notificationId,
+          updates: { isReadByUser: true }
+        }));
+        
+        // Rimuovi l'aggiornamento ottimistico dopo un delay
+        setTimeout(() => {
+          setOptimisticUpdates(prev => {
+            const newUpdates = { ...prev };
+            delete newUpdates[notification.notificationId];
+            return newUpdates;
+          });
+        }, 1000);
+      }
+      
+      // Apri la chat
       openChatModal(notification.notificationId);
     }
   };
@@ -529,46 +573,100 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
   const handleToggleReadUnread = async (notificationId, isRead, e) => {
     e.stopPropagation();
     
-    // Salva posizione prima dell'azione
     saveNotificationPosition(notificationId);
     
-    // Aggiornamento ottimistico
+    const newReadState = !isRead;
+    
+    // Aggiornamento ottimistico immediato
     setOptimisticUpdates(prev => ({
       ...prev,
-      [notificationId]: { isReadByUser: !isRead }
+      [notificationId]: { isReadByUser: newReadState }
     }));
     
+    // Calcola il nuovo unreadCount
+    let deltaCount = 0;
+    const notification = notifications.find(n => n.notificationId === notificationId);
+    
+    if (notification && notification.archived !== 1 && notification.archived !== '1') {
+      if (newReadState) {
+        deltaCount = isRead ? 0 : -1;
+      } else {
+        deltaCount = isRead ? 1 : 0;
+      }
+    }
+    
+    const newUnreadCount = Math.max(0, unreadCount + deltaCount);
+    
+    // IMPORTANTE: Setta il contatore pendente in Redux
+    dispatch(setPendingUnreadCount({ 
+      count: newUnreadCount, 
+      timestamp: Date.now() 
+    }));
+    
+    // Aggiorna immediatamente Redux
+    dispatch(updateUnreadCount(newUnreadCount));
+    
+    // Emetti evento per l'header con forced=true
+    document.dispatchEvent(
+      new CustomEvent('unread-count-changed', {
+        detail: {
+          unreadCount: newUnreadCount,
+          notificationId: parseInt(notificationId),
+          forced: true,
+          source: 'sidebar-toggle-read',
+          timestamp: Date.now()
+        }
+      })
+    );
+    
     try {
-      await toggleReadUnread(notificationId, !isRead);
+      await toggleReadUnread(notificationId, newReadState);
       
-      // Rimuovi aggiornamento ottimistico
-      setOptimisticUpdates(prev => {
-        const newUpdates = { ...prev };
-        delete newUpdates[notificationId];
-        return newUpdates;
-      });
+      // Aggiorna la notifica specifica
+      dispatch(updatePaginatedNotification({
+        notificationId,
+        updates: { isReadByUser: newReadState }
+      }));
       
-      // Forza l'aggiornamento della sidebar
-      document.dispatchEvent(
-        new CustomEvent('notification-read-status-changed', {
-          detail: {
-            notificationId: parseInt(notificationId),
-            isRead: !isRead
-          }
-        })
-      );
-
-      // Aggiorna lo stato locale usando updateSingleNotificationInPlace
-      await updateSingleNotificationInPlace(notificationId);
+      // Dopo 5 secondi, pulisci il pendingCount
+      setTimeout(() => {
+        dispatch(clearPendingUnreadCount());
+      }, 5000);
+      
+      // Rimuovi ottimistico
+      setTimeout(() => {
+        setOptimisticUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[notificationId];
+          return newUpdates;
+        });
+      }, 300);
       
     } catch (error) {
       console.error("Error toggling read status:", error);
-      // Rimuovi aggiornamento ottimistico in caso di errore
+      
+      // In caso di errore, ripristina tutto
+      dispatch(clearPendingUnreadCount());
+      dispatch(updateUnreadCount(unreadCount)); // Ripristina valore originale
+      
       setOptimisticUpdates(prev => {
         const newUpdates = { ...prev };
         delete newUpdates[notificationId];
         return newUpdates;
       });
+      
+      // Ripristina contatore nell'header
+      document.dispatchEvent(
+        new CustomEvent('unread-count-changed', {
+          detail: {
+            unreadCount: unreadCount,
+            notificationId: parseInt(notificationId),
+            forced: true,
+            source: 'sidebar-toggle-read-error',
+            timestamp: Date.now()
+          }
+        })
+      );
     }
   };
 
