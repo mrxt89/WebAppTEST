@@ -1,3 +1,4 @@
+// src/components/chat/NewMessageModal.jsx
 import React, { useState, useRef, useEffect } from "react";
 import Modal from "react-modal";
 import ChatTopBar from "./ChatTopBar";
@@ -7,6 +8,8 @@ import ChatLayout from "./ChatLayout";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import { swal } from "@/lib/common";
 import { Paperclip, X, ChevronRight, ChevronLeft } from "lucide-react";
+import axios from "axios";
+import { config } from "@/config";
 
 Modal.setAppElement("#root");
 
@@ -16,8 +19,11 @@ const NewMessageModal = ({
   sidebarVisible,
   openChatModal,
   reply,
-  type,
+  type = "standard", // MODIFICATO: type può essere "standard" o "task"
   notificationCategoryId,
+  defaultTitle = "", // NUOVO: titolo predefinito
+  defaultReceivers = [], // NUOVO: destinatari predefiniti
+  metadata = {}, // NUOVO: metadati aggiuntivi (taskId, projectId, etc.)
 }) => {
   const {
     sendNotification,
@@ -30,8 +36,8 @@ const NewMessageModal = ({
   const [users, setUsers] = useState([]);
   const [responseOptions, setResponseOptions] = useState([]);
 
-  const [title, setTitle] = useState("");
-  const [receivers, setReceivers] = useState([]);
+  const [title, setTitle] = useState(defaultTitle);
+  const [receivers, setReceivers] = useState(defaultReceivers);
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
   const [fetchedUsers, setFetchedUsers] = useState([]);
@@ -41,9 +47,18 @@ const NewMessageModal = ({
   const [replyToMessage, setReplyToMessage] = useState(null);
   const [attachmentsLoaded, setAttachmentsLoaded] = useState(false);
   const [currentNotificationCategoryId, setCurrentNotificationCategoryId] =
-    useState(notificationCategoryId);
+    useState(notificationCategoryId || 1);
   const [modalStyle, setModalStyle] = useState({});
   const chatListRef = useRef(null);
+
+  // NUOVO: Effetto per inizializzare i valori quando cambiano le props
+  useEffect(() => {
+    if (isOpen) {
+      setTitle(defaultTitle || "");
+      setReceivers(defaultReceivers || []);
+      setCurrentNotificationCategoryId(notificationCategoryId || 1);
+    }
+  }, [isOpen]);
 
   // Funzione per caricare gli utenti
   useEffect(() => {
@@ -163,7 +178,8 @@ const NewMessageModal = ({
 
   // Update receivers list based on recipientsJSON in responseOptions
   useEffect(() => {
-    if (notificationCategoryId && responseOptions?.length > 0) {
+    // Solo per messaggi standard, non per task
+    if (type === "standard" && notificationCategoryId && responseOptions?.length > 0) {
       const currentResponseOption = responseOptions.find(
         (option) => option.notificationCategoryId == notificationCategoryId,
       );
@@ -182,7 +198,7 @@ const NewMessageModal = ({
         setReceivers([]);
       }
     }
-  }, [notificationCategoryId, responseOptions]);
+  }, [notificationCategoryId, responseOptions, type]);
 
   const resetFields = () => {
     setTitle("");
@@ -221,6 +237,24 @@ const NewMessageModal = ({
     try {
       const newNotification = await sendNotification(updatedNotificationData);
       if (newNotification) {
+        // NUOVO: Se è una chat da task, collega al task
+        if (type === "task" && metadata.taskId) {
+          try {
+            const token = localStorage.getItem("token");
+            await axios.post(
+              `${config.API_BASE_URL}/notifications/${newNotification.notificationId}/link/task/${metadata.taskId}`,
+              {},
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            );
+          } catch (error) {
+            console.error("Errore nel collegamento della chat al task:", error);
+          }
+        }
+
         // Prima resetta i campi
         resetFields();
         // Poi chiudi il modale
@@ -240,7 +274,7 @@ const NewMessageModal = ({
 
   // Update receivers list based on recipientsJSON in responseOptions
   useEffect(() => {
-    if (currentNotificationCategoryId && responseOptions?.length > 0) {
+    if (currentNotificationCategoryId && responseOptions?.length > 0 && type === "standard") {
       const currentResponseOption = responseOptions.find(
         (option) =>
           option.notificationCategoryId == currentNotificationCategoryId,
@@ -260,7 +294,7 @@ const NewMessageModal = ({
         setReceivers([]);
       }
     }
-  }, [currentNotificationCategoryId, responseOptions]);
+  }, [currentNotificationCategoryId, responseOptions, type]);
 
   // funzione per aggiornare il notificationCategoryId
   const handleUpdateCategoryId = (newCategoryId) => {
@@ -309,13 +343,18 @@ const NewMessageModal = ({
     ? users.filter((user) => !user.userDisabled)
     : [];
 
+  // NUOVO: Titolo del modale basato sul tipo
+  const modalTitle = type === "task" 
+    ? `Nuova chat per: ${title}` 
+    : "Nuovo messaggio";
+
   return (
     <Modal
       isOpen={isOpen}
       onRequestClose={onRequestClose}
       shouldCloseOnOverlayClick={false}
       shouldCloseOnEsc={false}
-      contentLabel="New Message Modal"
+      contentLabel={modalTitle}
       style={modalStyle}
     >
       <div className="flex flex-col justify-between w-full h-full">
@@ -335,6 +374,8 @@ const NewMessageModal = ({
           }
           receiversList={receivers.join("-")}
           onUpdateCategoryId={handleUpdateCategoryId} // Passiamo la funzione per aggiornare il valore
+          // NUOVO: Disabilita modifica titolo per chat da task
+          disableTitleEdit={type === "task"}
         />
 
         <div className="flex-1 flex overflow-hidden relative">
@@ -347,6 +388,15 @@ const NewMessageModal = ({
             }}
           >
             <div className="flex flex-col h-full">
+              {/* NUOVO: Header informativo per chat da task */}
+              {type === "task" && metadata.projectId && (
+                <div className="p-2 bg-blue-50 border-b">
+                  <p className="text-xs text-blue-700">
+                    Questa chat sarà collegata all'attività selezionata
+                  </p>
+                </div>
+              )}
+
               {/* Area per visualizzare i destinatari selezionati */}
               {receivers.length > 0 && (
                 <div className="p-2 bg-gray-50 border-b flex flex-wrap gap-1">
@@ -426,11 +476,13 @@ const NewMessageModal = ({
                       </div>
                     </div>
                     <p className="text-center text-lg font-medium mb-2">
-                      Nuovo messaggio
+                      {type === "task" ? "Nuova chat per l'attività" : "Nuovo messaggio"}
                     </p>
                     <p className="text-center text-sm max-w-md">
-                      Compila il titolo, seleziona i destinatari dal menu info
-                      (in alto a destra) e scrivi il tuo messaggio.
+                      {type === "task"
+                        ? "Scrivi il primo messaggio per iniziare la discussione su questa attività."
+                        : "Compila il titolo, seleziona i destinatari dal menu info (in alto a destra) e scrivi il tuo messaggio."
+                      }
                       {!isSidebarOpen && (
                         <span>
                           {" "}
@@ -484,6 +536,8 @@ const NewMessageModal = ({
           hexColor={hexColor}
           onRequestClose={onRequestClose}
           openChatModal={openChatModal}
+          // NUOVO: Passa i metadati per il contesto
+          metadata={metadata}
         />
       </div>
     </Modal>

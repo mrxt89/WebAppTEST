@@ -1,5 +1,6 @@
+// src/components/chat/MinimizedChatsDock.jsx
 import React from "react";
-import { X, MessageSquare } from "lucide-react";
+import { X, MessageSquare, Plus } from "lucide-react";
 import "@/styles/chat-components.css";
 
 /**
@@ -9,15 +10,22 @@ import "@/styles/chat-components.css";
  * @param {Function} onRestoreChat - Funzione per ripristinare una chat
  * @param {Function} onCloseChat - Funzione per chiudere una chat
  * @param {Array} notifications - Array completo di notifiche per controllare i messaggi non letti
+ * @param {Array} newMessageWindows - Array di finestre nuovo messaggio minimizzate
+ * @param {Function} onRestoreNewMessage - Funzione per ripristinare una finestra nuovo messaggio
+ * @param {Function} onCloseNewMessage - Funzione per chiudere una finestra nuovo messaggio
  */
 const MinimizedChatsDock = ({
   minimizedChats = [],
   onRestoreChat,
   onCloseChat,
   notifications = [],
+  newMessageWindows = [],
+  onRestoreNewMessage,
+  onCloseNewMessage,
 }) => {
   // Non renderizzare nulla se non ci sono chat minimizzate
-  if (!minimizedChats || minimizedChats.length === 0) {
+  if ((!minimizedChats || minimizedChats.length === 0) && 
+      (!newMessageWindows || newMessageWindows.length === 0)) {
     return null;
   }
 
@@ -34,6 +42,7 @@ const MinimizedChatsDock = ({
   return (
     <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 minimized-chat-dock pointer-events-auto z-[1000]">
       <div className="window-dock">
+        {/* Chat esistenti minimizzate */}
         {minimizedChats.map((chat) => (
           <div
             key={`minimized-chat-${chat.notificationId}`}
@@ -73,6 +82,45 @@ const MinimizedChatsDock = ({
               className="absolute -top-1 -right-1 bg-white rounded-full border border-gray-200 shadow-sm p-0.5 hover:bg-gray-100"
               onClick={() => onCloseChat(chat.notificationId)}
               title="Chiudi chat"
+            >
+              <X className="w-3 h-3 text-gray-500" />
+            </button>
+          </div>
+        ))}
+
+        {/* Finestre nuovo messaggio minimizzate */}
+        {newMessageWindows.map((window) => (
+          <div
+            key={`minimized-new-message-${window.id}`}
+            className="minimized-chat-icon relative mx-1 rounded-full bg-white p-2 cursor-pointer"
+            style={{
+              borderLeft: `3px solid #3b82f6`,
+            }}
+          >
+            {/* Icona nuovo messaggio */}
+            <div
+              className="flex items-center"
+              onClick={() => onRestoreNewMessage(window.id)}
+              title={window.defaultTitle || "Nuovo messaggio"}
+            >
+              <div className="w-8 h-8 flex items-center justify-center">
+                <Plus
+                  className="w-4 h-4 text-blue-600"
+                />
+              </div>
+              <span
+                className="ml-2 font-medium truncate max-w-[120px] text-blue-600"
+                style={{ fontSize: "0.575rem" }}
+              >
+                {window.defaultTitle || "Nuovo messaggio"}
+              </span>
+            </div>
+
+            {/* Pulsante per chiudere */}
+            <button
+              className="absolute -top-1 -right-1 bg-white rounded-full border border-gray-200 shadow-sm p-0.5 hover:bg-gray-100"
+              onClick={() => onCloseNewMessage(window.id)}
+              title="Chiudi"
             >
               <X className="w-3 h-3 text-gray-500" />
             </button>

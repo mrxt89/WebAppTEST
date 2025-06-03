@@ -12,7 +12,6 @@ import {
 import DocumentChatList from "./components/DocumentChatList";
 import useDocumentChats from "./hooks/useDocumentChats";
 import { getDocumentTypeConfig } from "./config/documentTypes";
-import NewMessageModal from "../NewMessageModal";
 
 const GenericDocumentChats = ({
   documentType,
@@ -35,8 +34,6 @@ const GenericDocumentChats = ({
   defaultCategoryId = 1
 }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
-  const [prefillData, setPrefillData] = useState(null);
 
   const {
     chats,
@@ -61,43 +58,51 @@ const GenericDocumentChats = ({
   // Titolo del pannello
   const panelTitle = title || `Chat collegate - ${docTypeConfig?.label || documentType}`;
 
-  // Gestione apertura modal nuova chat
+  // Gestione apertura finestra nuova chat
   const handleCreateNewChat = () => {
     const chatTitle = defaultChatTitle || 
       (docTypeConfig && documentData ? 
         docTypeConfig.displayFormat(documentData) : 
         `${documentType} - ${documentId}`);
 
-    setPrefillData({
-      title: chatTitle,
-      participants: defaultParticipants,
-      categoryId: defaultCategoryId,
-      linkToDocument: {
+    // Prepara i dati per la nuova finestra
+    const newChatData = {
+      defaultTitle: chatTitle,
+      defaultReceivers: defaultParticipants,
+      notificationCategoryId: defaultCategoryId,
+      metadata: {
         documentType,
         documentId,
-        ...documentData
+        ...documentData,
+        onChatCreated: async (notificationId) => {
+          // Collega la chat al documento
+          if (notificationId) {
+            try {
+              // Qui potresti dover chiamare un'API per collegare la chat al documento
+              // Per ora assumiamo che il collegamento sia gestito lato backend
+              
+              await refresh();
+              
+              if (onChatCreated) {
+                onChatCreated(notificationId);
+              }
+              
+              // Apri la chat appena creata
+              openChat({ notificationId });
+            } catch (error) {
+              console.error("Errore nel collegamento della chat:", error);
+            }
+          }
+        }
       }
-    });
-    
-    setIsNewChatModalOpen(true);
-  };
+    };
 
-  // Gestione creazione chat dal modal
-  const handleChatCreatedFromModal = async (notificationId) => {
-    setIsNewChatModalOpen(false);
-    setPrefillData(null);
-    
-    // Il collegamento al documento viene gestito dal modal stesso
-    // tramite il prefillData.linkToDocument
-    
-    await refresh();
-    
-    if (onChatCreated) {
-      onChatCreated(notificationId);
-    }
-    
-    // Apri la chat appena creata
-    openChat({ notificationId });
+    // Emetti evento per aprire nuova finestra chat
+    document.dispatchEvent(
+      new CustomEvent("openNewMessageModal", {
+        detail: newChatData
+      })
+    );
   };
 
   // Contenuto del pannello
@@ -178,17 +183,6 @@ const GenericDocumentChats = ({
           />
         </CardContent>
       )}
-
-      <NewMessageModal
-        isOpen={isNewChatModalOpen}
-        onRequestClose={() => {
-          setIsNewChatModalOpen(false);
-          setPrefillData(null);
-        }}
-        sidebarVisible={false}
-        openChatModal={handleChatCreatedFromModal}
-        prefillData={prefillData}
-      />
     </>
   );
 

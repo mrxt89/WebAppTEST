@@ -63,8 +63,8 @@ const ChatTopBar = ({
   setTitle,
   closeChat,
   onMinimize,
-  onMaximize, // Aggiungi prop per massimizzare la finestra
-  isMaximized, // Aggiungi prop per indicare se la finestra è massimizzata
+  onMaximize,
+  isMaximized,
   membersInfo = [],
   updateReceiversList,
   users = [],
@@ -78,14 +78,15 @@ const ChatTopBar = ({
   receiversList = "",
   onUpdateCategoryId,
   leaveChat,
-  hasLeftChat = false, // Prop per identificare se l'utente ha abbandonato la chat
-  isArchived = false, // Prop per identificare se la chat è archiviata
-  archiveChat = null, // Funzione per archiviare la chat
-  unarchiveChat = null, // Funzione per rimuovere dall'archivio la chat
-  renderExtraButtons = null, // Prop per renderizzare pulsanti extra
-  isStandalone = false, // Nuova prop per indicare se siamo in modalità standalone
+  hasLeftChat = false,
+  isArchived = false,
+  archiveChat = null,
+  unarchiveChat = null,
+  renderExtraButtons = null,
+  isStandalone = false,
   onRequestClose = null,
-  refreshParticipants = null, // Nuova prop per aggiornare i partecipanti
+  refreshParticipants = null,
+  disableTitleEdit = false, // NUOVO: per disabilitare modifica titolo
 }) => {
   const [isInfoVisible, setIsInfoVisible] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
@@ -117,31 +118,27 @@ const ChatTopBar = ({
   const infoButtonRef = useRef(null);
   const moreMenuRef = useRef(null);
 
-  const [currentFilter, setCurrentFilter] = useState("all"); // Stato del filtro corrente
-  // Riferimento per input del titolo
+  const [currentFilter, setCurrentFilter] = useState("all");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(title || "");
   const titleInputRef = useRef(null);
 
   const [isDocumentLinkerOpen, setIsDocumentLinkerOpen] = useState(false);
-  const documents = []; // Array vuoto per ora
+  const documents = [];
 
-  // Aggiungo uno stato per tenere traccia dei filtri attivi
   const [activeFilters, setActiveFilters] = useState({
     color: null,
     messageType: "all",
     searchText: "",
   });
 
-  // Funzione per caricare i partecipanti - SPOSTATA QUI
+  // Funzione per caricare i partecipanti
   const loadParticipants = useCallback(async () => {
     if (!notificationId) return;
     
     try {
-      // Usa fetchNotificationById per aggiornare i dati della chat
       await fetchNotificationById(notificationId, true);
       
-      // Se è disponibile refreshParticipants, chiamalo
       if (typeof refreshParticipants === "function") {
         refreshParticipants(notificationId);
       }
@@ -169,37 +166,36 @@ const ChatTopBar = ({
     };
   }, []);
 
+  // IMPORTANTE: Rimuovi il loop problematico
   useEffect(() => {
-  console.log("TopBar: membersInfo aggiornato, numero membri:", membersInfo.length);
-  
-  // Se stavamo aspettando un aggiornamento membri dopo l'invio, resetta receivers
-  if (waitingForMembersUpdate && membersInfo.length > 0) {
-    console.log("TopBar: Reset receivers dopo aggiornamento membri");
-    setSelectedUsers([]);
-    if (typeof updateReceiversList === "function") {
-      updateReceiversList("");
-    }
-    setWaitingForMembersUpdate(false);
-  }
-}, [membersInfo, waitingForMembersUpdate, updateReceiversList]);
-
-// Aggiungi listener per l'evento di messaggio inviato
-useEffect(() => {
-  const handleMessageSent = (event) => {
-    const { notificationId: eventNotificationId } = event.detail;
+    // NON fare console.log continuamente per membersInfo
+    // Questo useEffect dovrebbe essere rimosso o modificato per non causare loop
     
-    if (eventNotificationId === notificationId) {
-      console.log("TopBar: Messaggio inviato, in attesa di aggiornamento membri");
-      setWaitingForMembersUpdate(true);
+    if (waitingForMembersUpdate && membersInfo.length > 0) {
+      setSelectedUsers([]);
+      if (typeof updateReceiversList === "function") {
+        updateReceiversList("");
+      }
+      setWaitingForMembersUpdate(false);
     }
-  };
+  }, [membersInfo.length, waitingForMembersUpdate, updateReceiversList]);
 
-  document.addEventListener("chat-message-sent", handleMessageSent);
-  
-  return () => {
-    document.removeEventListener("chat-message-sent", handleMessageSent);
-  };
-}, [notificationId]);
+  // Aggiungi listener per l'evento di messaggio inviato
+  useEffect(() => {
+    const handleMessageSent = (event) => {
+      const { notificationId: eventNotificationId } = event.detail;
+      
+      if (eventNotificationId === notificationId && !isNewMessage) {
+        setWaitingForMembersUpdate(true);
+      }
+    };
+
+    document.addEventListener("chat-message-sent", handleMessageSent);
+    
+    return () => {
+      document.removeEventListener("chat-message-sent", handleMessageSent);
+    };
+  }, [notificationId, isNewMessage]);
 
   // Ottieni il colore della categoria o usa un valore predefinito
   const getCategoryColor = () => {
@@ -214,7 +210,6 @@ useEffect(() => {
       }
     }
 
-    // Colore di fallback
     return "#3b82f6";
   };
 
@@ -250,14 +245,13 @@ useEffect(() => {
 
   // Focus automatico sull'input del titolo quando si apre una nuova chat
   useEffect(() => {
-    if (isNewMessage && titleInputRef.current) {
+    if (isNewMessage && titleInputRef.current && !disableTitleEdit) {
       titleInputRef.current.focus();
     }
-  }, [isNewMessage]);
+  }, [isNewMessage, disableTitleEdit]);
 
   // Aggiorna i receivers selezionati quando cambia receiversList
   useEffect(() => {
-    console.log("TopBar: receiversList aggiornato:", receiversList);
     if (receiversList !== undefined) {
       setSelectedUsers(receiversList ? receiversList.split("-").filter(Boolean) : []);
     }
@@ -276,7 +270,6 @@ useEffect(() => {
           },
         );
 
-        // Elabora i dati dei canali
         const channelsData = response.data.map((channel) => ({
           ...channel,
           members:
@@ -308,12 +301,10 @@ useEffect(() => {
       const { notificationId: eventNotificationId, receiversList: newReceiversList } = event.detail;
       
       if (eventNotificationId === notificationId) {
-        console.log("TopBar: Aggiornamento receivers da evento", newReceiversList);
         setSelectedUsers(newReceiversList ? newReceiversList.split("-").filter(Boolean) : []);
         
-        // Se siamo nella tab "add", potrebbe essere necessario resettare
         if (activeTab === "add" && !newReceiversList) {
-          setActiveTab("info"); // Torna alla tab info dopo l'invio
+          setActiveTab("info");
         }
       }
     };
@@ -330,7 +321,6 @@ useEffect(() => {
       const { notificationId: eventNotificationId } = event.detail;
       
       if (eventNotificationId === notificationId) {
-        console.log("Utente rimosso dalla chat, aggiorno partecipanti");
         loadParticipants();
       }
     };
@@ -339,7 +329,6 @@ useEffect(() => {
       const { notificationId: eventNotificationId, action } = event.detail;
       
       if (eventNotificationId === notificationId && action === 'left') {
-        console.log("Utente ha lasciato la chat, aggiorno partecipanti");
         loadParticipants();
       }
     };
@@ -347,8 +336,7 @@ useEffect(() => {
     const handleMessageSent = (event) => {
       const { notificationId: eventNotificationId } = event.detail;
       
-      if (eventNotificationId === notificationId) {
-        // Dopo l'invio di un messaggio, aggiorna i partecipanti se la tab è aperta
+      if (eventNotificationId === notificationId && !isNewMessage) {
         if (isInfoVisible && activeTab === "members") {
           setTimeout(() => {
             loadParticipants();
@@ -365,28 +353,25 @@ useEffect(() => {
       }
     };
   
-    // Aggiungi i listener
     document.addEventListener("user-removed-from-chat", handleUserRemovedFromChat);
     document.addEventListener("chat-status-changed", handleChatStatusChanged);
     document.addEventListener("chat-message-sent", handleMessageSent);
     document.addEventListener("refresh-participants", handleRefreshParticipants);
     
     return () => {
-      // Rimuovi i listener
       document.removeEventListener("user-removed-from-chat", handleUserRemovedFromChat);
       document.removeEventListener("chat-status-changed", handleChatStatusChanged);
       document.removeEventListener("chat-message-sent", handleMessageSent);
       document.removeEventListener("refresh-participants", handleRefreshParticipants);
     };
-  }, [notificationId, isInfoVisible, activeTab, loadParticipants]);
+  }, [notificationId, isInfoVisible, activeTab, loadParticipants, isNewMessage]);
 
   // Aggiungo useEffect per aggiornare i partecipanti quando si apre la topbar
   useEffect(() => {
-    if (isInfoVisible && notificationId) {
-      console.log("TopBar: Aggiornamento partecipanti al click su info");
+    if (isInfoVisible && notificationId && !isNewMessage) {
       fetchChatParticipants(notificationId);
     }
-  }, [isInfoVisible, notificationId, fetchChatParticipants]);
+  }, [isInfoVisible, notificationId, fetchChatParticipants, isNewMessage]);
 
   // Funzione per controllare lo stato online di un utente
   const getOnlineStatus = (user) => {
@@ -427,10 +412,9 @@ useEffect(() => {
 
   // Funzione per gestire la modifica del titolo
   const handleTitleEdit = () => {
-    if (hasLeftChat) return; // Non consentire la modifica se l'utente ha abbandonato la chat
+    if (hasLeftChat || disableTitleEdit) return;
     setIsEditingTitle(true);
 
-    // Focus sull'input dopo il render
     setTimeout(() => {
       if (titleInputRef.current) {
         titleInputRef.current.focus();
@@ -442,20 +426,15 @@ useEffect(() => {
   // Funzione per salvare il titolo modificato
   const handleTitleSave = async () => {
     if (!editedTitle.trim()) {
-      // Ripristina il titolo originale se è vuoto
       setEditedTitle(title);
       setIsEditingTitle(false);
       return;
     }
 
     if (editedTitle !== title) {
-      // Salva solo se il titolo è cambiato
       const success = await updateChatTitle(notificationId, editedTitle);
       if (success && typeof setTitle === "function") {
         setTitle(editedTitle);
-    
-        // Aggiorna la notifica per avere i dati aggiornati
-        // Usa true per chat aperte per ottenere tutti i messaggi
         await fetchNotificationById(notificationId, true);
       }
     }
@@ -470,21 +449,20 @@ useEffect(() => {
       handleTitleSave();
     } else if (e.key === "Escape") {
       e.preventDefault();
-      setEditedTitle(title); // Ripristina il valore originale
+      setEditedTitle(title);
       setIsEditingTitle(false);
     }
   };
 
   // Gestisce la selezione/deselezione degli utenti
   const handleUserSelect = (userId) => {
-    if (hasLeftChat) return; // Non consentire la selezione se l'utente ha abbandonato la chat
+    if (hasLeftChat) return;
 
     setSelectedUsers((prevSelected) => {
       const updatedList = prevSelected.includes(userId)
         ? prevSelected.filter((id) => id !== userId)
         : [...prevSelected, userId];
 
-      // IMPORTANTE: Chiama updateReceiversList con la stringa aggiornata
       if (typeof updateReceiversList === "function") {
         updateReceiversList(updatedList.join("-"));
       }
@@ -494,29 +472,24 @@ useEffect(() => {
 
   // Gestisce la selezione di un canale
   const handleChannelSelect = (channelId) => {
-    if (hasLeftChat) return; // Non consentire la selezione se l'utente ha abbandonato la chat
+    if (hasLeftChat) return;
 
-    // Ottieni il canale selezionato
     const selectedChannel = notificationChannels.find(
       (c) => c.notificationCategoryId == channelId,
     );
 
     if (selectedChannel) {
-      // Estrai gli ID degli utenti dal canale
       const channelUserIds = selectedChannel.members
         .map((member) => {
-          // Gestisci sia il formato API che il formato JSON parsato
           if (member.userId) return member.userId.toString();
           if (member.TB) return member.TB[0].userId.toString();
           return null;
         })
         .filter(Boolean);
 
-      // Aggiungi tutti gli utenti del canale ai destinatari selezionati
       setSelectedUsers(channelUserIds);
       updateReceiversList(channelUserIds.join("-"));
 
-      // Aggiorna il notificationCategoryId solo se è una nuova chat
       if (isNewMessage) {
         if (typeof onUpdateCategoryId === "function") {
           onUpdateCategoryId(selectedChannel.notificationCategoryId);
@@ -527,7 +500,6 @@ useEffect(() => {
 
   // Filtra gli utenti disponibili per la ricerca
   const filteredUsers = users.filter((user) => {
-    // Cerca nel nome, cognome o username
     const searchMatch =
       (user.firstName?.toLowerCase() || "").includes(
         searchTerm.toLowerCase(),
@@ -539,7 +511,6 @@ useEffect(() => {
         searchTerm.toLowerCase(),
       );
 
-    // Mostra solo utenti non disabilitati e non già membri (se siamo nella tab Aggiungi)
     if (activeTab === "add") {
       return searchMatch && !user.userDisabled;
     }
@@ -560,7 +531,7 @@ useEffect(() => {
 
   // Rimuove tutti i destinatari selezionati
   const handleClearAll = () => {
-    if (hasLeftChat) return; // Non consentire la modifica se l'utente ha abbandonato la chat
+    if (hasLeftChat) return;
 
     setSelectedUsers([]);
     updateReceiversList("");
@@ -571,13 +542,11 @@ useEffect(() => {
     if (!notificationId) return;
   
     try {
-      // Aggiorna i filtri attivi
       setActiveFilters((prev) => ({
         ...prev,
         ...filters,
       }));
   
-      // Costruisci l'oggetto dei filtri da inviare
       const filterParams = {
         ...activeFilters,
         ...filters,
@@ -586,14 +555,13 @@ useEffect(() => {
       const result = await filterMessages(notificationId, filterParams);
   
       if (result) {
-        // Emetti evento con il notificationId corretto
         const event = new CustomEvent("chat-filter-applied", {
           detail: {
             messageIds: result.filteredMessages 
               ? result.filteredMessages.map((m) => m.messageId)
-              : result.map((m) => m.messageId), // Gestisci entrambi i formati di risposta
+              : result.map((m) => m.messageId),
             totalFound: result.totalFound || result.length,
-            targetNotificationId: parseInt(notificationId), // Assicurati che sia un numero
+            targetNotificationId: parseInt(notificationId),
             activeFilters: filterParams,
           },
         });
@@ -635,12 +603,8 @@ useEffect(() => {
 
   // Toggle per mostrare/nascondere la barra di ricerca
   const toggleSearch = () => {
-    // Semplicemente alterna lo stato di visibilità della ricerca
     setIsSearchVisible(!isSearchVisible);
-
-    // Chiudi altri menu/dropdown aperti
     setIsMoreMenuOpen(false);
-    // Non aprire il pannello con le tab quando siamo in modalità mobile
     if (isInfoVisible && isMobile) {
       setIsInfoVisible(false);
     }
@@ -648,8 +612,6 @@ useEffect(() => {
 
   // Gestisce il click su un risultato della ricerca
   const handleSearchResultSelected = (messageId) => {
-    // Questa funzione verrà chiamata quando un risultato viene selezionato in ImprovedSearchBar
-    // Emit di un evento per scorrere al messaggio selezionato
     const event = new CustomEvent("chat-search-result-selected", {
       detail: { messageId },
     });
@@ -657,7 +619,6 @@ useEffect(() => {
   };
 
   const handlePollCreated = (poll, messageResult) => {
-    // Aggiorna la notifica per includere il nuovo messaggio del sondaggio
     if (messageResult && messageResult.notificationId) {
       fetchNotificationById(messageResult.notificationId);
     }
@@ -668,17 +629,9 @@ useEffect(() => {
     if (!archiveChat || !notificationId) return;
 
     try {
-      // Chiudi i menu aperti
       setIsMoreMenuOpen(false);
       setIsInfoVisible(false);
-
-      // Chiama la funzione archiveChat passata come prop
       await archiveChat(notificationId);
-
-      // Non è necessario fare altro qui perché:
-      // 1. La funzione archiveChat aggiorna già lo stato della chat
-      // 2. Emette un evento che notifica altri componenti
-      // 3. Lo stato isArchived verrà aggiornato tramite il ricaricamento dati in ChatWindow
     } catch (error) {
       console.error("Errore durante l'archiviazione della chat:", error);
     }
@@ -689,17 +642,9 @@ useEffect(() => {
     if (!unarchiveChat || !notificationId) return;
 
     try {
-      // Chiudi i menu aperti
       setIsMoreMenuOpen(false);
       setIsInfoVisible(false);
-
-      // Chiama la funzione unarchiveChat passata come prop
       await unarchiveChat(notificationId);
-
-      // Non è necessario fare altro qui perché:
-      // 1. La funzione unarchiveChat aggiorna già lo stato della chat
-      // 2. Emette un evento che notifica altri componenti
-      // 3. Lo stato isArchived verrà aggiornato tramite il ricaricamento dati in ChatWindow
     } catch (error) {
       console.error("Errore durante la rimozione dall'archivio:", error);
     }
@@ -710,11 +655,9 @@ useEffect(() => {
     if (!leaveChat || !notificationId) return;
 
     try {
-      // Chiudi i menu aperti
       setIsMoreMenuOpen(false);
       setIsInfoVisible(false);
 
-      // Mostra un indicatore di caricamento
       swal.fire({
         title: "Abbandono in corso...",
         allowOutsideClick: false,
@@ -724,17 +667,13 @@ useEffect(() => {
         },
       });
 
-      // Chiama la funzione leaveChat passata come prop
       const result = await leaveChat(notificationId);
 
       if (result) {
-        // Importante: Ricarica i dati aggiornati della chat
-        // Questa funzione deve essere disponibile come prop
         if (typeof fetchNotificationData === "function") {
           await fetchNotificationData(notificationId);
         }
 
-        // Aggiorna lo stato locale immediatamente
         setHasLeftChat(true);
 
         swal.fire({
@@ -745,7 +684,6 @@ useEffect(() => {
           showConfirmButton: false,
         });
 
-        // Emetti un evento per notificare altri componenti
         document.dispatchEvent(
           new CustomEvent("chat-status-changed", {
             detail: {
@@ -769,18 +707,11 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    // Questa funzione verrà chiamata quando lo stato della chat cambia
-    // (hasLeftChat o isArchived vengono aggiornati dal componente padre)
     const updateUIForChatStatus = () => {
-      // Puoi aggiungere logica di UI aggiuntiva qui se necessario
-      // Ad esempio, resettare alcuni stati, chiudere menu, ecc.
-
-      // Chiudi eventuali menu aperti per mostrare lo stato aggiornato
       setIsMoreMenuOpen(false);
       setIsInfoVisible(false);
     };
 
-    // Esegui la funzione quando lo stato cambia
     updateUIForChatStatus();
   }, [hasLeftChat, isArchived]);
 
@@ -823,16 +754,32 @@ useEffect(() => {
 
         {/* Center section - Title */}
         <div className="">
-          {isNewMessage ? (
+        {isNewMessage && !disableTitleEdit ? (
             <input
               ref={titleInputRef}
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onMouseDown={(e) => {
+                e.stopPropagation(); // Previene la propagazione del click
+              }}
+              onClick={(e) => {
+                e.stopPropagation(); // Previene la propagazione del click
+                e.target.focus(); // Forza il focus
+              }}
+              onFocus={(e) => {
+                e.target.select(); // Seleziona tutto il testo al focus
+              }}
               placeholder="Inserisci il titolo..."
-              className="bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none w-full text-center font-medium px-1"
+              className="bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none w-full text-center font-medium px-1 cursor-text"
+              style={{ 
+                cursor: 'text',
+                userSelect: 'text', // Permette la selezione del testo
+                WebkitUserSelect: 'text',
+                MozUserSelect: 'text'
+              }}
             />
-          ) : isEditingTitle ? (
+          ) : isEditingTitle && !disableTitleEdit ? (
             <div className="relative">
               <input
                 ref={titleInputRef}
@@ -850,9 +797,11 @@ useEffect(() => {
             </div>
           ) : (
             <h2
-              className="font-medium text-base md:text-lg truncate text-center cursor-pointer group relative"
-              onClick={handleTitleEdit}
-              title="Clicca per modificare il titolo"
+              className={`font-medium text-base md:text-lg truncate text-center ${
+                disableTitleEdit ? '' : 'cursor-pointer group'
+              } relative`}
+              onClick={disableTitleEdit ? undefined : handleTitleEdit}
+              title={disableTitleEdit ? title : "Clicca per modificare il titolo"}
             >
               {title}
               {isArchived && (
@@ -860,9 +809,11 @@ useEffect(() => {
                   Archiviata
                 </span>
               )}
-              <span className="hidden group-hover:inline-block absolute left-full ml-1 text-xs text-blue-500">
-                <Edit2 className="h-3 w-3" />
-              </span>
+              {!disableTitleEdit && (
+                <span className="hidden group-hover:inline-block absolute left-full ml-1 text-xs text-blue-500">
+                  <Edit2 className="h-3 w-3" />
+                </span>
+              )}
             </h2>
           )}
         </div>
@@ -925,7 +876,7 @@ useEffect(() => {
                 className={`p-2 rounded-full transition-colors ${isInfoVisible ? "bg-blue-100 text-blue-600" : "hover:bg-gray-200"}`}
                 title="Informazioni chat"
                 data-info-button
-                disabled={hasLeftChat} // Disabilita il pulsante se l'utente ha abbandonato la chat
+                disabled={hasLeftChat}
                 style={{ opacity: hasLeftChat ? 0.5 : 1 }}
               >
                 <Info className="w-4 h-4" />
@@ -1159,7 +1110,7 @@ useEffect(() => {
                 border: "1px solid rgba(0,0,0,0.05)",
                 width: isMobile ? "calc(100% - 16px)" : "350px",
                 maxHeight: "85vh",
-                zIndex: 1050 // IMPORTANTE: Aggiungi z-index alto per essere sopra altri elementi
+                zIndex: 1050
               }}
             >
             {/* Tabs bar for navigation */}
@@ -1455,7 +1406,6 @@ useEffect(() => {
                                 onClick={async () => {
                                   const result = await removeUserFromChat(notificationId, member.userId);
                                   if (result) {
-                                    // Triggera il refresh dei partecipanti dopo la rimozione
                                     document.dispatchEvent(
                                       new CustomEvent("refresh-participants", {
                                         detail: { notificationId }
@@ -1689,299 +1639,298 @@ useEffect(() => {
                           )}
                         </div>
                       </div>
-
                       <div className="space-y-1 max-h-[300px] overflow-y-auto pr-1">
-                        {loadingChannels ? (
-                          <div className="px-4 py-6 text-center">
-                            <div className="inline-block animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                            <p className="mt-2 text-sm text-gray-500">
-                              Caricamento canali...
-                            </p>
-                          </div>
-                        ) : filteredChannels.length === 0 ? (
-                          <div className="px-4 py-6 text-center text-gray-500">
-                            {channelSearchTerm
-                              ? "Nessun canale trovato"
-                              : "Nessun canale disponibile"}
-                          </div>
-                        ) : (
-                          filteredChannels.map((channel) => {
-                            const memberCount = channel.members?.length || 0;
-                            const isIntercompany =
-                              channel.intercompany === 1 ||
-                              channel.intercompany === true;
+                       {loadingChannels ? (
+                         <div className="px-4 py-6 text-center">
+                           <div className="inline-block animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                           <p className="mt-2 text-sm text-gray-500">
+                             Caricamento canali...
+                           </p>
+                         </div>
+                       ) : filteredChannels.length === 0 ? (
+                         <div className="px-4 py-6 text-center text-gray-500">
+                           {channelSearchTerm
+                             ? "Nessun canale trovato"
+                             : "Nessun canale disponibile"}
+                         </div>
+                       ) : (
+                         filteredChannels.map((channel) => {
+                           const memberCount = channel.members?.length || 0;
+                           const isIntercompany =
+                             channel.intercompany === 1 ||
+                             channel.intercompany === true;
 
-                            return (
-                              <div
-                                key={channel.notificationCategoryId}
-                                className="px-3 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer"
-                                onClick={() =>
-                                  handleChannelSelect(
-                                    channel.notificationCategoryId,
-                                  )
-                                }
-                              >
-                                <div className="flex items-start">
-                                  <div className="flex-shrink-0 mr-3">
-                                    <div
-                                      className="w-8 h-8 rounded-full flex items-center justify-center"
-                                      style={{
-                                        backgroundColor:
-                                          channel.hexColor || "#3b82f6",
-                                      }}
-                                    >
-                                      {isIntercompany ? (
-                                        <Globe className="h-4 w-4 text-white" />
-                                      ) : (
-                                        <Bell className="h-4 w-4 text-white" />
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="flex-grow min-w-0">
-                                    <div className="flex items-center justify-between">
-                                      <p className="text-sm font-medium text-gray-900 truncate">
-                                        {channel.name}
-                                      </p>
-                                      {isIntercompany && (
-                                        <span className="ml-2 text-xs bg-purple-100 text-purple-800 rounded-full px-2 py-0.5">
-                                          Intercompany
-                                        </span>
-                                      )}
-                                    </div>
-                                    <p className="text-xs text-gray-500 truncate">
-                                      {channel.description}
-                                    </p>
-                                    <div className="mt-1 flex items-center">
-                                      <Users className="h-3 w-3 text-gray-400 mr-1" />
-                                      <span className="text-xs text-gray-500">
-                                        {memberCount}{" "}
-                                        {memberCount === 1
-                                          ? "membro"
-                                          : "membri"}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+                           return (
+                             <div
+                               key={channel.notificationCategoryId}
+                               className="px-3 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer"
+                               onClick={() =>
+                                 handleChannelSelect(
+                                   channel.notificationCategoryId,
+                                 )
+                               }
+                             >
+                               <div className="flex items-start">
+                                 <div className="flex-shrink-0 mr-3">
+                                   <div
+                                     className="w-8 h-8 rounded-full flex items-center justify-center"
+                                     style={{
+                                       backgroundColor:
+                                         channel.hexColor || "#3b82f6",
+                                     }}
+                                   >
+                                     {isIntercompany ? (
+                                       <Globe className="h-4 w-4 text-white" />
+                                     ) : (
+                                       <Bell className="h-4 w-4 text-white" />
+                                     )}
+                                   </div>
+                                 </div>
+                                 <div className="flex-grow min-w-0">
+                                   <div className="flex items-center justify-between">
+                                     <p className="text-sm font-medium text-gray-900 truncate">
+                                       {channel.name}
+                                     </p>
+                                     {isIntercompany && (
+                                       <span className="ml-2 text-xs bg-purple-100 text-purple-800 rounded-full px-2 py-0.5">
+                                         Intercompany
+                                       </span>
+                                     )}
+                                   </div>
+                                   <p className="text-xs text-gray-500 truncate">
+                                     {channel.description}
+                                   </p>
+                                   <div className="mt-1 flex items-center">
+                                     <Users className="h-3 w-3 text-gray-400 mr-1" />
+                                     <span className="text-xs text-gray-500">
+                                       {memberCount}{" "}
+                                       {memberCount === 1
+                                         ? "membro"
+                                         : "membri"}
+                                     </span>
+                                   </div>
+                                 </div>
+                               </div>
+                             </div>
+                           );
+                         })
+                       )}
+                     </div>
+                   </>
+                 )}
+               </div>
+             )}
 
-              {/* SEARCH TAB */}
-              {activeTab === "search" && (
-                <div className="p-4">
-                  <h3
-                    className="font-medium text-sm mb-3"
-                    style={{ color: categoryColor }}
-                  >
-                    Cerca nei messaggi
-                  </h3>
+             {/* SEARCH TAB */}
+             {activeTab === "search" && (
+               <div className="p-4">
+                 <h3
+                   className="font-medium text-sm mb-3"
+                   style={{ color: categoryColor }}
+                 >
+                   Cerca nei messaggi
+                 </h3>
 
-                  <div className="space-y-4">
-                    {/* Filtri attivi */}
-                    {(activeFilters.color ||
-                      activeFilters.messageType !== "all" ||
-                      activeFilters.searchText) && (
-                      <div className="flex flex-wrap gap-2 p-2 bg-blue-50 rounded-lg">
-                        {activeFilters.color && (
-                          <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-sm">
-                            <span
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: activeFilters.color }}
-                            />
-                            <span>Colore</span>
-                            <button
-                              onClick={() =>
-                                handleFilterMessages({ color: null })
-                              }
-                              className="text-gray-400 hover:text-gray-600"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        )}
+                 <div className="space-y-4">
+                   {/* Filtri attivi */}
+                   {(activeFilters.color ||
+                     activeFilters.messageType !== "all" ||
+                     activeFilters.searchText) && (
+                     <div className="flex flex-wrap gap-2 p-2 bg-blue-50 rounded-lg">
+                       {activeFilters.color && (
+                         <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-sm">
+                           <span
+                             className="w-3 h-3 rounded-full"
+                             style={{ backgroundColor: activeFilters.color }}
+                           />
+                           <span>Colore</span>
+                           <button
+                             onClick={() =>
+                               handleFilterMessages({ color: null })
+                             }
+                             className="text-gray-400 hover:text-gray-600"
+                           >
+                             <X className="h-3 w-3" />
+                           </button>
+                         </div>
+                       )}
 
-                        {activeFilters.messageType !== "all" && (
-                          <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-sm">
-                            <BarChart className="h-3 w-3 text-blue-500" />
-                            <span>Sondaggi</span>
-                            <button
-                              onClick={() =>
-                                handleFilterMessages({ messageType: "all" })
-                              }
-                              className="text-gray-400 hover:text-gray-600"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        )}
+                       {activeFilters.messageType !== "all" && (
+                         <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-sm">
+                           <BarChart className="h-3 w-3 text-blue-500" />
+                           <span>Sondaggi</span>
+                           <button
+                             onClick={() =>
+                               handleFilterMessages({ messageType: "all" })
+                             }
+                             className="text-gray-400 hover:text-gray-600"
+                           >
+                             <X className="h-3 w-3" />
+                           </button>
+                         </div>
+                       )}
 
-                        {activeFilters.searchText && (
-                          <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-sm">
-                            <Search className="h-3 w-3 text-blue-500" />
-                            <span>{activeFilters.searchText}</span>
-                            <button
-                              onClick={() => {
-                                setMessageSearchTerm("");
-                                handleFilterMessages({ searchText: "" });
-                              }}
-                              className="text-gray-400 hover:text-gray-600"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                       {activeFilters.searchText && (
+                         <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full text-sm">
+                           <Search className="h-3 w-3 text-blue-500" />
+                           <span>{activeFilters.searchText}</span>
+                           <button
+                             onClick={() => {
+                               setMessageSearchTerm("");
+                               handleFilterMessages({ searchText: "" });
+                             }}
+                             className="text-gray-400 hover:text-gray-600"
+                           >
+                             <X className="h-3 w-3" />
+                           </button>
+                         </div>
+                       )}
+                     </div>
+                   )}
 
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-500">
-                        Parola chiave
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          placeholder="Cerca nei messaggi..."
-                          value={messageSearchTerm}
-                          onChange={(e) => setMessageSearchTerm(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && messageSearchTerm.trim()) {
-                              handleFilterMessages({
-                                searchText: messageSearchTerm.trim(),
-                              });
-                            } else if (e.key === "Escape") {
-                              setMessageSearchTerm("");
-                              handleResetFilters();
-                            }
-                          }}
-                          className="w-full py-2 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-blue-300"
-                          autoFocus
-                        />
-                        <button
-                          className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-md ${
-                            messageSearchTerm.trim()
-                              ? "bg-blue-50 text-blue-600 hover:bg-blue-100"
-                              : "bg-gray-50 text-gray-400 cursor-not-allowed"
-                          }`}
-                          onClick={() =>
-                            messageSearchTerm.trim() &&
-                            handleFilterMessages({
-                              searchText: messageSearchTerm.trim(),
-                            })
-                          }
-                          disabled={!messageSearchTerm.trim()}
-                        >
-                          <Search className="h-4 w-4" />
-                        </button>
-                        {messageSearchTerm && (
-                          <button
-                            className="absolute right-10 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
-                            onClick={() => {
-                              setMessageSearchTerm("");
-                              handleFilterMessages({ searchText: "" });
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                   <div className="space-y-2">
+                     <label className="text-xs text-gray-500">
+                       Parola chiave
+                     </label>
+                     <div className="relative">
+                       <input
+                         type="text"
+                         placeholder="Cerca nei messaggi..."
+                         value={messageSearchTerm}
+                         onChange={(e) => setMessageSearchTerm(e.target.value)}
+                         onKeyDown={(e) => {
+                           if (e.key === "Enter" && messageSearchTerm.trim()) {
+                             handleFilterMessages({
+                               searchText: messageSearchTerm.trim(),
+                             });
+                           } else if (e.key === "Escape") {
+                             setMessageSearchTerm("");
+                             handleResetFilters();
+                           }
+                         }}
+                         className="w-full py-2 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-blue-300"
+                         autoFocus
+                       />
+                       <button
+                         className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-md ${
+                           messageSearchTerm.trim()
+                             ? "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                             : "bg-gray-50 text-gray-400 cursor-not-allowed"
+                         }`}
+                         onClick={() =>
+                           messageSearchTerm.trim() &&
+                           handleFilterMessages({
+                             searchText: messageSearchTerm.trim(),
+                           })
+                         }
+                         disabled={!messageSearchTerm.trim()}
+                       >
+                         <Search className="h-4 w-4" />
+                       </button>
+                       {messageSearchTerm && (
+                         <button
+                           className="absolute right-10 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                           onClick={() => {
+                             setMessageSearchTerm("");
+                             handleFilterMessages({ searchText: "" });
+                           }}
+                         >
+                           <X className="h-4 w-4" />
+                         </button>
+                       )}
+                     </div>
+                   </div>
 
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-500">
-                        Filtra per colore
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { color: "#d62828", name: "Rosso" },
-                          { color: "#fad02c", name: "Giallo" },
-                          { color: "#00a14b", name: "Verde" },
-                          { color: "#6ccff6", name: "Azzurro" },
-                          { color: "#e5e9ec", name: "Grigio" },
-                        ].map(({ color, name }) => (
-                          <button
-                            key={color}
-                            className={`w-8 h-8 rounded-full transition-all ${
-                              activeFilters.color === color
-                                ? "ring-2 ring-offset-2 ring-blue-500 scale-110"
-                                : "hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400"
-                            }`}
-                            style={{
-                              backgroundColor: color,
-                              boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                            }}
-                            onClick={() =>
-                              handleFilterMessages({
-                                color:
-                                  activeFilters.color === color ? null : color,
-                              })
-                            }
-                            title={`Cerca messaggi con colore ${name}`}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                   <div className="space-y-2">
+                     <label className="text-xs text-gray-500">
+                       Filtra per colore
+                     </label>
+                     <div className="flex flex-wrap gap-2">
+                       {[
+                         { color: "#d62828", name: "Rosso" },
+                         { color: "#fad02c", name: "Giallo" },
+                         { color: "#00a14b", name: "Verde" },
+                         { color: "#6ccff6", name: "Azzurro" },
+                         { color: "#e5e9ec", name: "Grigio" },
+                       ].map(({ color, name }) => (
+                         <button
+                           key={color}
+                           className={`w-8 h-8 rounded-full transition-all ${
+                             activeFilters.color === color
+                               ? "ring-2 ring-offset-2 ring-blue-500 scale-110"
+                               : "hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400"
+                           }`}
+                           style={{
+                             backgroundColor: color,
+                             boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                           }}
+                           onClick={() =>
+                             handleFilterMessages({
+                               color:
+                                 activeFilters.color === color ? null : color,
+                             })
+                           }
+                           title={`Cerca messaggi con colore ${name}`}
+                         />
+                       ))}
+                     </div>
+                   </div>
 
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-500">
-                        Filtra per tipo
-                      </label>
-                      <div className="flex gap-2">
-                        <button
-                          className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                            activeFilters.messageType === "all"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
-                          onClick={() =>
-                            handleFilterMessages({ messageType: "all" })
-                          }
-                        >
-                          Tutti
-                        </button>
-                        <button
-                          className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
-                            activeFilters.messageType === "polls"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
-                          onClick={() =>
-                            handleFilterMessages({ messageType: "polls" })
-                          }
-                        >
-                          <BarChart className="h-4 w-4" />
-                          Sondaggi
-                        </button>
-                      </div>
-                    </div>
+                   <div className="space-y-2">
+                     <label className="text-xs text-gray-500">
+                       Filtra per tipo
+                     </label>
+                     <div className="flex gap-2">
+                       <button
+                         className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                           activeFilters.messageType === "all"
+                             ? "bg-blue-100 text-blue-700"
+                             : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                         }`}
+                         onClick={() =>
+                           handleFilterMessages({ messageType: "all" })
+                         }
+                       >
+                         Tutti
+                       </button>
+                       <button
+                         className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                           activeFilters.messageType === "polls"
+                             ? "bg-blue-100 text-blue-700"
+                             : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                         }`}
+                         onClick={() =>
+                           handleFilterMessages({ messageType: "polls" })
+                         }
+                       >
+                         <BarChart className="h-4 w-4" />
+                         Sondaggi
+                       </button>
+                     </div>
+                   </div>
 
-                    <div className="pt-2 border-t border-gray-100">
-                      <button
-                        className="w-full py-2 px-3 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
-                        onClick={handleResetFilters}
-                      >
-                        Mostra tutti i messaggi
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <DocumentLinker
-        notificationId={notificationId}
-        isOpen={isDocumentLinkerOpen}
-        onClose={() => setIsDocumentLinkerOpen(false)}
-      />
-    </div>
-  );
+                   <div className="pt-2 border-t border-gray-100">
+                     <button
+                       className="w-full py-2 px-3 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
+                       onClick={handleResetFilters}
+                     >
+                       Mostra tutti i messaggi
+                     </button>
+                   </div>
+                 </div>
+               </div>
+             )}
+           </div>
+         </motion.div>
+       )}
+     </AnimatePresence>
+     <DocumentLinker
+       notificationId={notificationId}
+       isOpen={isDocumentLinkerOpen}
+       onClose={() => setIsDocumentLinkerOpen(false)}
+     />
+   </div>
+ );
 };
 
-export default ChatTopBar;
+export default ChatTopBar;     
