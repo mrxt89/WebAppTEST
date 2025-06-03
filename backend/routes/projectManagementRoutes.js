@@ -19,7 +19,8 @@ const {
     getUserTasks,
     updateProjectMemberRole,
     getProjectStatuses,
-    getUserMemberProjects
+    getUserMemberProjects,
+    getUserMemberProjectsPaginated
   } = require('../queries/projectManagement');
 
 // Ottieni tutte le unità di misura
@@ -458,6 +459,22 @@ router.get('/projects/user/member', authenticateToken, async (req, res) => {
   }
 });
 
-  
+router.get('/projects/user/member/paginated', authenticateToken, async (req, res) => {
+    try {
+      const userId = req.user.UserId;
+      const page = parseInt(req.query.page) || 0;
+      const pageSize = parseInt(req.query.pageSize) || 20;
+      const filters = req.query.filters ? JSON.parse(req.query.filters) : {};
+      
+      const result = await getUserMemberProjectsPaginated(userId, page, pageSize, filters);
+      res.json(result);
+    } catch (err) {
+      console.error('Error fetching user member projects paginated:', err);
+      res.status(500).json({ 
+        success: 0, 
+        msg: 'Error fetching user member projects' 
+      });
+    }
+  });
 
 module.exports = router;

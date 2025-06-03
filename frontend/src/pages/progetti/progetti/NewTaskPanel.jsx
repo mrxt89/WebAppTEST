@@ -380,7 +380,7 @@ const NewTaskPanel = ({
     if (position === "right") {
       return {
         position: "fixed",
-        top: 0,
+        top: 60,
         right: 0,
         bottom: 0,
         width: defaultWidth,
@@ -953,7 +953,7 @@ const NewTaskPanel = ({
                       ) : (
                         <span className="text-amber-600 flex items-center gap-1">
                           <AlertTriangle className="h-4 w-4" />
-                          Compila i campi obbligatori
+                          Campi obbligatori
                         </span>
                       )}
                     </div>
