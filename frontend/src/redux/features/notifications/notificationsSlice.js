@@ -639,6 +639,8 @@ const notificationsSlice = createSlice({
     openChatData: {}, // NUOVO: Storage per dati completi delle chat aperte
     chatPagination: {},
     unreadCount: 0,
+    pendingUnreadCount: null, 
+    unreadCountLastModified: null, 
     loading: true,
     sending: false,
     error: null,
@@ -660,7 +662,25 @@ const notificationsSlice = createSlice({
         oldestMessageId: null,
       };
     },
+    setPendingUnreadCount: (state, action) => {
+      state.pendingUnreadCount = action.payload.count;
+      state.unreadCountLastModified = action.payload.timestamp;
+    },
     
+    clearPendingUnreadCount: (state) => {
+      state.pendingUnreadCount = null;
+      state.unreadCountLastModified = null;
+    },
+    
+    updateUnreadCount: (state, action) => {
+      // Se abbiamo una modifica pendente recente (< 5 secondi), ignora l'update del worker
+      if (state.unreadCountLastModified && 
+          Date.now() - state.unreadCountLastModified < 5000) {
+        console.log('[Redux] Ignorando update del worker, modifica locale in corso');
+        return;
+      }
+      state.unreadCount = action.payload;
+    },
     appendPaginatedNotifications: (state, action) => {
       const { notifications, metadata } = action.payload;
       
@@ -1994,6 +2014,9 @@ export const fetchPaginatedNotifications = createAsyncThunk(
 export const {
  setOpenChatData,
  replaceTemporaryMessage,
+ setPendingUnreadCount,
+ clearPendingUnreadCount,
+ updateUnreadCount,
  initChatPagination,
  removeOpenChatData,
  appendMessagesToChat,

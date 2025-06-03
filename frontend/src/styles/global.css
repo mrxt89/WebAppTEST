@@ -516,6 +516,8 @@ body {
 
 .read-indicator-wrapper {
   display: flex;
+  transition: background-color 0.3s ease-in-out !important;
+  position: relative;
   background-color: #e7e7e7;
   border-radius: 10%;
   cursor: pointer;
@@ -525,9 +527,42 @@ body {
   margin-left: 5px;
 }
 
+.read-indicator-wrapper:hover {
+  opacity: 0.8;
+}
+
+.read-indicator-wrapper:active {
+  transform: scale(0.95);
+}
+
 .notification-item:hover .read-indicator-wrapper {
   width: 15px;
   transition: width 0.3s cubic-bezier(0.075, 0.82, 0.165, 1);
+}
+
+/* Animazione per il cambio di stato */
+.notification-item.updating .read-indicator-wrapper {
+  animation: pulse 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* Migliora la visibilità del cambio di stato */
+.notification-item {
+  transition: all 0.2s ease-out;
+}
+
+.notification-item.unread {
+  background-color: rgba(239, 68, 68, 0.02);
+  border-left: 3px solid transparent;
+}
+
+.notification-item.unread:hover {
+  border-left-color: rgb(239, 68, 68);
 }
 
 .notification-content1A {
