@@ -1221,8 +1221,9 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
 const ProjectManagementSplitView = () => {
   const navigate = useNavigate();
   const { projectId } = useParams();
+  const location = useLocation();
   const { fetchUsers } = useNotifications();
-  const [leftPanelWidth, setLeftPanelWidth] = useState(33.33); // Percentuale iniziale
+  const [leftPanelWidth, setLeftPanelWidth] = useState(33.33);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef(null);
   const {
@@ -1289,6 +1290,11 @@ const ProjectManagementSplitView = () => {
     erpId: "",
   });
 
+  // Estrai projectId e autoSelect dall'URL
+  const searchParams = new URLSearchParams(location.search);
+  const urlProjectId = searchParams.get('projectId');
+  const autoSelect = searchParams.get('autoSelect') === 'true';
+
   // Funzione per gestire il resize
   const handleMouseDown = (e) => {
     setIsResizing(true);
@@ -1353,8 +1359,12 @@ const ProjectManagementSplitView = () => {
         await fetchProjects(0, 100, filters);
 
         // Carica il progetto selezionato se esiste un ID nell'URL
-        if (projectId && !isNaN(parseInt(projectId))) {
-          selectProject(parseInt(projectId));
+        if (urlProjectId && !isNaN(parseInt(urlProjectId))) {
+          selectProject(parseInt(urlProjectId));
+          // Se autoSelect è true, rimuovi il parametro dall'URL
+          if (autoSelect) {
+            navigate(`/progetti/dashboard?projectId=${urlProjectId}`, { replace: true });
+          }
         }
       } catch (error) {
         console.error("Error loading initial data:", error);
@@ -1365,7 +1375,7 @@ const ProjectManagementSplitView = () => {
     };
 
     loadInitialData();
-  }, []);
+  }, [urlProjectId, autoSelect]);
 
   // Seleziona un progetto
   const selectProject = (id) => {

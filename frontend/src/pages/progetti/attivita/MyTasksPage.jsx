@@ -405,6 +405,11 @@ const MyTasksPage = () => {
     }
   };
 
+  // Aggiungo la funzione per navigare al progetto
+  const handleProjectClick = (projectId) => {
+    navigate(`/progetti/dashboard?projectId=${projectId}&autoSelect=true`);
+  };
+
   // Aggiornamento di un'attività
   const handleTaskUpdate = async (taskData, shouldCloseModal = false) => {
     try {
@@ -533,7 +538,7 @@ const MyTasksPage = () => {
   };
 
   return (
-    <div className="p-6 mx-auto space-y-6 relative">
+    <div className=" flex flex-col p-2 gap-2" style={{ height: "calc(100vh - 110px)" }} >
       {/* Header con titolo e pulsante creazione */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Le mie attività</h1>
@@ -633,6 +638,7 @@ const MyTasksPage = () => {
                         isAdmin={isUserAdmin}
                         columnFilters={columnFilters}
                         onFilterChange={handleColumnFilterChange}
+                        onProjectClick={handleProjectClick}
                       />
                     )}
   
@@ -699,7 +705,7 @@ const MyTasksPage = () => {
         refreshProject={loadTasks}
         position={taskPanelPosition}
         defaultWidth={600}
-        minWidth={400}
+        minWidth={500}
         maxWidth={1200}
       />
   
