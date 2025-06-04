@@ -171,20 +171,71 @@ const NewMessageWindow = ({
     try {
       const newNotification = await sendNotification(updatedNotificationData);
       if (newNotification) {
-        if (type === "task" && metadata.taskId) {
+        // Gestione collegamento automatico basato su metadata.autoLink
+        if (metadata?.autoLink && metadata.documentType && (metadata.documentId || metadata.taskId)) {
           try {
             const token = localStorage.getItem("token");
+            
+            // Costruisci i parametri del documento in modo generalizzato
+            const documentParams = {
+              documentType: metadata.documentType
+            };
+
+            // Aggiungi i parametri specifici in base al tipo
+            switch (metadata.documentType) {
+              case 'Task':
+                documentParams.taskId = metadata.taskId || metadata.documentId;
+                if (metadata.projectId) {
+                  documentParams.projectId = metadata.projectId;
+                }
+                break;
+              case 'MO':
+                documentParams.moId = metadata.moId || metadata.documentId;
+                break;
+              case 'SaleOrd':
+                documentParams.saleOrdId = metadata.saleOrdId || metadata.documentId;
+                break;
+              case 'PurchaseOrd':
+                documentParams.purchaseOrdId = metadata.purchaseOrdId || metadata.documentId;
+                break;
+              case 'SaleDoc':
+                documentParams.saleDocId = metadata.saleDocId || metadata.documentId;
+                break;
+              case 'Item':
+                documentParams.itemCode = metadata.itemCode || metadata.documentId;
+                break;
+              case 'BOM':
+              case 'BillOfMaterials':
+                documentParams.bom = metadata.bom || metadata.documentId;
+                break;
+              case 'Customer':
+                documentParams.custSuppCode = metadata.custSuppCode || metadata.documentId;
+                documentParams.custSuppType = 3211265;
+                break;
+              case 'Supplier':
+                documentParams.custSuppCode = metadata.custSuppCode || metadata.documentId;
+                documentParams.custSuppType = 3211264;
+                break;
+              default:
+                // Per tipi personalizzati, passa tutti i metadata disponibili
+                Object.assign(documentParams, metadata);
+            }
+
+            // Effettua la chiamata per collegare il documento
             await axios.post(
-              `${config.API_BASE_URL}/notifications/${newNotification.notificationId}/link/task/${metadata.taskId}`,
-              {},
+              `${config.API_BASE_URL}/notifications/${newNotification.notificationId}/documents`,
+              documentParams,
               {
                 headers: {
                   Authorization: `Bearer ${token}`,
                 },
               }
             );
+
+            console.log(`Chat collegata automaticamente a ${metadata.documentType} ${metadata.documentId || metadata.taskId}`);
           } catch (error) {
-            console.error("Errore nel collegamento della chat al task:", error);
+            console.error("Errore nel collegamento automatico del documento:", error);
+            // Non bloccare il flusso se il collegamento fallisce
           }
         }
 

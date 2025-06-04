@@ -89,10 +89,10 @@ const DocumentChatItem = ({
               {chat.lastMessage}
             </p>
           )}
-
+        
           {/* Badges informativi */}
           <div className="flex flex-wrap items-center gap-2 mb-2">
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="transparent" className="text-xs" style={{ backgroundColor: chat.hexColor }}>
               {chat.categoryName || "Generale"}
             </Badge>
             
@@ -111,19 +111,6 @@ const DocumentChatItem = ({
             {chat.isClosed && (
               <Badge variant="destructive" className="text-xs">
                 Chiusa
-              </Badge>
-            )}
-
-            {chat.archived && (
-              <Badge variant="secondary" className="text-xs text-purple-600">
-                Archiviata
-              </Badge>
-            )}
-
-            {!isUserMember && (
-              <Badge variant="warning" className="text-xs">
-                <Eye className="h-3 w-3 mr-1" />
-                Sola lettura
               </Badge>
             )}
           </div>

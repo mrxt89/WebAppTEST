@@ -32,6 +32,37 @@ const UsersTab = ({
   const [userCompanies, setUserCompanies] = useState([]);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [selectedCompanies, setSelectedCompanies] = useState([]);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [showDisabled, setShowDisabled] = useState(true);
+
+  // Funzione di ordinamento
+  const sortUsers = (users) => {
+    if (!sortConfig.key) return users;
+
+    return [...users].sort((a, b) => {
+      if (a[sortConfig.key] < b[sortConfig.key]) {
+        return sortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (a[sortConfig.key] > b[sortConfig.key]) {
+        return sortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  };
+
+  // Gestione click sull'header della colonna
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // Filtra e ordina gli utenti
+  const filteredAndSortedUsers = sortUsers(
+    users.filter(user => showDisabled || !user.userDisabled)
+  );
 
   const handleSelectUser = async (user) => {
     setSelectedUser(user);
@@ -581,17 +612,50 @@ const UsersTab = ({
       {/* Left column - User list */}
       <Card>
         <CardHeader>
-          <CardTitle>Utenti</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>Utenti</CardTitle>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="showDisabled"
+                checked={!showDisabled}
+                onCheckedChange={(checked) => setShowDisabled(!checked)}
+                variant="transparent"
+                className="h-4 w-4"
+              />
+              <Label htmlFor="showDisabled" className="text-sm">
+                Nascondi disabilitati
+              </Label>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-[calc(100vh-230px)] overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead className="hidden md:table-cell">Nome</TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Cognome
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('username')}
+                  >
+                    Username {sortConfig.key === 'username' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </TableHead>
+                  <TableHead 
+                    className="hidden md:table-cell cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('firstName')}
+                  >
+                    Nome {sortConfig.key === 'firstName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </TableHead>
+                  <TableHead 
+                    className="hidden md:table-cell cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('lastName')}
+                  >
+                    Cognome {sortConfig.key === 'lastName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </TableHead>
+                  <TableHead 
+                    className="hidden md:table-cell cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('role')}
+                  >
+                    Ruolo {sortConfig.key === 'role' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </TableHead>
                   <TableHead className="hidden md:table-cell">
                     Azienda
@@ -599,8 +663,8 @@ const UsersTab = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Array.isArray(users) &&
-                  users.map((user) => {
+                {Array.isArray(filteredAndSortedUsers) &&
+                  filteredAndSortedUsers.map((user) => {
                     const company = companies.find(
                       (c) => c.CompanyId === user.CompanyId,
                     );
@@ -618,6 +682,9 @@ const UsersTab = ({
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           {user.lastName}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {user.role || "-"}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           {company?.Description || "-"}

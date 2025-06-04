@@ -66,10 +66,9 @@ const TaskDetailsPanel = ({
   activeTabOnReopen = null,
   onTabChange,
   position = "right", // "right", "bottom", o "fullscreen"
-  defaultWidth = 600,
+  defaultWidth = 700,
   minWidth = 400,
   maxWidth = 1200,
-  top = 100,
 }) => {
   const panelRef = useRef(null);
   const resizeRef = useRef(null);
@@ -79,7 +78,7 @@ const TaskDetailsPanel = ({
   const [editedTask, setEditedTask] = useState(task);
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState(activeTabOnReopen || "information");
-  const [panelWidth, setPanelWidth] = useState(defaultWidth);
+  const [panelWidth, setPanelWidth] = useState(position === "right" ? 700 : defaultWidth);
   const [isResizing, setIsResizing] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -356,7 +355,7 @@ const TaskDetailsPanel = ({
         bottom: 0,
         left: 0,
         right: 0,
-        height: isMinimized ? 60 : "70vh",
+        height: isMinimized ? 60 : "calc(100vh - 100px)",
         width: "100%",
         zIndex: 1040,
       };
@@ -450,25 +449,10 @@ const TaskDetailsPanel = ({
                   </div>
                 ) : (
                   <>
+                  {/* Titolo attività */}
                     <h2 className="text-xl font-bold text-gray-800 truncate max-w-md">
                       {editedTask?.Title}
                     </h2>
-                    
-                    {/* Badge stato e priorità */}
-                    <div className="flex items-center gap-2">
-                      <Badge className={statusConfig[editedTask?.Status]?.color}>
-                        <span className="flex items-center gap-1">
-                          {statusConfig[editedTask?.Status]?.icon}
-                          {editedTask?.Status}
-                        </span>
-                      </Badge>
-                      <Badge className={priorityConfig[editedTask?.Priority]?.color}>
-                        <span className="flex items-center gap-1">
-                          {priorityConfig[editedTask?.Priority]?.icon}
-                          {editedTask?.Priority}
-                        </span>
-                      </Badge>
-                    </div>
                   </>
                 )}
               </div>
@@ -558,47 +542,48 @@ const TaskDetailsPanel = ({
                 className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b"
               >
                 <div className="flex items-center gap-3">
-                  {/* Cambio rapido stato */}
-                  <Select
-                    value={editedTask?.Status || ""}
-                    onValueChange={handleStatusChange}
-                    disabled={!canEdit}
-                  >
-                    <SelectTrigger className="h-8 w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(statusConfig).map(([status, config]) => (
-                        <SelectItem key={status} value={status}>
-                          <div className="flex items-center gap-2">
-                            {config.icon}
-                            <span>{status}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* Cambio rapido stato e priorità */}
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={editedTask?.Status || ""}
+                      onValueChange={handleStatusChange}
+                      disabled={!canEdit}
+                    >
+                      <SelectTrigger className="h-7 w-36 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(statusConfig).map(([status, config]) => (
+                          <SelectItem key={status} value={status} className="text-xs">
+                            <div className="flex items-center gap-1.5">
+                              {config.icon}
+                              <span>{status}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                  {/* Cambio rapido priorità */}
-                  <Select
-                    value={editedTask?.Priority || ""}
-                    onValueChange={handlePriorityChange}
-                    disabled={!canEdit}
-                  >
-                    <SelectTrigger className="h-8 w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(priorityConfig).map(([priority, config]) => (
-                        <SelectItem key={priority} value={priority}>
-                          <div className="flex items-center gap-2">
-                            {config.icon}
-                            <span>{priority}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <Select
+                      value={editedTask?.Priority || ""}
+                      onValueChange={handlePriorityChange}
+                      disabled={!canEdit}
+                    >
+                      <SelectTrigger className="h-7 w-28 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(priorityConfig).map(([priority, config]) => (
+                          <SelectItem key={priority} value={priority} className="text-xs">
+                            <div className="flex items-center gap-1.5">
+                              {config.icon}
+                              <span>{priority}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   {/* Date info */}
                   <div className="flex items-center gap-2 text-sm text-gray-600">

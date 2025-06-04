@@ -1,7 +1,6 @@
 // Hook useDocumentLinks.js aggiornato
 import { useState, useRef, useCallback } from "react";
-import axios from "axios";
-import { config } from "../config";
+import axiosInstance from "@/lib/axios";
 
 const useDocumentLinks = () => {
   const [documents, setDocuments] = useState([]);
@@ -31,10 +30,8 @@ const useDocumentLinks = () => {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${config.API_BASE_URL}/notifications/${notificationId}/documents`,
-        { headers: { Authorization: `Bearer ${token}` } },
+      const response = await axiosInstance.get(
+        `/notifications/${notificationId}/documents`
       );
 
       if (response.data.success) {
@@ -63,10 +60,8 @@ const useDocumentLinks = () => {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${config.API_BASE_URL}/documents/search?documentType=${encodeURIComponent(documentType)}&searchTerm=${encodeURIComponent(searchTerm)}`,
-        { headers: { Authorization: `Bearer ${token}` } },
+      const response = await axiosInstance.get(
+        `/documents/search?documentType=${encodeURIComponent(documentType)}&searchTerm=${encodeURIComponent(searchTerm)}`
       );
 
       if (response.data.success) {
@@ -85,9 +80,74 @@ const useDocumentLinks = () => {
     }
   }, []);
 
-  // Collega un documento a una notifica (VERSIONE CORRETTA)
+  // Funzione helper per costruire i parametri del documento
+  const buildDocumentParams = useCallback((documentType, documentData) => {
+    const params = {
+      documentType
+    };
+
+    switch (documentType) {
+      case 'Task':
+        if (typeof documentData === 'object') {
+          params.taskId = documentData.taskId || documentData.TaskID;
+          params.projectId = documentData.projectId || documentData.ProjectID;
+        } else {
+          params.taskId = documentData;
+        }
+        break;
+
+      case 'MO':
+        params.moId = typeof documentData === 'object' ? documentData.moId : documentData;
+        break;
+
+      case 'SaleOrd':
+        params.saleOrdId = typeof documentData === 'object' ? documentData.saleOrdId : documentData;
+        break;
+
+      case 'PurchaseOrd':
+        params.purchaseOrdId = typeof documentData === 'object' ? documentData.purchaseOrdId : documentData;
+        break;
+
+      case 'SaleDoc':
+        params.saleDocId = typeof documentData === 'object' ? documentData.saleDocId : documentData;
+        break;
+
+      case 'PurchaseDoc':
+        params.purchaseDocId = typeof documentData === 'object' ? documentData.purchaseDocId : documentData;
+        break;
+
+      case 'Item':
+        params.itemCode = typeof documentData === 'object' ? documentData.itemCode : documentData;
+        break;
+
+      case 'BOM':
+      case 'BillOfMaterials':
+        params.bom = typeof documentData === 'object' ? documentData.bom : documentData;
+        break;
+
+      case 'Customer':
+        params.custSuppCode = typeof documentData === 'object' ? documentData.custSuppCode : documentData;
+        params.custSuppType = 3211265; // Cliente
+        break;
+
+      case 'Supplier':
+        params.custSuppCode = typeof documentData === 'object' ? documentData.custSuppCode : documentData;
+        params.custSuppType = 3211264; // Fornitore
+        break;
+
+      default:
+        // Per tipi personalizzati, passa tutti i dati
+        if (typeof documentData === 'object') {
+          Object.assign(params, documentData);
+        }
+    }
+
+    return params;
+  }, []);
+
+  // Collega un documento a una notifica (VERSIONE GENERALIZZATA)
   const linkDocument = useCallback(
-    async (notificationId, documentType, documentParams) => {
+    async (notificationId, documentType, documentData) => {
       if (!notificationId || !documentType) {
         console.error("Missing required parameters for linking document");
         return false;
@@ -95,18 +155,51 @@ const useDocumentLinks = () => {
 
       try {
         setLoading(true);
-        const token = localStorage.getItem("token");
 
-        // Prepara i dati nel formato corretto per il backend
-        const requestData = {
-          documentType: documentType,
-          ...documentParams,
-        };
+        // Costruisci i parametri usando la funzione helper
+        const requestData = buildDocumentParams(documentType, documentData);
 
-        const response = await axios.post(
-          `${config.API_BASE_URL}/notifications/${notificationId}/documents`,
-          requestData,
-          { headers: { Authorization: `Bearer ${token}` } },
+        console.log("Linking document with params:", requestData);
+
+        const response = await axiosInstance.post(
+          `/notifications/${notificationId}/documents`,
+          requestData
+        );
+
+        if (response.data.success) {
+          // Aggiorna la lista dei documenti collegati
+          await getLinkedDocuments(notificationId);
+          return true;
+        } else {
+          throw new Error(
+            response.data.message || "Errore nel collegamento del documento",
+          );
+        }
+      } catch (error) {
+        console.error("Error linking document:", error);
+        setError(error.message);
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [getLinkedDocuments, buildDocumentParams],
+  );
+
+  // Versione semplificata per compatibilità con componenti esistenti
+  const linkDocumentSimple = useCallback(
+    async (notificationId, documentParams) => {
+      if (!notificationId || !documentParams) {
+        console.error("Missing required parameters for linking document");
+        return false;
+      }
+
+      try {
+        setLoading(true);
+
+        const response = await axiosInstance.post(
+          `/notifications/${notificationId}/documents`,
+          documentParams
         );
 
         if (response.data.success) {
@@ -138,10 +231,8 @@ const useDocumentLinks = () => {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      const response = await axios.delete(
-        `${config.API_BASE_URL}/notifications/${notificationId}/documents/${linkId}`,
-        { headers: { Authorization: `Bearer ${token}` } },
+      const response = await axiosInstance.delete(
+        `/notifications/${notificationId}/documents/${linkId}`
       );
 
       if (response.data.success) {
@@ -177,6 +268,7 @@ const useDocumentLinks = () => {
     getLinkedDocuments,
     searchDocuments,
     linkDocument,
+    linkDocumentSimple, // Per compatibilità
     unlinkDocument,
     resetDocuments,
   };
