@@ -51,6 +51,7 @@ const MyTasksList = ({
   isAdmin = false,
   columnFilters = {},
   onFilterChange,
+  onProjectClick,
 }) => {
   const navigate = useNavigate();
   const [showColumnFilters, setShowColumnFilters] = useState(false);
@@ -162,7 +163,9 @@ const MyTasksList = ({
   // Funzione per navigare alla pagina del progetto
   const navigateToProject = (e, projectId) => {
     e.stopPropagation();
-    navigate(`/progetti/dashboard?projectId=${projectId}`);
+    if (onProjectClick) {
+      onProjectClick(projectId);
+    }
   };
 
   // Funzione per gestire il filtro delle colonne

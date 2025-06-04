@@ -69,6 +69,7 @@ const TaskDetailsPanel = ({
   defaultWidth = 700,
   minWidth = 400,
   maxWidth = 1200,
+  topOffset = null, 
 }) => {
   const panelRef = useRef(null);
   const resizeRef = useRef(null);
@@ -140,6 +141,32 @@ const TaskDetailsPanel = ({
       icon: <AlertTriangle className="w-4 h-4 text-green-500" />,
     },
   };
+
+  // Calcola l'offset top dinamicamente
+  const calculateTopOffset = useCallback(() => {
+    if (topOffset !== null) {
+      return topOffset;
+    }
+    
+    // Cerca l'header principale o il breadcrumb per calcolare l'offset
+    const header = document.querySelector('.breadcrumb-container, .breadcrumb');
+    if (header) {
+      const headerRect = header.getBoundingClientRect();
+      return headerRect.bottom;
+    }
+    
+    // Default fallback
+    return 100;
+  }, [topOffset]);
+
+  const [calculatedTopOffset, setCalculatedTopOffset] = useState(100);
+
+  useEffect(() => {
+    if (isOpen) {
+      const offset = calculateTopOffset();
+      setCalculatedTopOffset(offset);
+    }
+  }, [isOpen, calculateTopOffset]);
 
   // Sincronizza task quando cambia
   useEffect(() => {
@@ -327,12 +354,12 @@ const TaskDetailsPanel = ({
     if (panelPosition === "fullscreen") {
       return {
         position: "fixed",
-        top: 100,
+        top: calculatedTopOffset,
         left: 0,
         right: 0,
         bottom: 0,
         width: "100%",
-        height: "calc(100% - 100px)",
+        height: `calc(100% - ${calculatedTopOffset}px)`,
         zIndex: 1050,
       };
     }
@@ -340,11 +367,11 @@ const TaskDetailsPanel = ({
     if (panelPosition === "right") {
       return {
         position: "fixed",
-        top: 100,
+        top: calculatedTopOffset,
         right: 0,
         bottom: 0,
         width: isMinimized ? 60 : panelWidth,
-        height: "calc(100% - 100px)",
+        height: `calc(100% - ${calculatedTopOffset}px)`,
         zIndex: 1040,
       };
     }
@@ -355,12 +382,13 @@ const TaskDetailsPanel = ({
         bottom: 0,
         left: 0,
         right: 0,
-        height: isMinimized ? 60 : "calc(100vh - 100px)",
+        height: isMinimized ? 60 : `calc(100vh - ${calculatedTopOffset}px)`,
         width: "100%",
         zIndex: 1040,
       };
     }
   };
+
 
   if (!isOpen || !task) return null;
 
