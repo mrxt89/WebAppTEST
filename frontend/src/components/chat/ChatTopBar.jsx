@@ -728,7 +728,7 @@ const ChatTopBar = ({
       {/* Top row with responsive layout */}
       <div className="flex items-center justify-between px-2 py-2 md:px-4">
         {/* Left section - Back button (mobile) or Category name */}
-        <div className="flex items-center">
+        <div className="flex items-center min-w-[100px]">
           {isMobile ? (
             <button
               onClick={closeChat}
@@ -753,28 +753,28 @@ const ChatTopBar = ({
         </div>
 
         {/* Center section - Title */}
-        <div className="">
-        {isNewMessage && !disableTitleEdit ? (
+        <div className="flex-1 min-w-0 px-2">
+          {isNewMessage && !disableTitleEdit ? (
             <input
               ref={titleInputRef}
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onMouseDown={(e) => {
-                e.stopPropagation(); // Previene la propagazione del click
+                e.stopPropagation();
               }}
               onClick={(e) => {
-                e.stopPropagation(); // Previene la propagazione del click
-                e.target.focus(); // Forza il focus
+                e.stopPropagation();
+                e.target.focus();
               }}
               onFocus={(e) => {
-                e.target.select(); // Seleziona tutto il testo al focus
+                e.target.select();
               }}
               placeholder="Inserisci il titolo..."
               className="bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none w-full text-center font-medium px-1 cursor-text"
               style={{ 
                 cursor: 'text',
-                userSelect: 'text', // Permette la selezione del testo
+                userSelect: 'text',
                 WebkitUserSelect: 'text',
                 MozUserSelect: 'text'
               }}
@@ -819,7 +819,7 @@ const ChatTopBar = ({
         </div>
 
         {/* Right section - Actions */}
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-1 min-w-[200px] justify-end">
           {/* Desktop: Mostra tutti i pulsanti */}
           {!isMobile && (
             <>

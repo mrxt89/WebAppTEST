@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
-import { config } from "../config";
+import axiosInstance from "@/lib/axios";
 
 const useAdminActions = () => {
   const [users, setUsers] = useState([]);
@@ -36,10 +35,7 @@ const useAdminActions = () => {
   /* Gestione aziende */
   const fetchCompanies = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${config.API_BASE_URL}/companies`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axiosInstance.get(`/companies`);
       setCompanies(response.data);
       setLoading(false);
     } catch (error) {
@@ -50,13 +46,7 @@ const useAdminActions = () => {
 
   const getUserCompanies = async (userId) => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${config.API_BASE_URL}/user-companies/${userId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const response = await axiosInstance.get(`/user-companies/${userId}`);
       return response.data;
     } catch (error) {
       console.error("Error fetching user companies:", error);
@@ -66,14 +56,7 @@ const useAdminActions = () => {
 
   const assignUserToCompany = async (userId, companyId) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.post(
-        `${config.API_BASE_URL}/user/${userId}/assign-company/${companyId}`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axiosInstance.post(`/user/${userId}/assign-company/${companyId}`, {});
       fetchUsers(); // Aggiorna l'elenco degli utenti
     } catch (error) {
       console.error("Error assigning user to company:", error);
@@ -83,14 +66,7 @@ const useAdminActions = () => {
 
   const removeUserFromCompany = async (userId, companyId) => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.post(
-        `${config.API_BASE_URL}/user/${userId}/remove-company/${companyId}`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axiosInstance.post(`/user/${userId}/remove-company/${companyId}`, {});
       fetchUsers(); // Aggiorna l'elenco degli utenti
       return response.data;
     } catch (error) {
@@ -101,13 +77,9 @@ const useAdminActions = () => {
 
   const setPrimaryCompany = async (userId, companyId) => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.post(
-        `${config.API_BASE_URL}/user/${userId}/set-primary-company/${companyId}`,
+      await axiosInstance.post(
+        `/user/${userId}/set-primary-company/${companyId}`,
         {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
       );
       fetchUsers(); // Aggiorna l'elenco degli utenti
       return response.data;
@@ -120,10 +92,7 @@ const useAdminActions = () => {
   /* Gestione utenti */
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem("token");
-      let response = await axios.get(`${config.API_BASE_URL}/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      let response = await axiosInstance.get(`/users`);
 
       const usersData = response.data.map((user) => {
         let groupsArray = [];
@@ -165,10 +134,7 @@ const useAdminActions = () => {
 
   const addUser = async (userData) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.post(`${config.API_BASE_URL}/add-user`, userData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axiosInstance.post(`/add-user`, userData);
       fetchUsers();
     } catch (error) {
       console.error("Error adding user:", error);
@@ -178,10 +144,7 @@ const useAdminActions = () => {
 
   const updateUser = async (userId, userData) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.put(`${config.API_BASE_URL}/user/${userId}`, userData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axiosInstance.put(`/user/${userId}`, userData);
       fetchUsers();
     } catch (error) {
       console.error("Error updating user:", error);
@@ -191,10 +154,7 @@ const useAdminActions = () => {
 
   const deleteUser = async (userId) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.delete(`${config.API_BASE_URL}/users/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axiosInstance.delete(`/users/${userId}`);
       fetchUsers();
     } catch (error) {
       console.error("Error deleting user:", error);
@@ -204,14 +164,7 @@ const useAdminActions = () => {
 
   const resetPassword = async (userId, newPassword) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.post(
-        `${config.API_BASE_URL}/reset-password`,
-        { userId, newPassword },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axiosInstance.post(`/reset-password`, { userId, newPassword });
       fetchUsers();
     } catch (error) {
       console.error("Error resetting password:", error);
@@ -221,14 +174,7 @@ const useAdminActions = () => {
 
   const toggleUserStatus = async (userId, userDisabled) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.put(
-        `${config.API_BASE_URL}/user/${userId}/status`,
-        { userDisabled },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axiosInstance.put(`/user/${userId}/status`, { userDisabled });
       fetchUsers();
     } catch (error) {
       console.error("Error toggling user status:", error);
@@ -239,10 +185,7 @@ const useAdminActions = () => {
   /* Gestione dei gruppi */
   const fetchGroups = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${config.API_BASE_URL}/groups`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axiosInstance.get(`/groups`);
       const groupsData = response.data.map((group) => ({
         ...group,
         users: parseData(group.users) || [], // Assicurati che users sia sempre un array
@@ -258,10 +201,7 @@ const useAdminActions = () => {
 
   const addGroup = async (groupData) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.post(`${config.API_BASE_URL}/groups`, groupData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axiosInstance.post(`/groups`, groupData);
       fetchGroups();
     } catch (error) {
       console.error("Error adding group:", error);
@@ -270,10 +210,7 @@ const useAdminActions = () => {
 
   const updateGroup = async (groupId, groupData) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.put(`${config.API_BASE_URL}/groups/${groupId}`, groupData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axiosInstance.put(`/groups/${groupId}`, groupData);
       fetchGroups();
     } catch (error) {
       console.error("Error updating group:", error);
@@ -282,14 +219,7 @@ const useAdminActions = () => {
 
   const assignUserToGroup = async (userId, groupId) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.post(
-        `${config.API_BASE_URL}/groups/${groupId}/add-user`,
-        { userId },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axiosInstance.post(`/groups/${groupId}/add-user`, { userId });
       fetchGroups();
     } catch (error) {
       console.error("Error assigning user to group:", error);
@@ -298,14 +228,7 @@ const useAdminActions = () => {
 
   const removeUserFromGroup = async (userId, groupId) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.post(
-        `${config.API_BASE_URL}/groups/${groupId}/remove-user`,
-        { userId },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axiosInstance.post(`/groups/${groupId}/remove-user`, { userId });
       fetchGroups();
     } catch (error) {
       console.error("Error removing user from group:", error);
@@ -315,10 +238,7 @@ const useAdminActions = () => {
   /* Gestione delle pagine */
   const fetchPages = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${config.API_BASE_URL}/pages`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axiosInstance.get(`/pages`);
 
       const pagesData = response.data.map((page) => ({
         ...page,
@@ -373,14 +293,7 @@ const useAdminActions = () => {
 
   const enableDisablePage = async (pageId, disabled) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.put(
-        `${config.API_BASE_URL}/pages/${pageId}/status`,
-        { disabled },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axiosInstance.put(`/pages/${pageId}/status`, { disabled });
       fetchPages();
     } catch (error) {
       console.error("Error enabling/disabling page:", error);
@@ -389,14 +302,7 @@ const useAdminActions = () => {
 
   const toggleInheritPermissions = async (pageId, inheritPermissions) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.put(
-        `${config.API_BASE_URL}/pages/${pageId}/inheritance`,
-        { inheritPermissions },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axiosInstance.put(`/pages/${pageId}/inheritance`, { inheritPermissions });
       fetchPages();
     } catch (error) {
       console.error("Error toggling page inheritance:", error);
@@ -409,14 +315,7 @@ const useAdminActions = () => {
     applyToChildren = false,
   ) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.post(
-        `${config.API_BASE_URL}/pages/${pageId}/add-group`,
-        { groupId, applyToChildren },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axiosInstance.post(`/pages/${pageId}/add-group`, { groupId, applyToChildren });
       fetchPages();
     } catch (error) {
       console.error("Error assigning group to page:", error);
@@ -429,14 +328,7 @@ const useAdminActions = () => {
     applyToChildren = false,
   ) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.post(
-        `${config.API_BASE_URL}/pages/${pageId}/remove-group`,
-        { groupId, applyToChildren },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axiosInstance.post(`/pages/${pageId}/remove-group`, { groupId, applyToChildren });
       fetchPages();
     } catch (error) {
       console.error("Error removing group from page:", error);
@@ -446,12 +338,8 @@ const useAdminActions = () => {
   /* Gestione dei canali delle notifiche */
   const fetchNotificationsChannels = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${config.API_BASE_URL}/notifications-channels`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
+      const response = await axiosInstance.get(
+        `/notifications-channels`,
       );
       /* In response.data c'è anche un json chiamato membersJson che ha come campi: userId, firstName, lastName, role */
       const channelsData = response.data.map((channel) => ({
@@ -468,13 +356,9 @@ const useAdminActions = () => {
 
   const addNotificationChannel = async (channelData) => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.post(
-        `${config.API_BASE_URL}/notifications-channels`,
+      const response = await axiosInstance.post(
+        `/notifications-channels`,
         channelData,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
       );
       fetchNotificationsChannels();
       return response.data;
@@ -485,13 +369,9 @@ const useAdminActions = () => {
 
   const updateNotificationChannel = async (channelData) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.put(
-        `${config.API_BASE_URL}/notifications-channels/${channelData.notificationCategoryId}`,
+      await axiosInstance.put(
+        `/notifications-channels/${channelData.notificationCategoryId}`,
         channelData,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
       );
       fetchNotificationsChannels();
     } catch (error) {
@@ -501,13 +381,9 @@ const useAdminActions = () => {
 
   const addUserToChannel = async (userId, notificationCategoryId) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.post(
-        `${config.API_BASE_URL}/notifications-channels/${notificationCategoryId}/add-user`,
+      await axiosInstance.post(
+        `/notifications-channels/${notificationCategoryId}/add-user`,
         { userId },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
       );
       fetchNotificationsChannels(); // Aggiorna i canali di notifica
     } catch (error) {
@@ -517,13 +393,9 @@ const useAdminActions = () => {
 
   const removeUserFromChannel = async (userId, notificationCategoryId) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.post(
-        `${config.API_BASE_URL}/notifications-channels/${notificationCategoryId}/remove-user`,
+      await axiosInstance.post(
+        `/notifications-channels/${notificationCategoryId}/remove-user`,
         { userId },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
       );
       fetchNotificationsChannels(); // Aggiorna i canali di notifica
     } catch (error) {

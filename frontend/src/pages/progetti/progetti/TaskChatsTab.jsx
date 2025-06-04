@@ -46,6 +46,7 @@ const TaskChatsTab = ({ task, project, onRefresh }) => {
       defaultChatTitle={defaultChatTitle}
       defaultParticipants={getDefaultParticipants()}
       defaultCategoryId={1}
+      enableAutoLink={true} // Abilita il collegamento automatico
       onChatCreated={(notificationId) => {
         // Callback opzionale quando viene creata una nuova chat
         console.log('Nuova chat creata:', notificationId);

@@ -58,6 +58,69 @@ const useDocumentChats = ({
     });
   }, []);
 
+  // Funzione helper per costruire i parametri di collegamento documento
+  const buildDocumentLinkParams = useCallback((notificationId) => {
+    const params = {
+      documentType,
+      notificationId
+    };
+
+    // Aggiungi i parametri specifici in base al tipo di documento
+    switch (documentType) {
+      case 'Task':
+        params.taskId = documentId;
+        if (documentData.projectId) {
+          params.projectId = documentData.projectId;
+        }
+        break;
+      
+      case 'MO':
+        params.moId = documentId;
+        break;
+      
+      case 'SaleOrd':
+        params.saleOrdId = documentId;
+        break;
+      
+      case 'PurchaseOrd':
+        params.purchaseOrdId = documentId;
+        break;
+      
+      case 'SaleDoc':
+        params.saleDocId = documentId;
+        break;
+      
+      case 'PurchaseDoc':
+        params.purchaseDocId = documentId;
+        break;
+      
+      case 'Item':
+        params.itemCode = documentId;
+        break;
+      
+      case 'BOM':
+      case 'BillOfMaterials':
+        params.bom = documentId;
+        break;
+      
+      case 'Customer':
+        params.custSuppCode = documentId;
+        params.custSuppType = 3211265; // Cliente
+        break;
+      
+      case 'Supplier':
+        params.custSuppCode = documentId;
+        params.custSuppType = 3211264; // Fornitore
+        break;
+      
+      default:
+        // Per tipi di documento personalizzati, passa tutti i dati disponibili
+        Object.assign(params, documentData);
+    }
+
+    return params;
+  }, [documentType, documentId, documentData]);
+
   // Carica le chat collegate al documento
   const loadChats = useCallback(async () => {
     // Evita ricaricamenti inutili
@@ -112,12 +175,11 @@ const useDocumentChats = ({
     try {
       setLoading(true);
       
+      const linkParams = buildDocumentLinkParams(notificationId);
+      
       const result = await linkDocument(
-        notificationId,
-        documentId,
-        documentType,
-        documentData.projectId,
-        documentData.taskId
+        linkParams.notificationId,
+        linkParams
       );
 
       if (result) {
@@ -149,7 +211,7 @@ const useDocumentChats = ({
     } finally {
       setLoading(false);
     }
-  }, [documentType, documentId, documentData, linkDocument, loadChats, swalWithHighZIndex]);
+  }, [buildDocumentLinkParams, linkDocument, loadChats, swalWithHighZIndex]);
 
   // Crea una nuova chat e la collega al documento
   const createAndLinkChat = useCallback(async ({
@@ -174,13 +236,12 @@ const useDocumentChats = ({
       const result = await sendNotification(notificationData);
       
       if (result && result.notificationId) {
-        // Collega la chat al documento
+        // Collega automaticamente la chat al documento
+        const linkParams = buildDocumentLinkParams(result.notificationId);
+        
         await linkDocument(
           result.notificationId,
-          documentId,
-          documentType,
-          documentData.projectId,
-          documentData.taskId
+          linkParams
         );
 
         await swalWithHighZIndex({
@@ -216,7 +277,7 @@ const useDocumentChats = ({
     } finally {
       setLoading(false);
     }
-  }, [documentType, documentId, documentData, sendNotification, linkDocument, loadChats, onChatCreated, swalWithHighZIndex]);
+  }, [documentType, documentId, buildDocumentLinkParams, sendNotification, linkDocument, loadChats, onChatCreated, swalWithHighZIndex]);
 
   // Scollega una chat dal documento
   const unlinkChat = useCallback(async (chat) => {

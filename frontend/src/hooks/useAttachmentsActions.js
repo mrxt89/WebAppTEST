@@ -1,7 +1,6 @@
 // Frontend/src/hooks/useAttachmentsActions.js
 import { useState } from "react";
-import axios from "axios";
-import { config } from "../config";
+import axiosInstance from "@/lib/axios";
 
 const useAttachmentsActions = () => {
   const [loading, setLoading] = useState(false);
@@ -9,13 +8,8 @@ const useAttachmentsActions = () => {
   const getAttachments = async (projectId, taskId = 0) => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `${config.API_BASE_URL}/attachments/${projectId}${taskId ? `/${taskId}` : ""}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
+      const response = await axiosInstance.get(
+        `/attachments/${projectId}${taskId ? `/${taskId}` : ""}`,
       );
       return response.data;
     } catch (error) {
@@ -35,17 +29,9 @@ const useAttachmentsActions = () => {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        `${config.API_BASE_URL}/attachments/itemCode`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ itemCode }),
-        },
+      const response = await axiosInstance.post(
+        `/attachments/itemCode`,
+        { itemCode },
       );
 
       if (!response.ok) {
@@ -81,14 +67,13 @@ const useAttachmentsActions = () => {
       // Costruisci l'URL in base al tipo di allegato
       let url;
       if (itemCode) {
-        url = `${config.API_BASE_URL}/attachments/itemCode/upload/${itemCode}`;
+        url = `/attachments/itemCode/upload/${itemCode}`;
       } else {
-        url = `${config.API_BASE_URL}/attachments/${projectId}${taskId ? `/${taskId}` : ""}`;
+        url = `/attachments/${projectId}${taskId ? `/${taskId}` : ""}`;
       }
 
-      const response = await axios.post(url, formData, {
+      const response = await axiosInstance.post(url, formData, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "multipart/form-data",
         },
       });
@@ -127,18 +112,12 @@ const useAttachmentsActions = () => {
     }
   };
 
-  const deleteAttachment = async (attachmentId) => {
+  const deleteAttachment = async (notificationId, attachmentId) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await axios.delete(
-        `${config.API_BASE_URL}/attachments/${attachmentId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
+      await axiosInstance.delete(
+        `/notifications/${notificationId}/attachments/${attachmentId}`
       );
-      return response.data;
     } catch (error) {
       console.error("Error deleting attachment:", error);
       throw error;
@@ -147,17 +126,12 @@ const useAttachmentsActions = () => {
     }
   };
 
-  const downloadAttachment = async (attachmentId, fileName) => {
+  const downloadAttachment = async (attachmentId) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await axios.get(
-        `${config.API_BASE_URL}/attachments/${attachmentId}/download`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          responseType: "blob",
-        },
+      const response = await axiosInstance.get(
+        `/notifications/attachments/${attachmentId}/download`,
+        { responseType: "blob" }
       );
 
       // Crea un URL per il blob e avvia il download
@@ -191,19 +165,16 @@ const useAttachmentsActions = () => {
       let fileName;
 
       if (itemCode) {
-        url = `${config.API_BASE_URL}/attachments/itemCode/${itemCode}/download-all`;
+        url = `/attachments/itemCode/${itemCode}/download-all`;
         fileName = `ItemCode_${itemCode}_Attachments.zip`;
       } else {
-        url = `${config.API_BASE_URL}/attachments/${projectId}${taskId ? `/${taskId}` : ""}/download-all`;
+        url = `/attachments/${projectId}${taskId ? `/${taskId}` : ""}/download-all`;
         fileName = taskId
           ? `Task_${taskId}_Attachments.zip`
           : `Project_${projectId}_Attachments.zip`;
       }
 
-      const response = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+      const response = await axiosInstance.get(url, {
         responseType: "blob",
       });
 

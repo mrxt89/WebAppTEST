@@ -31,7 +31,8 @@ const GenericDocumentChats = ({
   headerActions = null,
   defaultChatTitle = null,
   defaultParticipants = [],
-  defaultCategoryId = 1
+  defaultCategoryId = 1,
+  enableAutoLink = true // Nuovo parametro per abilitare/disabilitare il collegamento automatico
 }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -70,29 +71,27 @@ const GenericDocumentChats = ({
       defaultTitle: chatTitle,
       defaultReceivers: defaultParticipants,
       notificationCategoryId: defaultCategoryId,
+      documentType,
+      documentId,
+      documentData,
+      enableAutoLink, // Passa il flag per il collegamento automatico
       metadata: {
         documentType,
         documentId,
         ...documentData,
+        autoLink: enableAutoLink, // Segnala che deve fare il collegamento automatico
         onChatCreated: async (notificationId) => {
-          // Collega la chat al documento
-          if (notificationId) {
-            try {
-              // Qui potresti dover chiamare un'API per collegare la chat al documento
-              // Per ora assumiamo che il collegamento sia gestito lato backend
-              
-              await refresh();
-              
-              if (onChatCreated) {
-                onChatCreated(notificationId);
-              }
-              
-              // Apri la chat appena creata
-              openChat({ notificationId });
-            } catch (error) {
-              console.error("Errore nel collegamento della chat:", error);
-            }
+          // Il collegamento verrà gestito nel NewMessageWindow o ChatWindow
+          // basandosi sul flag autoLink
+          
+          await refresh();
+          
+          if (onChatCreated) {
+            onChatCreated(notificationId);
           }
+          
+          // Apri la chat appena creata
+          openChat({ notificationId });
         }
       }
     };

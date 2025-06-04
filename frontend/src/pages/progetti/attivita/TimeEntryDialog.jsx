@@ -217,12 +217,16 @@ const TimeEntryDialog = ({
     // Altrimenti usa tutte le attività disponibili
     const uniqueTasks = [];
     const uniqueTaskIds = new Set();
-    tasks.forEach((task) => {
-      if (!uniqueTaskIds.has(task.TaskID)) {
-        uniqueTaskIds.add(task.TaskID);
-        uniqueTasks.push(task);
-      }
-    });
+    
+    // Verifica che tasks sia un array prima di iterarlo
+    if (Array.isArray(tasks)) {
+      tasks.forEach((task) => {
+        if (!uniqueTaskIds.has(task.TaskID)) {
+          uniqueTaskIds.add(task.TaskID);
+          uniqueTasks.push(task);
+        }
+      });
+    }
 
     return uniqueTasks;
   }, [tasks, dialogConfig.availableTasks]);

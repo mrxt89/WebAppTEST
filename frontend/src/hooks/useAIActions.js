@@ -1,7 +1,6 @@
+import axiosInstance from "@/lib/axios";
 import { useState, useCallback } from "react";
-import axios from "axios";
-import { swal } from "../lib/common";
-import { config } from "../config";
+import { swal } from "@/lib/common";
 
 /**
  * Hook per gestire le azioni di intelligenza artificiale nell'applicazione
@@ -21,12 +20,7 @@ const useAIActions = () => {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${config.API_BASE_URL}/ai/status`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await axiosInstance.get("/ai/status");
 
       if (response.data.success) {
         setAIStatus(response.data.status);
@@ -61,15 +55,9 @@ const useAIActions = () => {
         setError(null);
 
         // Chiamata diretta all'endpoint di generazione highlights
-        const token = localStorage.getItem("token");
-        const response = await axios.post(
-          `${config.API_BASE_URL}/ai/generate-highlights/${notificationId}`,
+        const response = await axiosInstance.post(
+          `/ai/generate-highlights/${notificationId}`,
           {}, // Body vuoto, tutti i parametri sono nell'URL e nell'autenticazione
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
         );
 
         if (!response.data.success) {
@@ -120,16 +108,9 @@ const useAIActions = () => {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem("token");
-      const response = await axios.post(
-        `${config.API_BASE_URL}/ai/sentiment`,
-        { text },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        },
+      const response = await axiosInstance.post(
+        `/ai/sentiment`,
+        { text }
       );
 
       if (!response.data.success) {
@@ -162,19 +143,12 @@ const useAIActions = () => {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem("token");
-      const response = await axios.post(
-        `${config.API_BASE_URL}/ai/suggest-reply`,
+      const response = await axiosInstance.post(
+        `/ai/suggest-reply`,
         {
           notificationId,
           lastMessage,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        },
+        }
       );
 
       if (!response.data.success) {

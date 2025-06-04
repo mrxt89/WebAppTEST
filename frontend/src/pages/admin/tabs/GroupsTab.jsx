@@ -25,6 +25,37 @@ const GroupsTab = ({
 }) => {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [selectedUsers, setSelectedUsers] = useState([]);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [showDisabled, setShowDisabled] = useState(true);
+
+  // Funzione di ordinamento
+  const sortGroups = (groups) => {
+    if (!sortConfig.key) return groups;
+
+    return [...groups].sort((a, b) => {
+      if (a[sortConfig.key] < b[sortConfig.key]) {
+        return sortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (a[sortConfig.key] > b[sortConfig.key]) {
+        return sortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  };
+
+  // Gestione click sull'header della colonna
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // Filtra e ordina i gruppi
+  const filteredAndSortedGroups = sortGroups(
+    groups.filter(group => showDisabled || !group.disabled)
+  );
 
   const handleSelectGroup = (group) => {
     setSelectedGroup(group);
@@ -300,25 +331,47 @@ const GroupsTab = ({
       {/* Left column - Group list */}
       <Card>
         <CardHeader>
-          <CardTitle>Gruppi</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>Gruppi</CardTitle>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="showDisabled"
+                checked={!showDisabled}
+                onCheckedChange={(checked) => setShowDisabled(!checked)}
+                variant="transparent"
+                className="h-4 w-4"
+              />
+              <Label htmlFor="showDisabled" className="text-sm">
+                Nascondi disabilitati
+              </Label>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[calc(100vh-230px)] overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Descrizione
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('groupName')}
+                  >
+                    Nome {sortConfig.key === 'groupName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </TableHead>
+                  <TableHead 
+                    className="hidden md:table-cell cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('description')}
+                  >
+                    Descrizione {sortConfig.key === 'description' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Array.isArray(groups) &&
-                  groups.map((group) => (
+                {Array.isArray(filteredAndSortedGroups) &&
+                  filteredAndSortedGroups.map((group) => (
                     <TableRow
                       key={group.groupId}
-                      className={`${selectedGroup && selectedGroup.groupId === group.groupId ? "bg-blue-100" : ""} cursor-pointer`}
+                      className={`${group.disabled ? "bg-red-100" : ""} ${selectedGroup && selectedGroup.groupId === group.groupId ? "bg-blue-100" : ""} cursor-pointer`}
                       onClick={() => handleSelectGroup(group)}
                     >
                       <TableCell className="font-medium">

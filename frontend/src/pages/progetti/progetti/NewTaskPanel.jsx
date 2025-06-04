@@ -380,7 +380,8 @@ const NewTaskPanel = ({
     if (position === "right") {
       return {
         position: "fixed",
-        top: 60,
+        top: 100,
+        margin: 0,
         right: 0,
         bottom: 0,
         width: defaultWidth,
@@ -391,10 +392,10 @@ const NewTaskPanel = ({
 
     return {
       position: "fixed",
-      bottom: 0,
+      top: 100,
       left: 0,
       right: 0,
-      height: "80vh",
+      height: "calc(100vh - 100px)",
       width: "100%",
       zIndex: 1040,
     };
@@ -448,8 +449,23 @@ const NewTaskPanel = ({
               className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-50 to-white"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Plus className="h-5 w-5 text-blue-600" />
+                <div 
+                  className={`p-2 rounded-lg cursor-pointer transition-colors ${
+                    taskData.Title && taskData.StartDate && taskData.DueDate && taskData.AssignedTo
+                      ? "bg-green-100 hover:bg-green-200"
+                      : "bg-blue-100 hover:bg-blue-200"
+                  }`}
+                  onClick={() => {
+                    if (taskData.Title && taskData.StartDate && taskData.DueDate && taskData.AssignedTo) {
+                      handleSubmit();
+                    }
+                  }}
+                >
+                  <Plus className={`h-5 w-5 ${
+                    taskData.Title && taskData.StartDate && taskData.DueDate && taskData.AssignedTo
+                      ? "text-green-600"
+                      : "text-blue-600"
+                  }`} />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-800">Nuova Attività</h2>
@@ -496,7 +512,7 @@ const NewTaskPanel = ({
                             <FileText className="h-5 w-5 text-gray-600" />
                             <h3 className="font-semibold">Informazioni Base</h3>
                             {taskData.Title && (
-                              <Badge variant="secondary" className="ml-2">
+                              <Badge variant="secondary" className="ml-2 bg-green-300">
                                 Compilato
                               </Badge>
                             )}
@@ -587,7 +603,7 @@ const NewTaskPanel = ({
                             <Calendar className="h-5 w-5 text-gray-600" />
                             <h3 className="font-semibold">Date e Scadenze</h3>
                             {taskData.StartDate && taskData.DueDate && (
-                              <Badge variant="secondary" className="ml-2">
+                              <Badge variant="secondary" className="ml-2 bg-green-300">
                                 {Math.ceil((new Date(taskData.DueDate) - new Date(taskData.StartDate)) / (1000 * 60 * 60 * 24)) + 1} giorni
                               </Badge>
                             )}
@@ -665,7 +681,7 @@ const NewTaskPanel = ({
                             <Users className="h-5 w-5 text-gray-600" />
                             <h3 className="font-semibold">Assegnazione</h3>
                             {taskData.AssignedTo && (
-                              <Badge variant="secondary" className="ml-2">
+                              <Badge variant="secondary" className="ml-2 bg-green-300">
                                 {getSelectedUser(taskData.AssignedTo)?.firstName || "Assegnato"}
                               </Badge>
                             )}
@@ -731,6 +747,7 @@ const NewTaskPanel = ({
                                             />
                                             <CommandEmpty>Nessun utente trovato.</CommandEmpty>
                                             <CommandGroup className="max-h-[200px] overflow-auto">
+                                              
                                               {filterUsers.map((user) => (
                                                 <CommandItem
                                                   key={user.userId}
@@ -773,6 +790,7 @@ const NewTaskPanel = ({
                                             id="showSelected"
                                             checked={showSelectedOnly}
                                             onCheckedChange={setShowSelectedOnly}
+                                            className="h-4 w-4 text-black"
                                           />
                                           <Label
                                             htmlFor="showSelected"
@@ -801,6 +819,7 @@ const NewTaskPanel = ({
                                                     }));
                                                   }}
                                                   id={`user-${user.userId}`}
+                                                  className="h-4 w-4 text-black"
                                                 />
                                                 <Label
                                                   htmlFor={`user-${user.userId}`}
@@ -956,39 +975,6 @@ const NewTaskPanel = ({
                           Campi obbligatori
                         </span>
                       )}
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={handleClose}
-                        disabled={isSubmitting}
-                      >
-                        Annulla
-                      </Button>
-                      <Button
-                        onClick={handleSubmit}
-                        disabled={
-                          isSubmitting ||
-                          !taskData.Title ||
-                          !taskData.DueDate ||
-                          !taskData.StartDate ||
-                          !taskData.AssignedTo
-                        }
-                        className="min-w-[100px]"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Creazione...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-2" />
-                            Crea Attività
-                          </>
-                        )}
-                      </Button>
                     </div>
                   </div>
                 </motion.div>

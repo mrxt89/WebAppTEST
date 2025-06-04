@@ -1,6 +1,6 @@
 // hooks/useCalendar.js
 import { useState, useCallback } from "react";
-import { config } from "../config";
+import axiosInstance from "@/lib/axios";
 
 const useCalendar = () => {
   const [state, setState] = useState({
@@ -15,23 +15,11 @@ const useCalendar = () => {
   const getTaskEvents = useCallback(async (taskId) => {
     try {
       setState((prev) => ({ ...prev, loading: true, error: null }));
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        `${config.API_BASE_URL}/calendar/tasks/${taskId}/events`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        },
+      const response = await axiosInstance.get(
+        `/calendar/tasks/${taskId}/events`,
       );
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to fetch calendar events");
-      }
-
-      return await response.json();
+      return response.data;
     } catch (err) {
       setState((prev) => ({ ...prev, error: err.message }));
       throw err;
@@ -44,31 +32,18 @@ const useCalendar = () => {
     async (taskId, participants, reminderTime) => {
       try {
         setState((prev) => ({ ...prev, loading: true, error: null }));
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          `${config.API_BASE_URL}/calendar/tasks/${taskId}/events`,
+        const response = await axiosInstance.post(
+          `/calendar/tasks/${taskId}/events`,
           {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              participants: participants.map((p) => ({
-                ...p,
-                reminderMinutes: parseInt(reminderTime),
-              })),
-              createdBy: parseInt(JSON.parse(atob(token.split(".")[1])).UserId), // Aggiungi l'userId dal token JWT
-            }),
+            participants: participants.map((p) => ({
+              ...p,
+              reminderMinutes: parseInt(reminderTime),
+            })),
+            createdBy: parseInt(JSON.parse(atob(token.split(".")[1])).UserId), // Aggiungi l'userId dal token JWT
           },
         );
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || "Failed to sync calendar event");
-        }
-
-        return await response.json();
+        return response.data;
       } catch (err) {
         setState((prev) => ({ ...prev, error: err.message }));
         throw err;
@@ -82,24 +57,11 @@ const useCalendar = () => {
   const removeCalendarEvent = useCallback(async (taskId, eventId) => {
     try {
       setState((prev) => ({ ...prev, loading: true, error: null }));
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        `${config.API_BASE_URL}/calendar/tasks/${taskId}/events/${eventId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        },
+      const response = await axiosInstance.delete(
+        `/calendar/tasks/${taskId}/events/${eventId}`,
       );
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to delete calendar event");
-      }
-
-      return await response.json();
+      return response.data;
     } catch (err) {
       setState((prev) => ({ ...prev, error: err.message }));
       throw err;
@@ -122,23 +84,9 @@ const useCalendar = () => {
         }
 
         setState((prev) => ({ ...prev, loading: true, error: null }));
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          `${config.API_BASE_URL}/calendar/preferences`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          },
+        const response = await axiosInstance.get(
+          `/calendar/preferences`,
         );
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(
-            error.message || "Failed to fetch calendar preferences",
-          );
-        }
 
         const preferences = await response.json();
         setState((prev) => ({
@@ -161,25 +109,10 @@ const useCalendar = () => {
   const updateCalendarPreferences = useCallback(async (preferences) => {
     try {
       setState((prev) => ({ ...prev, loading: true, error: null }));
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        `${config.API_BASE_URL}/calendar/preferences`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(preferences),
-        },
+      const response = await axiosInstance.put(
+        `/calendar/preferences`,
+        preferences,
       );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(
-          error.message || "Failed to update calendar preferences",
-        );
-      }
 
       const updatedPreferences = await response.json();
       setState((prev) => ({
