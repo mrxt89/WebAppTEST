@@ -38,7 +38,9 @@ import {
   MoveVertical,
   GitBranch,
   Link2,
+  Loader2,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Funzione di debounce per limitare chiamate ripetute
 const debounce = (func, wait) => {
@@ -51,7 +53,7 @@ const debounce = (func, wait) => {
 };
 
 /**
- * ProjectGanttView - Implementazione Gantt con dipendenze multiple
+ * ProjectGanttView - Implementazione Gantt con dipendenze multiple e optimistic updates
  */
 const ProjectGanttView = ({
   project,
@@ -78,8 +80,17 @@ const ProjectGanttView = ({
   const moveInProgress = useRef(false);
   const clickHandledRef = useRef(false);
 
+  // Stato per loading overlay
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
+  const [optimisticTasks, setOptimisticTasks] = useState([]);
+
   // Preservare lo stato attuale
-  const [viewMode, setViewMode] = useState(ViewMode.Week);
+  const [viewMode, setViewMode] = useState(() => {
+    // Recupera il viewMode salvato o usa Week come default
+    const saved = sessionStorage.getItem(`gantt-viewMode-${project.ProjectID}`);
+    return saved ? ViewMode[saved] : ViewMode.Week;
+  });
   const [scrollPosition, setScrollPosition] = useState(0);
   const [visibleTimeStart, setVisibleTimeStart] = useState(null);
   const [visibleTimeEnd, setVisibleTimeEnd] = useState(null);
@@ -94,13 +105,22 @@ const ProjectGanttView = ({
     showDelayed: false,
   });
 
+  // Salva il viewMode quando cambia
+  useEffect(() => {
+    if (project?.ProjectID) {
+      sessionStorage.setItem(`gantt-viewMode-${project.ProjectID}`, Object.keys(ViewMode).find(key => ViewMode[key] === viewMode));
+    }
+  }, [viewMode, project?.ProjectID]);
+
   // Monitora l'elemento del container
   useEffect(() => {
     ganttContainerRef.current = document.querySelector(".gantt-container");
 
     // Configurare l'observer per riapplicare la posizione di scroll dopo il rendering
     const observer = new MutationObserver(() => {
-      applyScrollPosition();
+      if (!isLoading) {
+        applyScrollPosition();
+      }
     });
 
     if (ganttContainerRef.current) {
@@ -111,7 +131,7 @@ const ProjectGanttView = ({
     }
 
     return () => observer.disconnect();
-  }, []);
+  }, [isLoading]);
 
   // Funzione per applicare la posizione di scroll
   const applyScrollPosition = useCallback(() => {
@@ -140,10 +160,15 @@ const ProjectGanttView = ({
     }
   };
 
+  // Usa optimisticTasks se sono disponibili, altrimenti usa tasks normali
+  const displayTasks = useMemo(() => {
+    return optimisticTasks.length > 0 ? optimisticTasks : tasks;
+  }, [optimisticTasks, tasks]);
+
   // Quando refreshProject viene chiamato, marca che stiamo aggiornando
   const handleTaskChangeWrapper = async (task) => {
     // Verifica se l'utente può modificare questo task
-    const originalTask = tasks.find((t) => t.TaskID.toString() === task.id);
+    const originalTask = displayTasks.find((t) => t.TaskID.toString() === task.id);
     if (!originalTask) return;
 
     if (!checkAdminPermission(project) && !isOwnTask(originalTask)) {
@@ -197,7 +222,7 @@ const ProjectGanttView = ({
 
   // Filtra le task
   const filteredTasks = useMemo(() => {
-    let result = [...tasks];
+    let result = [...displayTasks];
 
     // Status filter
     if (filters.status !== "all") {
@@ -234,7 +259,7 @@ const ProjectGanttView = ({
 
     // Verifica sempre che ogni task abbia date valide per evitare errori nel gantt
     return result.filter((task) => task.StartDate && task.DueDate);
-  }, [tasks, filters]);
+  }, [displayTasks, filters]);
 
   // Costruisce le dipendenze per gantt-task-react
   const buildDependencies = useCallback((task) => {
@@ -332,7 +357,7 @@ const ProjectGanttView = ({
   // Handler per aggiornamento delle date tramite drag
   const handleTaskChange = async (task) => {
     // Trova il task originale
-    const originalTask = tasks.find((t) => t.TaskID.toString() === task.id);
+    const originalTask = displayTasks.find((t) => t.TaskID.toString() === task.id);
     if (!originalTask) return;
 
     // Controllo permessi
@@ -355,6 +380,13 @@ const ProjectGanttView = ({
       return;
     }
 
+    // Salva lo stato corrente del Gantt prima dell'aggiornamento
+    const currentState = {
+      scrollLeft: ganttContainerRef.current?.querySelector(".gantt-horizontal-scroll")?.scrollLeft || 0,
+      viewMode: viewMode,
+      showDependencies: showDependencies
+    };
+
     // Crea oggetto aggiornato
     const startDate = task.start.toISOString().split("T")[0] + "T00:00:00";
     const dueDate = task.end.toISOString().split("T")[0] + "T00:00:00";
@@ -365,20 +397,56 @@ const ProjectGanttView = ({
       DueDate: dueDate,
     };
 
-    // Chiamata aggiornamento
-    const result = await onTaskUpdate(updatedTask);
+    // Optimistic update: aggiorna immediatamente l'UI
+    setOptimisticTasks(prev => 
+      prev.length > 0 
+        ? prev.map(t => t.TaskID === originalTask.TaskID ? updatedTask : t)
+        : displayTasks.map(t => t.TaskID === originalTask.TaskID ? updatedTask : t)
+    );
 
-    // Dopo l'aggiornamento, aspetta un po' e poi applica lo scroll
-    setTimeout(() => {
-      applyScrollPosition();
-    }, 300);
+    // Mostra loading overlay
+    setIsLoading(true);
+    setLoadingMessage("Aggiornamento date attività...");
 
-    return result;
+    try {
+      // Chiamata aggiornamento
+      const result = await onTaskUpdate(updatedTask);
+
+      if (result && result.success) {
+        // Forza il refresh mantenendo lo stato
+        await refreshProject(() => {
+          // Reset optimistic tasks
+          setOptimisticTasks([]);
+          setIsLoading(false);
+          
+          setTimeout(() => {
+            // Ripristina la posizione di scroll
+            if (ganttContainerRef.current) {
+              const horizontalScroll = ganttContainerRef.current.querySelector(".gantt-horizontal-scroll");
+              if (horizontalScroll) {
+                horizontalScroll.scrollLeft = currentState.scrollLeft;
+              }
+            }
+          }, 100);
+        });
+      } else {
+        // Rollback in caso di errore
+        setOptimisticTasks([]);
+        setIsLoading(false);
+      }
+    } catch (error) {
+      // Rollback in caso di errore
+      setOptimisticTasks([]);
+      setIsLoading(false);
+      console.error("Error updating task:", error);
+    }
+
+    return true;
   };
 
   // Gestisce il doppio click per aprire i dettagli
   const handleDoubleClick = (task) => {
-    const originalTask = tasks.find((t) => t.TaskID.toString() === task.id);
+    const originalTask = displayTasks.find((t) => t.TaskID.toString() === task.id);
     if (originalTask) {
       // Salva la posizione corrente prima di aprire il modal
       if (ganttContainerRef.current) {
@@ -395,7 +463,7 @@ const ProjectGanttView = ({
 
   // Gestisce il click singolo
   const handleClick = (task) => {
-    const originalTask = tasks.find((t) => t.TaskID.toString() === task.id);
+    const originalTask = displayTasks.find((t) => t.TaskID.toString() === task.id);
     if (originalTask) {
       // Salva la posizione corrente prima di aprire il modal
       if (ganttContainerRef.current) {
@@ -413,26 +481,35 @@ const ProjectGanttView = ({
   // Funzione diretta per l'aggiornamento della sequenza senza debounce
   const executeTaskSequenceUpdate = async (taskId, projectId, newIndex) => {
     try {
-      // Assicurati che updateTaskSequence sia una funzione
-      if (typeof updateTaskSequence !== "function") {
-        console.error("[GANTT] updateTaskSequence non è una funzione");
-        return { success: false };
-      }
+      // Mostra loading overlay
+      setIsLoading(true);
+      setLoadingMessage("Riordinamento attività...");
 
       // Effettua la chiamata API direttamente
       const result = await updateTaskSequence(taskId, projectId, newIndex);
 
       // Se la chiamata ha avuto successo, aggiorna la UI
       if (result && result.success) {
-        // Ricarica il progetto con un leggero ritardo
-        setTimeout(() => {
-          refreshProject();
-        }, 300);
+        // Ricarica il progetto
+        await refreshProject(() => {
+          setIsLoading(false);
+        });
+        
+        swal.fire({
+          title: "Riordinamento completato",
+          text: "La sequenza delle attività è stata aggiornata",
+          icon: "success",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      } else {
+        setIsLoading(false);
       }
 
       return result;
     } catch (error) {
       console.error("[GANTT] Errore in executeTaskSequenceUpdate:", error);
+      setIsLoading(false);
       return { success: false };
     }
   };
@@ -443,15 +520,12 @@ const ProjectGanttView = ({
     clickHandledRef.current = true;
     moveInProgress.current = true;
 
-    // Stampo immediatamente per verificare la chiamata
-    clickCount.current++;
-
     try {
       // Converti l'ID del task da stringa a numero se necessario
       const taskId = typeof task.id === "string" ? parseInt(task.id) : task.id;
 
       // Trova il task originale usando l'ID corretto
-      const originalTask = tasks.find((t) => t.TaskID === taskId);
+      const originalTask = displayTasks.find((t) => t.TaskID === taskId);
       if (!originalTask) {
         moveInProgress.current = false;
         clickHandledRef.current = false;
@@ -487,17 +561,6 @@ const ProjectGanttView = ({
         project.ProjectID,
         orderIndex,
       );
-
-      if (result && result.success) {
-        // Mostra una notifica di successo temporanea
-        swal.fire({
-          title: "Riordinamento completato",
-          text: "La sequenza delle attività è stata aggiornata",
-          icon: "success",
-          timer: 1500,
-          showConfirmButton: false,
-        });
-      }
     } catch (error) {
       console.error("[GANTT] Errore aggiornamento sequenza:", error);
       swal.fire(
@@ -555,7 +618,7 @@ const ProjectGanttView = ({
     );
   }
 
-  // Funzione per gestire il click sui pulsanti di riordinamento - Log aggiuntivi
+  // Funzione per gestire il click sui pulsanti di riordinamento
   const handleMoveButtonClick = (e, task, direction) => {
     e.preventDefault();
     e.stopPropagation();
@@ -600,20 +663,8 @@ const ProjectGanttView = ({
       }
 
       // Calcola il nuovo valore di sequenza
-      // Ottieni il task precedente e successivo nella posizione desiderata
-      const tasks = ganttTasks.map((t) =>
-        parseInt(t.originalTask.TaskSequence),
-      );
-
-      // Calcola il nuovo valore di sequenza basato sulla posizione
-      let newSequenceValue;
-      if (direction === "up") {
-        const targetTask = ganttTasks[newIndex].originalTask;
-        newSequenceValue = parseInt(targetTask.TaskSequence);
-      } else {
-        const targetTask = ganttTasks[newIndex].originalTask;
-        newSequenceValue = parseInt(targetTask.TaskSequence);
-      }
+      const targetTask = ganttTasks[newIndex].originalTask;
+      const newSequenceValue = parseInt(targetTask.TaskSequence);
 
       // Trasforma il task in un oggetto con TaskID numerico
       const taskId = parseInt(task.id);
@@ -628,7 +679,7 @@ const ProjectGanttView = ({
     if (!predecessors || predecessors.length === 0) return null;
     
     return predecessors.map((dep, idx) => {
-      const predTask = tasks.find(t => t.TaskID === dep.taskId);
+      const predTask = displayTasks.find(t => t.TaskID === dep.taskId);
       if (!predTask) return null;
       
       const typeLabel = {
@@ -652,8 +703,42 @@ const ProjectGanttView = ({
     }).filter(Boolean);
   };
 
+  // Effetto per gestire il refresh esterno
+  useEffect(() => {
+    // Se riceviamo un aggiornamento esterno mentre non stiamo caricando,
+    // mostra brevemente l'overlay
+    if (tasks !== displayTasks && !isLoading && optimisticTasks.length === 0) {
+      setIsLoading(true);
+      setLoadingMessage("Aggiornamento vista...");
+      
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+        applyScrollPosition();
+      }, 300);
+
+      return () => clearTimeout(timer);
+    }
+  }, [tasks]);
+
   return (
-    <Card className="border rounded-lg bg-white">
+    <Card className="border rounded-lg bg-white relative">
+      {/* Loading Overlay */}
+      <AnimatePresence>
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg"
+          >
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <p className="text-sm font-medium text-gray-700">{loadingMessage || "Caricamento..."}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header Controls */}
       <div className="border-b">
         <div className="flex flex-wrap items-center justify-between gap-2 p-2">
@@ -662,6 +747,7 @@ const ProjectGanttView = ({
               variant={viewMode === ViewMode.Day ? "default" : "outline"}
               onClick={() => setViewMode(ViewMode.Day)}
               className="flex-shrink-0"
+              disabled={isLoading}
             >
               Giorno
             </Button>
@@ -669,6 +755,7 @@ const ProjectGanttView = ({
               variant={viewMode === ViewMode.Week ? "default" : "outline"}
               onClick={() => setViewMode(ViewMode.Week)}
               className="flex-shrink-0"
+              disabled={isLoading}
             >
               Settimana
             </Button>
@@ -676,6 +763,7 @@ const ProjectGanttView = ({
               variant={viewMode === ViewMode.Month ? "default" : "outline"}
               onClick={() => setViewMode(ViewMode.Month)}
               className="flex-shrink-0"
+              disabled={isLoading}
             >
               Mese
             </Button>
@@ -686,6 +774,7 @@ const ProjectGanttView = ({
                 onClick={() => setShowDependencies(!showDependencies)}
                 className="flex-shrink-0"
                 size="sm"
+                disabled={isLoading}
               >
                 <Link2 className="h-4 w-4 mr-2" />
                 Dipendenze
@@ -700,6 +789,7 @@ const ProjectGanttView = ({
                 onValueChange={(value) =>
                   setFilters((prev) => ({ ...prev, status: value }))
                 }
+                disabled={isLoading}
               >
                 <SelectTrigger className="h-8 min-w-[120px]">
                   <SelectValue placeholder="Stato" />
@@ -720,6 +810,7 @@ const ProjectGanttView = ({
                 onValueChange={(value) =>
                   setFilters((prev) => ({ ...prev, priority: value }))
                 }
+                disabled={isLoading}
               >
                 <SelectTrigger className="h-8 min-w-[120px]">
                   <SelectValue placeholder="Priorità" />
@@ -743,6 +834,7 @@ const ProjectGanttView = ({
                     assignedTo: value === "all" ? null : parseInt(value),
                   }))
                 }
+                disabled={isLoading}
               >
                 <SelectTrigger className="h-8 min-w-[150px]">
                   <SelectValue placeholder="Assegnato a" />
@@ -751,7 +843,7 @@ const ProjectGanttView = ({
                   <SelectItem value="all">Tutti gli utenti</SelectItem>
                   {users
                     .filter((user) =>
-                      tasks.some((task) => task.AssignedTo === user.userId),
+                      displayTasks.some((task) => task.AssignedTo === user.userId),
                     )
                     .map((user) => (
                       <SelectItem
@@ -774,6 +866,7 @@ const ProjectGanttView = ({
                     setFilters((prev) => ({ ...prev, search: e.target.value }))
                   }
                   className="h-8 pl-8 pr-2"
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -785,6 +878,7 @@ const ProjectGanttView = ({
                 onClick={resetFilters}
                 className="h-8 w-8"
                 title="Resetta filtri"
+                disabled={isLoading}
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -816,6 +910,7 @@ const ProjectGanttView = ({
               className={
                 filters.showDelayed ? "bg-amber-600 hover:bg-amber-700" : ""
               }
+              disabled={isLoading}
             >
               <AlertTriangle className="h-4 w-4 mr-2" />
               In ritardo
@@ -857,9 +952,11 @@ const ProjectGanttView = ({
         <div
           className="gantt-container"
           style={{
-            height: "calc(90vh - 300px)",
+            height: "calc(90vh - 350px)",
             overflow: "auto",
             position: "relative",
+            opacity: isLoading ? 0.5 : 1,
+            transition: "opacity 0.3s ease",
           }}
         >
           {ganttTasks.length > 0 ? (
@@ -1060,7 +1157,7 @@ const ProjectGanttView = ({
                               style={{ height: "75px" }}
                             >
                               {/* PULSANTI RIORDINAMENTO MIGLIORATI */}
-                              {canMove && (
+                              {canMove && !isLoading && (
                                 <div className="flex flex-col gap-1 items-center">
                                   {/* Pulsante SPOSTA SU */}
                                   <button
@@ -1078,7 +1175,8 @@ const ProjectGanttView = ({
                                     disabled={
                                       index === 0 ||
                                       moveInProgress.current ||
-                                      clickHandledRef.current
+                                      clickHandledRef.current ||
+                                      isLoading
                                     }
                                     title="Sposta su"
                                   >
@@ -1101,7 +1199,8 @@ const ProjectGanttView = ({
                                     disabled={
                                       index === ganttTasks.length - 1 ||
                                       moveInProgress.current ||
-                                      clickHandledRef.current
+                                      clickHandledRef.current ||
+                                      isLoading
                                     }
                                     title="Sposta giù"
                                   >
@@ -1130,7 +1229,7 @@ const ProjectGanttView = ({
               todayColor="rgba(252, 165, 165, 0.5)"
               onTimeChange={handleTimeChange}
               TaskListHeader={() => (
-                <div className="">
+                <div className="sticky top-0 z-10 bg-white">
                   <table className="w-full h-full">
                     <thead>
                       <tr>

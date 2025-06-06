@@ -1209,6 +1209,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         projectId={projectId}
         position={taskPanelPosition}
         defaultWidth={500}
+        refreshProject={(callback) => loadProject(true, callback)}
       />
 
       <ProjectEditModalWithTemplate
