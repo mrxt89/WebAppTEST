@@ -396,6 +396,9 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     isOwnTask,
     updateProjectMemberRole,
     updateTaskSequence,
+    manageTaskDependencies,
+  checkCircularDependencies,
+  calculateProjectDates,
   } = useProjectActions();
 
   // Get the current user ID from localStorage
@@ -1098,20 +1101,23 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
                     currentUserId={currentUserId}
                   />
                 )}
-                {tasksViewMode === "gantt" && (
-                  <ProjectGanttView
-                    project={project}
-                    tasks={project.tasks || []}
-                    onTaskClick={handleTaskClick}
-                    onTaskUpdate={handleTaskUpdate}
-                    checkAdminPermission={checkAdminPermission}
-                    isOwnTask={isOwnTask}
-                    updateTaskSequence={updateTaskSequence}
-                    getProjectById={getProjectById}
-                    refreshProject={(callback) => loadProject(true, callback)}
-                    users={users}
-                  />
-                )}
+                  {tasksViewMode === "gantt" && (
+                    <ProjectGanttView
+                      project={project}
+                      tasks={project.tasks || []}
+                      onTaskClick={handleTaskClick}
+                      onTaskUpdate={handleTaskUpdate}
+                      checkAdminPermission={checkAdminPermission}
+                      isOwnTask={isOwnTask}
+                      updateTaskSequence={updateTaskSequence}
+                      getProjectById={getProjectById}
+                      refreshProject={(callback) => loadProject(true, callback)}
+                      users={users}
+                      manageTaskDependencies={manageTaskDependencies}
+                      checkCircularDependencies={checkCircularDependencies}
+                      calculateProjectDates={calculateProjectDates}
+                    />
+                  )}
               </div>
             </TabsContent>
 

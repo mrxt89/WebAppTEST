@@ -172,6 +172,7 @@ const updateProjectMembers = async (projectId, userId, members) => {
 };
 
 // Aggiungi o aggiorna task
+// Modifica la funzione esistente per gestire il nuovo parametro
 const addUpdateProjectTask = async (taskData, userId) => {
     try {
         let pool = await sql.connect(config.dbConfig);
@@ -190,6 +191,7 @@ const addUpdateProjectTask = async (taskData, userId) => {
         request.input('PredecessorTaskID', sql.Int, taskData.PredecessorTaskID || null);
         request.input('UserId', sql.Int, userId);
         request.input('AdditionalAssignees', sql.NVarChar(sql.MAX), taskData.AdditionalAssignees ? taskData.AdditionalAssignees : null);
+        request.input('PredecessorTasks', sql.NVarChar(sql.MAX), taskData.PredecessorTasks ? taskData.PredecessorTasks : null); // Nuovo parametro
 
         const result = await request.execute('MA_AddUpdateProjectTask');
         console.log("[DEBUG] Result:", result.recordset[0]);
@@ -576,6 +578,53 @@ const getUserMemberProjectsPaginated = async (userId, page = 0, pageSize = 20, f
     }
   };
   
+  // Gestisce le dipendenze dei task
+const manageTaskDependencies = async (taskId, dependencies, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('TaskID', sql.Int, taskId)
+            .input('Dependencies', sql.NVarChar(sql.MAX), JSON.stringify(dependencies))
+            .input('UserId', sql.Int, userId)
+            .execute('MA_ManageTaskDependencies');
+        
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in manageTaskDependencies:', err);
+        throw err;
+    }
+};
+
+// Verifica dipendenze circolari
+const checkCircularDependencies = async (taskId, predecessorTaskId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('TaskID', sql.Int, taskId)
+            .input('PredecessorTaskID', sql.Int, predecessorTaskId)
+            .execute('MA_CheckCircularDependencies');
+        
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in checkCircularDependencies:', err);
+        throw err;
+    }
+};
+
+// Calcola le date basate sulle dipendenze
+const calculateTaskDates = async (projectId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('ProjectID', sql.Int, projectId)
+            .execute('MA_CalculateTaskDates');
+        
+        return result.recordset;
+    } catch (err) {
+        console.error('Error in calculateTaskDates:', err);
+        throw err;
+    }
+};
 
 module.exports = {
     getPaginatedProjects,
@@ -596,5 +645,8 @@ module.exports = {
     updateProjectMemberRole,
     getProjectStatuses,
     getUserMemberProjects,
-    getUserMemberProjectsPaginated
+    getUserMemberProjectsPaginated,
+    manageTaskDependencies,
+    checkCircularDependencies,
+    calculateTaskDates
 };
