@@ -25,7 +25,9 @@ import {
   FileText,
   CalendarDays,
   UserCheck,
-  Info
+  Info,
+  AlertCircle,
+  X
 } from "lucide-react";
 import { config } from "../../../config";
 
@@ -52,6 +54,11 @@ const TaskInformationTab = ({
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [participantSearch, setParticipantSearch] = useState("");
+  
+  // Stati per dipendenze multiple
+  const [selectedPredecessors, setSelectedPredecessors] = useState([]);
+  const [dependencyType, setDependencyType] = useState("FS");
+  const [lagDays, setLagDays] = useState(0);
 
   // Funzione per normalizzare i partecipanti in un formato consistente
   const normalizeParticipants = (participants) => {
@@ -125,6 +132,19 @@ const TaskInformationTab = ({
 
       // Resetta lo stato del gruppo
       setSelectedGroupId(task.DefaultGroupId || null);
+      
+      // Inizializza i predecessori
+      if (task.Predecessors) {
+        try {
+          const predecessors = typeof task.Predecessors === 'string' 
+            ? JSON.parse(task.Predecessors) 
+            : task.Predecessors;
+          setSelectedPredecessors(predecessors || []);
+        } catch (error) {
+          console.error("Error parsing predecessors:", error);
+          setSelectedPredecessors([]);
+        }
+      }
     }
   }, [task]);
 
@@ -183,19 +203,24 @@ const TaskInformationTab = ({
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Prepara le dipendenze nel formato corretto
+    const dependencies = selectedPredecessors.map(pred => ({
+      taskId: pred.taskId,
+      dependencyType: pred.dependencyType || "FS",
+      lagDays: pred.lagDays || 0
+    }));
+    
     const saveData = {
       ...editedData,
       AdditionalAssignees: JSON.stringify(selectedParticipants),
-      DefaultGroupId: selectedGroupId, // Aggiungi il gruppo selezionato
+      DefaultGroupId: selectedGroupId,
+      PredecessorTasks: JSON.stringify(dependencies)
     };
     onSave(saveData);
   };
-
-  const predecessorTask = task?.PredecessorTaskID
-    ? tasks.find((t) => t.TaskID === task.PredecessorTaskID)
-    : null;
 
   // Filtra gli utenti disponibili per i partecipanti
   const filteredAssignableUsers = assignableUsers.filter((user) => {
@@ -367,339 +392,429 @@ const TaskInformationTab = ({
         </CardContent>
       </Card>
 
-    {/* Assignments Section con Card */}
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-center gap-2 mb-3">
-          <UserCheck className="h-5 w-5 text-gray-600" />
-          <h3 className="text-lg font-semibold">Assegnazioni</h3>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Colonna sinistra - Partecipanti */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center mb-2">
-              <Label className="text-sm font-medium flex items-center gap-1">
-                <UserPlus className="h-3 w-3" />
-                Partecipanti ({selectedParticipants.length})
-              </Label>
-              {isEditing && (
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="showSelected"
-                    checked={showSelectedOnly}
-                    onCheckedChange={setShowSelectedOnly}
-                    className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
-                  />
-                  <Label htmlFor="showSelected" className="text-sm text-gray-600 cursor-pointer">
-                    Solo selezionati
-                  </Label>
-                </div>
-              )}
-            </div>
-
-            {isEditing && (
-              <Input
-                placeholder="Cerca partecipante..."
-                value={participantSearch}
-                onChange={(e) => setParticipantSearch(e.target.value)}
-                className="w-full mb-2"
-              />
-            )}
-
-            {isEditing ? (
-              <Card className="border-dashed">
-                <ScrollArea className="h-[280px]">
-                  <div className="p-2 space-y-1">
-                    {filteredAssignableUsers.length > 0 ? (
-                      filteredAssignableUsers.map((user) => {
-                        const isChecked = selectedParticipants.includes(user.userId.toString());
-                        return (
-                          <div
-                            key={user.userId}
-                            className="flex items-center space-x-3 hover:bg-gray-50 p-2 rounded-md transition-colors"
-                          >
-                            <input
-                              type="checkbox"
-                              id={`user-${user.userId}`}
-                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                setSelectedParticipants((prev) => {
-                                  const userId = user.userId.toString();
-                                  if (prev.includes(userId)) {
-                                    return prev.filter((id) => id !== userId);
-                                  }
-                                  return [...prev, userId];
-                                });
-                              }}
-                            />
-                            <label
-                              htmlFor={`user-${user.userId}`}
-                              className="flex-grow cursor-pointer font-normal"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                const checkbox = document.getElementById(`user-${user.userId}`);
-                                if (checkbox) {
-                                  checkbox.click();
-                                }
-                              }}
-                            >
-                              {user.firstName} {user.lastName}
-                            </label>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="text-center py-8 text-sm text-gray-500">
-                        {participantSearch
-                          ? "Nessun partecipante trovato"
-                          : "Nessun partecipante disponibile"}
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
-              </Card>
-            ) : (
-              <div className="bg-gray-50 rounded-lg p-4 min-h-[280px]">
-                <div className="flex flex-wrap gap-2">
-                  {getParticipantDetails().length > 0 ? (
-                    getParticipantDetails().map((participant, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 bg-white px-3 py-2 rounded-md border border-gray-200"
-                      >
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-xs">
-                            {getInitials(participant.firstName, participant.lastName)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">
-                          {participant.firstName} {participant.lastName}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <span className="text-sm text-gray-500 italic">
-                      Nessun partecipante aggiuntivo
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
+      {/* Assignments Section con Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <UserCheck className="h-5 w-5 text-gray-600" />
+            <h3 className="text-lg font-semibold">Assegnazioni</h3>
           </div>
 
-          {/* Colonna destra - Responsabile e Gruppo */}
-          <div className="space-y-1">
-            {/* Responsabile */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Colonna sinistra - Partecipanti */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-1">
-                <User className="h-3 w-3" />
-                Responsabile
-              </Label>
+              <div className="flex justify-between items-center mb-2">
+                <Label className="text-sm font-medium flex items-center gap-1">
+                  <UserPlus className="h-3 w-3" />
+                  Partecipanti ({selectedParticipants.length})
+                </Label>
+                {isEditing && (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="showSelected"
+                      checked={showSelectedOnly}
+                      onCheckedChange={setShowSelectedOnly}
+                      className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                    />
+                    <Label htmlFor="showSelected" className="text-sm text-gray-600 cursor-pointer">
+                      Solo selezionati
+                    </Label>
+                  </div>
+                )}
+              </div>
+
+              {isEditing && (
+                <Input
+                  placeholder="Cerca partecipante..."
+                  value={participantSearch}
+                  onChange={(e) => setParticipantSearch(e.target.value)}
+                  className="w-full mb-2"
+                />
+              )}
+
               {isEditing ? (
-                <Select
-                  value={editedData.AssignedTo}
-                  onValueChange={(value) =>
-                    setEditedData((prev) => ({ ...prev, AssignedTo: value }))
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleziona il responsabile dell'attività" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {assignableUsers.map((user) => (
-                      <SelectItem key={user.userId} value={user.userId.toString()}>
-                        <div className="flex items-center gap-2">
+                <Card className="border-dashed">
+                  <ScrollArea className="h-[280px]">
+                    <div className="p-2 space-y-1">
+                      {filteredAssignableUsers.length > 0 ? (
+                        filteredAssignableUsers.map((user) => {
+                          const isChecked = selectedParticipants.includes(user.userId.toString());
+                          return (
+                            <div
+                              key={user.userId}
+                              className="flex items-center space-x-3 hover:bg-gray-50 p-2 rounded-md transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                id={`user-${user.userId}`}
+                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedParticipants((prev) => {
+                                    const userId = user.userId.toString();
+                                    if (prev.includes(userId)) {
+                                      return prev.filter((id) => id !== userId);
+                                    }
+                                    return [...prev, userId];
+                                  });
+                                }}
+                              />
+                              <label
+                                htmlFor={`user-${user.userId}`}
+                                className="flex-grow cursor-pointer font-normal"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  const checkbox = document.getElementById(`user-${user.userId}`);
+                                  if (checkbox) {
+                                    checkbox.click();
+                                  }
+                                }}
+                              >
+                                {user.firstName} {user.lastName}
+                              </label>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-8 text-sm text-gray-500">
+                          {participantSearch
+                            ? "Nessun partecipante trovato"
+                            : "Nessun partecipante disponibile"}
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </Card>
+              ) : (
+                <div className="bg-gray-50 rounded-lg p-4 min-h-[280px]">
+                  <div className="flex flex-wrap gap-2">
+                    {getParticipantDetails().length > 0 ? (
+                      getParticipantDetails().map((participant, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 bg-white px-3 py-2 rounded-md border border-gray-200"
+                        >
                           <Avatar className="h-6 w-6">
                             <AvatarFallback className="text-xs">
-                              {getInitials(user.firstName, user.lastName)}
+                              {getInitials(participant.firstName, participant.lastName)}
                             </AvatarFallback>
                           </Avatar>
-                          <span>{user.firstName} {user.lastName}</span>
+                          <span className="text-sm">
+                            {participant.firstName} {participant.lastName}
+                          </span>
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
-                  <div>
-                    <p className="font-medium">{task?.AssignedToName}</p>
+                      ))
+                    ) : (
+                      <span className="text-sm text-gray-500 italic">
+                        Nessun partecipante aggiuntivo
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="w-full border-t border-gray-200" />
-
-            {/* Gruppo */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-1">
-                <Users className="h-3 w-3" />
-                Gruppo
-              </Label>
-              {isEditing ? (
-                <div className="space-y-2">
+            {/* Colonna destra - Responsabile e Gruppo */}
+            <div className="space-y-1">
+              {/* Responsabile */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  Responsabile
+                </Label>
+                {isEditing ? (
                   <Select
-                    value={selectedGroupId?.toString() || "null"}
-                    onValueChange={handleGroupChange}
-                    disabled={isLoadingGroups}
+                    value={editedData.AssignedTo}
+                    onValueChange={(value) =>
+                      setEditedData((prev) => ({ ...prev, AssignedTo: value }))
+                    }
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue
-                        placeholder={
-                          isLoadingGroups
-                            ? "Caricamento gruppi..."
-                            : "Seleziona un gruppo di lavoro"
-                        }
-                      />
+                      <SelectValue placeholder="Seleziona il responsabile dell'attività" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="null">
-                        <span className="text-gray-500">Nessun gruppo</span>
-                      </SelectItem>
-                      {availableGroups.map((group) => (
-                        <SelectItem
-                          key={group.groupId}
-                          value={group.groupId.toString()}
-                        >
+                      {assignableUsers.map((user) => (
+                        <SelectItem key={user.userId} value={user.userId.toString()}>
                           <div className="flex items-center gap-2">
-                            <Users className="w-4 h-4 text-gray-500" />
-                            <div>
-                              <p className="font-medium">{group.groupName}</p>
-                              <p className="text-xs text-gray-500">{group.description}</p>
-                            </div>
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="text-xs">
+                                {getInitials(user.firstName, user.lastName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span>{user.firstName} {user.lastName}</span>
                           </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {selectedGroupId && (
-                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md">
-                      <Info className="h-4 w-4 text-blue-600" />
-                      <p className="text-xs text-blue-700">
-                        Selezionando un gruppo, l'attività sarà automaticamente assegnata a tutti i membri
-                      </p>
+                ) : (
+                  <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                    <div>
+                      <p className="font-medium">{task?.AssignedToName}</p>
                     </div>
-                  )}
-                </div>
-              ) : task?.GroupName ? (
-                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <Users className="h-4 w-4 text-gray-600" />
-                  <div>
-                    <p className="font-medium">{task.GroupName}</p>
-                    <p className="text-xs text-gray-500">Gruppo assegnato</p>
                   </div>
-                </div>
-              ) : (
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm text-gray-500 italic">Nessun gruppo assegnato</p>
-                </div>
-              )}
+                )}
+              </div>
+
+              <div className="w-full border-t border-gray-200" />
+
+              {/* Gruppo */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  Gruppo
+                </Label>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <Select
+                      value={selectedGroupId?.toString() || "null"}
+                      onValueChange={handleGroupChange}
+                      disabled={isLoadingGroups}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue
+                          placeholder={
+                            isLoadingGroups
+                              ? "Caricamento gruppi..."
+                              : "Seleziona un gruppo di lavoro"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="null">
+                          <span className="text-gray-500">Nessun gruppo</span>
+                        </SelectItem>
+                        {availableGroups.map((group) => (
+                          <SelectItem
+                            key={group.groupId}
+                            value={group.groupId.toString()}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Users className="w-4 h-4 text-gray-500" />
+                              <div>
+                                <p className="font-medium">{group.groupName}</p>
+                                <p className="text-xs text-gray-500">{group.description}</p>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedGroupId && (
+                      <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md">
+                        <Info className="h-4 w-4 text-blue-600" />
+                        <p className="text-xs text-blue-700">
+                          Selezionando un gruppo, l'attività sarà automaticamente assegnata a tutti i membri
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : task?.GroupName ? (
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <Users className="h-4 w-4 text-gray-600" />
+                    <div>
+                      <p className="font-medium">{task.GroupName}</p>
+                      <p className="text-xs text-gray-500">Gruppo assegnato</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-sm text-gray-500 italic">Nessun gruppo assegnato</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
 
-      {/* Collegamenti Section con Card */}
+      {/* Collegamenti Section con Card - NUOVA VERSIONE CON DIPENDENZE MULTIPLE */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center gap-2 mb-3">
             <Link2 className="h-5 w-5 text-gray-600" />
-            <h3 className="text-lg font-semibold">Collegamenti</h3>
+            <h3 className="text-lg font-semibold">Dipendenze</h3>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Attività precedente</Label>
-            {isEditing ? (
-              <Select
-                value={editedData.PredecessorTaskID?.toString() || "0"}
-                onValueChange={(value) =>
-                  setEditedData((prev) => ({
-                    ...prev,
-                    PredecessorTaskID: value === "0" ? null : parseInt(value),
-                  }))
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleziona un'attività collegata" />
-                </SelectTrigger>
-                <SelectContent className="max-h-80">
-                  <SelectItem value="0">
-                    <span className="text-gray-500">Nessuna attività collegata</span>
-                  </SelectItem>
-                  {tasks
-                    .filter((t) => t.TaskID !== task.TaskID)
-                    .map((t) => (
-                      <SelectItem key={t.TaskID} value={t.TaskID.toString()}>
-                        <div className="flex flex-col gap-1 py-1">
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant="outline"
-                              className={`text-xs ${
-                                t.Status === "COMPLETATA"
-                                  ? "bg-green-50 text-green-700 border-green-200"
-                                  : t.Status === "IN ESECUZIONE"
-                                    ? "bg-blue-50 text-blue-700 border-blue-200"
-                                    : t.Status === "BLOCCATA"
-                                      ? "bg-red-50 text-red-700 border-red-200"
-                                      : t.Status === "SOSPESA"
-                                        ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                                        : "bg-gray-50 text-gray-700 border-gray-200"
-                              }`}
-                            >
-                              {t.Status}
-                            </Badge>
-                            <span className="font-medium truncate max-w-[300px]">
-                              {t.Title}
-                            </span>
-                          </div>
-                          <div className="flex gap-3 text-xs text-gray-500 ml-2">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {new Date(t.StartDate).toLocaleDateString("it-IT")}
-                            </span>
-                            <span>→</span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {new Date(t.DueDate).toLocaleDateString("it-IT")}
-                            </span>
-                          </div>
+          <div className="space-y-4">
+            {/* Lista dipendenze esistenti */}
+            {!isEditing && selectedPredecessors.length > 0 ? (
+              <div className="space-y-2">
+                {selectedPredecessors.map((dep, index) => {
+                  const predTask = tasks.find(t => t.TaskID === dep.taskId);
+                  if (!predTask) return null;
+                  
+                  return (
+                    <div key={index} className="p-3 bg-gray-50 rounded-md border border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${
+                              predTask.Status === "COMPLETATA"
+                                ? "bg-green-50 text-green-700 border-green-200"
+                                : predTask.Status === "IN ESECUZIONE"
+                                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                                  : "bg-gray-50 text-gray-700 border-gray-200"
+                            }`}
+                          >
+                            {predTask.Status}
+                          </Badge>
+                          <span className="font-medium">{predTask.Title}</span>
                         </div>
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            ) : predecessorTask ? (
-              <div className="p-3 bg-gray-50 rounded-md">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={`text-xs ${
-                        predecessorTask.Status === "COMPLETATA"
-                          ? "bg-green-50 text-green-700 border-green-200"
-                          : predecessorTask.Status === "IN ESECUZIONE"
-                            ? "bg-blue-50 text-blue-700 border-blue-200"
-                            : "bg-gray-50 text-gray-700 border-gray-200"
-                      }`}
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Badge variant="secondary" className="text-xs">
+                            {dep.dependencyType}
+                          </Badge>
+                          {dep.lagDays !== 0 && (
+                            <span className="text-xs">
+                              {dep.lagDays > 0 ? `+${dep.lagDays}` : dep.lagDays} giorni
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : !isEditing ? (
+              <p className="text-sm text-gray-500 italic">
+                Nessuna dipendenza configurata
+              </p>
+            ) : null}
+
+            {/* Form per aggiungere dipendenze in modalità edit */}
+            {isEditing && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="md:col-span-2">
+                    <Label className="text-sm">Attività predecessore</Label>
+                    <Select
+                      onValueChange={(value) => {
+                        if (value && value !== "0") {
+                          const taskId = parseInt(value);
+                          // Verifica che non sia già presente
+                          if (!selectedPredecessors.find(p => p.taskId === taskId)) {
+                            setSelectedPredecessors(prev => [...prev, {
+                              taskId,
+                              dependencyType,
+                              lagDays
+                            }]);
+                          }
+                        }
+                      }}
                     >
-                      {predecessorTask.Status}
-                    </Badge>
-                    <span className="font-medium">{predecessorTask.Title}</span>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Aggiungi dipendenza..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-80">
+                        <SelectItem value="0">
+                          <span className="text-gray-500">Seleziona attività...</span>
+                        </SelectItem>
+                        {tasks
+                          .filter(t => 
+                            t.TaskID !== task.TaskID && 
+                            !selectedPredecessors.find(p => p.taskId === t.TaskID)
+                          )
+                          .map((t) => (
+                            <SelectItem key={t.TaskID} value={t.TaskID.toString()}>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs"
+                                >
+                                  {t.Status}
+                                </Badge>
+                                <span className="truncate max-w-[300px]">
+                                  {t.Title}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <span className="text-xs text-gray-500">
-                    {new Date(predecessorTask.StartDate).toLocaleDateString("it-IT")}
-                  </span>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-sm">Tipo</Label>
+                      <Select
+                        value={dependencyType}
+                        onValueChange={setDependencyType}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="FS">FS</SelectItem>
+                          <SelectItem value="FF">FF</SelectItem>
+                          <SelectItem value="SS">SS</SelectItem>
+                          <SelectItem value="SF">SF</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-sm">Ritardo</Label>
+                      <Input
+                        type="number"
+                        value={lagDays}
+                        onChange={(e) => setLagDays(parseInt(e.target.value) || 0)}
+                        className="h-9"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista dipendenze selezionate */}
+                {selectedPredecessors.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Dipendenze configurate:</Label>
+                    {selectedPredecessors.map((dep, index) => {
+                      const predTask = tasks.find(t => t.TaskID === dep.taskId);
+                      if (!predTask) return null;
+                      
+                      return (
+                        <div key={index} className="flex items-center justify-between p-2 bg-blue-50 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{predTask.Title}</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {dep.dependencyType}
+                            </Badge>
+                            {dep.lagDays !== 0 && (
+                              <span className="text-xs text-gray-600">
+                                {dep.lagDays > 0 ? `+${dep.lagDays}` : dep.lagDays} giorni
+                              </span>
+                            )}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedPredecessors(prev => 
+                                prev.filter((_, i) => i !== index)
+                              );
+                            }}
+                            className="h-6 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-2 p-2 bg-amber-50 rounded-md">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <p className="text-xs text-amber-700">
+                    FS: Finish-Start, FF: Finish-Finish, SS: Start-Start, SF: Start-Finish
+                  </p>
                 </div>
               </div>
-            ) : (
-              <p className="text-sm text-gray-500 italic">
-                Nessuna attività collegata
-              </p>
             )}
           </div>
         </CardContent>

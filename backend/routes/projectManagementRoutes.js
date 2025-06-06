@@ -20,7 +20,10 @@ const {
     updateProjectMemberRole,
     getProjectStatuses,
     getUserMemberProjects,
-    getUserMemberProjectsPaginated
+    getUserMemberProjectsPaginated,
+    manageTaskDependencies,
+    checkCircularDependencies,
+    calculateTaskDates
   } = require('../queries/projectManagement');
 
 // Ottieni tutte le unità di misura
@@ -476,5 +479,55 @@ router.get('/projects/user/member/paginated', authenticateToken, async (req, res
       });
     }
   });
+
+  router.post('/projects/tasks/:taskId/dependencies', authenticateToken, async (req, res) => {
+    try {
+        const taskId = parseInt(req.params.taskId);
+        const { dependencies } = req.body;
+        const userId = req.user.UserId;
+        
+        const result = await manageTaskDependencies(taskId, dependencies, userId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error managing task dependencies:', err);
+        res.status(500).json({ 
+            success: 0,
+            msg: 'Error managing task dependencies'
+        });
+    }
+});
+
+// Verifica dipendenze circolari
+router.post('/projects/tasks/:taskId/check-circular', authenticateToken, async (req, res) => {
+    try {
+        const taskId = parseInt(req.params.taskId);
+        const { predecessorTaskId } = req.body;
+        
+        const result = await checkCircularDependencies(taskId, predecessorTaskId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error checking circular dependencies:', err);
+        res.status(500).json({ 
+            success: 0,
+            msg: 'Error checking circular dependencies'
+        });
+    }
+});
+
+// Calcola date progetto
+router.get('/projects/:projectId/calculate-dates', authenticateToken, async (req, res) => {
+    try {
+        const projectId = parseInt(req.params.projectId);
+        
+        const result = await calculateTaskDates(projectId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error calculating task dates:', err);
+        res.status(500).json({ 
+            success: 0,
+            msg: 'Error calculating task dates'
+        });
+    }
+});
 
 module.exports = router;

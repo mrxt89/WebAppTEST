@@ -36,6 +36,8 @@ import {
   X,
   ArrowDown,
   MoveVertical,
+  GitBranch,
+  Link2,
 } from "lucide-react";
 
 // Funzione di debounce per limitare chiamate ripetute
@@ -49,7 +51,7 @@ const debounce = (func, wait) => {
 };
 
 /**
- * ProjectGanttView - Implementazione Gantt tramite gantt-task-react
+ * ProjectGanttView - Implementazione Gantt con dipendenze multiple
  */
 const ProjectGanttView = ({
   project,
@@ -62,6 +64,9 @@ const ProjectGanttView = ({
   getProjectById,
   refreshProject,
   users = [],
+  manageTaskDependencies,
+  checkCircularDependencies,
+  calculateProjectDates,
 }) => {
   // Contatori di debug
   const renderCount = useRef(0);
@@ -78,6 +83,7 @@ const ProjectGanttView = ({
   const [scrollPosition, setScrollPosition] = useState(0);
   const [visibleTimeStart, setVisibleTimeStart] = useState(null);
   const [visibleTimeEnd, setVisibleTimeEnd] = useState(null);
+  const [showDependencies, setShowDependencies] = useState(true);
 
   // Stato per i filtri
   const [filters, setFilters] = useState({
@@ -118,6 +124,21 @@ const ProjectGanttView = ({
       }
     }
   }, [scrollPosition]);
+
+  // Parsing delle dipendenze
+  const parseDependencies = (dependenciesData) => {
+    if (!dependenciesData) return [];
+    
+    try {
+      if (typeof dependenciesData === 'string') {
+        return JSON.parse(dependenciesData);
+      }
+      return Array.isArray(dependenciesData) ? dependenciesData : [];
+    } catch (e) {
+      console.error('Error parsing dependencies:', e);
+      return [];
+    }
+  };
 
   // Quando refreshProject viene chiamato, marca che stiamo aggiornando
   const handleTaskChangeWrapper = async (task) => {
@@ -215,77 +236,92 @@ const ProjectGanttView = ({
     return result.filter((task) => task.StartDate && task.DueDate);
   }, [tasks, filters]);
 
+  // Costruisce le dipendenze per gantt-task-react
+  const buildDependencies = useCallback((task) => {
+    const predecessors = parseDependencies(task.Predecessors);
+    if (!predecessors || predecessors.length === 0) return [];
+    
+    // gantt-task-react supporta solo dipendenze FS semplici
+    // quindi prendiamo solo le dipendenze FS
+    return predecessors
+      .filter(dep => dep.dependencyType === 'FS')
+      .map(dep => dep.taskId.toString());
+  }, []);
+
   // Convertire le task nel formato richiesto dalla libreria
   const convertTasks = useCallback(
     (sourceTasks) => {
-      return sourceTasks.map((task) => ({
-        id: task.TaskID.toString(),
-        name: task.Title,
-        start: new Date(task.StartDate),
-        end: new Date(task.DueDate),
-        progress:
-          task.Status === "COMPLETATA"
-            ? 100
-            : task.Status === "IN ESECUZIONE"
-              ? 50
-              : task.Status === "BLOCCATA"
-                ? 0
-                : task.Status === "SOSPESA"
-                  ? 25
-                  : 10, // Per "DA FARE"
-        type: "task",
-        project: project.ProjectID.toString(),
-        dependencies: task.PredecessorTaskID
-          ? [task.PredecessorTaskID.toString()]
-          : [],
-        hideChildren: false,
-        displayOrder: task.TaskSequence,
+      return sourceTasks.map((task) => {
+        const predecessors = parseDependencies(task.Predecessors);
+        
+        return {
+          id: task.TaskID.toString(),
+          name: task.Title,
+          start: new Date(task.StartDate),
+          end: new Date(task.DueDate),
+          progress:
+            task.Status === "COMPLETATA"
+              ? 100
+              : task.Status === "IN ESECUZIONE"
+                ? 50
+                : task.Status === "BLOCCATA"
+                  ? 0
+                  : task.Status === "SOSPESA"
+                    ? 25
+                    : 10, // Per "DA FARE"
+          type: "task",
+          project: project.ProjectID.toString(),
+          dependencies: buildDependencies(task),
+          hideChildren: false,
+          displayOrder: task.TaskSequence,
 
-        // Dati personalizzati per preservare tutte le informazioni originali
-        originalTask: task,
-        canInteract: checkAdminPermission(project) || isOwnTask(task),
-        // Status dell'attività
-        status: task.Status,
-        priority: task.Priority,
-        isDelayed:
-          new Date(task.DueDate) < new Date() && task.Status !== "COMPLETATA",
-        assignedToName: task.AssignedToName,
-        // Stile in base allo stato
-        styles: {
-          backgroundColor:
-            task.Status === "COMPLETATA"
-              ? "#10b981"
-              : task.Status === "IN ESECUZIONE"
-                ? "#3b82f6"
-                : task.Status === "BLOCCATA"
-                  ? "#ef4444"
-                  : task.Status === "SOSPESA"
-                    ? "#f59e0b"
-                    : "#94a3b8",
-          progressColor:
-            task.Status === "COMPLETATA"
-              ? "#10b981"
-              : task.Status === "IN ESECUZIONE"
-                ? "#3b82f6"
-                : task.Status === "BLOCCATA"
-                  ? "#ef4444"
-                  : task.Status === "SOSPESA"
-                    ? "#f59e0b"
-                    : "#94a3b8",
-          progressSelectedColor:
-            task.Status === "COMPLETATA"
-              ? "#10b981"
-              : task.Status === "IN ESECUZIONE"
-                ? "#3b82f6"
-                : task.Status === "BLOCCATA"
-                  ? "#ef4444"
-                  : task.Status === "SOSPESA"
-                    ? "#f59e0b"
-                    : "#94a3b8",
-        },
-      }));
+          // Dati personalizzati per preservare tutte le informazioni originali
+          originalTask: task,
+          canInteract: checkAdminPermission(project) || isOwnTask(task),
+          // Status dell'attività
+          status: task.Status,
+          priority: task.Priority,
+          isDelayed:
+            new Date(task.DueDate) < new Date() && task.Status !== "COMPLETATA",
+          assignedToName: task.AssignedToName,
+          predecessorsData: predecessors,
+          // Stile in base allo stato
+          styles: {
+            backgroundColor:
+              task.Status === "COMPLETATA"
+                ? "#10b981"
+                : task.Status === "IN ESECUZIONE"
+                  ? "#3b82f6"
+                  : task.Status === "BLOCCATA"
+                    ? "#ef4444"
+                    : task.Status === "SOSPESA"
+                      ? "#f59e0b"
+                      : "#94a3b8",
+            progressColor:
+              task.Status === "COMPLETATA"
+                ? "#10b981"
+                : task.Status === "IN ESECUZIONE"
+                  ? "#3b82f6"
+                  : task.Status === "BLOCCATA"
+                    ? "#ef4444"
+                    : task.Status === "SOSPESA"
+                      ? "#f59e0b"
+                      : "#94a3b8",
+            progressSelectedColor:
+              task.Status === "COMPLETATA"
+                ? "#10b981"
+                : task.Status === "IN ESECUZIONE"
+                  ? "#3b82f6"
+                  : task.Status === "BLOCCATA"
+                    ? "#ef4444"
+                    : task.Status === "SOSPESA"
+                      ? "#f59e0b"
+                      : "#94a3b8",
+          },
+        };
+      });
     },
-    [checkAdminPermission, isOwnTask, project],
+    [checkAdminPermission, isOwnTask, project, buildDependencies],
   );
 
   // Preparazione dei task per la libreria
@@ -587,6 +623,35 @@ const ProjectGanttView = ({
     }, 100);
   };
 
+  // Funzione per formattare le dipendenze
+  const formatDependencyInfo = (predecessors) => {
+    if (!predecessors || predecessors.length === 0) return null;
+    
+    return predecessors.map((dep, idx) => {
+      const predTask = tasks.find(t => t.TaskID === dep.taskId);
+      if (!predTask) return null;
+      
+      const typeLabel = {
+        'FS': 'Fine-Inizio',
+        'FF': 'Fine-Fine',
+        'SS': 'Inizio-Inizio',
+        'SF': 'Inizio-Fine'
+      }[dep.dependencyType] || dep.dependencyType;
+      
+      return (
+        <div key={idx} className="text-xs">
+          <span className="font-medium">{predTask.Title}</span>
+          <span className="text-gray-500 ml-1">({typeLabel})</span>
+          {dep.lagDays !== 0 && (
+            <span className="text-gray-500 ml-1">
+              {dep.lagDays > 0 ? `+${dep.lagDays}` : dep.lagDays}g
+            </span>
+          )}
+        </div>
+      );
+    }).filter(Boolean);
+  };
+
   return (
     <Card className="border rounded-lg bg-white">
       {/* Header Controls */}
@@ -614,6 +679,18 @@ const ProjectGanttView = ({
             >
               Mese
             </Button>
+            
+            <div className="border-l pl-4">
+              <Button
+                variant={showDependencies ? "default" : "outline"}
+                onClick={() => setShowDependencies(!showDependencies)}
+                className="flex-shrink-0"
+                size="sm"
+              >
+                <Link2 className="h-4 w-4 mr-2" />
+                Dipendenze
+              </Button>
+            </div>
           </div>
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-2 p-2">
@@ -770,6 +847,10 @@ const ProjectGanttView = ({
             <span className="inline-block w-3 h-3 bg-yellow-500 rounded-sm"></span>
             <span>Sospesa</span>
           </div>
+          <div className="border-l pl-4 flex items-center gap-1">
+            <GitBranch className="h-3 w-3 text-gray-600" />
+            <span>Linee = Dipendenze (FS)</span>
+          </div>
         </div>
 
         {/* Gantt Chart */}
@@ -794,30 +875,88 @@ const ProjectGanttView = ({
               barProgressSelectedColor={null}
               projectProgressColor={null}
               projectProgressSelectedColor={null}
+              arrow={showDependencies}
+              arrowColor="#6366f1"
+              arrowIndent={20}
               TooltipContent={({ task }) => {
                 const originalTask = task.originalTask;
                 const status = originalTask.Status;
                 const priority = originalTask.Priority;
                 const assignedTo = originalTask.AssignedToName;
+                const predecessors = task.predecessorsData;
 
                 return (
-                  <div className="p-2 bg-white shadow-lg rounded border">
-                    <div className="font-bold">{task.name}</div>
-                    <div>
-                      Inizio: {new Date(task.start).toLocaleDateString()}
+                  <div className="p-3 bg-white shadow-lg rounded-lg border max-w-sm">
+                    <div className="font-bold text-base mb-2">{task.name}</div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Inizio:</span>
+                        <span className="font-medium">
+                          {new Date(task.start).toLocaleDateString('it-IT')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Fine:</span>
+                        <span className="font-medium">
+                          {new Date(task.end).toLocaleDateString('it-IT')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Stato:</span>
+                        <Badge 
+                          variant="outline"
+                          className={
+                            status === "COMPLETATA" ? "bg-green-50 text-green-700 border-green-300" :
+                            status === "IN ESECUZIONE" ? "bg-blue-50 text-blue-700 border-blue-300" :
+                            status === "BLOCCATA" ? "bg-red-50 text-red-700 border-red-300" :
+                            status === "SOSPESA" ? "bg-yellow-50 text-yellow-700 border-yellow-300" :
+                            "bg-gray-50 text-gray-700 border-gray-300"
+                          }
+                        >
+                          {status}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Priorità:</span>
+                        <Badge 
+                          variant="outline"
+                          className={
+                            priority === "ALTA" ? "bg-red-50 text-red-700 border-red-300" :
+                            priority === "MEDIA" ? "bg-yellow-50 text-yellow-700 border-yellow-300" :
+                            "bg-green-50 text-green-700 border-green-300"
+                          }
+                        >
+                          {priority}
+                        </Badge>
+                      </div>
+                      {assignedTo && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Assegnato a:</span>
+                          <span className="font-medium">{assignedTo}</span>
+                        </div>
+                      )}
                     </div>
-                    <div>Fine: {new Date(task.end).toLocaleDateString()}</div>
-                    <div>Stato: {status}</div>
-                    <div>Priorità: {priority}</div>
-                    {assignedTo && <div>Assegnato a: {assignedTo}</div>}
+                    
+                    {predecessors && predecessors.length > 0 && (
+                      <div className="mt-3 pt-3 border-t">
+                        <div className="text-sm font-medium mb-1 flex items-center gap-1">
+                          <GitBranch className="h-3 w-3" />
+                          Dipendenze:
+                        </div>
+                        <div className="space-y-1">
+                          {formatDependencyInfo(predecessors)}
+                        </div>
+                      </div>
+                    )}
+                    
                     {originalTask.Description && (
-                      <div className="mt-1 pt-1 border-t">
-                        <div className="text-xs text-gray-600">
+                      <div className="mt-3 pt-3 border-t">
+                        <div className="text-xs text-gray-600 font-medium mb-1">
                           Descrizione:
                         </div>
-                        <div className="text-sm max-w-xs overflow-hidden text-ellipsis">
-                          {originalTask.Description.substring(0, 100)}
-                          {originalTask.Description.length > 100 ? "..." : ""}
+                        <div className="text-sm text-gray-700 max-w-xs overflow-hidden">
+                          {originalTask.Description.substring(0, 150)}
+                          {originalTask.Description.length > 150 ? "..." : ""}
                         </div>
                       </div>
                     )}
@@ -835,6 +974,7 @@ const ProjectGanttView = ({
                         const canMove =
                           checkAdminPermission(project) ||
                           isOwnTask(task.originalTask);
+                        const hasDependencies = task.predecessorsData && task.predecessorsData.length > 0;
 
                         return (
                           <tr key={task.id} className="hover:bg-gray-50">
@@ -863,6 +1003,21 @@ const ProjectGanttView = ({
                                     {task.name}
                                   </span>
 
+                                  {hasDependencies && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          <GitBranch className="w-3 h-3 ml-2 text-indigo-600" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <div className="text-xs">
+                                            {task.predecessorsData.length} dipendenz{task.predecessorsData.length > 1 ? 'e' : 'a'}
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+
                                   {isDelayed && (
                                     <Badge className="ml-2 bg-amber-100 text-amber-700 border-amber-300">
                                       <AlertTriangle className="w-3 h-3" />
@@ -888,8 +1043,14 @@ const ProjectGanttView = ({
                                   <span
                                     className={isDelayed ? "text-red-500" : ""}
                                   >
-                                    {new Date(task.start).toLocaleDateString()}{" "}
-                                    - {new Date(task.end).toLocaleDateString()}
+                                    {new Date(task.start).toLocaleDateString('it-IT', { 
+                                      day: '2-digit', 
+                                      month: 'short' 
+                                    })} - {new Date(task.end).toLocaleDateString('it-IT', { 
+                                      day: '2-digit', 
+                                      month: 'short',
+                                      year: 'numeric'
+                                    })}
                                   </span>
                                 </div>
                               </div>
@@ -956,8 +1117,8 @@ const ProjectGanttView = ({
                   </table>
                 </div>
               )}
-              barFill={90} // Ridotto da 100 per evitare di riempire l'intera barra
-              handleWidth={8} // Larghezza delle maniglie per il ridimensionamento
+              barFill={90}
+              handleWidth={8}
               columnWidth={
                 viewMode === ViewMode.Month
                   ? 300
@@ -967,9 +1128,8 @@ const ProjectGanttView = ({
               }
               listCellWidth="100px"
               todayColor="rgba(252, 165, 165, 0.5)"
-              onTimeChange={handleTimeChange} // Aggiungiamo questo evento per salvare la posizione
+              onTimeChange={handleTimeChange}
               TaskListHeader={() => (
-                // Manteniamo lo stesso stile ma non scriviamo nulla dentro
                 <div className="">
                   <table className="w-full h-full">
                     <thead>
@@ -980,17 +1140,12 @@ const ProjectGanttView = ({
                   </table>
                 </div>
               )}
-              ganttHeight={0} // Auto altezza
-              arrowIndent={20} // Distanza per le frecce di dipendenza
-              // Questo fa sì che le barre abbiano lo stile personalizzato
-              ganttFullHeight={true}
-              timeStep={10000} // Intervallo di tempo minimo per il drag
+              ganttHeight={0}
+              timeStep={10000}
               fontFamily="Inter, system-ui, sans-serif"
               fontSize="12px"
-              // Personalizzazione dello stile per ogni tipo di task
-              preStepsCount={1} // Spazio prima della prima colonna
+              preStepsCount={1}
               rtl={false}
-              // Usa style per ogni barra
               locale="it-IT"
             />
           ) : (
@@ -1023,7 +1178,8 @@ export default React.memo(ProjectGanttView, (prevProps, nextProps) => {
         seq: t.TaskSequence,
         start: t.StartDate,
         end: t.DueDate,
-        status: t.Status
+        status: t.Status,
+        predecessors: t.Predecessors
       }))
     ) ===
     JSON.stringify(
@@ -1032,7 +1188,8 @@ export default React.memo(ProjectGanttView, (prevProps, nextProps) => {
         seq: t.TaskSequence,
         start: t.StartDate,
         end: t.DueDate,
-        status: t.Status
+        status: t.Status,
+        predecessors: t.Predecessors
       }))
     );
 

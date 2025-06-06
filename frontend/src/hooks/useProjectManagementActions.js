@@ -657,6 +657,42 @@ const useProjectActions = () => {
     }
   };
 
+  const manageTaskDependencies = async (taskId, dependencies) => {
+    try {
+        const url = `${config.API_BASE_URL}/projects/tasks/${taskId}/dependencies`;
+        return await makeRequest(url, {
+            method: "POST",
+            body: JSON.stringify({ dependencies }),
+        });
+    } catch (error) {
+        console.error("Error managing task dependencies:", error);
+        throw error;
+    }
+};
+
+const checkCircularDependencies = async (taskId, predecessorTaskId) => {
+    try {
+        const url = `${config.API_BASE_URL}/projects/tasks/${taskId}/check-circular`;
+        return await makeRequest(url, {
+            method: "POST",
+            body: JSON.stringify({ predecessorTaskId }),
+        });
+    } catch (error) {
+        console.error("Error checking circular dependencies:", error);
+        throw error;
+    }
+};
+
+const calculateProjectDates = async (projectId) => {
+    try {
+        const url = `${config.API_BASE_URL}/projects/${projectId}/calculate-dates`;
+        return await makeRequest(url);
+    } catch (error) {
+        console.error("Error calculating project dates:", error);
+        throw error;
+    }
+};
+
   return {
     projects,
     loading,
@@ -692,6 +728,9 @@ const useProjectActions = () => {
     fetchProjectStatuses,
     getUserMemberProjects,
     getUserMemberProjectsPaginated,
+    manageTaskDependencies,
+    checkCircularDependencies,
+    calculateProjectDates
   };
 };
 
