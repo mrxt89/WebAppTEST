@@ -1,34 +1,25 @@
-// TaskDetailsPanel.jsx
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { motion, AnimatePresence, useDragControls } from "framer-motion";
+// TimesheetTaskPanel.jsx
+import React, { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
-  Maximize2,
-  Minimize2,
+  Search,
+  Filter,
   ChevronLeft,
   ChevronRight,
-  GripVertical,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  Play,
-  AlertCircle,
-  ListTodo,
   Loader2,
-  Calendar,
-  Users,
-  MessageSquare,
-  Paperclip,
-  History,
-  DollarSign,
-  CalendarClock,
-  Pin,
-  PinOff,
+  FolderOpen,
+  CheckCircle,
+  Info,
+  AlertCircle,
+  Briefcase,
+  Tag,
+  Hash,
 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -36,125 +27,71 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "@/components/ui/use-toast";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import TaskInformationTab from "../progetti/TaskInformationTab";
-import TaskChatsTab from "../progetti/TaskChatsTab";
-import TaskCostsTab from "../progetti/TaskCostsTab";
-import TaskHistoryTab from "../progetti/TaskHistoryTab";
-import TaskAttachmentsTab from "../progetti/TaskAttachmentsTab";
-import CalendarIntegration from "../../../components/calendar/CalendarIntegration";
-import useProjectActions from "../../../hooks/useProjectManagementActions";
-import useCalendar from "../../../hooks/useCalendar";
-import { swal } from "../../../lib/common";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import NewTaskForm from "@/pages/progetti/progetti/NewTaskForm";
+import useProjectActions from "@/hooks/useProjectManagementActions";
+import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 
-const TaskDetailsPanel = ({
-  project,
-  task,
-  tasks = [],
+const TimesheetTaskPanel = ({
   isOpen,
   onClose,
-  onUpdate,
-  onAddComment,
-  assignableUsers = [],
-  refreshProject,
-  activeTabOnReopen = null,
-  onTabChange,
-  position = "right", // "right", "bottom", o "fullscreen"
-  defaultWidth = 700,
-  minWidth = 400,
-  maxWidth = 1200,
+  onTaskCreated,
+  position = "right",
+  defaultWidth = 600,
 }) => {
-  const panelRef = useRef(null);
-  const resizeRef = useRef(null);
-  const dragControls = useDragControls();
-  
-  // Stati principali
-  const [editedTask, setEditedTask] = useState(task);
-  const [isEditing, setIsEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState(activeTabOnReopen || "information");
-  const [panelWidth, setPanelWidth] = useState(position === "right" ? 700 : defaultWidth);
-  const [isResizing, setIsResizing] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isPinned, setIsPinned] = useState(false);
-  const [panelPosition, setPanelPosition] = useState(position);
-  
-  // Stati per animazioni e transizioni
+  const [loading, setLoading] = useState(false);
+  const [userProjects, setUserProjects] = useState([]);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [projectTasks, setProjectTasks] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedCategoryDetail, setSelectedCategoryDetail] = useState("all");
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [showContent, setShowContent] = useState(false);
-  
-  const { checkAdminPermission, isOwnTask } = useProjectActions();
-  const { syncCalendarEvent } = useCalendar();
-  const canEdit = checkAdminPermission(project) || isOwnTask(task);
 
-  // Stato calendario
-  const [calendarState, setCalendarState] = useState({
-    eventSynced: false,
-    reminderTime: "30",
-    selectedParticipants: [],
-    loading: false,
-    error: null,
-  });
+  const { user } = useAuth();
+  const projectActions = useProjectActions();
+  const { fetchUsers } = useNotifications();
 
-  // Configurazione stati e priorità
-  const statusConfig = {
-    COMPLETATA: {
-      color: "bg-green-100 text-green-700 border border-green-200",
-      icon: <CheckCircle2 className="w-4 h-4" />,
-    },
-    "DA FARE": {
-      color: "bg-gray-100 text-gray-700 border border-gray-200",
-      icon: <ListTodo className="w-4 h-4" />,
-    },
-    "IN ESECUZIONE": {
-      color: "bg-blue-100 text-blue-700 border border-blue-200",
-      icon: <Loader2 className="w-4 h-4 animate-spin" />,
-    },
-    BLOCCATA: {
-      color: "bg-red-100 text-red-700 border border-red-200",
-      icon: <AlertCircle className="w-4 h-4" />,
-    },
-    SOSPESA: {
-      color: "bg-yellow-100 text-yellow-700 border border-yellow-200",
-      icon: <AlertCircle className="w-4 h-4" />,
-    },
-  };
-
-  const priorityConfig = {
-    ALTA: {
-      color: "text-red-500 border-red-200 bg-red-50",
-      icon: <AlertTriangle className="w-4 h-4 text-red-500" />,
-    },
-    MEDIA: {
-      color: "text-yellow-500 border-yellow-200 bg-yellow-50",
-      icon: <AlertTriangle className="w-4 h-4 text-yellow-500" />,
-    },
-    BASSA: {
-      color: "text-green-500 border-green-200 bg-green-50",
-      icon: <AlertTriangle className="w-4 h-4 text-green-500" />,
-    },
-  };
-
-  // Sincronizza task quando cambia
+  // Carica gli utenti quando il pannello viene aperto
   useEffect(() => {
-    if (task && Object.keys(task).length > 0) {
-      setEditedTask({
-        ...task,
-        PredecessorTaskID: task.PredecessorTaskID,
-      });
-      if (task.CalendarEventsCount > 0) {
-        setCalendarState((prev) => ({ ...prev, eventSynced: true }));
-      }
+    if (isOpen && users.length === 0) {
+      loadUsers();
     }
-  }, [task]);
+  }, [isOpen]);
 
-  // Effetto per mostrare contenuto con delay per animazione
+  const loadUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const fetchedUsers = await fetchUsers();
+      setUsers(fetchedUsers || []);
+    } catch (error) {
+      console.error("Error loading users:", error);
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare gli utenti",
+        variant: "destructive",
+      });
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  // Effetto per mostrare contenuto con delay
   useEffect(() => {
     if (isOpen) {
       const timer = setTimeout(() => setShowContent(true), 100);
@@ -167,612 +104,467 @@ const TaskDetailsPanel = ({
   // Reset stato quando si chiude
   useEffect(() => {
     if (!isOpen) {
-      setIsEditing(false);
+      setShowForm(false);
+      setSelectedProject(null);
+      setProjectTasks([]);
+      setInitialized(false);
+      setSearchText("");
+      setSelectedStatus("all");
+      setSelectedCategory("all");
+      setSelectedCategoryDetail("all");
       setIsClosing(false);
-      setShowContent(false);
     }
   }, [isOpen]);
 
-  // Gestione resize del pannello
-  const handleResizeStart = useCallback((e) => {
-    e.preventDefault();
-    setIsResizing(true);
-    
-    const startX = e.pageX;
-    const startWidth = panelWidth;
+  // Carica progetti all'apertura
+  useEffect(() => {
+    if (!isOpen || initialized) return;
 
-    const handleMouseMove = (e) => {
-      if (panelPosition === "right") {
-        const newWidth = startWidth - (e.pageX - startX);
-        setPanelWidth(Math.max(minWidth, Math.min(maxWidth, newWidth)));
+    const loadUserProjects = async () => {
+      try {
+        setLoading(true);
+        const projects = await projectActions.getUserMemberProjects();
+
+        const filteredProjects = projects.filter(
+          (project) =>
+            project.Status !== "COMPLETATO" &&
+            (project.Role === "ADMIN" ||
+              project.Role === "MANAGER" ||
+              project.Role === "USER"),
+        );
+
+        setUserProjects(filteredProjects);
+        setInitialized(true);
+      } catch (error) {
+        console.error("Error loading user projects:", error);
+        toast({
+          title: "Errore",
+          description: "Impossibile caricare i progetti",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
       }
     };
 
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "";
-    };
+    loadUserProjects();
+  }, [isOpen, initialized, projectActions]);
 
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-    document.body.style.cursor = "ew-resize";
-  }, [panelWidth, panelPosition, minWidth, maxWidth]);
+  // Estrai valori unici per i filtri
+  const uniqueStatuses = [...new Set(userProjects.map(p => p.StatusDescription))];
+  const uniqueCategories = [...new Set(userProjects.map(p => p.Category).filter(Boolean))];
+  const uniqueCategoryDetails = [...new Set(userProjects.map(p => p.CategoryDetail).filter(Boolean))];
 
-  // Gestione chiusura con animazione
-  const handleClose = useCallback(() => {
-    if (isEditing) {
-      swal.fire({
-        title: "Modifiche non salvate",
-        text: "Vuoi salvare le modifiche prima di chiudere?",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonText: "Salva",
-        cancelButtonText: "Chiudi senza salvare",
-        showDenyButton: true,
-        denyButtonText: "Annulla",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          handleSave();
-        } else if (result.dismiss === swal.DismissReason.cancel) {
-          setIsClosing(true);
-          setTimeout(() => {
-            onClose();
-          }, 300);
-        }
-      });
-    } else {
-      setIsClosing(true);
-      setTimeout(() => {
-        onClose();
-      }, 300);
-    }
-  }, [isEditing, onClose]);
+  // Filtra progetti
+  const filteredProjects = userProjects.filter(project => {
+    const matchesSearch = searchText === "" || 
+      project.Description?.toLowerCase().includes(searchText.toLowerCase()) ||
+      project.Name?.toLowerCase().includes(searchText.toLowerCase());
+    
+    const matchesStatus = selectedStatus === "all" || project.StatusDescription === selectedStatus;
+    const matchesCategory = selectedCategory === "all" || project.Category === selectedCategory;
+    const matchesCategoryDetail = selectedCategoryDetail === "all" || project.CategoryDetail === selectedCategoryDetail;
 
-  // Gestione cambio tab
-  const handleTabChange = useCallback((value) => {
-    setActiveTab(value);
-    if (onTabChange) {
-      onTabChange(value);
-    }
-  }, [onTabChange]);
+    return matchesSearch && matchesStatus && matchesCategory && matchesCategoryDetail;
+  });
 
-  // Gestione salvataggio
-  const handleSave = async (updatedData) => {
+  // Reset filtri
+  const resetFilters = () => {
+    setSearchText("");
+    setSelectedStatus("all");
+    setSelectedCategory("all");
+    setSelectedCategoryDetail("all");
+  };
+
+  // Seleziona progetto
+  const handleProjectSelect = async (projectId) => {
     try {
-      const dataToUpdate = {
-        ...editedTask,
-        ...updatedData,
-        TaskID: editedTask.TaskID,
-        ProjectID: editedTask.ProjectID,
+      setLoading(true);
+
+      const project = userProjects.find(
+        (p) => p.ProjectID === parseInt(projectId),
+      );
+      setSelectedProject(project);
+
+      const projectDetails = await projectActions.getProjectById(
+        parseInt(projectId),
+      );
+      setProjectTasks(projectDetails?.tasks || []);
+
+      setShowForm(true);
+    } catch (error) {
+      console.error("Error loading project details:", error);
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare i dettagli del progetto",
+        variant: "destructive",
+      });
+      setShowForm(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Crea task
+  const handleCreateTask = async (taskData) => {
+    try {
+      if (!selectedProject) {
+        toast({
+          title: "Errore",
+          description: "Seleziona un progetto prima di creare l'attività",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const completeTaskData = {
+        ...taskData,
+        ProjectID: selectedProject.ProjectID,
       };
 
-      const result = await onUpdate(dataToUpdate, false);
+      const result = await projectActions.addUpdateProjectTask(completeTaskData);
 
-      if (result?.success) {
-        setIsEditing(false);
-        if (result.task) {
-          setEditedTask(result.task);
-        }
+      if (result.success) {
         toast({
-          title: "Modifiche salvate",
-          description: "Le modifiche sono state salvate con successo",
+          title: "Attività creata",
+          description: "La nuova attività è stata creata con successo",
           variant: "success",
         });
+
+        if (onTaskCreated) {
+          onTaskCreated();
+        }
+
+        handleClose();
+      } else {
+        throw new Error("Errore nella creazione dell'attività");
       }
     } catch (error) {
-      console.error("Error saving task:", error);
-      swal.fire("Errore", "Errore nel salvataggio delle modifiche", "error");
+      console.error("Error creating task:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Si è verificato un errore durante la creazione dell'attività",
+        variant: "destructive",
+      });
     }
   };
 
-  // Gestione cambio stato
-  const handleStatusChange = async (newStatus) => {
-    if (!editedTask?.TaskID) return;
-
-    try {
-      const updatedTaskData = {
-        ...editedTask,
-        Status: newStatus,
-      };
-
-      const result = await onUpdate(updatedTaskData);
-      if (result?.success && result?.task) {
-        setEditedTask(result.task);
-        refreshProject(activeTab);
-      }
-    } catch (error) {
-      console.error("Error updating task status:", error);
-    }
+  // Chiudi pannello
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 300);
   };
 
-  // Gestione cambio priorità
-  const handlePriorityChange = async (newPriority) => {
-    if (!editedTask?.TaskID) return;
-
-    try {
-      const updatedTaskData = {
-        ...editedTask,
-        Priority: newPriority,
-      };
-
-      const result = await onUpdate(updatedTaskData);
-      if (result?.success && result?.task) {
-        setEditedTask(result.task);
-        refreshProject(activeTab);
-      }
-    } catch (error) {
-      console.error("Error updating task priority:", error);
-    }
+  // Torna alla selezione progetto
+  const handleBackToProjects = () => {
+    setShowForm(false);
+    setSelectedProject(null);
+    setProjectTasks([]);
   };
 
-  // Gestione fullscreen
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
-    if (!isFullscreen) {
-      setPanelPosition("fullscreen");
-    } else {
-      setPanelPosition(position);
-    }
-  };
-
-  // Gestione minimize
-  const toggleMinimize = () => {
-    setIsMinimized(!isMinimized);
-  };
-
-  // Calcola posizione e dimensioni del pannello
+  // Calcola stili pannello
   const getPanelStyles = () => {
-    if (panelPosition === "fullscreen") {
-      return {
-        position: "fixed",
-        top: 100,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: "100%",
-        height: "calc(100% - 100px)",
-        zIndex: 1050,
-      };
-    }
-
-    if (panelPosition === "right") {
+    if (position === "right") {
       return {
         position: "fixed",
         top: 100,
         right: 0,
         bottom: 0,
-        width: isMinimized ? 60 : panelWidth,
-        height: "calc(100% - 100px)",
+        width: defaultWidth,
+        height: "100%",
         zIndex: 1040,
       };
     }
 
-    if (panelPosition === "bottom") {
-      return {
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: isMinimized ? 60 : "calc(100vh - 100px)",
-        width: "100%",
-        zIndex: 1040,
-      };
-    }
+    return {
+      position: "fixed",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: "85vh",
+      width: "100%",
+      zIndex: 1040,
+    };
   };
 
-  if (!isOpen || !task) return null;
+  if (!isOpen) return null;
 
   return (
     <AnimatePresence mode="wait">
       {isOpen && (
         <>
           {/* Backdrop */}
-          {!isPinned && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/30 backdrop-blur-sm"
-              style={{ zIndex: 1039 }}
-              onClick={handleClose}
-            />
-          )}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm"
+            style={{ zIndex: 1039 }}
+            onClick={handleClose}
+          />
 
           {/* Panel */}
           <motion.div
-            ref={panelRef}
             initial={{
-              x: panelPosition === "right" ? "100%" : 0,
-              y: panelPosition === "bottom" ? "100%" : 0,
+              x: position === "right" ? "100%" : 0,
+              y: position === "bottom" ? "100%" : 0,
               opacity: 0,
             }}
             animate={{
-              x: isClosing && panelPosition === "right" ? "100%" : 0,
-              y: isClosing && panelPosition === "bottom" ? "100%" : 0,
+              x: isClosing && position === "right" ? "100%" : 0,
+              y: isClosing && position === "bottom" ? "100%" : 0,
               opacity: 1,
             }}
             exit={{
-              x: panelPosition === "right" ? "100%" : 0,
-              y: panelPosition === "bottom" ? "100%" : 0,
+              x: position === "right" ? "100%" : 0,
+              y: position === "bottom" ? "100%" : 0,
               opacity: 0,
             }}
-            transition={{
-              type: "spring",
-              damping: 25,
-              stiffness: 300,
-            }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className={`
               bg-white shadow-2xl flex flex-col overflow-hidden
-              ${panelPosition === "right" ? "border-l" : ""}
-              ${panelPosition === "bottom" ? "border-t" : ""}
-              ${isResizing ? "select-none" : ""}
-              ${isMinimized ? "cursor-pointer" : ""}
+              ${position === "right" ? "border-l" : "border-t"}
             `}
             style={getPanelStyles()}
-            onClick={isMinimized ? toggleMinimize : undefined}
           >
-            {/* Resize handle */}
-            {panelPosition === "right" && !isFullscreen && !isMinimized && (
-              <div
-                ref={resizeRef}
-                className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-500 transition-colors"
-                onMouseDown={handleResizeStart}
-              >
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                  <GripVertical className="h-8 w-4 text-gray-400" />
-                </div>
-              </div>
-            )}
-
             {/* Header */}
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className={`
-                flex items-center justify-between p-4 border-b bg-gradient-to-r from-gray-50 to-white
-                ${isMinimized ? "cursor-pointer" : ""}
-              `}
+              className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-50 to-white"
             >
-              <div className={`flex items-center gap-3 ${isMinimized ? "flex-col" : ""}`}>
-                {/* Icona stato/priorità quando minimizzato */}
-                {isMinimized ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className={`p-2 rounded-full ${statusConfig[editedTask?.Status]?.color}`}>
-                      {statusConfig[editedTask?.Status]?.icon}
-                    </div>
-                    <div className={`p-1 rounded ${priorityConfig[editedTask?.Priority]?.color}`}>
-                      {priorityConfig[editedTask?.Priority]?.icon}
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                  {/* Titolo attività */}
-                    <h2 className="text-xl font-bold text-gray-800 truncate max-w-md">
-                      {editedTask?.Title}
-                    </h2>
-                  </>
+              <div className="flex items-center gap-3">
+                {showForm && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleBackToProjects}
+                    className="h-8 w-8"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
                 )}
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Briefcase className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800">
+                    {showForm ? "Nuova Attività" : "Seleziona Progetto"}
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    {showForm 
+                      ? `Crea attività in: ${selectedProject?.Name}`
+                      : "Scegli un progetto per creare una nuova attività"
+                    }
+                  </p>
+                </div>
               </div>
 
-              {/* Controlli header */}
-              {!isMinimized && (
-                <div className="flex items-center gap-2">
-                  <TooltipProvider>
-                    {/* Pin/Unpin */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setIsPinned(!isPinned)}
-                          className="h-8 w-8"
-                        >
-                          {isPinned ? (
-                            <PinOff className="h-4 w-4" />
-                          ) : (
-                            <Pin className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {isPinned ? "Sblocca pannello" : "Blocca pannello"}
-                      </TooltipContent>
-                    </Tooltip>
-
-                    {/* Minimize */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={toggleMinimize}
-                          className="h-8 w-8"
-                        >
-                          <Minimize2 className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Minimizza</TooltipContent>
-                    </Tooltip>
-
-                    {/* Fullscreen */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={toggleFullscreen}
-                          className="h-8 w-8"
-                        >
-                          <Maximize2 className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {isFullscreen ? "Esci da schermo intero" : "Schermo intero"}
-                      </TooltipContent>
-                    </Tooltip>
-
-                    {/* Close */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleClose}
-                          className="h-8 w-8 hover:bg-red-100 hover:text-red-600"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Chiudi</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-              )}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleClose}
+                      className="h-8 w-8 hover:bg-red-100 hover:text-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Chiudi</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </motion.div>
 
-            {/* Quick actions bar */}
-            {!isMinimized && showContent && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b"
-              >
-                <div className="flex items-center gap-3">
-                  {/* Cambio rapido stato e priorità */}
-                  <div className="flex items-center gap-2">
-                    <Select
-                      value={editedTask?.Status || ""}
-                      onValueChange={handleStatusChange}
-                      disabled={!canEdit}
-                    >
-                      <SelectTrigger className="h-7 w-36 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(statusConfig).map(([status, config]) => (
-                          <SelectItem key={status} value={status} className="text-xs">
-                            <div className="flex items-center gap-1.5">
-                              {config.icon}
-                              <span>{status}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Select
-                      value={editedTask?.Priority || ""}
-                      onValueChange={handlePriorityChange}
-                      disabled={!canEdit}
-                    >
-                      <SelectTrigger className="h-7 w-28 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(priorityConfig).map(([priority, config]) => (
-                          <SelectItem key={priority} value={priority} className="text-xs">
-                            <div className="flex items-center gap-1.5">
-                              {config.icon}
-                              <span>{priority}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Date info */}
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      Scadenza: {editedTask?.DueDate 
-                        ? new Date(editedTask.DueDate).toLocaleDateString() 
-                        : "Non definita"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Azioni */}
-                <div className="flex items-center gap-2">
-                  {isEditing ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setIsEditing(false)}
-                      >
-                        Annulla
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          const form = document.getElementById("taskInformationTab");
-                          if (form) {
-                            form.dispatchEvent(
-                              new Event("submit", {
-                                bubbles: true,
-                                cancelable: true,
-                              }),
-                            );
-                          }
-                        }}
-                      >
-                        Salva
-                      </Button>
-                    </>
-                  ) : (
-                    canEdit && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setIsEditing(true)}
-                      >
-                        Modifica
-                      </Button>
-                    )
-                  )}
-                </div>
-              </motion.div>
-            )}
-
             {/* Content */}
-            {!isMinimized && showContent && (
+            {showContent && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
+                transition={{ delay: 0.2 }}
                 className="flex-1 overflow-hidden flex flex-col"
               >
-                <Tabs
-                  value={activeTab}
-                  onValueChange={handleTabChange}
-                  className="flex-1 flex flex-col"
-                >
-                  <TabsList className="px-4 h-16 justify-between overflow-x-auto flex-nowrap">
-                    <TabsTrigger value="information" className="flex items-center gap-2">
-                      <ListTodo className="h-4 w-4" />
-                      Info
-                    </TabsTrigger>
-                    <TabsTrigger value="comments" className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      Chat
-                      {editedTask?.UnreadComments > 0 && (
-                        <Badge variant="destructive" className="ml-1 h-5 px-1">
-                          {editedTask.UnreadComments}
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                    <TabsTrigger value="costs" className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4" />
-                      Costi
-                    </TabsTrigger>
-                    <TabsTrigger value="attachments" className="flex items-center gap-2">
-                      <Paperclip className="h-4 w-4" />
-                      Allegati
-                      {editedTask?.AttachmentsCount > 0 && (
-                        <Badge variant="outline" className="ml-1 h-5 px-1">
-                          {editedTask.AttachmentsCount}
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                    <TabsTrigger value="history" className="flex items-center gap-2">
-                      <History className="h-4 w-4" />
-                      Storico
-                    </TabsTrigger>
-                    <TabsTrigger value="calendar" className="flex items-center gap-2">
-                      <CalendarClock className="h-4 w-4" />
-                      Calendario
-                      {editedTask?.CalendarEventsCount > 0 && (
-                        <Badge variant="secondary" className="ml-1 h-5 px-1">
-                          {editedTask.CalendarEventsCount}
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <div className="flex-1 overflow-y-auto">
-                    <TabsContent value="information" className="p-4 m-0 h-1">
-                      <TaskInformationTab
-                        task={editedTask}
-                        isEditing={isEditing}
-                        canEdit={canEdit}
-                        onSave={handleSave}
-                        onCancel={() => setIsEditing(false)}
-                        assignableUsers={assignableUsers}
-                        tasks={tasks}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="comments" className="p-4 m-0 h-full">
-                      <TaskChatsTab
-                        task={editedTask}
-                        project={project}
-                        onAddComment={onAddComment}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="costs" className="p-4 m-0">
-                      <TaskCostsTab
-                        task={editedTask}
-                        canEdit={canEdit}
-                        onCostChange={async (operation) => {
-                          await operation();
-                          await refreshProject(activeTab);
-                        }}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="attachments" className="p-4 m-0">
-                      <TaskAttachmentsTab
-                        task={editedTask}
-                        canEdit={canEdit}
-                        onAttachmentChange={() => refreshProject(activeTab)}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="history" className="p-4 m-0">
-                      <TaskHistoryTab task={editedTask} />
-                    </TabsContent>
-
-                    <TabsContent value="calendar" className="p-4 m-0">
-                      <CalendarIntegration
-                        task={editedTask}
-                        assignedUsers={assignableUsers}
-                        onUpdateEvent={async (participants) => {
-                          setCalendarState((prev) => ({ ...prev, loading: true }));
-                          try {
-                            await syncCalendarEvent(
-                              editedTask.TaskID,
-                              participants,
-                              calendarState.reminderTime,
-                            );
-                            toast({
-                              title: "Successo",
-                              description: "Inviti calendario inviati con successo",
-                            });
-                            refreshProject(activeTab);
-                          } catch (error) {
-                            console.error("Error updating calendar:", error);
-                            toast({
-                              title: "Errore",
-                              description: "Errore nell'invio degli inviti",
-                              variant: "destructive",
-                            });
-                          } finally {
-                            setCalendarState((prev) => ({ ...prev, loading: false }));
-                          }
-                        }}
-                        canEdit={canEdit}
-                        calendarState={calendarState}
-                        setCalendarState={setCalendarState}
-                      />
-                    </TabsContent>
+                {loading ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <Loader2 className="h-10 w-10 animate-spin text-blue-600 mx-auto mb-4" />
+                      <p className="text-gray-500">Caricamento in corso...</p>
+                    </div>
                   </div>
-                </Tabs>
+                ) : userProjects.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center p-6">
+                    <div className="text-center">
+                      <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">
+                        Non sei membro di nessun progetto con permessi sufficienti per creare attività.
+                      </p>
+                    </div>
+                  </div>
+                ) : !showForm ? (
+                  <div className="flex-1 flex flex-col">
+                    {/* Filtri */}
+                    <div className="p-4 border-b bg-gray-50">
+                      <div className="space-y-3">
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                            <Input
+                              placeholder="Cerca per nome o descrizione..."
+                              value={searchText}
+                              onChange={(e) => setSearchText(e.target.value)}
+                              className="pl-10"
+                            />
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={resetFilters}
+                            title="Reset filtri"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Stato" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Tutti gli stati</SelectItem>
+                              {uniqueStatuses.map(status => (
+                                <SelectItem key={status} value={status}>
+                                  {status}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Categoria" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Tutte le categorie</SelectItem>
+                              {uniqueCategories.map(category => (
+                                <SelectItem key={category} value={category}>
+                                  {category}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <Select value={selectedCategoryDetail} onValueChange={setSelectedCategoryDetail}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sottocategoria" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Tutte le sottocategorie</SelectItem>
+                              {uniqueCategoryDetails.map(detail => (
+                                <SelectItem key={detail} value={detail}>
+                                  {detail}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Lista progetti */}
+                    <ScrollArea className="flex-1">
+                      <div className="p-4 space-y-3">
+                        {filteredProjects.length === 0 ? (
+                          <div className="text-center py-8">
+                            <FolderOpen className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                            <p className="text-gray-500">
+                              Nessun progetto trovato con i filtri selezionati
+                            </p>
+                          </div>
+                        ) : (
+                          filteredProjects.map((project) => (
+                            <motion.div
+                              key={project.ProjectID}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <Card
+                                className="cursor-pointer hover:shadow-md transition-shadow"
+                                onClick={() => handleProjectSelect(project.ProjectID)}
+                              >
+                                <CardContent className="p-4">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div>
+                                      <h3 className="font-semibold text-lg">
+                                        {project.Name}
+                                      </h3>
+                                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                        {project.Description}
+                                      </p>
+                                    </div>
+                                    <ChevronRight className="h-5 w-5 text-gray-400 mt-1" />
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-2 mt-3">
+                                    <Badge
+                                      variant="secondary"
+                                      className="bg-blue-100 text-blue-700"
+                                    >
+                                      <Hash className="h-3 w-3 mr-1" />
+                                      {project.Role}
+                                    </Badge>
+                                    
+                                    <Badge
+                                      variant="secondary"
+                                      className="bg-gray-100 text-gray-700"
+                                    >
+                                      {project.Status}
+                                    </Badge>
+                                    
+                                    {project.Category && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-green-100 text-green-700"
+                                      >
+                                        <Tag className="h-3 w-3 mr-1" />
+                                        {project.Category}
+                                      </Badge>
+                                    )}
+                                    
+                                    {project.CategoryDetail && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-purple-100 text-purple-700"
+                                      >
+                                        {project.CategoryDetail}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </motion.div>
+                          ))
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-hidden">
+                    <NewTaskForm
+                      onSubmit={handleCreateTask}
+                      onCancel={handleClose}
+                      projectTasks={projectTasks}
+                      projectId={selectedProject?.ProjectID}
+                      users={users}
+                      usersLoading={usersLoading}
+                    />
+                  </div>
+                )}
               </motion.div>
             )}
           </motion.div>
@@ -782,4 +574,4 @@ const TaskDetailsPanel = ({
   );
 };
 
-export default TaskDetailsPanel;
+export default TimesheetTaskPanel;

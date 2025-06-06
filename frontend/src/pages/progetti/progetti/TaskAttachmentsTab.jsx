@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Download, Trash2, Upload, File, X } from "lucide-react";
 import { swal } from "../../../lib/common";
 import useAttachmentsActions from "../../../hooks/useAttachmentsActions";
-import DeleteConfirmationModal from "./DeleteConfirmationModal";
+import DeleteConfirmationModal from "../../../components/ui/DeleteConfirmationModal";
 import FileViewer from "../../../components/ui/fileViewer";
 import FileDropZone from "@/components/ui/FileDropZone";
 

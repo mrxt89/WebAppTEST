@@ -26,107 +26,204 @@ class FileService {
         this.baseUploadPath = this.storage.getBasePath();
     }
 
-/**
- * Salva un file caricato
- * @param {Object} file - File caricato da multer
- * @param {number} projectId - ID del progetto (opzionale)
- * @param {number} taskId - ID del task (opzionale)
- * @param {number} notificationId - ID della notifica (opzionale)
- * @param {string} itemCode - Codice articolo (opzionale)
- * @param {number} companyId - ID dell'azienda (opzionale)
- * @returns {Promise<Object>} - Informazioni sul file salvato
- */
-async saveFile(file, projectId = null, taskId = 0, notificationId = null, itemCode = null, companyId = null) {
-    try {
-        console.log('saveFile called with params:', {
-            projectId,
-            taskId,
-            notificationId,
-            itemCode,
-            companyId
-        });
+    /**
+     * Salva un file caricato
+     * @param {Object} file - File caricato da multer
+     * @param {number} projectId - ID del progetto (opzionale)
+     * @param {number} taskId - ID del task (opzionale)
+     * @param {number} notificationId - ID della notifica (opzionale)
+     * @param {string} itemCode - Codice articolo (opzionale)
+     * @param {number} companyId - ID dell'azienda (opzionale)
+     * @returns {Promise<Object>} - Informazioni sul file salvato
+     */
+    async saveFile(file, projectId = null, taskId = 0, notificationId = null, itemCode = null, companyId = null) {
+        try {
+            console.log('====== START SAVEFILE DEBUG ======');
+            console.log('saveFile called with params:', {
+                projectId,
+                taskId,
+                notificationId,
+                itemCode,
+                companyId
+            });
+            
+            console.log('File object details:', {
+                originalname: file.originalname,
+                filename: file.filename,
+                path: file.path,
+                mimetype: file.mimetype,
+                size: file.size,
+                destination: file.destination,
+                encoding: file.encoding
+            });
 
-        projectId = isNaN(parseInt(projectId)) ? 0 : parseInt(projectId);
-        taskId = isNaN(parseInt(taskId)) ? 0 : parseInt(taskId);
-        companyId = isNaN(parseInt(companyId)) ? null : parseInt(companyId);
+            // Verifica che il file temporaneo esista
+            const tempFileExists = await fs.pathExists(file.path);
+            console.log('Temp file exists:', tempFileExists);
+            
+            if (!tempFileExists) {
+                throw new Error(`Temp file does not exist at path: ${file.path}`);
+            }
 
-        // Determina il percorso della directory
-        let uploadDir;
+            // Verifica la dimensione del file temporaneo
+            const tempStats = await fs.stat(file.path);
+            console.log('Temp file size:', tempStats.size, 'bytes');
+            
+            if (tempStats.size === 0) {
+                throw new Error('Temp file is empty (0 bytes)');
+            }
 
-        // NUOVA STRUTTURA PER ITEMCODE E FUTURI TIPI:
-        // /Companies/{companyId}/{documentType}/{documentId}/
-        if (typeof itemCode === 'string' && itemCode.trim() !== '') {
-            if (!companyId) {
-                throw new Error('CompanyId è necessario per salvare allegati di ItemCode');
+            projectId = isNaN(parseInt(projectId)) ? 0 : parseInt(projectId);
+            taskId = isNaN(parseInt(taskId)) ? 0 : parseInt(taskId);
+            companyId = isNaN(parseInt(companyId)) ? null : parseInt(companyId);
+
+            // Determina il percorso della directory
+            let uploadDir;
+
+            // NUOVA STRUTTURA PER ITEMCODE E FUTURI TIPI:
+            // /Companies/{companyId}/{documentType}/{documentId}/
+            if (typeof itemCode === 'string' && itemCode.trim() !== '') {
+                if (!companyId) {
+                    throw new Error('CompanyId è necessario per salvare allegati di ItemCode');
+                }
+                
+                // Usiamo il metodo ensureCompanyDocDir per creare la directory appropriata
+                uploadDir = await this.storage.ensureCompanyDocDir(companyId, 'itemCode', itemCode.trim());
+                console.log('Using company-based itemCode directory:', uploadDir);
+            } 
+            // Mantieni la vecchia struttura per progetti e notifiche
+            else if (notificationId) {
+                uploadDir = path.join('notifications', notificationId.toString());
+                console.log('Using notification directory:', uploadDir);
+            } else if (projectId > 0) {
+                if (taskId > 0) {
+                    uploadDir = path.join('projects', projectId.toString(), 'tasks', taskId.toString());
+                    console.log('Using task directory:', uploadDir);
+                } else {
+                    uploadDir = path.join('projects', projectId.toString());
+                    console.log('Using project directory:', uploadDir);
+                }
+            } else {
+                throw new Error('Errore in fileService.js - saveFile: variabili mancanti: projectId : ' + projectId + 
+                               ', taskId : ' + taskId + ', notificationId : ' + notificationId + ', itemCode : ' + itemCode);
             }
             
-            // Usiamo il metodo ensureCompanyDocDir per creare la directory appropriata
-            uploadDir = await this.storage.ensureCompanyDocDir(companyId, 'itemCode', itemCode.trim());
-            console.log('Using company-based itemCode directory:', uploadDir);
-        } 
-        // Mantieni la vecchia struttura per progetti e notifiche
-        else if (notificationId) {
-            uploadDir = path.join('notifications', notificationId.toString());
-        } else if (projectId > 0) {
-            if (taskId > 0) {
-                uploadDir = path.join('projects', projectId.toString(), 'tasks', taskId.toString());
+            // Genera timestamp e hash
+            const timestamp = Date.now();
+            const fileHash = crypto.randomBytes(8).toString('hex');
+            const ext = path.extname(file.originalname);
+            const fileName = `${timestamp}-${fileHash}${ext}`;
+            const filePath = path.join(uploadDir, fileName);
+            
+            console.log('Generated fileName:', fileName);
+            console.log('Relative filePath:', filePath);
+            
+            // Percorso completo per il filesystem
+            const fullPath = path.join(this.baseUploadPath, uploadDir);
+            const fullFilePath = path.join(fullPath, fileName);
+            
+            console.log('Full directory path:', fullPath);
+            console.log('Full file path:', fullFilePath);
+            
+            // Assicurati che la directory esista
+            await fs.ensureDir(fullPath);
+            console.log('Directory ensured');
+            
+            // Ottieni la dimensione del file PRIMA di spostarlo
+            const stats = await fs.stat(file.path);
+            const fileSizeKB = Math.round(stats.size / 1024);
+            
+            console.log('File size before move:', stats.size, 'bytes (', fileSizeKB, 'KB)');
+            
+            // Sposta il file
+            // Se è una VM remota montata o locale, usa il metodo standard
+            if (this.storage.getStorageType() === 'local' || 
+                config.storage.remoteType === 'mounted') {
+                
+                console.log('Using local/mounted storage method');
+                console.log('Moving file from:', file.path);
+                console.log('Moving file to:', fullFilePath);
+                
+                try {
+                    // Usa copy + delete invece di move per maggiore affidabilità
+                    await fs.copy(file.path, fullFilePath, { overwrite: true });
+                    console.log('File copied successfully');
+                    
+                    // Verifica che il file di destinazione esista
+                    const destExists = await fs.pathExists(fullFilePath);
+                    if (!destExists) {
+                        throw new Error('Destination file does not exist after copy');
+                    }
+                    
+                    // Verifica la dimensione del file di destinazione
+                    const destStats = await fs.stat(fullFilePath);
+                    console.log('Destination file size:', destStats.size, 'bytes');
+                    
+                    if (destStats.size !== stats.size) {
+                        throw new Error(`File size mismatch after copy. Source: ${stats.size}, Dest: ${destStats.size}`);
+                    }
+                    
+                    // Solo dopo aver verificato che la copia sia andata a buon fine, elimina il file temporaneo
+                    await fs.unlink(file.path);
+                    console.log('Temp file deleted');
+                    
+                } catch (copyError) {
+                    console.error('Error during file copy/move:', copyError);
+                    // Se la copia fallisce, prova con il metodo move
+                    console.log('Falling back to fs.move method');
+                    await fs.move(file.path, fullFilePath, { overwrite: true });
+                }
+                
             } else {
-                uploadDir = path.join('projects', projectId.toString());
+                // Altrimenti, leggi il file temp e caricalo tramite il servizio di storage
+                console.log('Using remote storage method');
+                const fileData = await fs.readFile(file.path);
+                console.log('File data read, size:', fileData.length);
+                
+                await this.storage.createFile(path.join(uploadDir, fileName), fileData);
+                console.log('File created in remote storage');
+                
+                // Elimina il file temporaneo
+                await fs.unlink(file.path);
+                console.log('Temp file deleted');
             }
-        } else {
-            throw new Error('Errore in fileService.js - saveFile: variabili mancanti: projectId : ' + projectId + 
-                           ', taskId : ' + taskId + ', notificationId : ' + notificationId + ', itemCode : ' + itemCode);
+            
+            // Verifica finale che il file sia stato salvato correttamente
+            if (this.storage.getStorageType() === 'local' || config.storage.remoteType === 'mounted') {
+                const finalExists = await fs.pathExists(fullFilePath);
+                if (!finalExists) {
+                    throw new Error('File does not exist after save operation');
+                }
+                
+                const finalStats = await fs.stat(fullFilePath);
+                console.log('Final file verification - exists:', finalExists, ', size:', finalStats.size);
+            }
+            
+            // Costruisci il percorso relativo per il database
+            let dbPath = filePath;
+            
+            // Normalizza i separatori di percorso per il database
+            dbPath = dbPath.replace(/\\/g, '/');
+            
+            console.log('Database path:', dbPath);
+            console.log('====== END SAVEFILE DEBUG ======');
+            
+            return {
+                originalName: file.originalname,
+                fileName: fileName,
+                filePath: dbPath,
+                fileType: file.mimetype,
+                fileSizeKB: fileSizeKB,
+                storageType: this.storage.getStorageType()
+            };
+        } catch (error) {
+            console.error('====== SAVEFILE ERROR ======');
+            console.error('Error saving file:', error);
+            console.error('Error stack:', error.stack);
+            console.error('==========================');
+            throw new Error(`Error saving file: ${error.message}`);
         }
-        
-        // Genera timestamp e hash
-        const timestamp = Date.now();
-        const fileHash = crypto.randomBytes(8).toString('hex');
-        const ext = path.extname(file.originalname);
-        const fileName = `${timestamp}-${fileHash}${ext}`;
-        const filePath = path.join(uploadDir, fileName);
-        
-        // Percorso completo per il filesystem
-        const fullPath = path.join(this.baseUploadPath, uploadDir);
-        
-        // Assicurati che la directory esista
-        await fs.ensureDir(fullPath);
-        
-        // Ottieni la dimensione del file PRIMA di spostarlo
-        const stats = await fs.stat(file.path);
-        const fileSizeKB = Math.round(stats.size / 1024);
-        
-        // Sposta il file
-        // Se è una VM remota montata o locale, usa il metodo standard
-        if (this.storage.getStorageType() === 'local' || 
-            config.storage.remoteType === 'mounted') {
-            await fs.move(file.path, path.join(fullPath, fileName));
-        } else {
-            // Altrimenti, leggi il file temp e caricalo tramite il servizio di storage
-            const fileData = await fs.readFile(file.path);
-            await this.storage.createFile(path.join(uploadDir, fileName), fileData);
-            // Elimina il file temporaneo
-            await fs.unlink(file.path);
-        }
-        
-        // Costruisci il percorso relativo per il database
-        let dbPath = filePath;
-        
-        // Normalizza i separatori di percorso per il database
-        dbPath = dbPath.replace(/\\/g, '/');
-        
-        return {
-            originalName: file.originalname,
-            fileName: fileName,
-            filePath: dbPath,
-            fileType: file.mimetype,
-            fileSizeKB: fileSizeKB,
-            storageType: this.storage.getStorageType()
-        };
-    } catch (error) {
-        console.error('Error saving file:', error);
-        throw new Error(`Error saving file: ${error.message}`);
     }
-}
 
     /**
      * Elimina un file
@@ -135,7 +232,9 @@ async saveFile(file, projectId = null, taskId = 0, notificationId = null, itemCo
      */
     async deleteFile(filePath) {
         try {
+            console.log('Deleting file:', filePath);
             await this.storage.deleteFile(filePath);
+            console.log('File deleted successfully');
             return true;
         } catch (error) {
             console.error('Error deleting file:', error);
@@ -150,9 +249,29 @@ async saveFile(file, projectId = null, taskId = 0, notificationId = null, itemCo
      */
     async getFileStream(filePath) {
         try {
-            return this.storage.createReadStream(filePath);
+            console.log('Creating read stream for file:', filePath);
+            
+            // Se è storage locale, verifica prima che il file esista
+            if (this.storage.getStorageType() === 'local' || config.storage.remoteType === 'mounted') {
+                const fullPath = path.join(this.baseUploadPath, filePath);
+                const exists = await fs.pathExists(fullPath);
+                
+                console.log('Checking file at path:', fullPath);
+                console.log('File exists:', exists);
+                
+                if (!exists) {
+                    throw new Error(`File not found at path: ${fullPath}`);
+                }
+                
+                const stats = await fs.stat(fullPath);
+                console.log('File size for streaming:', stats.size, 'bytes');
+            }
+            
+            const stream = this.storage.createReadStream(filePath);
+            console.log('Read stream created successfully');
+            return stream;
         } catch (error) {
-            console.error('Error reading file:', error);
+            console.error('Error creating read stream:', error);
             throw new Error(`Error reading file: ${error.message}`);
         }
     }

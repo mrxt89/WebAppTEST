@@ -74,6 +74,7 @@ const TaskSelectWithSearch = ({ value, onValueChange, tasksByProject }) => {
   // Trova l'attività selezionata per mostrare il suo titolo
   const selectedTaskTitle = useMemo(() => {
     if (!value) return null;
+    
     for (const project of tasksByProject) {
       const task = project.tasks.find((t) => t.TaskID.toString() === value);
       if (task) return String(task.Title || '');
@@ -136,7 +137,7 @@ const TaskSelectWithSearch = ({ value, onValueChange, tasksByProject }) => {
                                 value === task.TaskID.toString() ? "opacity-100" : "opacity-0"
                               }`}
                             />
-                            {task.Title || 'Attività senza titolo'}
+                            {task.TaskTitle || 'Attività senza titolo'}
                           </CommandItem>
                         );
                       })}
@@ -173,6 +174,8 @@ const TimeEntryDialog = ({
     hoursWorked: "",
     workType: "INTERNO",
     notes: "",
+    projectName: "",
+    taskName: "",
   });
 
   // Stati per la UI
@@ -215,25 +218,13 @@ const TimeEntryDialog = ({
     }
 
     // Altrimenti usa tutte le attività disponibili
-    const uniqueTasks = [];
-    const uniqueTaskIds = new Set();
-    
-    // Verifica che tasks sia un array prima di iterarlo
-    if (Array.isArray(tasks)) {
-      tasks.forEach((task) => {
-        if (!uniqueTaskIds.has(task.TaskID)) {
-          uniqueTaskIds.add(task.TaskID);
-          uniqueTasks.push(task);
-        }
-      });
-    }
-
-    return uniqueTasks;
+    return tasks || [];
   }, [tasks, dialogConfig.availableTasks]);
 
   // Organizza le attività per progetto
   const tasksByProject = useMemo(() => {
     const projectMap = {};
+    console.log('gridTasks:', gridTasks);
     gridTasks.forEach((task) => {
       const projectId = task.ProjectID;
       if (!projectMap[projectId]) {
@@ -261,6 +252,8 @@ const TimeEntryDialog = ({
         hoursWorked: entry.HoursWorked.toString(),
         workType: entry.WorkType || "INTERNO",
         notes: entry.Notes || "",
+        projectName: entry.ProjectName || "",
+        taskName: entry.TaskName || "",
       });
     } else {
       // Per nuove entry
@@ -273,6 +266,8 @@ const TimeEntryDialog = ({
         hoursWorked: "",
         workType: "INTERNO",
         notes: "",
+        projectName: "",
+        taskName: "",
       };
 
       // Se c'è un taskId preselezionato nella configurazione del dialog, usalo
@@ -425,12 +420,19 @@ const TimeEntryDialog = ({
           {/* Selezione Attività con Ricerca */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Attività:</label>
-            {tasksByProject.length === 0 ? (
-              <div className="text-sm text-gray-500 border rounded-md p-4 text-center">
-                Nessuna attività disponibile nel timesheet
+            {dialogConfig.preselectedTaskId ? (
+              <div className="text-sm p-2 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="font-medium">{dialogConfig.taskData?.taskName}</div>
+                <div className="text-xs text-gray-600">
+                  Progetto: {dialogConfig.taskData?.projectName}
+                </div>
               </div>
-            ) : selectedTask ? (
-              <div></div>
+            ) : tasksByProject.length === 0 ? (
+              <div className="text-sm text-gray-500 border rounded-md p-4 text-center">
+                <Info className="h-4 w-4 mx-auto mb-2" />
+                <p>Nessuna attività disponibile per la registrazione delle ore</p>
+                <p className="text-xs mt-1">Contatta il tuo responsabile per essere assegnato a un'attività</p>
+              </div>
             ) : (
               <TaskSelectWithSearch
                 value={formData.taskId}
@@ -439,8 +441,8 @@ const TimeEntryDialog = ({
               />
             )}
 
-            {/* Mostra dettaglio attività selezionata */}
-            {selectedTask && (
+            {/* Mostra dettaglio attività selezionata solo se non è preselezionata */}
+            {selectedTask && !dialogConfig.preselectedTaskId && (
               <div className="text-sm p-2 bg-blue-50 border border-blue-200 rounded-md">
                 <div className="font-medium">{selectedTask.Title}</div>
                 <div className="text-xs text-gray-600">

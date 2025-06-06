@@ -36,26 +36,54 @@ const FileViewer = ({ file, isOpen, onClose }) => {
   }, [previewUrl]);
 
   useEffect(() => {
-    // Resetta lo stato quando cambia il file
-    setPreviewError(false);
-    setPreviewUrl("");
-    setIsLoading(false);
-    setErrorMessage("");
-    loadingRef.current = false;
-
-    // Ottieni un URL temporaneo per la preview quando il file cambia
-    if (file && isOpen && file.AttachmentID) {
-      // Evita di ricaricare se è lo stesso file
-      if (currentFileIdRef.current !== file.AttachmentID) {
-        currentFileIdRef.current = file.AttachmentID;
-        getPreviewUrl();
-      }
+    console.log("=== FileViewer useEffect triggered ===");
+    console.log("Current file:", file);
+    console.log("isOpen:", isOpen);
+    
+    // Se non c'è file o non è aperto, resetta tutto
+    if (!file || !isOpen) {
+      console.log("No file or not open, resetting state");
+      setPreviewError(false);
+      setPreviewUrl("");
+      setIsLoading(false);
+      setErrorMessage("");
+      loadingRef.current = false;
+      currentFileIdRef.current = null;
+      return;
     }
-  }, [file?.AttachmentID, isOpen]);
+
+    // Se è un file email, non serve caricare preview URL
+    if (isEmailFile(file)) {
+      console.log("Email file detected, skipping preview URL");
+      return;
+    }
+
+    // Verifica se è un nuovo file
+    if (file.AttachmentID && currentFileIdRef.current !== file.AttachmentID) {
+      console.log("New file detected, loading preview");
+      currentFileIdRef.current = file.AttachmentID;
+      
+      // Resetta lo stato
+      setPreviewError(false);
+      setPreviewUrl("");
+      setIsLoading(false);
+      setErrorMessage("");
+      loadingRef.current = false;
+      
+      // Carica la preview
+      getPreviewUrl();
+    }
+  }, [file, isOpen]); // Dipendenze semplificate
 
   // Ottieni un URL tramite l'endpoint di download
   const getPreviewUrl = async () => {
-    if (!file || loadingRef.current) return;
+    console.log("=== getPreviewUrl CALLED ===");
+    console.log("Getting preview URL for file:", file);
+    
+    if (!file || loadingRef.current) {
+      console.log("No file or already loading");
+      return;
+    }
     
     // Previeni chiamate multiple
     loadingRef.current = true;
@@ -66,21 +94,34 @@ const FileViewer = ({ file, isOpen, onClose }) => {
       setErrorMessage("");
       
       let url;
-      console.log("Fetching preview URL for file:", file);
+      console.log("File structure:", {
+        AttachmentID: file.AttachmentID,
+        ProjectID: file.ProjectID,
+        TaskID: file.TaskID,
+        NotificationID: file.NotificationID,
+        ItemCode: file.ItemCode,
+        ProjectItemId: file.ProjectItemId
+      });
       
       // Determina l'URL di download in base al tipo di allegato
       if (file.NotificationID) {
+        console.log("=> Using NOTIFICATION route");
         url = `${config.API_BASE_URL}/notifications/attachments/${file.AttachmentID}/download`;
-      } else if (file.TaskID) {
+      } else if (file.TaskID && file.TaskID !== null && file.TaskID !== 0) {
+        console.log("=> Using TASK route");
         url = `${config.API_BASE_URL}/tasks/${file.TaskID}/attachments/${file.AttachmentID}/download`;
       } else if (file.ProjectItemId || file.ItemCode) {
-        console.log("File is an article or project item attachment:", file);
+        console.log("=> Using ITEM route");
         url = `${config.API_BASE_URL}/item-attachments/${file.AttachmentID}/download`;
+      } else if (file.ProjectID) {
+        console.log("=> Using PROJECT route");
+        url = `${config.API_BASE_URL}/projects/${file.ProjectID}/attachments/${file.AttachmentID}/download`;
       } else {
+        console.log("=> Using GENERIC route");
         url = `${config.API_BASE_URL}/attachments/${file.AttachmentID}/download`;
       }
 
-      console.log("Fetching from URL:", url);
+      console.log("Final URL:", url);
 
       const token = localStorage.getItem("token");
       if (!token) {
@@ -93,14 +134,21 @@ const FileViewer = ({ file, isOpen, onClose }) => {
         },
       });
 
+      console.log("Response status:", response.status);
+      console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
         console.error("Response not OK:", response.status, response.statusText);
         const errorText = await response.text().catch(() => "");
+        console.error("Error response body:", errorText);
         throw new Error(`Download failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ""}`);
       }
 
       const blob = await response.blob();
-      console.log("Blob received:", blob.type, blob.size);
+      console.log("Blob received:", {
+        type: blob.type,
+        size: blob.size
+      });
       
       // Verifica che il blob non sia vuoto
       if (blob.size === 0) {
@@ -160,7 +208,6 @@ const FileViewer = ({ file, isOpen, onClose }) => {
 
     // Se c'è un errore nel caricamento
     if (previewError) {
-      console.log("Preview error detected");
       return (
         <div className="flex flex-col items-center justify-center p-8 bg-gray-50">
           <FileText className="w-16 h-16 text-gray-500 mb-4" />
@@ -343,10 +390,12 @@ const FileViewer = ({ file, isOpen, onClose }) => {
       // Determina l'URL di download in base al tipo di allegato
       if (attachment.NotificationID) {
         url = `${config.API_BASE_URL}/notifications/attachments/${attachment.AttachmentID}/download`;
-      } else if (attachment.TaskID) {
+      } else if (attachment.TaskID && attachment.TaskID !== null && attachment.TaskID !== 0) {
         url = `${config.API_BASE_URL}/tasks/${attachment.TaskID}/attachments/${attachment.AttachmentID}/download`;
       } else if (attachment.ProjectItemId || attachment.ItemCode) {
         url = `${config.API_BASE_URL}/item-attachments/${attachment.AttachmentID}/download`;
+      } else if (attachment.ProjectID) {
+        url = `${config.API_BASE_URL}/projects/${attachment.ProjectID}/attachments/${attachment.AttachmentID}/download`;
       } else {
         url = `${config.API_BASE_URL}/attachments/${attachment.AttachmentID}/download`;
       }

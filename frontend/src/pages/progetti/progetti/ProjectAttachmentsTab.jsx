@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Download, Trash2, Upload, File, X } from "lucide-react";
 import { swal } from "../../../lib/common";
 import useAttachmentsActions from "../../../hooks/useAttachmentsActions";
-import DeleteConfirmationModal from "./DeleteConfirmationModal";
+import DeleteConfirmationModal from "../../../components/ui/DeleteConfirmationModal";
 import FileViewer from "@/components/ui/fileViewer";
 import FileDropZone from "@/components/ui/FileDropZone";
 
@@ -46,6 +46,12 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
       }
 
       const data = await getAttachments(project.ProjectID);
+      console.log("=== DEBUG: Attachments loaded ===");
+      console.log("Attachments data:", data);
+      if (data && data.length > 0) {
+        console.log("First attachment structure:", data[0]);
+        console.log("First attachment keys:", Object.keys(data[0]));
+      }
       setAttachments(data);
     } catch (error) {
       console.error("Error loading attachments:", error);
@@ -235,6 +241,23 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
     }
   };
 
+  // Nuova funzione per gestire il click sul file con debug
+  const handleFileClick = (attachment) => {
+    console.log("=== DEBUG: ProjectAttachmentsTab - File Click ===");
+    console.log("Attachment clicked:", attachment);
+    console.log("Current project:", project);
+    console.log("Attachment properties:", Object.keys(attachment));
+    
+    // Aggiungi il ProjectID se non presente
+    const fileWithProject = {
+      ...attachment,
+      ProjectID: attachment.ProjectID || project?.ProjectID
+    };
+    
+    console.log("File being passed to viewer:", fileWithProject);
+    setSelectedFile(fileWithProject);
+  };
+
   return (
     <div className="space-y-4">
       {/* Azioni e tabella */}
@@ -373,7 +396,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
                     <TableCell className="font-medium">
                       <div
                         className="flex items-center gap-2 cursor-pointer hover:text-blue-500"
-                        onClick={() => setSelectedFile(attachment)}
+                        onClick={() => handleFileClick(attachment)}
                       >
                         <File className="h-4 w-4" />
                         {attachment.FileName}

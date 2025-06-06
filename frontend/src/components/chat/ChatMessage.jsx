@@ -735,9 +735,18 @@ const ChatMessage = memo(({
                                   <span className="text-gray-700 font-medium">
                                     {reader.Name || 'Utente'}
                                   </span>
-                                  <span className="text-gray-500 ml-4">
-                                    {formatTimestamp(reader.ReceiverReadedDate)}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    {reader.isReadByReceiver ? (
+                                      <>
+                                        <CheckCheck className="h-3 w-3 text-green-500" />
+                                        <span className="text-gray-500">
+                                          {formatTimestamp(reader.ReceiverReadedDate)}
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <span className="text-gray-400 italic">Non letto</span>
+                                    )}
+                                  </div>
                                 </div>
                               ))}
                             </div>
