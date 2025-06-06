@@ -287,6 +287,13 @@ const TaskDetailsPanel = ({
           description: "Le modifiche sono state salvate con successo",
           variant: "success",
         });
+        
+        // Chiama refreshProject per aggiornare il Gantt mantenendo lo stato
+        if (refreshProject) {
+          refreshProject(() => {
+            // Il Gantt manterrà automaticamente il suo stato grazie al sessionStorage
+          });
+        }
       }
     } catch (error) {
       console.error("Error saving task:", error);

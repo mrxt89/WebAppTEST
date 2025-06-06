@@ -1,4 +1,3 @@
-// NewTaskPanel.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -64,8 +63,9 @@ const NewTaskPanel = ({
   onTaskCreated,
   projectTasks = [],
   projectId = null,
-  position = "right", // "right" o "bottom"
+  position = "right",
   defaultWidth = 500,
+  refreshProject, // Aggiungi questa prop
 }) => {
   const { users, loading: loadingUsers, fetchUsers } = useUsers();
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
@@ -279,7 +279,7 @@ const NewTaskPanel = ({
     return true;
   };
 
-  // Submit form
+  // Submit form - VERSIONE CORRETTA
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
@@ -294,15 +294,24 @@ const NewTaskPanel = ({
         ProjectID: taskData.ProjectID || projectId,
       };
 
-      await onTaskCreated(formattedData);
+      const result = await onTaskCreated(formattedData);
       
-      toast({
-        title: "Attività creata",
-        description: "L'attività è stata creata con successo",
-        variant: "success",
-      });
+      if (result && result.success) {
+        toast({
+          title: "Attività creata",
+          description: "L'attività è stata creata con successo",
+          variant: "success",
+        });
 
-      handleClose();
+        // Chiama refreshProject se disponibile per aggiornare la vista
+        if (refreshProject) {
+          await refreshProject();
+        }
+
+        handleClose();
+      } else {
+        throw new Error("Creazione attività fallita");
+      }
     } catch (error) {
       console.error("Error creating task:", error);
       toast({
@@ -327,20 +336,20 @@ const NewTaskPanel = ({
         cancelButtonText: "Annulla",
       }).then((result) => {
         if (result.isConfirmed) {
-          setIsClosing(true);
-          setTimeout(() => {
-            onClose();
-            resetForm();
-          }, 300);
+          performClose();
         }
       });
     } else {
-      setIsClosing(true);
-      setTimeout(() => {
-        onClose();
-        resetForm();
-      }, 300);
+      performClose();
     }
+  };
+
+  const performClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+      resetForm();
+    }, 300);
   };
 
   // Toggle sezione
@@ -975,6 +984,33 @@ const NewTaskPanel = ({
                           Campi obbligatori
                         </span>
                       )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleClose}
+                        disabled={isSubmitting}
+                      >
+                        Annulla
+                      </Button>
+                      <Button
+                        onClick={handleSubmit}
+                        disabled={
+                          !taskData.Title || 
+                          !taskData.DueDate || 
+                          !taskData.AssignedTo || 
+                          isSubmitting
+                        }
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Creazione...
+                          </>
+                        ) : (
+                          "Crea Attività"
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </motion.div>
