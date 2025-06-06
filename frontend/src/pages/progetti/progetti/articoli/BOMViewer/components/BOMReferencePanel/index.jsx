@@ -89,18 +89,6 @@ const BOMReferencePanel = ({ activeItem = null, setDragSettings = null }) => {
             </TooltipProvider>
           </div>
         </div>
-
-        {/* Istruzioni sull'utilizzo del drag and drop - Nuova sezione */}
-        <div className="bg-blue-50 rounded p-2 text-xs text-blue-700">
-          <p className="font-medium mb-1">Modalità di trascinamento:</p>
-          <p>
-            • <strong>Area sinistra</strong>: Sostituisci il componente
-          </p>
-          <p>
-            • <strong>Area destra</strong>: Aggiungi sotto al componente
-          </p>
-        </div>
-
         <div className="flex items-center space-x-2">
           <Checkbox
             id="createTempComponent"

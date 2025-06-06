@@ -262,7 +262,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
     <div className="space-y-4">
       {/* Azioni e tabella */}
       <div>
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4 mt-2">
           {canEdit && (
             <div className="flex gap-2">
               <input
