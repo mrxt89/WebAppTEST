@@ -119,7 +119,7 @@ const ALLOWED_MIME_TYPES = [
 
 // Aggiorna il controllo aggiuntivo basato sull'estensione per file CAD e 3D
 const upload = multer({ 
-    storage: storage,
+    storage: storage,  // IMPORTANTE: usa lo storage definito sopra
     limits: {
         fileSize: 50 * 1024 * 1024 // 50MB
     },
@@ -402,7 +402,11 @@ router.post('/attachments/itemCode/upload/:itemCode', authenticateToken, upload.
 // ENDPOINTS COMUNI
 
 // Elimina un allegato (con supporto per entrambi i percorsi)
-router.delete(['/attachments/:attachmentId', '/tasks/:taskId/attachments/:attachmentId'], authenticateToken, async (req, res) => {
+router.delete([ 
+    '/attachments/:attachmentId'
+    , '/item-attachments/:attachmentId'
+    , '/projects/:projectId/attachments/:attachmentId'
+    , '/tasks/:taskId/attachments/:attachmentId'], authenticateToken, async (req, res) => {
     try {
         const attachmentId = parseInt(req.params.attachmentId);
         const attachment = await getAttachmentById(attachmentId);
@@ -421,7 +425,13 @@ router.delete(['/attachments/:attachmentId', '/tasks/:taskId/attachments/:attach
 });
 
 // Download di un allegato (con supporto per entrambi i percorsi)
-router.get(['/attachments/:attachmentId/download', '/tasks/:taskId/attachments/:attachmentId/download'], authenticateToken, async (req, res) => {
+router.get([
+    '/attachments/:attachmentId/download'
+    , '/tasks/:taskId/attachments/:attachmentId/download'
+    , '/notifications/:notificationId/attachments/:attachmentId/download'
+    , '/item-attachments/:attachmentId/download'
+    , '/projects/:projectId/attachments/:attachmentId/download'
+], authenticateToken, async (req, res) => {
     try {
         const attachmentId = parseInt(req.params.attachmentId);
         const attachment = await getAttachmentById(attachmentId);
@@ -441,7 +451,10 @@ router.get(['/attachments/:attachmentId/download', '/tasks/:taskId/attachments/:
 });
 
 // Download di più allegati come ZIP (con supporto per entrambi i percorsi)
-router.get(['/attachments/:projectId/:taskId?/download-all', '/tasks/:taskId/attachments/download-all'], authenticateToken, async (req, res) => {
+router.get([
+        '/attachments/:projectId/:taskId?/download-all'
+        , '/tasks/:taskId/attachments/download-all'
+    ], authenticateToken, async (req, res) => {
     try {
         let projectId = req.params.projectId;
         let taskId = req.params.taskId || 0;

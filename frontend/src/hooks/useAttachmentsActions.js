@@ -112,12 +112,14 @@ const useAttachmentsActions = () => {
     }
   };
 
-  const deleteAttachment = async (notificationId, attachmentId) => {
+  const deleteAttachment = async (attachmentId) => {
+    if (!attachmentId) {
+      throw new Error("AttachmentID is required");
+    }
+    
     setLoading(true);
     try {
-      await axiosInstance.delete(
-        `/notifications/${notificationId}/attachments/${attachmentId}`
-      );
+      await axiosInstance.delete(`/attachments/${attachmentId}`);
     } catch (error) {
       console.error("Error deleting attachment:", error);
       throw error;
@@ -126,19 +128,23 @@ const useAttachmentsActions = () => {
     }
   };
 
-  const downloadAttachment = async (attachmentId) => {
+  const downloadAttachment = async (attachmentId, fileName) => {
+    if (!attachmentId) {
+      throw new Error("AttachmentID is required");
+    }
+    
     setLoading(true);
     try {
       const response = await axiosInstance.get(
-        `/notifications/attachments/${attachmentId}/download`,
+        `/attachments/${attachmentId}/download`,
         { responseType: "blob" }
       );
-
+  
       // Crea un URL per il blob e avvia il download
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", fileName);
+      link.setAttribute("download", fileName || "download");
       document.body.appendChild(link);
       link.click();
       link.remove();

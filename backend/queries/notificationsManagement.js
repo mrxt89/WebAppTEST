@@ -1352,11 +1352,12 @@ async function getReadReceipts(messageId, userId) {
       .input('messageId', sql.Int, messageId)
       .input('userId', sql.Int, userId)
       .query(`
-        SELECT	CONCAT(TC.firstName, ' ', TC.lastName) AS Name
+        SELECT	DISTINCT
+          CONCAT(TC.firstName, ' ', TC.lastName) AS Name
             , TA.isReadByReceiver
             , TA.ReceiverReadedDate
         FROM	AR_NotificationDetails (NOLOCK) TA
-        JOIN	(	SELECT	notificationId, message, tbCreated
+        JOIN	(	SELECT	DISTINCT notificationId, message, tbCreated
               FROM	AR_NotificationDetails (NOLOCK) T0
               WHERE	messageId = @messageId
             ) TB

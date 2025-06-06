@@ -192,16 +192,25 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
   };
 
   // Funzione per aprire il dialog per aggiungere ore
-  const openAddDialog = (date, taskId = null) => {
-    setSelectedDate(date);
-    setSelectedEntry(null);
+const openAddDialog = async (date, taskId = null) => {
+  setSelectedDate(date);
+  setSelectedEntry(null);
 
-    // Filtra le attività da mostrare nel dialog
-    // Quando si è cliccato su una cella della riga di un'attività specifica (taskId fornito),
-    // mostra solo l'attività su cui si è cliccato preselezionandola
-    // Quando si è cliccato sulla riga dei totali, mostra tutte le attività disponibili
-    let filteredTasks = availableTasks;
+  try {
+    // Assicuriamoci che le attività siano caricate
+    if (availableTasks.length === 0) {
+      const tasks = await getUserAvailableTasks(selectedUserId);
+      setAvailableTasks(tasks);
+    }
+
+    // Prepara le attività da mostrare nel dialog
+    let filteredTasks = [];
     let preselectedTaskId = null;
+    let taskData = null;
+
+    console.log('availableTasks:', availableTasks);
+    console.log('taskId:', taskId);
+    console.log('weekData.weeklyTotals:', weekData.weeklyTotals);
 
     if (taskId) {
       // Se si è cliccato su una cella di un'attività specifica
@@ -212,23 +221,47 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
 
       if (selectedTask) {
         preselectedTaskId = selectedTask.TaskID.toString();
+        taskData = {
+          projectName: selectedTask.ProjectName,
+          taskName: selectedTask.TaskTitle
+        };
       }
-    } else {
-      // Se si è cliccato sulla riga dei totali, mostra solo le attività presenti nella griglia
+      
+      // Se c'è un taskId, mostra solo le attività presenti nella griglia
       filteredTasks = availableTasks.filter((task) =>
-        weekData.weeklyTotals.some((t) => t.TaskID === task.TaskID),
+        weekData.weeklyTotals.some((t) => t.TaskID === task.TaskID)
       );
+    } else {
+      // Se NON c'è un taskId (cliccato dal totale giornaliero)
+      // Mostra TUTTE le attività disponibili per l'utente
+      filteredTasks = availableTasks;
+      
+      // Se non ci sono attività disponibili, prova a ricaricarle
+      if (filteredTasks.length === 0) {
+        const tasks = await getUserAvailableTasks(selectedUserId);
+        filteredTasks = tasks;
+        setAvailableTasks(tasks);
+      }
     }
 
     // Imposta la configurazione del dialogo
     setDialogConfig({
       preselectedTaskId,
       availableTasks: filteredTasks,
+      taskData
     });
 
     // Apri il dialogo
     setIsDialogOpen(true);
-  };
+  } catch (error) {
+    console.error("Errore nel caricamento delle attività:", error);
+    toast({
+      title: "Errore",
+      description: "Impossibile caricare le attività disponibili",
+      variant: "destructive",
+    });
+  }
+};
 
   // Funzione per aprire il dialog per modificare ore
   const openEditDialog = (entry) => {
@@ -382,7 +415,7 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
   }, [weekData.dailyTotals]);
 
   return (
-    <div className="space-y-4">
+    <div className="" style={{ height: "calc(100vh - 110px)" }}>
       {/* Intestazione */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-2">
@@ -471,6 +504,7 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
             </CardTitle>
 
             <div className="flex items-center gap-4">
+              
               <Button
                 variant="outline"
                 onClick={() => setIsTaskPanelOpen(true)}

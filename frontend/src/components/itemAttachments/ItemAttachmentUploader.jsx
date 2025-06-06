@@ -204,7 +204,7 @@ function ItemAttachmentUploader({
     if (!selectedFile) {
       return (
         <FileDropZone
-          onFilesSelected={handleFileSelect}
+          onFileSelect={handleFileSelect}
           disabled={isUploading}
           acceptedFileTypes={[
             "application/pdf",
