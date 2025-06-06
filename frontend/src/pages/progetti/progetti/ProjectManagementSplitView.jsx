@@ -2039,7 +2039,7 @@ const ProjectManagementSplitView = () => {
 
       {/* Sezione destra (resizable) */}
       <div 
-        className="h-full flex flex-col p-4 overflow-hidden" 
+        className="h-full flex flex-col overflow-hidden" 
         style={{ width: `${100 - leftPanelWidth}%`, height: "calc(100vh - 110px)" }}
       >
         {selectedProjectId ? (

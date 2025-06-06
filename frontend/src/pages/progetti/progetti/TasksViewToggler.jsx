@@ -105,35 +105,6 @@ const TasksViewToggler = ({
             </Label>
           </div>
         </RadioGroup>
-
-        {/* Statistiche */}
-        <div className="flex flex-wrap items-center gap-2">
-          {delayedTasksCount > 0 && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    variant="outline"
-                    className="bg-red-50 text-red-700 border-red-200 flex items-center gap-1"
-                  >
-                    <AlertTriangle className="h-3 w-3" />
-                    <span>{delayedTasksCount} in ritardo</span>
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Attività con scadenza superata</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-
-          <Badge
-            variant="outline"
-            className="bg-blue-50 text-blue-700 border-blue-200"
-          >
-            Totale: {tasks.length}
-          </Badge>
-        </div>
       </div>
     </div>
   );
