@@ -719,7 +719,7 @@ const TimeReportsView = ({ currentUserId, isAdmin = false }) => {
                           <Tooltip
                             formatter={(value) => [
                               `${value.toFixed(1)}h`,
-                              "Ore lavorate",
+                              "Ore",
                             ]}
                             labelFormatter={(label) => {
                               try {

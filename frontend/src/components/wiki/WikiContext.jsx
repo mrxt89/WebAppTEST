@@ -114,7 +114,7 @@ export const WikiProvider = ({ children }) => {
       } else if (path.includes("/progetti/categorie")) {
         contentFile = "ProjectCategories";
       } else if (path.includes("/progetti/attivita")) {
-        // Se esiste l'elemento html con id "task-time-tracking" allora siamo nella pagina delle Ore lavorate (TaskTimesheet)
+        // Se esiste l'elemento html con id "task-time-tracking" allora siamo nella pagina delle Ore (TaskTimesheet)
         if (document.getElementById("task-time-tracking")) {
           // Carica il contenuto del TaskTimesheet
           contentFile = "TaskTimesheet";

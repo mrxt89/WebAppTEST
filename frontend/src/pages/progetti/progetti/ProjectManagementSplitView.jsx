@@ -1078,7 +1078,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
                 />
               </div>
 
-              <div className="flex-1 min-h-0 overflow-hidden" style={{ height: "calc(100vh - 110px)" }} id="project-management-split-view-content3">
+              <div className="flex-1 min-h-0 overflow-hidden" style={{ height: "calc(100vh - 120px)" }} id="project-management-split-view-content3">
                 {/* Visualizzazione condizionale in base al viewMode */}
                 {tasksViewMode === "kanban" && (
                   <TasksKanban
@@ -1103,6 +1103,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
                 )}
                   {tasksViewMode === "gantt" && (
                     <ProjectGanttView
+                      id="project-gantt-view"
                       project={project}
                       tasks={project.tasks || []}
                       onTaskClick={handleTaskClick}

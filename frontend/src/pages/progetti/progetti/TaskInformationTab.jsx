@@ -230,15 +230,17 @@ const TaskInformationTab = ({
           .toLowerCase()
           .includes(participantSearch.toLowerCase())
       : true;
+    const isActive = user.userDisabled !== 1;
     
     if (showSelectedOnly) {
       return (
         isNotLeader && 
         matchesSearch &&
-        selectedParticipants.includes(user.userId.toString())
+        selectedParticipants.includes(user.userId.toString()) &&
+        isActive
       );
     }
-    return isNotLeader && matchesSearch;
+    return isNotLeader && matchesSearch && isActive;
   });
 
   // Ottiene i dati completi dei partecipanti per la visualizzazione

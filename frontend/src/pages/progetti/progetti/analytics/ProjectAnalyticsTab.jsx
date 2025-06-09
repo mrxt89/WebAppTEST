@@ -197,7 +197,7 @@ const ProjectAnalyticsTab = ({ project, refreshProject }) => {
           csvContent =
             "Risorsa,Attività Assegnate,Completate,In Corso,In Ritardo,Tasso Completamento,Ore Interne,Ore Esterne\n";
 
-          // Raggruppa le risorse dai dati delle ore lavorate
+          // Raggruppa le risorse dai dati delle ore
           const resourcesFromHours = {};
           if (workHoursData && workHoursData.length > 0) {
             workHoursData.forEach((entry) => {
@@ -270,7 +270,7 @@ const ProjectAnalyticsTab = ({ project, refreshProject }) => {
         case "timeline":
           filename = `timeline-progetto-${project.ProjectID}.csv`;
           csvContent =
-            "Titolo,Data Inizio,Data Fine,Durata (giorni),Stato,Ore Lavorate\n";
+            "Titolo,Data Inizio,Data Fine,Durata (giorni),Stato,Ore\n";
 
           // Raggruppa le ore per attività
           const taskHours = {};
@@ -369,6 +369,8 @@ const ProjectAnalyticsTab = ({ project, refreshProject }) => {
               <TabsTrigger
                 value="resources"
                 className="flex items-center gap-2"
+                disabled={true}
+                style={{ display: "none" }}
               >
                 <Users className="h-4 w-4" />
                 <span>Risorse</span>

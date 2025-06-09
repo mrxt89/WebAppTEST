@@ -290,15 +290,15 @@ const openAddDialog = async (date, taskId = null) => {
       if (entryId) {
         await updateTimeEntry(entryId, entryData);
         toast({
-          title: "Ore aggiornate",
-          description: "Le ore sono state aggiornate con successo",
+          title: "Attività aggiornata",
+          description: "Attività aggiornata con successo",
           style: { backgroundColor: "#2c7a7b", color: "#fff" },
         });
       } else {
         await addTimeEntry(entryData);
         toast({
-          title: "Ore aggiunte",
-          description: "Le ore sono state registrate con successo",
+          title: "Attività registrata",
+          description: "Attività registrata con successo",
           style: { backgroundColor: "#2c7a7b", color: "#fff" },
         });
       }
@@ -617,13 +617,19 @@ const openAddDialog = async (date, taskId = null) => {
                           return (
                             <TableCell
                               key={format(day, "yyyy-MM-dd")}
-                              className={`text-center border-r h-16 ${dayTotal > 0 ? "bg-blue-50" : ""} ${isFutureDay(day) ? "bg-gray-50" : ""}`}
+                              className={`text-center border-r h-16 ${
+                                dayTotal > 0 
+                                  ? "bg-green-50" 
+                                  : entries.some(e => e.EntryID > 0) 
+                                    ? "bg-green-50" 
+                                    : ""
+                              } ${isFutureDay(day) ? "bg-gray-50" : ""}`}
                             >
                               {isFutureDay(day) ? (
                                 <span className="text-gray-400">-</span>
                               ) : dayTotal > 0 ? (
                                 <div className="flex flex-col items-center h-full justify-center">
-                                  <Badge className="bg-white border border-blue-200 text-blue-700">
+                                  <Badge className="bg-white border border-green-200 text-green-700">
                                     {formatHoursIndicator(dayTotal)}
                                   </Badge>
 
@@ -697,7 +703,7 @@ const openAddDialog = async (date, taskId = null) => {
                                           </Button>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                          <p>Aggiungi ore</p>
+                                          <p>Inserisci attività svolta</p>
                                         </TooltipContent>
                                       </Tooltip>
                                     </TooltipProvider>
@@ -791,57 +797,6 @@ const openAddDialog = async (date, taskId = null) => {
             </Table>
           </div>
         </CardContent>
-
-        <CardFooter className="border-t bg-gray-50 p-4">
-          <div className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="text-sm">
-                <span className="text-gray-500">Totale ore:</span>{" "}
-                <span className="font-bold">
-                  {formatHoursIndicator(weekSummary.totalHours)}
-                </span>
-                <span className="text-gray-500 ml-1">/ 40h</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="text-sm">
-                  <span className="text-green-600">
-                    {weekSummary.completeDays}
-                  </span>{" "}
-                  complete
-                </div>
-                <div className="text-sm">
-                  <span className="text-yellow-600">
-                    {weekSummary.incompleteDays}
-                  </span>{" "}
-                  parziali
-                </div>
-                <div className="text-sm">
-                  <span className="text-red-600">{weekSummary.emptyDays}</span>{" "}
-                  vuote
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {weekSummary.totalHours < 40 && (
-                <div className="text-sm">
-                  <AlertCircle className="inline-block h-4 w-4 text-yellow-500 mr-1" />
-                  <span className="text-yellow-700">
-                    Mancano {formatHoursIndicator(40 - weekSummary.totalHours)}{" "}
-                    per completare le 40 ore settimanali
-                  </span>
-                </div>
-              )}
-
-              {weekSummary.totalHours >= 40 && (
-                <Badge className="bg-green-50 text-green-700 border-green-200">
-                  Settimana completata
-                </Badge>
-              )}
-            </div>
-          </div>
-        </CardFooter>
       </Card>
 
       {/* Dialog per aggiungere/modificare ore */}

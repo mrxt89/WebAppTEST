@@ -294,11 +294,7 @@ const TimeEntryDialog = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (
-      !formData.taskId ||
-      !formData.hoursWorked ||
-      parseFloat(formData.hoursWorked) <= 0
-    ) {
+    if (!formData.taskId) {
       toast({
         title: "Dati mancanti",
         description: "Completa tutti i campi obbligatori prima di salvare",
@@ -307,11 +303,11 @@ const TimeEntryDialog = ({
       return;
     }
 
-    if (parseFloat(formData.hoursWorked) > 12) {
+    if (parseFloat(formData.hoursWorked) > 40) {
       toast({
         title: "Ore eccessive",
         description:
-          "Non puoi registrare più di 12 ore per una singola attività in un giorno",
+          "Non puoi registrare più di 40 ore per una singola attività in un giorno",
         variant: "destructive",
       });
       return;
@@ -325,7 +321,7 @@ const TimeEntryDialog = ({
         TaskID: parseInt(formData.taskId),
         UserID: parseInt(formData.userId),
         WorkDate: formData.workDate,
-        HoursWorked: parseFloat(formData.hoursWorked),
+        HoursWorked: parseFloat(formData.hoursWorked) || 0,
         WorkType: formData.workType,
         Notes: formData.notes,
       };
@@ -354,13 +350,13 @@ const TimeEntryDialog = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-hidden">
         <DialogHeader>
-          <DialogTitle>{entry ? "Modifica ore" : "Aggiungi ore"}</DialogTitle>
+          <DialogTitle>{entry ? "Modifica attività svolta" : "Inserisci attività svolta"}</DialogTitle>
           <DialogDescription>
             {entry
               ? "Modifica le ore registrate per questa attività"
               : date
-                ? `Aggiungi ore per ${format(date, "EEEE d MMMM", { locale: it })}`
-                : "Aggiungi ore"}
+                ? `Inserisci attività svolta per ${format(date, "EEEE d MMMM", { locale: it })}`
+                : "Inserisci attività svolta"}
           </DialogDescription>
         </DialogHeader>
 
@@ -456,7 +452,7 @@ const TimeEntryDialog = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center">
-                Ore lavorate:
+                Orario indicativo:
                 <Clock className="h-4 w-4 ml-1 text-gray-400" />
               </label>
               <Input
@@ -467,10 +463,9 @@ const TimeEntryDialog = ({
                 min="0.25"
                 max="12"
                 step="0.25"
-                required
                 className="text-center"
               />
-              <p className="text-xs text-gray-500">Minimo 0.25 ore</p>
+              <p className="text-xs text-gray-500">Minimo 0.25 ore (15 minuti)</p>
             </div>
 
             <div className="space-y-2 hidden">

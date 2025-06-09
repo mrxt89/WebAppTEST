@@ -39,8 +39,29 @@ import {
   GitBranch,
   Link2,
   Loader2,
+  GripVertical,
+  Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import {
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // Funzione di debounce per limitare chiamate ripetute
 const debounce = (func, wait) => {
@@ -50,6 +71,172 @@ const debounce = (func, wait) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => func.apply(context, args), wait);
   };
+};
+
+// Componente per task sortable nella lista
+const SortableTaskRow = ({ 
+  task, 
+  index, 
+  ganttTasks, 
+  canMove, 
+  isLoading, 
+  checkAdminPermission, 
+  isOwnTask, 
+  project,
+  handleMoveButtonClick,
+  isReadOnly 
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ 
+    id: task.id,
+    disabled: !canMove || isLoading || isReadOnly,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    position: 'relative',
+  };
+
+  const isDelayed = new Date(task.end) < new Date() && task.status !== "COMPLETATA";
+  const hasDependencies = task.predecessorsData && task.predecessorsData.length > 0;
+
+  return (
+    <tr 
+      ref={setNodeRef} 
+      style={style}
+      className="hover:bg-gray-50"
+    >
+      <td className="p-2 border-b" style={{ height: "75px" }}>
+        <div className="flex h-[75px]">
+          {/* Handle per drag & drop */}
+          {canMove && !isReadOnly && (
+            <div className="flex items-center mr-2">
+              <div
+                {...attributes}
+                {...listeners}
+                className="cursor-move p-1 text-gray-400 hover:text-gray-600"
+              >
+                <GripVertical className="h-4 w-4" />
+              </div>
+            </div>
+          )}
+          
+          <div className="flex flex-col justify-center flex-1">
+            <div className="flex items-center">
+              <span
+                className="inline-block w-3 h-3 mr-2 rounded-full"
+                style={{
+                  backgroundColor:
+                    task.status === "COMPLETATA"
+                      ? "#10b981"
+                      : task.status === "IN ESECUZIONE"
+                        ? "#3b82f6"
+                        : task.status === "BLOCCATA"
+                          ? "#ef4444"
+                          : task.status === "SOSPESA"
+                            ? "#f59e0b"
+                            : "#94a3b8",
+                }}
+              ></span>
+              <span className="font-medium truncate max-w-[150px]">
+                {task.name}
+              </span>
+
+              {hasDependencies && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <GitBranch className="w-3 h-3 ml-2 text-indigo-600" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        {task.predecessorsData.length} dipendenz{task.predecessorsData.length > 1 ? 'e' : 'a'}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+
+              {isDelayed && (
+                <Badge className="ml-2 bg-amber-100 text-amber-700 border-amber-300">
+                  <AlertTriangle className="w-3 h-3" />
+                </Badge>
+              )}
+
+              {isReadOnly && (
+                <Lock className="w-3 h-3 ml-2 text-gray-400" />
+              )}
+            </div>
+
+            {task.assignedToName && (
+              <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                <span className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-xs">
+                  {task.assignedToName
+                    .charAt(0)
+                    .toUpperCase()}
+                </span>
+                <span className="truncate max-w-[140px]">
+                  {task.assignedToName}
+                </span>
+              </div>
+            )}
+
+            <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              <span className={isDelayed ? "text-red-500" : ""}>
+                {new Date(task.start).toLocaleDateString('it-IT', { 
+                  day: '2-digit', 
+                  month: 'short' 
+                })} - {new Date(task.end).toLocaleDateString('it-IT', { 
+                  day: '2-digit', 
+                  month: 'short',
+                  year: 'numeric'
+                })}
+              </span>
+            </div>
+          </div>
+        </div>
+      </td>
+      <td className="border-b w-10 text-center align-middle" style={{ height: "75px" }}>
+        {/* PULSANTI RIORDINAMENTO - Solo se non in drag & drop */}
+        {canMove && !isLoading && !isReadOnly && (
+          <div className="flex flex-col gap-1 items-center">
+            <button
+              type="button"
+              onClick={(e) => handleMoveButtonClick(e, task, "up")}
+              className={`p-1 rounded bg-white hover:bg-gray-200 border border-gray-300 ${
+                index === 0 ? "opacity-30 cursor-not-allowed" : "hover:border-gray-400"
+              }`}
+              disabled={index === 0 || isLoading}
+              title="Sposta su"
+            >
+              <ArrowUp className="h-4 w-4 text-gray-600" />
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => handleMoveButtonClick(e, task, "down")}
+              className={`p-1 rounded bg-white hover:bg-gray-200 border border-gray-300 ${
+                index === ganttTasks.length - 1 ? "opacity-30 cursor-not-allowed" : "hover:border-gray-400"
+              }`}
+              disabled={index === ganttTasks.length - 1 || isLoading}
+              title="Sposta giù"
+            >
+              <ArrowDown className="h-4 w-4 text-gray-600" />
+            </button>
+          </div>
+        )}
+      </td>
+    </tr>
+  );
 };
 
 /**
@@ -77,6 +264,7 @@ const ProjectGanttView = ({
   // Refs per mantenere lo stato tra aggiornamenti
   const isTaskUpdating = useRef(false);
   const ganttContainerRef = useRef(null);
+  const ganttWrapperRef = useRef(null);
   const moveInProgress = useRef(false);
   const clickHandledRef = useRef(false);
 
@@ -87,7 +275,6 @@ const ProjectGanttView = ({
 
   // Preservare lo stato attuale
   const [viewMode, setViewMode] = useState(() => {
-    // Recupera il viewMode salvato o usa Week come default
     const saved = sessionStorage.getItem(`gantt-viewMode-${project.ProjectID}`);
     return saved ? ViewMode[saved] : ViewMode.Week;
   });
@@ -95,6 +282,8 @@ const ProjectGanttView = ({
   const [visibleTimeStart, setVisibleTimeStart] = useState(null);
   const [visibleTimeEnd, setVisibleTimeEnd] = useState(null);
   const [showDependencies, setShowDependencies] = useState(true);
+  const [customZoomLevel, setCustomZoomLevel] = useState(1);
+  const [draggedTaskId, setDraggedTaskId] = useState(null);
 
   // Stato per i filtri
   const [filters, setFilters] = useState({
@@ -105,6 +294,26 @@ const ProjectGanttView = ({
     showDelayed: false,
   });
 
+  // Determina se l'utente è in modalità read-only
+  const isReadOnly = useMemo(() => {
+    // L'utente è in read-only se non è admin e non ha task propri
+    const hasEditPermission = checkAdminPermission(project) || 
+      tasks.some(task => isOwnTask(task));
+    return !hasEditPermission;
+  }, [checkAdminPermission, isOwnTask, project, tasks]);
+
+  // Setup sensori per drag & drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   // Salva il viewMode quando cambia
   useEffect(() => {
     if (project?.ProjectID) {
@@ -112,11 +321,35 @@ const ProjectGanttView = ({
     }
   }, [viewMode, project?.ProjectID]);
 
+  // Gestione del custom zoom con Ctrl + rotella del mouse
+  useEffect(() => {
+    const handleWheel = (e) => {
+      if (e.ctrlKey && ganttWrapperRef.current?.contains(e.target)) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        setCustomZoomLevel(prev => {
+          const newZoom = Math.max(0.5, Math.min(2, prev + delta));
+          return newZoom;
+        });
+      }
+    };
+
+    const wrapper = ganttWrapperRef.current;
+    if (wrapper) {
+      wrapper.addEventListener('wheel', handleWheel, { passive: false });
+    }
+
+    return () => {
+      if (wrapper) {
+        wrapper.removeEventListener('wheel', handleWheel);
+      }
+    };
+  }, []);
+
   // Monitora l'elemento del container
   useEffect(() => {
     ganttContainerRef.current = document.querySelector(".gantt-container");
 
-    // Configurare l'observer per riapplicare la posizione di scroll dopo il rendering
     const observer = new MutationObserver(() => {
       if (!isLoading) {
         applyScrollPosition();
@@ -165,8 +398,49 @@ const ProjectGanttView = ({
     return optimisticTasks.length > 0 ? optimisticTasks : tasks;
   }, [optimisticTasks, tasks]);
 
+  // Gestione del drag start
+  const handleDragStart = (event) => {
+    setDraggedTaskId(event.active.id);
+  };
+
+  // Gestione del drag end
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
+    setDraggedTaskId(null);
+
+    if (active.id !== over.id) {
+      const oldIndex = ganttTasks.findIndex((t) => t.id === active.id);
+      const newIndex = ganttTasks.findIndex((t) => t.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        // Riordina visivamente
+        const newOrder = arrayMove(ganttTasks, oldIndex, newIndex);
+        
+        // Calcola la nuova sequenza
+        const targetTask = ganttTasks[newIndex];
+        const newSequenceValue = parseInt(targetTask.originalTask.TaskSequence);
+
+        // Esegui l'aggiornamento
+        await executeTaskSequenceUpdate(
+          parseInt(active.id),
+          project.ProjectID,
+          newSequenceValue
+        );
+      }
+    }
+  };
+
   // Quando refreshProject viene chiamato, marca che stiamo aggiornando
   const handleTaskChangeWrapper = async (task) => {
+    if (isReadOnly) {
+      swal.fire(
+        "Modalità di sola lettura",
+        "Non hai i permessi per modificare le attività in questo progetto",
+        "info"
+      );
+      return;
+    }
+
     // Verifica se l'utente può modificare questo task
     const originalTask = displayTasks.find((t) => t.TaskID.toString() === task.id);
     if (!originalTask) return;
@@ -299,10 +573,11 @@ const ProjectGanttView = ({
           dependencies: buildDependencies(task),
           hideChildren: false,
           displayOrder: task.TaskSequence,
+          isDisabled: isReadOnly,
 
           // Dati personalizzati per preservare tutte le informazioni originali
           originalTask: task,
-          canInteract: checkAdminPermission(project) || isOwnTask(task),
+          canInteract: !isReadOnly && (checkAdminPermission(project) || isOwnTask(task)),
           // Status dell'attività
           status: task.Status,
           priority: task.Priority,
@@ -346,7 +621,7 @@ const ProjectGanttView = ({
         };
       });
     },
-    [checkAdminPermission, isOwnTask, project, buildDependencies],
+    [checkAdminPermission, isOwnTask, project, buildDependencies, isReadOnly],
   );
 
   // Preparazione dei task per la libreria
@@ -356,6 +631,8 @@ const ProjectGanttView = ({
 
   // Handler per aggiornamento delle date tramite drag
   const handleTaskChange = async (task) => {
+    if (isReadOnly) return;
+
     // Trova il task originale
     const originalTask = displayTasks.find((t) => t.TaskID.toString() === task.id);
     if (!originalTask) return;
@@ -516,6 +793,8 @@ const ProjectGanttView = ({
 
   // Callback per lo spostamento tramite drag (aggiorna la sequenza)
   const handleTaskMove = async (task, orderIndex) => {
+    if (isReadOnly) return;
+
     // Imposta la flag di elaborazione immediata
     clickHandledRef.current = true;
     moveInProgress.current = true;
@@ -623,6 +902,8 @@ const ProjectGanttView = ({
     e.preventDefault();
     e.stopPropagation();
 
+    if (isReadOnly) return;
+
     // Verifica se è già in corso un'operazione di spostamento
     if (moveInProgress.current || clickHandledRef.current) {
       return;
@@ -721,7 +1002,7 @@ const ProjectGanttView = ({
   }, [tasks]);
 
   return (
-    <Card className="border rounded-lg bg-white relative">
+    <Card className="border rounded-lg bg-white relative h-full flex flex-col">
       {/* Loading Overlay */}
       <AnimatePresence>
         {isLoading && (
@@ -740,7 +1021,7 @@ const ProjectGanttView = ({
       </AnimatePresence>
 
       {/* Header Controls */}
-      <div className="border-b">
+      <div className="border-b flex-none">
         <div className="flex flex-wrap items-center justify-between gap-2 p-2">
           <div className="flex items-center space-x-4">
             <Button
@@ -780,126 +1061,112 @@ const ProjectGanttView = ({
                 Dipendenze
               </Button>
             </div>
+
+            {isReadOnly && (
+              <div className="border-l pl-4">
+                <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-300">
+                  <Lock className="h-3 w-3 mr-1" />
+                  Sola lettura
+                </Badge>
+              </div>
+            )}
           </div>
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-2 p-2">
-            <div className="flex-grow-0 flex-shrink-0 w-auto">
-              <Select
-                value={filters.status}
-                onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, status: value }))
-                }
-                disabled={isLoading}
-              >
-                <SelectTrigger className="h-8 min-w-[120px]">
-                  <SelectValue placeholder="Stato" />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+          <div className="flex items-center gap-2 p-2">
+            <Select
+              value={filters.status}
+              onValueChange={(value) =>
+                setFilters((prev) => ({ ...prev, status: value }))
+              }
+              disabled={isLoading}
+            >
+              <SelectTrigger className="h-8 w-[120px]">
+                <SelectValue placeholder="Stato" />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.priority}
+              onValueChange={(value) =>
+                setFilters((prev) => ({ ...prev, priority: value }))
+              }
+              disabled={isLoading}
+            >
+              <SelectTrigger className="h-8 w-[120px]">
+                <SelectValue placeholder="Priorità" />
+              </SelectTrigger>
+              <SelectContent>
+                {priorityOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.assignedTo?.toString() || "all"}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  assignedTo: value === "all" ? null : parseInt(value),
+                }))
+              }
+              disabled={isLoading}
+            >
+              <SelectTrigger className="h-8 w-[150px]">
+                <SelectValue placeholder="Assegnato a" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti gli utenti</SelectItem>
+                {users
+                  .filter((user) =>
+                    displayTasks.some((task) => task.AssignedTo === user.userId),
+                  )
+                  .map((user) => (
+                    <SelectItem
+                      key={user.userId}
+                      value={user.userId.toString()}
+                    >
+                      {user.firstName} {user.lastName}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
+              </SelectContent>
+            </Select>
 
-            <div className="flex-grow-0 flex-shrink-0 w-auto">
-              <Select
-                value={filters.priority}
-                onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, priority: value }))
+            <div className="relative">
+              <Input
+                placeholder="Cerca..."
+                value={filters.search}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, search: e.target.value }))
                 }
+                className="h-8 w-[150px] pl-8 pr-2"
                 disabled={isLoading}
-              >
-                <SelectTrigger className="h-8 min-w-[120px]">
-                  <SelectValue placeholder="Priorità" />
-                </SelectTrigger>
-                <SelectContent>
-                  {priorityOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             </div>
 
-            <div className="flex-grow-0 flex-shrink-0 w-auto">
-              <Select
-                value={filters.assignedTo?.toString() || "all"}
-                onValueChange={(value) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    assignedTo: value === "all" ? null : parseInt(value),
-                  }))
-                }
-                disabled={isLoading}
-              >
-                <SelectTrigger className="h-8 min-w-[150px]">
-                  <SelectValue placeholder="Assegnato a" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutti gli utenti</SelectItem>
-                  {users
-                    .filter((user) =>
-                      displayTasks.some((task) => task.AssignedTo === user.userId),
-                    )
-                    .map((user) => (
-                      <SelectItem
-                        key={user.userId}
-                        value={user.userId.toString()}
-                      >
-                        {user.firstName} {user.lastName}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex-grow-0 flex-shrink-0 w-auto">
-              <div className="relative">
-                <Input
-                  placeholder="Cerca..."
-                  value={filters.search}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, search: e.target.value }))
-                  }
-                  className="h-8 pl-8 pr-2"
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-
-            <div className="flex-grow-0 flex-shrink-0 w-auto">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={resetFilters}
-                className="h-8 w-8"
-                title="Resetta filtri"
-                disabled={isLoading}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="flex-grow-0 flex-shrink-0 ml-auto">
-              <div className="flex items-center gap-1">
-                {filters.showDelayed && (
-                  <Badge
-                    variant="outline"
-                    className="bg-amber-50 text-amber-700 border-amber-200"
-                  >
-                    Solo attività in ritardo
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 ">
             <Button
-              size="sm"
+              variant="ghost"
+              size="icon"
+              onClick={resetFilters}
+              className="h-8 w-8"
+              title="Resetta filtri"
+              disabled={isLoading}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+
+            <Button
+              size="icon"
               variant={filters.showDelayed ? "default" : "outline"}
               onClick={() =>
                 setFilters((prev) => ({
@@ -907,360 +1174,311 @@ const ProjectGanttView = ({
                   showDelayed: !prev.showDelayed,
                 }))
               }
-              className={
+              className={`h-8 w-8 ${
                 filters.showDelayed ? "bg-amber-600 hover:bg-amber-700" : ""
-              }
+              }`}
+              title="Mostra attività in ritardo"
               disabled={isLoading}
             >
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              In ritardo
+              <AlertTriangle className="h-4 w-4" />
             </Button>
+
+            {filters.showDelayed && (
+              <Badge
+                variant="outline"
+                className="bg-amber-50 text-amber-700 border-amber-200"
+              >
+                Solo attività in ritardo
+              </Badge>
+            )}
           </div>
         </div>
       </div>
 
-      <CardContent className="p-0">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Leggenda colori */}
-        <div className="p-2 border-b flex flex-wrap items-center gap-x-4 gap-y-2 bg-gray-50 text-xs text-gray-600">
-          <div className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 bg-gray-400 rounded-sm"></span>
-            <span>Da fare</span>
+        <div className="p-2 border-b flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-gray-50 text-xs text-gray-600 flex-none">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 bg-gray-400 rounded-sm"></span>
+              <span>Da fare</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 bg-blue-500 rounded-sm"></span>
+              <span>In esecuzione</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 bg-green-500 rounded-sm"></span>
+              <span>Completata</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 bg-red-500 rounded-sm"></span>
+              <span>Bloccata</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 bg-yellow-500 rounded-sm"></span>
+              <span>Sospesa</span>
+            </div>
+            <div className="border-l pl-4 flex items-center gap-1">
+              <GitBranch className="h-3 w-3 text-gray-600" />
+              <span>Linee = Dipendenze (FS)</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 bg-blue-500 rounded-sm"></span>
-            <span>In esecuzione</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 bg-green-500 rounded-sm"></span>
-            <span>Completata</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 bg-red-500 rounded-sm"></span>
-            <span>Bloccata</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 bg-yellow-500 rounded-sm"></span>
-            <span>Sospesa</span>
-          </div>
-          <div className="border-l pl-4 flex items-center gap-1">
-            <GitBranch className="h-3 w-3 text-gray-600" />
-            <span>Linee = Dipendenze (FS)</span>
+          
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span>Ctrl + Rotella per zoom</span>
+            {customZoomLevel !== 1 && (
+              <Badge variant="outline" className="text-xs">
+                Zoom: {Math.round(customZoomLevel * 100)}%
+              </Badge>
+            )}
           </div>
         </div>
 
-        {/* Gantt Chart */}
-        <div
-          className="gantt-container"
+        {/* Gantt Chart Container */}
+        <div 
+          ref={ganttWrapperRef}
+          className="flex-1 relative overflow-hidden"
           style={{
-            height: "calc(90vh - 350px)",
-            overflow: "auto",
-            position: "relative",
-            opacity: isLoading ? 0.5 : 1,
-            transition: "opacity 0.3s ease",
+            minHeight: 0,
           }}
         >
-          {ganttTasks.length > 0 ? (
-            <Gantt
-              tasks={ganttTasks}
-              viewMode={viewMode}
-              rowHeight={90}
-              onDateChange={handleTaskChangeWrapper}
-              onDoubleClick={handleDoubleClick}
-              onTaskMove={handleTaskMove}
-              barCornerRadius={4}
-              barProgressColor={null}
-              barProgressSelectedColor={null}
-              projectProgressColor={null}
-              projectProgressSelectedColor={null}
-              arrow={showDependencies}
-              arrowColor="#6366f1"
-              arrowIndent={20}
-              TooltipContent={({ task }) => {
-                const originalTask = task.originalTask;
-                const status = originalTask.Status;
-                const priority = originalTask.Priority;
-                const assignedTo = originalTask.AssignedToName;
-                const predecessors = task.predecessorsData;
+          <div 
+            className="gantt-container absolute inset-0 overflow-auto"
+            style={{
+              transform: `scale(${customZoomLevel})`,
+              transformOrigin: 'top left',
+              width: `${100 / customZoomLevel}%`,
+              height: `${100 / customZoomLevel}%`,
+              opacity: isLoading ? 0.5 : 1,
+              transition: "opacity 0.3s ease",
+            }}
+          >
+            {ganttTasks.length > 0 ? (
+              <Gantt
+                id="gantt-container"
+                tasks={ganttTasks}
+                viewMode={viewMode}
+                rowHeight={90}
+                onDateChange={isReadOnly ? undefined : handleTaskChangeWrapper}
+                onDoubleClick={handleDoubleClick}
+                onTaskMove={isReadOnly ? undefined : handleTaskMove}
+                barCornerRadius={4}
+                barProgressColor={null}
+                barProgressSelectedColor={null}
+                projectProgressColor={null}
+                projectProgressSelectedColor={null}
+                arrow={showDependencies}
+                arrowColor="#6366f1"
+                arrowIndent={20}
+                TooltipContent={({ task }) => {
+                  const originalTask = task.originalTask;
+                  const status = originalTask.Status;
+                  const priority = originalTask.Priority;
+                  const assignedTo = originalTask.AssignedToName;
+                  const predecessors = task.predecessorsData;
 
-                return (
-                  <div className="p-3 bg-white shadow-lg rounded-lg border max-w-sm">
-                    <div className="font-bold text-base mb-2">{task.name}</div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Inizio:</span>
-                        <span className="font-medium">
-                          {new Date(task.start).toLocaleDateString('it-IT')}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Fine:</span>
-                        <span className="font-medium">
-                          {new Date(task.end).toLocaleDateString('it-IT')}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Stato:</span>
-                        <Badge 
-                          variant="outline"
-                          className={
-                            status === "COMPLETATA" ? "bg-green-50 text-green-700 border-green-300" :
-                            status === "IN ESECUZIONE" ? "bg-blue-50 text-blue-700 border-blue-300" :
-                            status === "BLOCCATA" ? "bg-red-50 text-red-700 border-red-300" :
-                            status === "SOSPESA" ? "bg-yellow-50 text-yellow-700 border-yellow-300" :
-                            "bg-gray-50 text-gray-700 border-gray-300"
-                          }
-                        >
-                          {status}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Priorità:</span>
-                        <Badge 
-                          variant="outline"
-                          className={
-                            priority === "ALTA" ? "bg-red-50 text-red-700 border-red-300" :
-                            priority === "MEDIA" ? "bg-yellow-50 text-yellow-700 border-yellow-300" :
-                            "bg-green-50 text-green-700 border-green-300"
-                          }
-                        >
-                          {priority}
-                        </Badge>
-                      </div>
-                      {assignedTo && (
+                  return (
+                    <div className="p-3 bg-white shadow-lg rounded-lg border max-w-sm">
+                      <div className="font-bold text-base mb-2">{task.name}</div>
+                      <div className="space-y-1 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Assegnato a:</span>
-                          <span className="font-medium">{assignedTo}</span>
+                          <span className="text-gray-600">Inizio:</span>
+                          <span className="font-medium">
+                            {new Date(task.start).toLocaleDateString('it-IT')}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Fine:</span>
+                          <span className="font-medium">
+                            {new Date(task.end).toLocaleDateString('it-IT')}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Stato:</span>
+                          <Badge 
+                            variant="outline"
+                            className={
+                              status === "COMPLETATA" ? "bg-green-50 text-green-700 border-green-300" :
+                              status === "IN ESECUZIONE" ? "bg-blue-50 text-blue-700 border-blue-300" :
+                              status === "BLOCCATA" ? "bg-red-50 text-red-700 border-red-300" :
+                              status === "SOSPESA" ? "bg-yellow-50 text-yellow-700 border-yellow-300" :
+                              "bg-gray-50 text-gray-700 border-gray-300"
+                            }
+                          >
+                            {status}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Priorità:</span>
+                          <Badge 
+                            variant="outline"
+                            className={
+                              priority === "ALTA" ? "bg-red-50 text-red-700 border-red-300" :
+                              priority === "MEDIA" ? "bg-yellow-50 text-yellow-700 border-yellow-300" :
+                              "bg-green-50 text-green-700 border-green-300"
+                            }
+                          >
+                            {priority}
+                          </Badge>
+                        </div>
+                        {assignedTo && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Assegnato a:</span>
+                            <span className="font-medium">{assignedTo}</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {predecessors && predecessors.length > 0 && (
+                        <div className="mt-3 pt-3 border-t">
+                          <div className="text-sm font-medium mb-1 flex items-center gap-1">
+                            <GitBranch className="h-3 w-3" />
+                            Dipendenze:
+                          </div>
+                          <div className="space-y-1">
+                            {formatDependencyInfo(predecessors)}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {originalTask.Description && (
+                        <div className="mt-3 pt-3 border-t">
+                          <div className="text-xs text-gray-600 font-medium mb-1">
+                            Descrizione:
+                          </div>
+                          <div className="text-sm text-gray-700 max-w-xs overflow-hidden">
+                            {originalTask.Description.substring(0, 150)}
+                            {originalTask.Description.length > 150 ? "..." : ""}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {isReadOnly && (
+                        <div className="mt-3 pt-3 border-t text-xs text-gray-500 flex items-center gap-1">
+                          <Lock className="h-3 w-3" />
+                          Modalità di sola lettura
                         </div>
                       )}
                     </div>
-                    
-                    {predecessors && predecessors.length > 0 && (
-                      <div className="mt-3 pt-3 border-t">
-                        <div className="text-sm font-medium mb-1 flex items-center gap-1">
-                          <GitBranch className="h-3 w-3" />
-                          Dipendenze:
-                        </div>
-                        <div className="space-y-1">
-                          {formatDependencyInfo(predecessors)}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {originalTask.Description && (
-                      <div className="mt-3 pt-3 border-t">
-                        <div className="text-xs text-gray-600 font-medium mb-1">
-                          Descrizione:
-                        </div>
-                        <div className="text-sm text-gray-700 max-w-xs overflow-hidden">
-                          {originalTask.Description.substring(0, 150)}
-                          {originalTask.Description.length > 150 ? "..." : ""}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              }}
-              TaskListTable={() => (
-                <div className="p-2 border-r h-full">
-                  <table className="w-full h-full border-spacing-0 border-separate">
-                    <tbody>
-                      {ganttTasks.map((task, index) => {
-                        const isDelayed =
-                          new Date(task.end) < new Date() &&
-                          task.status !== "COMPLETATA";
-                        const canMove =
-                          checkAdminPermission(project) ||
-                          isOwnTask(task.originalTask);
-                        const hasDependencies = task.predecessorsData && task.predecessorsData.length > 0;
-
-                        return (
-                          <tr key={task.id} className="hover:bg-gray-50">
-                            <td
-                              className="p-2 border-b"
-                              style={{ height: "75px" }}
-                            >
-                              <div className="flex flex-col h-[75px] justify-center">
-                                <div className="flex items-center">
-                                  <span
-                                    className="inline-block w-3 h-3 mr-2 rounded-full"
-                                    style={{
-                                      backgroundColor:
-                                        task.status === "COMPLETATA"
-                                          ? "#10b981"
-                                          : task.status === "IN ESECUZIONE"
-                                            ? "#3b82f6"
-                                            : task.status === "BLOCCATA"
-                                              ? "#ef4444"
-                                              : task.status === "SOSPESA"
-                                                ? "#f59e0b"
-                                                : "#94a3b8",
-                                    }}
-                                  ></span>
-                                  <span className="font-medium truncate max-w-[150px]">
-                                    {task.name}
-                                  </span>
-
-                                  {hasDependencies && (
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger>
-                                          <GitBranch className="w-3 h-3 ml-2 text-indigo-600" />
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <div className="text-xs">
-                                            {task.predecessorsData.length} dipendenz{task.predecessorsData.length > 1 ? 'e' : 'a'}
-                                          </div>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                  )}
-
-                                  {isDelayed && (
-                                    <Badge className="ml-2 bg-amber-100 text-amber-700 border-amber-300">
-                                      <AlertTriangle className="w-3 h-3" />
-                                    </Badge>
-                                  )}
+                  );
+                }}
+                TaskListTable={() => (
+                  <div className="p-2 border-r h-full">
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                      modifiers={[]}
+                    >
+                      <table className="w-full h-full border-spacing-0 border-separate">
+                        <tbody>
+                          <SortableContext
+                            items={ganttTasks.map(t => t.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {ganttTasks.map((task, index) => (
+                              <SortableTaskRow
+                                key={task.id}
+                                task={task}
+                                index={index}
+                                ganttTasks={ganttTasks}
+                                canMove={
+                                  !isReadOnly && (checkAdminPermission(project) ||
+                                  isOwnTask(task.originalTask))
+                                }
+                                isLoading={isLoading}
+                                checkAdminPermission={checkAdminPermission}
+                                isOwnTask={isOwnTask}
+                                project={project}
+                                handleMoveButtonClick={handleMoveButtonClick}
+                                isReadOnly={isReadOnly}
+                              />
+                            ))}
+                          </SortableContext>
+                        </tbody>
+                      </table>
+                      <DragOverlay 
+                        dropAnimation={{
+                          duration: 250,
+                          easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+                        }}
+                      >
+                        {draggedTaskId ? (
+                          <div 
+                            className="bg-white shadow-2xl rounded-lg p-4 border-2 border-blue-500 min-w-[300px]"
+                            style={{
+                              cursor: 'grabbing',
+                              maxWidth: '400px',
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <GripVertical className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-base truncate">
+                                  {ganttTasks.find(t => t.id === draggedTaskId)?.name}
                                 </div>
-
-                                {task.assignedToName && (
-                                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                    <span className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-xs">
-                                      {task.assignedToName
-                                        .charAt(0)
-                                        .toUpperCase()}
-                                    </span>
-                                    <span className="truncate max-w-[140px]">
-                                      {task.assignedToName}
-                                    </span>
+                                {ganttTasks.find(t => t.id === draggedTaskId)?.assignedToName && (
+                                  <div className="text-sm text-gray-600 mt-1 truncate">
+                                    Assegnato a: {ganttTasks.find(t => t.id === draggedTaskId)?.assignedToName}
                                   </div>
                                 )}
-
-                                <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                  <Calendar className="w-3 h-3" />
-                                  <span
-                                    className={isDelayed ? "text-red-500" : ""}
-                                  >
-                                    {new Date(task.start).toLocaleDateString('it-IT', { 
-                                      day: '2-digit', 
-                                      month: 'short' 
-                                    })} - {new Date(task.end).toLocaleDateString('it-IT', { 
-                                      day: '2-digit', 
-                                      month: 'short',
-                                      year: 'numeric'
-                                    })}
-                                  </span>
-                                </div>
                               </div>
-                            </td>
-                            <td
-                              className="border-b w-10 text-center align-middle"
-                              style={{ height: "75px" }}
-                            >
-                              {/* PULSANTI RIORDINAMENTO MIGLIORATI */}
-                              {canMove && !isLoading && (
-                                <div className="flex flex-col gap-1 items-center">
-                                  {/* Pulsante SPOSTA SU */}
-                                  <button
-                                    type="button"
-                                    onClick={(e) =>
-                                      handleMoveButtonClick(e, task, "up")
-                                    }
-                                    className={`p-1 rounded bg-white hover:bg-gray-200 border border-gray-300 ${
-                                      index === 0 ||
-                                      moveInProgress.current ||
-                                      clickHandledRef.current
-                                        ? "opacity-30 cursor-not-allowed"
-                                        : "hover:border-gray-400"
-                                    }`}
-                                    disabled={
-                                      index === 0 ||
-                                      moveInProgress.current ||
-                                      clickHandledRef.current ||
-                                      isLoading
-                                    }
-                                    title="Sposta su"
-                                  >
-                                    <ArrowUp className="h-4 w-4 text-gray-600" />
-                                  </button>
-
-                                  {/* Pulsante SPOSTA GIÙ */}
-                                  <button
-                                    type="button"
-                                    onClick={(e) =>
-                                      handleMoveButtonClick(e, task, "down")
-                                    }
-                                    className={`p-1 rounded bg-white hover:bg-gray-200 border border-gray-300 ${
-                                      index === ganttTasks.length - 1 ||
-                                      moveInProgress.current ||
-                                      clickHandledRef.current
-                                        ? "opacity-30 cursor-not-allowed"
-                                        : "hover:border-gray-400"
-                                    }`}
-                                    disabled={
-                                      index === ganttTasks.length - 1 ||
-                                      moveInProgress.current ||
-                                      clickHandledRef.current ||
-                                      isLoading
-                                    }
-                                    title="Sposta giù"
-                                  >
-                                    <ArrowDown className="h-4 w-4 text-gray-600" />
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              barFill={90}
-              handleWidth={8}
-              columnWidth={
-                viewMode === ViewMode.Month
-                  ? 300
-                  : viewMode === ViewMode.Week
-                    ? 170
-                    : 60
-              }
-              listCellWidth="100px"
-              todayColor="rgba(252, 165, 165, 0.5)"
-              onTimeChange={handleTimeChange}
-              TaskListHeader={() => (
-                <div className="sticky top-0 z-10 bg-white">
-                  <table className="w-full h-full">
-                    <thead>
-                      <tr>
-                        <th className="p-1 border-r">Attività</th>
-                      </tr>
-                    </thead>
-                  </table>
-                </div>
-              )}
-              ganttHeight={0}
-              timeStep={10000}
-              fontFamily="Inter, system-ui, sans-serif"
-              fontSize="12px"
-              preStepsCount={1}
-              rtl={false}
-              locale="it-IT"
-            />
-          ) : (
-            <div className="p-4 text-center text-gray-500">
-              Nessuna attività corrispondente ai filtri selezionati
-            </div>
-          )}
+                            </div>
+                          </div>
+                        ) : null}
+                      </DragOverlay>
+                    </DndContext>
+                  </div>
+                )}
+                barFill={90}
+                handleWidth={8}
+                columnWidth={
+                  viewMode === ViewMode.Month
+                    ? 300
+                    : viewMode === ViewMode.Week
+                      ? 170
+                      : 60
+                }
+                listCellWidth="100px"
+                todayColor="rgba(252, 165, 165, 0.5)"
+                onTimeChange={handleTimeChange}
+                TaskListHeader={() => (
+                  <div className="sticky top-0 z-10 bg-white">
+                    <table className="w-full h-full">
+                      <thead>
+                        <tr>
+                          <th className="p-1 border-r">Attività</th>
+                        </tr>
+                      </thead>
+                    </table>
+                  </div>
+                )}
+                ganttHeight={0}
+                timeStep={10000}
+                fontFamily="Inter, system-ui, sans-serif"
+                fontSize="12px"
+                preStepsCount={1}
+                rtl={false}
+                locale="it-IT"
+              />
+            ) : (
+              <div className="p-4 text-center text-gray-500">
+                Nessuna attività corrispondente ai filtri selezionati
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Stato operazione (visibile solo durante un'operazione) */}
         {moveInProgress.current && (
-          <div className="p-2 border-t bg-blue-50 text-blue-700 text-sm flex items-center justify-center">
+          <div className="p-2 border-t bg-blue-50 text-blue-700 text-sm flex items-center justify-center flex-none">
             <span className="animate-pulse">Aggiornamento in corso...</span>
           </div>
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 };

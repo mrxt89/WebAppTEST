@@ -26,7 +26,7 @@ const MyTasksTimeTracking = ({
             Timesheet e reportistica
           </h2>
           <p className="text-gray-500 mt-1">
-            Gestisci e monitora le ore lavorate sui progetti
+            Gestisci le attività da portare a termine
           </p>
         </div>
 
