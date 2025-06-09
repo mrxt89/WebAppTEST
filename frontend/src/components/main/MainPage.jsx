@@ -822,18 +822,6 @@ const openChatModal = async (notificationId) => {
   }, [dropdownVisible, windowManagerMenuOpen]);
 
   useEffect(() => {
-    if (location?.state?.pageComponent !== undefined) {
-      setIsPageComponent(location.state.pageComponent);
-      if (location.state.breadcrumb) {
-        setBreadcrumb(location.state.breadcrumb);
-      }
-      if (location.state.selectedOrder) {
-        setPageTitle("Avanzamento ODP");
-      }
-    }
-  }, [location]);
-
-  useEffect(() => {
     if (!isDBNotificationsViewExecuted) {
       const initializeNotifications = async () => {
         await DBNotificationsView();

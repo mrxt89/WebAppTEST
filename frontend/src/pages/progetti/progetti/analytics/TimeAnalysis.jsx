@@ -471,7 +471,7 @@ const TimeAnalysis = ({ project, loading, workHoursData = [] }) => {
                   />
                   <Bar
                     yAxisId="right"
-                    name="Ore Lavorate"
+                    name="Ore"
                     dataKey="hours"
                     fill="#8884d8"
                   />
@@ -536,7 +536,7 @@ const TimeAnalysis = ({ project, loading, workHoursData = [] }) => {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-gray-500 flex items-center gap-2">
               <Clock className="h-4 w-4 text-blue-500" />
-              <span>Distribuzione Ore per Attività</span>
+              <span>Distribuzione ore per attività</span>
             </CardTitle>
           </CardHeader>
           <CardContent>

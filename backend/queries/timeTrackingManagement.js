@@ -16,7 +16,7 @@ const getUserTimeWeekly = async (userId, weekStartDate) => {
       .input('UserID', sql.Int, userId)
       .input('WeekStartDate', sql.Date, weekStartDate);
     
-    const result = await request.execute('AR_GetUserTimeWeekly');
+    const result = await request.execute('MA_GetUserTimeWeekly');
     return result.recordsets;
   } catch (err) {
     console.error('Error in getUserTimeWeekly:', err);
@@ -255,18 +255,18 @@ const getUserAvailableTasks = async (userId) => {
           t.Title AS TaskTitle,
           p.ProjectID,
           p.Name AS ProjectName
-        FROM AR_ProjectTasks t
-        JOIN AR_Projects p ON t.ProjectID = p.ProjectID
+        FROM MA_ProjectTasks t
+        JOIN MA_Projects p ON t.ProjectID = p.ProjectID
         WHERE 
           (
             -- L'utente è assegnato all'attività
             t.AssignedTo = @UserID
             
             -- L'utente è un assegnatario aggiuntivo dell'attività
-            OR EXISTS (SELECT 1 FROM AR_ProjectTaskAssignees a WHERE a.TaskID = t.TaskID AND a.UserID = @UserID)
+            OR EXISTS (SELECT 1 FROM MA_ProjectTaskAssignees a WHERE a.TaskID = t.TaskID AND a.UserID = @UserID)
             
             -- L'utente è un membro del progetto
-            OR EXISTS (SELECT 1 FROM AR_ProjectMembers m WHERE m.ProjectID = p.ProjectID AND m.UserID = @UserID)
+            OR EXISTS (SELECT 1 FROM MA_ProjectMembers m WHERE m.ProjectID = p.ProjectID AND m.UserID = @UserID)
           )
           -- Solo progetti attivi
           AND p.Status NOT IN ('CHIUSO', 'CANCELLATO', 'SOSPESO', 'RIFIUTATO', 'ANNULLATO')
@@ -310,7 +310,7 @@ const manageTimeEntry = async (action, entryId = null, entryData = null, created
         .input('Notes', sql.NVarChar(sql.MAX), entryData.Notes);
     }
     
-    const result = await request.execute('AR_ManageUserTaskTime');
+    const result = await request.execute('MA_ManageUserTaskTime');
     
     // Per GET restituisci l'intero recordset, per le altre azioni solo il primo record
     if (action === 'GET') {
@@ -340,10 +340,10 @@ const getProjectTimeSummary = async (projectId, userId) => {
       .input('UserID', sql.Int, userId)
       .query(`
         -- Verifica se l'utente è admin
-        IF EXISTS (SELECT 1 FROM [WebApp]..AR_Users WHERE userId = @UserID AND Role = 'ADMIN')
+        IF EXISTS (SELECT 1 FROM AR_Users WHERE userId = @UserID AND Role = 'ADMIN')
           SELECT 1 AS HasAccess
         -- Verifica se l'utente è membro del progetto
-        ELSE IF EXISTS (SELECT 1 FROM AR_ProjectMembers WHERE ProjectID = @ProjectID AND UserID = @UserID)
+        ELSE IF EXISTS (SELECT 1 FROM MA_ProjectMembers WHERE ProjectID = @ProjectID AND UserID = @UserID)
           SELECT 1 AS HasAccess
         ELSE
           SELECT 0 AS HasAccess
@@ -357,7 +357,7 @@ const getProjectTimeSummary = async (projectId, userId) => {
     const result = await pool.request()
       .input('ProjectID', sql.Int, projectId)
       .input('UserId', sql.Int, userId)
-      .execute('AR_GetProjectTimeSummary');
+      .execute('MA_GetProjectTimeSummary');
     
     return {
       projectSummary: result.recordsets[0][0] || { TotalHours: 0, TotalUsers: 0, TotalTasks: 0 },
@@ -386,16 +386,16 @@ const getTaskTimeSummary = async (taskId, userId) => {
       .input('UserID', sql.Int, userId)
       .query(`
         -- Verifica se l'utente è admin
-        IF EXISTS (SELECT 1 FROM [WebApp]..AR_Users WHERE userId = @UserID AND Role = 'ADMIN')
+        IF EXISTS (SELECT 1 FROM AR_Users WHERE userId = @UserID AND Role = 'ADMIN')
           SELECT 1 AS HasAccess
         -- Verifica se l'utente è assegnato all'attività
-        ELSE IF EXISTS (SELECT 1 FROM AR_ProjectTasks WHERE TaskID = @TaskID AND AssignedTo = @UserID)
+        ELSE IF EXISTS (SELECT 1 FROM MA_ProjectTasks WHERE TaskID = @TaskID AND AssignedTo = @UserID)
           SELECT 1 AS HasAccess
         -- Verifica se l'utente è membro del progetto
         ELSE IF EXISTS (
           SELECT 1 
-          FROM AR_ProjectTasks t
-          JOIN AR_ProjectMembers m ON t.ProjectID = m.ProjectID
+          FROM MA_ProjectTasks t
+          JOIN MA_ProjectMembers m ON t.ProjectID = m.ProjectID
           WHERE t.TaskID = @TaskID AND m.UserID = @UserID
         )
           SELECT 1 AS HasAccess
@@ -411,7 +411,7 @@ const getTaskTimeSummary = async (taskId, userId) => {
     const result = await pool.request()
       .input('TaskID', sql.Int, taskId)
       .input('UserId', sql.Int, userId)
-      .execute('AR_GetTaskTimeSummary');
+      .execute('MA_GetTaskTimeSummary');
     
     return {
       taskSummary: result.recordsets[0][0] || null,
@@ -454,7 +454,7 @@ const getUserTimeReport = async (userId, timeBucket = 'month', options = {}) => 
       .input('IncludeDetails', sql.Bit, includeDetails ? 1 : 0)
       .input('IncludeProjectDetails', sql.Bit, includeProjectDetails ? 1 : 0);
       
-    const result = await request.execute('AR_GetUserTimeReport');
+    const result = await request.execute('MA_GetUserTimeReport');
     
     // Costruisci l'oggetto di report con tutti i dati restituiti
     const reportData = {
@@ -570,7 +570,7 @@ const exportTimeReport = async (userId, timeBucket = 'month', period = null, for
     let pool = await sql.connect(config.dbConfig);
     const userResult = await pool.request()
       .input('UserID', sql.Int, userId)
-      .query('SELECT username, firstName, lastName, email FROM [WebApp]..AR_Users WHERE userId = @UserID');
+      .query('SELECT username, firstName, lastName, email FROM AR_Users WHERE userId = @UserID');
     
     const user = userResult.recordset[0] || { username: `User-${userId}` };
     

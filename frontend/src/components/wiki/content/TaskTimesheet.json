@@ -1,15 +1,15 @@
 {
   "title": "Guida Timesheet",
-  "description": "Questa sezione permette di registrare e visualizzare le ore lavorate sui progetti.",
+  "description": "Questa sezione permette di registrare e visualizzare le ore indicative dedicate ai singoli progetti.",
   "sections": [
     {
       "title": "Panoramica del Timesheet",
-      "content": "<p>Il <strong>Timesheet</strong> ti permette di tracciare le ore lavorate sui vari progetti e attività. Con questo strumento puoi:</p><ul><li>Registrare le ore lavorate quotidianamente</li><li>Visualizzare il riepilogo settimanale</li><li>Generare report e statistiche</li><li>Esportare i dati in formato CSV o Excel</li></ul><p>Il sistema calcola automaticamente i totali e mostra avvisi quando non raggiungi le ore lavorative previste.</p>",
+      "content": "<p>Il <strong>Timesheet</strong> ti permette di tracciare le ore sui vari progetti e attività. Con questo strumento puoi:</p><ul><li>Registrare le ore quotidianamente</li><li>Visualizzare il riepilogo settimanale</li><li>Generare report e statistiche</li><li>Esportare i dati in formato CSV o Excel</li></ul><p>Il sistema calcola automaticamente i totali e mostra avvisi quando non raggiungi le ore lavorative previste.</p>",
       "tourId": "panoramica_timesheet"
     },
     {
       "title": "Inserimento ore",
-      "content": "<p>Per inserire le ore lavorate:</p><ol><li>Individua il giorno e l'attività su cui vuoi registrare le ore</li><li>Clicca sul simbolo <strong>+</strong> corrispondente</li><li>Inserisci il numero di ore lavorate</li><li>Aggiungi eventuali note</li><li>Clicca su <strong>Salva</strong></li></ol><p>Puoi inserire ore anche facendo clic sul totale giornaliero per aggiungere ore a qualsiasi attività.</p>",
+      "content": "<p>Per inserire le ore:</p><ol><li>Individua il giorno e l'attività su cui vuoi registrare le ore</li><li>Clicca sul simbolo <strong>+</strong> corrispondente</li><li>Inserisci il numero di ore </li><li>Aggiungi eventuali note</li><li>Clicca su <strong>Salva</strong></li></ol><p>Puoi inserire ore anche facendo clic sul totale giornaliero per aggiungere ore a qualsiasi attività.</p>",
       "tourId": "inserimento_ore",
       "selector": ".lucide-plus",
       "position": "bottom"
@@ -74,7 +74,7 @@
     "inserimento_ore": [
       {
         "title": "Inserimento ore",
-        "description": "Ti mostrerò come inserire le ore lavorate.",
+        "description": "Ti mostrerò come inserire le ore.",
         "selector": "div[value='timesheet'] button:has(.h-4.w-4.mr-1), div[data-state='active'][role='tabpanel'] button:has(.h-4.w-4.mr-1)",
         "position": "bottom"
       },
@@ -86,7 +86,7 @@
       },
       {
         "title": "Inserisci le ore",
-        "description": "Inserisci il numero di ore lavorate. Puoi usare incrementi di 0.25 ore (15 minuti).",
+        "description": "Inserisci il numero di ore dedicate a questa attività. Puoi usare incrementi di 0.25 ore (15 minuti).",
         "selector": ".lucide-plus",
         "position": "bottom"
       },

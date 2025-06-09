@@ -192,7 +192,6 @@ const addUpdateProjectTask = async (taskData, userId) => {
         request.input('UserId', sql.Int, userId);
         request.input('AdditionalAssignees', sql.NVarChar(sql.MAX), taskData.AdditionalAssignees ? taskData.AdditionalAssignees : null);
         request.input('PredecessorTasks', sql.NVarChar(sql.MAX), taskData.PredecessorTasks ? taskData.PredecessorTasks : null); // Nuovo parametro
-
         const result = await request.execute('MA_AddUpdateProjectTask');
         console.log("[DEBUG] Result:", result.recordset[0]);
         return result.recordset[0];
