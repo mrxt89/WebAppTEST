@@ -153,7 +153,6 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
   // Validazione form
   const isFormValid = () => {
     return (
-      codeValidation.isValid &&
       formData.Description.trim() !== '' &&
       formData.Nature !== null &&
       formData.StatusId !== null
@@ -170,17 +169,6 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
 
   // Gestione submit
   const handleSubmit = async () => {
-    
-    // Verifica validazione del codice
-    if (!codeValidation.isValid) {
-      swal.fire({
-        title: "Errore di Validazione",
-        text: codeValidation.message || "Il codice articolo non è valido",
-        icon: "error",
-      });
-      return;
-    }
-
     // Verifica altri campi obbligatori
     if (!formData.Description.trim()) {
       swal.fire({
@@ -206,7 +194,7 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
       let result;
       const itemData = {
         ...formData,
-        Code: formData.Item, // Usa 'Code' per la nuova API con validazione
+        Code: formData.Item || '', // Permetti codice vuoto
       };
 
       if (mode === 'new') {
@@ -583,7 +571,6 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
                 <span className="text-sm font-medium">Campi da completare:</span>
               </div>
               <ul className="text-sm text-amber-600 list-disc list-inside space-y-1">
-                {!codeValidation.isValid && <li>Codice articolo valido</li>}
                 {!formData.Description.trim() && <li>Descrizione articolo</li>}
                 {!formData.Nature && <li>Natura articolo</li>}
                 {!formData.StatusId && <li>Stato articolo</li>}

@@ -52,6 +52,7 @@ const addUpdateItem = async (action, companyId, itemData, userId, projectId = nu
         request.output('ReturnValue', sql.BigInt);
         request.output('ErrorCode', sql.Int);
         request.output('ErrorMessage', sql.NVarChar(4000));
+        request.output('CreatedComponentCode', sql.VarChar(64)); // NUOVO parametro per il codice generato
 
         
         // Esecuzione della stored procedure
@@ -65,8 +66,8 @@ const addUpdateItem = async (action, companyId, itemData, userId, projectId = nu
 
         const result = {
             success: 1,
-            bomId: request.parameters.ReturnValue.value,
-            msg: `BOM ${action} operation completed successfully`
+            itemId: request.parameters.ReturnValue.value,
+            msg: `Item ${action.toLowerCase()} operation completed successfully`
         };
         
         // NUOVO: Aggiungi CreatedComponentCode al risultato se disponibile
