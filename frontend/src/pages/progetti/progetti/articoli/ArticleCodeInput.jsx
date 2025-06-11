@@ -33,7 +33,7 @@ const ArticleCodeInput = ({
   disabled = false,
   isFromERP = false,
   placeholder = "Inserisci codice articolo",
-  required = true,
+  required = false,
   className = ""
 }) => {
   const [validationState, setValidationState] = useState({
@@ -150,7 +150,7 @@ const ArticleCodeInput = ({
     if (validationState.status === 'idle' && !value) {
       return (
         <div className="text-gray-500 text-sm mt-1">
-          Inserisci un codice articolo univoco (max 64 caratteri)
+          Inserisci un codice articolo univoco (max 50 caratteri). Se vuoto, verrà creato automaticamente.
         </div>
       );
     }
@@ -202,7 +202,6 @@ const ArticleCodeInput = ({
       <Label htmlFor="item-code" className="flex items-center gap-2">
         <Package className="h-4 w-4" />
         Codice Articolo
-        {required && <span className="text-red-500">*</span>}
       </Label>
       
       <div className="relative">

@@ -350,7 +350,7 @@ const ArticleSelectionModal = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl h-[80vh] flex flex-col overflow-hidden">
+        <DialogContent className="max-w-4xl h-[80vh] w-full flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>
               Seleziona un Articolo Esistente o Crea Nuovo
