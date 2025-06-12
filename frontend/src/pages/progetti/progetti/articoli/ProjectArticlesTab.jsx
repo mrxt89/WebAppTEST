@@ -156,70 +156,87 @@ const ProjectArticlesTab = ({ project, canEdit }) => {
     setShowSelectionModal(true);
   };
 
-  // Gestione selezione di un articolo dal modale
-  const handleItemSelection = async (
-    item,
-    source,
-    importBOM = false,
-    processMultilevelBOM = true,
-    maxLevels = 5,
-  ) => {
-    try {
+// Gestione selezione di un articolo dal modale
+const handleItemSelection = async (
+  item,
+  source,
+  importBOM = false,
+  processMultilevelBOM = true,
+  maxLevels = 5,
+) => {
+  try {
+    // NUOVO: Se l'importazione è già stata completata dal wizard, 
+    // aggiorna solo la lista senza fare una nuova importazione
+    if (source === "already_imported") {
       setShowSelectionModal(false);
-      setLoading(true);
-
-      let result;
-      let newItemId;
-
-      if (source === "temporary") {
-        // Utilizziamo l'hook per associare l'articolo temporaneo esistente al progetto
-        result = await linkItemToProject(project.ProjectID, item.Id);
-        newItemId = item.Id;
-      } else if (source === "defined") {
-        // Utilizziamo l'hook per importare l'articolo dal gestionale
-        // con i nuovi parametri per la distinta base multilivello
-        result = await importERPItem(
-          project.ProjectID,
-          item.Item,
-          importBOM,
-          processMultilevelBOM,
-          maxLevels,
-        );
-        newItemId = result.itemId;
+      
+      // Ricarica la lista degli articoli
+      loadArticles();
+      
+      // Seleziona l'articolo appena importato se necessario
+      if (item && item.Id) {
+        setSelectedItem(item);
+        setSelectedRowId(item.Id);
       }
-
-      console.log("Item import result:", result);
-      if (result && result.success) {
-        // Se l'importazione è avvenuta con successo, mostra un messaggio
-        swal.fire({
-          title: "Successo",
-          text:
-            source === "temporary"
-              ? "Articolo esistente associato al progetto"
-              : importBOM
-                ? "Articolo e distinta base importati con successo"
-                : "Articolo importato con successo",
-          icon: "success",
-          timer: 1500,
-          showConfirmButton: false,
-        });
-
-        // Ricarica la lista degli articoli
-        loadArticles();
-      } else {
-        throw new Error((result && result.msg) || "Errore nell'operazione");
-      }
-    } catch (error) {
-      console.error("Error in item selection:", error);
-      swal.fire({
-        title: "Errore",
-        text: error.message || "Si è verificato un errore nell'operazione",
-        icon: "error",
-      });
-    } finally {
-      setLoading(false);
+      
+      return;
     }
-  };
+    
+    setShowSelectionModal(false);
+    setLoading(true);
+
+    let result;
+    let newItemId;
+
+    if (source === "temporary") {
+      // Utilizziamo l'hook per associare l'articolo temporaneo esistente al progetto
+      result = await linkItemToProject(project.ProjectID, item.Id);
+      newItemId = item.Id;
+    } else if (source === "defined") {
+      // Utilizziamo l'hook per importare l'articolo dal gestionale
+      // con i nuovi parametri per la distinta base multilivello
+      result = await importERPItem(
+        project.ProjectID,
+        item.Item,
+        importBOM,
+        processMultilevelBOM,
+        maxLevels,
+      );
+      newItemId = result.itemId;
+    }
+
+    console.log("Item import result:", result);
+    if (result && result.success) {
+      // Se l'importazione è avvenuta con successo, mostra un messaggio
+      swal.fire({
+        title: "Successo",
+        text:
+          source === "temporary"
+            ? "Articolo esistente associato al progetto"
+            : importBOM
+              ? "Articolo e distinta base importati con successo"
+              : "Articolo importato con successo",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
+      // Ricarica la lista degli articoli
+      loadArticles();
+    } else {
+      throw new Error((result && result.msg) || "Errore nell'operazione");
+    }
+  } catch (error) {
+    console.error("Error in item selection:", error);
+    swal.fire({
+      title: "Errore",
+      text: error.message || "Si è verificato un errore nell'operazione",
+      icon: "error",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Gestione creazione nuovo articolo dal modale
   const handleCreateNew = () => {

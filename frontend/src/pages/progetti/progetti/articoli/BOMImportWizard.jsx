@@ -163,16 +163,27 @@ const BOMImportWizard = ({
   // Gestione selezione componente con logica padre-figlio
   const handleComponentSelection = (nodeId, checked) => {
     const newSelected = { ...selectedComponents };
+    const newOptions = { ...componentOptions };
     
     if (checked) {
       // Se seleziono un componente, devo selezionare tutti i suoi padri
       selectWithParents(nodeId, newSelected);
+      
+      // Se il padre ha codice originale, forzo anche questo componente ad averlo
+      const parentId = findParentIdFromTree(nodeId);
+      if (parentId && newOptions[parentId]?.useOriginalCode) {
+        newOptions[nodeId] = {
+          ...newOptions[nodeId],
+          useOriginalCode: true
+        };
+      }
     } else {
       // Se deseleziono un componente, devo deselezionare tutti i suoi figli
       deselectWithChildren(nodeId, newSelected);
     }
     
     setSelectedComponents(newSelected);
+    setComponentOptions(newOptions);
   };
 
   const selectWithParents = (nodeId, selectedMap) => {
@@ -233,13 +244,52 @@ const BOMImportWizard = ({
 
   // Toggle opzione codice originale/temporaneo
   const toggleCodeOption = (nodeId) => {
-    setComponentOptions(prev => ({
-      ...prev,
-      [nodeId]: {
-        ...prev[nodeId],
-        useOriginalCode: !prev[nodeId]?.useOriginalCode
+    const currentOption = componentOptions[nodeId]?.useOriginalCode;
+    const newOption = !currentOption;
+    
+    const newOptions = { ...componentOptions };
+    
+    if (newOption) {
+      // Se sto passando a "mantieni codice originale"
+      // Devo forzare tutti i figli a mantenere il codice originale
+      forceChildrenToOriginalCode(nodeId, newOptions);
+    } else {
+      // Se sto passando a "codice temporaneo"
+      // Devo verificare che il padre non abbia codice originale
+      const parentId = findParentIdFromTree(nodeId);
+      if (parentId && componentOptions[parentId]?.useOriginalCode) {
+        // Il padre ha codice originale, non posso cambiare
+        toast({
+          title: "Operazione non consentita",
+          description: "Non puoi creare un codice temporaneo per un componente il cui padre mantiene il codice originale. Cambia prima l'opzione del padre.",
+          variant: "destructive",
+        });
+        return;
       }
-    }));
+    }
+    
+    newOptions[nodeId] = {
+      ...newOptions[nodeId],
+      useOriginalCode: newOption
+    };
+    
+    setComponentOptions(newOptions);
+  };
+  
+  // Forza tutti i figli a mantenere il codice originale
+  const forceChildrenToOriginalCode = (nodeId, optionsMap) => {
+    const node = findNodeById(nodeId, bomStructure);
+    if (node && node.children) {
+      node.children.forEach(child => {
+        if (selectedComponents[child.id]) {
+          optionsMap[child.id] = {
+            ...optionsMap[child.id],
+            useOriginalCode: true
+          };
+          forceChildrenToOriginalCode(child.id, optionsMap);
+        }
+      });
+    }
   };
 
   // Renderizza un nodo dell'albero
@@ -308,26 +358,36 @@ const BOMImportWizard = ({
           </div>
 
           {/* Toggle codice originale/temporaneo */}
-          {isSelected  && (
+          {isSelected && (
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7"
-                onClick={() => toggleCodeOption(node.id)}
-              >
-                {useOriginalCode ? (
-                  <>
-                    <Copy className="h-3 w-3 mr-1" />
-                    Mantieni codice
-                  </>
-                ) : (
-                  <>
-                    <Code className="h-3 w-3 mr-1" />
-                    Nuovo temporaneo
-                  </>
-                )}
-              </Button>
+              {(() => {
+                const parentId = findParentIdFromTree(node.id);
+                const parentHasOriginalCode = parentId && componentOptions[parentId]?.useOriginalCode;
+                const isDisabled = parentHasOriginalCode && !useOriginalCode;
+                
+                return (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`h-7 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => toggleCodeOption(node.id)}
+                    disabled={isDisabled}
+                    title={isDisabled ? "Il padre mantiene il codice originale, non puoi creare un codice temporaneo" : ""}
+                  >
+                    {useOriginalCode ? (
+                      <>
+                        <Copy className="h-3 w-3 mr-1" />
+                        Mantieni codice
+                      </>
+                    ) : (
+                      <>
+                        <Code className="h-3 w-3 mr-1" />
+                        Nuovo temporaneo
+                      </>
+                    )}
+                  </Button>
+                );
+              })()}
             </div>
           )}
 
@@ -347,8 +407,8 @@ const BOMImportWizard = ({
     );
   };
 
-// Conferma la selezione
-const handleConfirm = () => {
+  // Conferma la selezione
+  const handleConfirm = () => {
     // Prepara i dati per l'importazione
     const importData = {
       createNewBOM,
@@ -448,24 +508,29 @@ const handleConfirm = () => {
               <p className="mt-1">
                 Quando selezioni un componente, tutti i suoi padri vengono selezionati automaticamente.
               </p>
+              <p className="mt-1">
+                <strong>Nota:</strong> Se un componente mantiene il codice originale, tutti i suoi figli dovranno mantenerlo.
+              </p>
             </div>
           </div>
 
           {/* Albero componenti */}
-          <ScrollArea className="flex-1 border rounded-lg p-2">
-            {loading ? (
-              <div className="flex items-center justify-center h-32">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : bomStructure && bomStructure.length > 0 ? (
-              <div className="space-y-1">
-                {bomStructure.map(node => renderNode(node))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                Nessun componente trovato nella distinta
-              </div>
-            )}
+          <ScrollArea className="h-[500px] border rounded-lg [&_[data-radix-scroll-area-viewport]]:overflow-y-scroll [&_[data-radix-scroll-area-viewport]]:scrollbar-thin [&_[data-radix-scroll-area-viewport]]:scrollbar-thumb-gray-300 [&_[data-radix-scroll-area-viewport]]:scrollbar-track-gray-100">
+            <div className="p-2">
+              {loading ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : bomStructure && bomStructure.length > 0 ? (
+                <div className="space-y-1">
+                  {bomStructure.map(node => renderNode(node))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  Nessun componente trovato nella distinta
+                </div>
+              )}
+            </div>
           </ScrollArea>
 
           {/* Contatore selezione */}
