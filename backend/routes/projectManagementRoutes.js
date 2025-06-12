@@ -23,7 +23,9 @@ const {
     getUserMemberProjectsPaginated,
     manageTaskDependencies,
     checkCircularDependencies,
-    calculateTaskDates
+    calculateTaskDates,
+    getTaskCostsLog,
+    getTaskDependenciesLog
   } = require('../queries/projectManagement');
 
 // Ottieni tutte le unità di misura
@@ -301,6 +303,30 @@ router.post('/projects/tasks/:taskId/costs', authenticateToken, async (req, res)
         res.status(500).json({ success: 0, msg: err.message });
     }
  });
+
+ // Ottieni log dei costi per un task
+router.get('/projects/tasks/:taskId/costs/log', authenticateToken, async (req, res) => {
+    try {
+        const taskId = parseInt(req.params.taskId);
+        const result = await getTaskCostsLog(taskId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error fetching task costs log:', err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Ottieni log delle dipendenze per un task
+router.get('/projects/tasks/:taskId/dependencies/log', authenticateToken, async (req, res) => {
+    try {
+        const taskId = parseInt(req.params.taskId);
+        const result = await getTaskDependenciesLog(taskId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error fetching task dependencies log:', err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
 
  // Get task costs
 router.get('/projects/tasks/:taskId/costs', authenticateToken, async (req, res) => {

@@ -693,6 +693,53 @@ const calculateProjectDates = async (projectId) => {
     }
 };
 
+const getTaskCostsLog = async (taskId) => {
+  try {
+    const response = await fetch(
+      `${config.API_BASE_URL}/projects/tasks/${taskId}/costs/log`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Network response was not ok");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching task costs log:", error);
+    throw error;
+  }
+};
+
+const getTaskDependenciesLog = async (taskId) => {
+  try {
+    const response = await fetch(
+      `${config.API_BASE_URL}/projects/tasks/${taskId}/dependencies/log`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Network response was not ok");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching task dependencies log:", error);
+    throw error;
+  }
+};
+
+
   return {
     projects,
     loading,
@@ -730,7 +777,10 @@ const calculateProjectDates = async (projectId) => {
     getUserMemberProjectsPaginated,
     manageTaskDependencies,
     checkCircularDependencies,
-    calculateProjectDates
+    calculateProjectDates,
+    getTaskCostsLog,
+    getTaskDependenciesLog,
+    
   };
 };
 

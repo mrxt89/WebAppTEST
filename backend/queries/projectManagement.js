@@ -372,28 +372,51 @@ const getCostCategories = async () => {
     }
 };
 
-// Ottieni cronologia task
+// Ottieni cronologia task aggiornata con tutti i log
 const getTaskHistory = async (taskId) => {
     try {
         let pool = await sql.connect(config.dbConfig);
         const result = await pool.request()
             .input('TaskID', sql.Int, taskId)
-            .query(`
-                SELECT  T0.*
-                        , CONCAT(T1.firstName, ' ', T1.lastName ) AS Name
-                        , ISNULL(T2.Title,'') AS PredecessorTaskTitle
-                        , CONCAT(T3.firstName, ' ', T3.lastName ) AS AssignedToName
-                FROM    MA_ProjectTasks_Log (NOLOCK) T0
-                JOIN    AR_Users (NOLOCK) T1 ON T1.userId = T0.UserId
-                LEFT JOIN    MA_ProjectTasks (NOLOCK) T2 ON T2.TaskID = T0.PredecessorTaskID
-                JOIN    AR_Users (NOLOCK) T3 ON T3.userId = T0.AssignedTo
-                WHERE   T0.TaskID = @TaskID
-                ORDER BY T0.TBCreated DESC
-            `);
+            .execute('MA_GetTaskHistory');
 
         return result.recordset;
     } catch (err) {
         console.error('Error in getTaskHistory:', err);
+        throw err;
+    }
+};
+
+// Ottieni log dei costi di un task
+const getTaskCostsLog = async (taskId, startDate = null, endDate = null) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request()
+            .input('TaskID', sql.Int, taskId)
+            .input('StartDate', sql.DateTime, startDate)
+            .input('EndDate', sql.DateTime, endDate);
+
+        const result = await request.execute('MA_GetTaskCostsLog');
+        return result.recordset;
+    } catch (err) {
+        console.error('Error in getTaskCostsLog:', err);
+        throw err;
+    }
+};
+
+// Ottieni log delle dipendenze di un task
+const getTaskDependenciesLog = async (taskId, startDate = null, endDate = null) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request()
+            .input('TaskID', sql.Int, taskId)
+            .input('StartDate', sql.DateTime, startDate)
+            .input('EndDate', sql.DateTime, endDate);
+
+        const result = await request.execute('MA_GetTaskDependenciesLog');
+        return result.recordset;
+    } catch (err) {
+        console.error('Error in getTaskDependenciesLog:', err);
         throw err;
     }
 };
@@ -626,7 +649,7 @@ const calculateTaskDates = async (projectId) => {
 };
 
 module.exports = {
-    getPaginatedProjects,
+    getPaginatedProjects,   
     getProjectById,
     addUpdateProject,
     updateProjectMembers,
@@ -647,5 +670,7 @@ module.exports = {
     getUserMemberProjectsPaginated,
     manageTaskDependencies,
     checkCircularDependencies,
-    calculateTaskDates
+    calculateTaskDates,
+    getTaskCostsLog,
+    getTaskDependenciesLog
 };

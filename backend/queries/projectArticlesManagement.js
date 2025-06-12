@@ -2224,28 +2224,22 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
             componentsCount: importData.components.length
         });
         
-        // Parametri di input
-        request.input('CompanyId', sql.Int, companyId);
-        request.input('UserId', sql.Int, userId);
-        request.input('ProjectId', sql.Int, projectId);
-        request.input('SourceItem', sql.NVarChar(64), sourceItemCode);
-        request.input('SourceItemDescription', sql.NVarChar(128), sourceItemDescription);
-        request.input('CreateNewBOM', sql.Bit, importData.createNewBOM ? 1 : 0);
+        // IMPORTANTE: Definisci il tipo di tabella TVP
+        const tvp = new sql.Table('SelectedComponentsTableType');
         
-        // Prepara la tabella dei componenti selezionati
-        const componentsTable = new sql.Table();
-        componentsTable.columns.add('ComponentItemCode', sql.VarChar(64));
-        componentsTable.columns.add('Level', sql.Int);
-        componentsTable.columns.add('Path', sql.NVarChar(sql.MAX));
-        componentsTable.columns.add('UseOriginalCode', sql.Bit);
-        componentsTable.columns.add('Quantity', sql.Decimal(18, 5));
-        componentsTable.columns.add('ComponentType', sql.Int);
-        componentsTable.columns.add('Nature', sql.Int);
-        componentsTable.columns.add('UoM', sql.VarChar(10));
+        // Definisci le colonne del TVP nell'ordine esatto della definizione SQL
+        tvp.columns.add('ComponentItemCode', sql.VarChar(64));
+        tvp.columns.add('Level', sql.Int);
+        tvp.columns.add('Path', sql.NVarChar(sql.MAX));
+        tvp.columns.add('UseOriginalCode', sql.Bit);
+        tvp.columns.add('Quantity', sql.Decimal(18, 5));
+        tvp.columns.add('ComponentType', sql.Int);
+        tvp.columns.add('Nature', sql.Int);
+        tvp.columns.add('UoM', sql.VarChar(10));
         
         // Aggiungi i componenti alla tabella
         importData.components.forEach(comp => {
-            componentsTable.rows.add(
+            tvp.rows.add(
                 comp.ComponentItemCode || comp.Component,
                 comp.Level || 0,
                 comp.Path || '',
@@ -2256,65 +2250,185 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
                 comp.UoM || 'PZ'
             );
         });
+
+        console.log('Components table rows:', tvp.rows.length);
         
-        request.input('SelectedComponents', componentsTable);
+        // ALTERNATIVA: Usa una query diretta invece della stored procedure
+        // per evitare problemi con i parametri di output
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
         
-        // Parametri di output
-        request.output('ReturnItemId', sql.BigInt);
-        request.output('ReturnBOMId', sql.BigInt);
-        request.output('ImportedComponents', sql.Int);
-        request.output('ErrorCode', sql.Int);
-        request.output('ErrorMessage', sql.NVarChar(4000));
-        
-        // Esegui la stored procedure
-        await request.execute('MA_ProjectArticles_ImportWithSelection');
-        
-        // Controllo errori
-        const errorCode = request.parameters.ErrorCode.value || 0;
-        if (errorCode !== 0) {
-            console.error('SP Error:', {
+        try {
+            // Chiama la stored procedure usando una query SQL
+            const result = await transaction.request()
+                .input('CompanyId', sql.Int, companyId)
+                .input('UserId', sql.Int, userId)
+                .input('ProjectId', sql.Int, projectId)
+                .input('SourceItem', sql.NVarChar(64), sourceItemCode)
+                .input('SourceItemDescription', sql.NVarChar(128), sourceItemDescription)
+                .input('CreateNewBOM', sql.Bit, importData.createNewBOM ? 1 : 0)
+                .input('SelectedComponents', tvp)
+                .query(`
+                    DECLARE @ReturnItemId BIGINT;
+                    DECLARE @ReturnBOMId BIGINT;
+                    DECLARE @ImportedComponents INT;
+                    DECLARE @ErrorCode INT;
+                    DECLARE @ErrorMessage NVARCHAR(4000);
+                    
+                    EXEC [dbo].[MA_ProjectArticles_ImportWithSelection]
+                        @CompanyId = @CompanyId,
+                        @UserId = @UserId,
+                        @ProjectId = @ProjectId,
+                        @SourceItem = @SourceItem,
+                        @SourceItemDescription = @SourceItemDescription,
+                        @CreateNewBOM = @CreateNewBOM,
+                        @SelectedComponents = @SelectedComponents,
+                        @ReturnItemId = @ReturnItemId OUTPUT,
+                        @ReturnBOMId = @ReturnBOMId OUTPUT,
+                        @ImportedComponents = @ImportedComponents OUTPUT,
+                        @ErrorCode = @ErrorCode OUTPUT,
+                        @ErrorMessage = @ErrorMessage OUTPUT;
+                    
+                    SELECT 
+                        @ReturnItemId as ReturnItemId,
+                        @ReturnBOMId as ReturnBOMId,
+                        @ImportedComponents as ImportedComponents,
+                        @ErrorCode as ErrorCode,
+                        @ErrorMessage as ErrorMessage;
+                `);
+            
+            await transaction.commit();
+            
+            // Estrai i risultati
+            const outputRow = result.recordset[0] || {};
+            const returnItemId = outputRow.ReturnItemId;
+            const returnBOMId = outputRow.ReturnBOMId;
+            const importedComponents = outputRow.ImportedComponents || 0;
+            const errorCode = outputRow.ErrorCode || 0;
+            const errorMessage = outputRow.ErrorMessage || '';
+            
+            console.log('SP Output values:', {
+                returnItemId,
+                returnBOMId,
+                importedComponents,
                 errorCode,
-                errorMessage: request.parameters.ErrorMessage.value
+                errorMessage
             });
+            
+            // Controllo errori
+            if (errorCode !== 0) {
+                console.error('SP Error:', {
+                    errorCode,
+                    errorMessage
+                });
+                return {
+                    success: 0,
+                    msg: errorMessage || `Errore durante l'importazione. Codice errore: ${errorCode}`
+                };
+            }
+            
+            // Se non abbiamo un ID articolo valido, c'è stato un problema
+            if (!returnItemId) {
+                console.log('No ReturnItemId returned from SP');
+                
+                // Verifica debug aggiuntive
+                const checkSource = await pool.request()
+                    .input('Item', sql.NVarChar(64), sourceItemCode)
+                    .input('CompanyId', sql.Int, companyId)
+                    .query(`
+                        SELECT Item, Description, Nature, BaseUoM 
+                        FROM dbo.MA_Items 
+                        WHERE Item = @Item AND CompanyId = @CompanyId
+                    `);
+                
+                console.log('Source item in MA_Items:', checkSource.recordset);
+                
+                // Verifica se il progetto esiste
+                const checkProject = await pool.request()
+                    .input('ProjectId', sql.Int, projectId)
+                    .query(`
+                        SELECT ProjectId, ProjectDescription 
+                        FROM dbo.MA_Projects 
+                        WHERE ProjectId = @ProjectId
+                    `);
+                
+                console.log('Project exists:', checkProject.recordset);
+                
+                // Verifica l'ultimo articolo creato
+                const lastItem = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .query(`
+                        SELECT TOP 1 Id, Item, Description, TBCreated 
+                        FROM dbo.MA_ProjectArticles_Items 
+                        WHERE CompanyId = @CompanyId 
+                        ORDER BY TBCreated DESC
+                    `);
+                
+                console.log('Last created item:', lastItem.recordset[0]);
+                
+                return {
+                    success: 0,
+                    msg: 'Errore durante l\'importazione: nessun articolo creato. Verificare i log per maggiori dettagli.'
+                };
+            }
+            
+            // Ottieni i dettagli dell'articolo importato
+            let itemDetails = null;
+            try {
+                itemDetails = await getItemById(companyId, returnItemId);
+                console.log('Item details retrieved:', itemDetails);
+            } catch (err) {
+                console.error('Error getting item details:', err);
+            }
+            
+            // Se abbiamo creato componenti, recupera anche loro
+            let componentsDetails = [];
+            if (importedComponents > 0 && returnBOMId) {
+                try {
+                    const componentsQuery = await pool.request()
+                        .input('BOMId', sql.BigInt, returnBOMId)
+                        .input('CompanyId', sql.Int, companyId)
+                        .query(`
+                            SELECT 
+                                bc.Line,
+                                bc.ComponentId,
+                                bc.Quantity,
+                                bc.UoM,
+                                i.Item as ComponentCode,
+                                i.Description as ComponentDescription,
+                                i.Nature as ComponentNature
+                            FROM dbo.MA_ProjectArticles_BOMComponents bc
+                            INNER JOIN dbo.MA_ProjectArticles_Items i 
+                                ON bc.ComponentId = i.Id AND bc.CompanyId = i.CompanyId
+                            WHERE bc.BOMId = @BOMId AND bc.CompanyId = @CompanyId
+                            ORDER BY bc.Line
+                        `);
+                    
+                    componentsDetails = componentsQuery.recordset;
+                    console.log(`Retrieved ${componentsDetails.length} component details`);
+                } catch (err) {
+                    console.error('Error getting components details:', err);
+                }
+            }
+            
+            // Risultato
             return {
-                success: 0,
-                msg: request.parameters.ErrorMessage.value || `Errore codice: ${errorCode}`
+                success: 1,
+                item: itemDetails || { Id: returnItemId },
+                bomId: returnBOMId,
+                importedComponents: importedComponents,
+                components: componentsDetails,
+                msg: `Articolo ${itemDetails?.Item || sourceItemCode} e ${importedComponents} componenti importati con successo`
             };
+            
+        } catch (err) {
+            await transaction.rollback();
+            throw err;
         }
-        
-        // Estrai i valori di output
-        const returnItemId = request.parameters.ReturnItemId.value;
-        const returnBOMId = request.parameters.ReturnBOMId.value;
-        const importedComponents = request.parameters.ImportedComponents.value || 0;
-        
-        console.log('SP Output:', {
-            returnItemId,
-            returnBOMId,
-            importedComponents
-        });
-        
-        // Se non abbiamo un ID articolo valido, c'è stato un problema
-        if (!returnItemId) {
-            return {
-                success: 0,
-                msg: 'Errore durante l\'importazione: nessun articolo creato'
-            };
-        }
-        
-        // Ottieni i dettagli dell'articolo importato
-        const itemDetails = await getItemById(companyId, returnItemId);
-        
-        // Risultato
-        return {
-            success: 1,
-            item: itemDetails || { Id: returnItemId },
-            bomId: returnBOMId,
-            importedComponents: importedComponents,
-            msg: `Articolo ${sourceItemCode} e ${importedComponents} componenti importati con successo`
-        };
         
     } catch (err) {
         console.error('Error in importERPItemWithSelection:', err);
+        console.error('Error stack:', err.stack);
         return {
             success: 0,
             msg: err.message || 'Errore durante l\'importazione con selezione'
