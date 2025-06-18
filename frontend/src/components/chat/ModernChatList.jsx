@@ -1168,8 +1168,11 @@ const ModernChatList = ({
   }, []);
 
   const renderDateSeparator = (date) => (
-    <div className="chat-date-separator sticky top-0 z-10 bg-white/80 backdrop-blur-sm">
-      <span>{date}</span>
+    <div className="chat-date-separator sticky top-0 z-10" style={{
+    }}>
+      <span
+      className="border w-50"
+      >{date}</span>
     </div>
   );
 

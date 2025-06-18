@@ -248,6 +248,14 @@ export const useNotifications = () => {
 
         // Altrimenti carica dal server
         await handleNotificationUpdate(notificationId, highPriority);
+        
+        // IMPORTANTE: Carica anche i sondaggi per questa notifica
+        try {
+          console.log(`📊 Caricamento sondaggi per notifica ${notificationId}...`);
+          await dispatch(getNotificationPolls(notificationId));
+        } catch (pollError) {
+          console.error('Errore nel caricamento dei sondaggi:', pollError);
+        }
 
         // Ritorna openChatData aggiornato o notification dalla lista
         return openChatData[notificationId] || 
@@ -257,7 +265,7 @@ export const useNotifications = () => {
         throw error;
       }
     },
-    [handleNotificationUpdate, notifications, openChatData],
+    [handleNotificationUpdate, notifications, openChatData, dispatch],
   );
 
   const DBNotificationsView = useCallback(() => {

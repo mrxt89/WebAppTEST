@@ -237,7 +237,6 @@ const ChatSidebar = forwardRef((props, ref) => {
         // Aggiorna la lista degli allegati
         const updatedAttachments = await refreshAttachments(notificationId);
         setAttachments(updatedAttachments || []);
-        swal.fire("Eliminato!", "L'allegato è stato eliminato.", "success");
         // Aggiorna gli allegati
         getNotificationAttachments(notificationId)
           .then((data) => {

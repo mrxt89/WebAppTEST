@@ -92,7 +92,6 @@ const AttachmentsList = ({ notificationId, onAttachmentUploaded }) => {
         await refreshAttachments(notificationId);
 
         onAttachmentUploaded?.(); // Ricarica la lista se necessario
-        swal.fire("Eliminato!", "L'allegato è stato eliminato.", "success");
       }
     } catch (error) {
       swal.fire(

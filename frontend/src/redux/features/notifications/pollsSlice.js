@@ -19,7 +19,8 @@ export const createPoll = createAsyncThunk(
     { rejectWithValue, dispatch },
   ) => {
     try {
-      if (!notificationId || !messageId) {
+      console.log("createPoll", notificationId, messageId, question, options, allowMultipleAnswers, expirationDate);
+      if (!notificationId) {
         return rejectWithValue("Invalid notification or message ID");
       }
 
@@ -201,6 +202,8 @@ export const getNotificationPolls = createAsyncThunk(
         },
       );
 
+      console.log("response POLLS", response);
+      
       if (response.data && response.data.success) {
         // Convert array to a map indexed by messageId for easier lookup
         const pollsMap = {};
@@ -378,8 +381,17 @@ const pollsSlice = createSlice({
         // Store all polls by their ID
         if (polls && Array.isArray(polls)) {
           polls.forEach((poll) => {
-            if (poll.id) {
-              state.polls[poll.id] = poll;
+            if (poll.PollID) {
+              // Parse le opzioni JSON
+              try {
+                if (typeof poll.Options === 'string') {
+                  poll.Options = JSON.parse(poll.Options);
+                }
+              } catch (e) {
+                console.error('Errore nel parsing delle opzioni:', e);
+              }
+              
+              state.polls[poll.PollID] = poll;
             }
           });
         }

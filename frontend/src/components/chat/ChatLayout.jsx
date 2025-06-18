@@ -4,7 +4,8 @@ import ModernChatList from "./ModernChatList";
 import { motion, AnimatePresence } from "framer-motion";
 import FileViewer from "@/components/ui/fileViewer";
 import ChatSidebar from "./ChatSidebar";
-import ChatBottomBar from "./ChatBottomBar"; // Aggiungi import per ChatBottomBar
+import ChatBottomBar from "./ChatBottomBar";
+import PollButton from "./PollButton";
 
 const ChatLayout = ({
   messages,
@@ -25,18 +26,18 @@ const ChatLayout = ({
   notificationCategoryId,
   hexColor,
   hasLeftChat,
-  initialSidebarOpen = true, // Nuovo parametro per decidere se aprire inizialmente la sidebar
-  selectedMessageId = null, // Nuovo parametro per evidenziare un messaggio specifico
+  initialSidebarOpen = true,
+  selectedMessageId = null,
   onEditMessage,
   onViewVersionHistory,
   onReactionSelect,
-  replyToMessage, // Aggiungi per ricevere replyToMessage
-  setReplyToMessage, // Aggiungi per ricevere setReplyToMessage
-  setSending, // Aggiungi per ricevere setSending
-  onSend, // Aggiungi per ricevere onSend
-  responseOptions, // Aggiungi per ricevere responseOptions
-  uploadNotificationAttachment, // Aggiungi per l'upload di allegati
-  captureAndUploadPhoto, // Aggiungi per la cattura foto
+  replyToMessage,
+  setReplyToMessage,
+  setSending,
+  onSend,
+  responseOptions,
+  uploadNotificationAttachment,
+  captureAndUploadPhoto,
   hasNewMessages,
   reopenChat,
   closeChat,
@@ -54,9 +55,25 @@ const ChatLayout = ({
     typeof receivers === "string" ? receivers.split("-").filter(Boolean) : [],
   );
   const [selectedMessageText, setSelectedMessageText] = useState("");
-  // Calcola online status per compatibilità con vecchio componente
   const [onlineStatus, setOnlineStatus] = useState({});
   const sidebarRef = useRef(null);
+  
+  const { getNotificationPolls } = useNotifications();
+
+  // IMPORTANTE: Carica i sondaggi quando si apre la chat
+  useEffect(() => {
+    if (notificationId && messages && messages.length > 0) {
+      // Controlla se ci sono messaggi con pollId
+      const hasPolls = messages.some(m => m.pollId);
+      
+      if (hasPolls) {
+        console.log(`📊 Chat ${notificationId} contiene sondaggi, caricamento...`);
+        getNotificationPolls(notificationId).catch(err => {
+          console.error('Errore nel caricamento dei sondaggi:', err);
+        });
+      }
+    }
+  }, [notificationId, messages, getNotificationPolls]);
 
   // Gestione della visualizzazione mobile/desktop
   useEffect(() => {
@@ -179,11 +196,11 @@ const ChatLayout = ({
 
       {/* Main chat area */}
       <div
-        className={`flex-1 transition-all ${isSidebarOpen && !isMobile && !hasLeftChat ? "ml-4" : ""} flex flex-col`}
+        className={`flex-1 transition-all ${isSidebarOpen && !isMobile && !hasLeftChat ? "" : ""} flex flex-col`}
         style={{
           marginLeft:
             isSidebarOpen && !hasLeftChat ? (isMobile ? "0" : "") : "0",
-          transition: "margin-left 0.3s ease-in-out",
+          transition: "margin-left 0.3s ease-in-out"
         }}
       >
         <div className="flex-1 overflow-hidden">
@@ -203,6 +220,13 @@ const ChatLayout = ({
             onViewVersionHistory={onViewVersionHistory}
             onReactionSelect={onReactionSelect}
             users={users}
+            onLoadMore={onLoadMore}
+            hasMoreMessages={hasMoreMessages}
+            isLoadingMore={isLoadingMore}
+            totalMessageCount={totalMessageCount}
+            onMessageDeleted={onMessageDeleted}
+            onMessageColorChanged={onMessageColorChanged}
+            hasNewMessages={hasNewMessages}
           />
         </div>
 
@@ -242,6 +266,18 @@ const ChatLayout = ({
             />
           )}
         </div>
+      </div>
+      
+      {/* Componente invisibile che gestisce gli eventi dei sondaggi */}
+      <div style={{ display: 'none' }}>
+        <PollButton
+          notificationId={notificationId}
+          currentUserId={messages[0]?.selectedUser || users[0]?.userId || 0}
+          onPollCreated={(pollData, messageResult) => {
+            console.log('Sondaggio creato:', pollData);
+            // Puoi aggiungere qui logica per ricaricare i messaggi se necessario
+          }}
+        />
       </div>
     </div>
   );

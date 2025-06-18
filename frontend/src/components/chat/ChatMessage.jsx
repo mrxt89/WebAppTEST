@@ -589,12 +589,14 @@ const ChatMessage = memo(({
                 )}
               </AnimatePresence>
               
+              
               {/* Contenuto messaggio */}
               <div style={{ paddingTop: "15px", paddingBottom: "10px", fontSize: "1rem" }}>
                 {isPollMessage ? (
                   <PollModal 
                     pollId={message.pollId} 
                     messageId={message.messageId}
+                    notificationId={notificationId}
                     currentUserId={currentUserId}
                   />
                 ) : (
