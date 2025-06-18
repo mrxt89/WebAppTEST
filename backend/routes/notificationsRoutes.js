@@ -946,101 +946,77 @@ router.post('/leave-chat', authenticateToken, async (req, res) => {
 // Crea un nuovo sondaggio
 router.post('/polls', authenticateToken, async (req, res) => {
   try {
-    const { notificationId, question, options, allowMultipleAnswers, expirationDate } = req.body;
+    const { 
+      notificationId, 
+      messageId,  // IMPORTANTE: Ora riceviamo direttamente il messageId dal frontend
+      question, 
+      options, 
+      allowMultipleAnswers, 
+      expirationDate 
+    } = req.body;
+    
     const userId = req.user.UserId;
     
     // Verifica parametri base
-    if (!notificationId || !question || !options || !Array.isArray(options)) {
+    if (!notificationId || !messageId || !question || !options || !Array.isArray(options)) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Parametri mancanti o non validi' 
+        message: 'Parametri mancanti o non validi. Richiesti: notificationId, messageId, question, options' 
       });
     }
     
-    // 1. Crea un messaggio per il sondaggio
-    const pollMessage = `📊 **Sondaggio creato**: "${question}"`;
-    
-   
-    // Chiamata a sendNotification
-    const messageResult = await sendNotification({ 
-      notificationId, 
-      message: pollMessage,
-      responseOptionId: 3,
-      eventId: 0,
-      userId
-    });
-    
-   
-    
-    if (!messageResult) {
-      throw new Error('Risposta vuota da sendNotification');
+    if (options.length < 2) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Sono richieste almeno 2 opzioni per il sondaggio' 
+      });
     }
     
-    // Estrai il messageId dal risultato
-    let createdMessageId;
+    // NON creiamo un nuovo messaggio qui perché il frontend l'ha già fatto!
+    // Procediamo direttamente alla creazione del sondaggio
     
-    // Se messages è una stringa JSON, parsala
-    if (typeof messageResult.messages === 'string') {
-      try {
-        const messages = JSON.parse(messageResult.messages);
-        
-        if (Array.isArray(messages) && messages.length > 0) {
-          // Cerca il messaggio con il testo del sondaggio
-          const pollMsg = messages.find(m => m.message && m.message.includes('**Sondaggio creato**'));
-          
-          if (pollMsg && pollMsg.messageId) {
-            createdMessageId = pollMsg.messageId;
-        
-          } else {
-            // Usa l'ID dell'ultimo messaggio
-            createdMessageId = messages[messages.length - 1].messageId;
-           
-          }
-        }
-      } catch (e) {
-        console.error('Errore nel parsing dei messaggi:', e);
-      }
-    } 
-    // Se messages è già un array
-    else if (Array.isArray(messageResult.messages) && messageResult.messages.length > 0) {
-      const pollMsg = messageResult.messages.find(m => m.message && m.message.includes('**Sondaggio creato**'));
-      
-      if (pollMsg && pollMsg.messageId) {
-        createdMessageId = pollMsg.messageId;
-      } else {
-        createdMessageId = messageResult.messages[messageResult.messages.length - 1].messageId;
-      }
-
-    }
+    console.log("Creazione sondaggio con messageId esistente:", messageId);
     
-    // Se ancora non abbiamo un ID, facciamo un'ultima ricerca
-    if (!createdMessageId) {
-      // Cerca l'ID più recente dalla notifica
-     
-      // In una situazione reale, potremmo eseguire una query al database
-      // Ma per ora, generiamo un errore più descrittivo
-      throw new Error('Impossibile trovare il messageId nella risposta. Controlla la struttura della risposta di sendNotification');
-    }
-    
-    // 2. Crea il sondaggio collegato al messaggio
+    // Formatta le opzioni per la stored procedure
     const formattedOptions = options.map((option, index) => ({
-      text: option,
+      text: typeof option === 'string' ? option : option.text,
       order: index + 1
     }));
     
-  
+    console.log("Parametri per createPoll:", {
+      notificationId,
+      messageId,
+      question,
+      formattedOptions,
+      allowMultipleAnswers,
+      userId,
+      expirationDate
+    });
     
+    // Crea il sondaggio collegato al messaggio già esistente
     const poll = await createPoll(
       notificationId, 
-      createdMessageId, 
+      messageId, 
       question, 
       formattedOptions, 
       allowMultipleAnswers || false, 
       userId, 
       expirationDate
     );
- 
-    res.json({ success: true, poll, messageId: createdMessageId });
+    
+    if (!poll) {
+      throw new Error('Errore durante la creazione del sondaggio nel database');
+    }
+    
+    console.log("Sondaggio creato con successo:", poll);
+    
+    res.json({ 
+      success: true, 
+      poll, 
+      messageId: messageId,
+      message: 'Sondaggio creato con successo' 
+    });
+    
   } catch (error) {
     console.error('Error creating poll:', error);
     res.status(500).json({ 

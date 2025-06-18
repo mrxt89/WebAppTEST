@@ -1,4 +1,4 @@
-// PollMessage.jsx - File COMPLETO
+// PollMessage.jsx - File COMPLETO CORRETTO
 
 import React, { useState, useEffect } from "react";
 import { BarChart, Check, CheckCircle, Clock, X } from "lucide-react";
@@ -17,6 +17,8 @@ const PollMessage = ({
   const [showingResults, setShowingResults] = useState(showResults);
   const [pollData, setPollData] = useState(poll);
   const [selectedOptions, setSelectedOptions] = useState([]);
+  
+  // IMPORTANTE: Tutti gli hook devono essere dichiarati SEMPRE, non condizionalmente
   const { votePoll, closePoll } = useNotifications();
 
   // Log poll data when received to help debug
@@ -92,8 +94,6 @@ const PollMessage = ({
       return { max: 0, totalVotes: 0, options: [] };
     }
   };
-
-  const stats = calculateStats();
 
   // Gestisci il voto
   const handleVote = async (optionId) => {
@@ -179,7 +179,7 @@ const PollMessage = ({
         showCancelButton: true,
         confirmButtonText: "Sì, chiudi il sondaggio",
         cancelButtonText: "Annulla",
-        zIndex: 9999, // Aggiungi questa riga per aumentare lo z-index
+        zIndex: 9999,
       });
 
       if (confirmed.isConfirmed) {
@@ -192,7 +192,7 @@ const PollMessage = ({
             title: "Completato",
             text: "Il sondaggio è stato chiuso",
             icon: "success",
-            zIndex: 9999, // Aggiungi questa riga per aumentare lo z-index
+            zIndex: 9999,
           });
         }
       }
@@ -202,7 +202,7 @@ const PollMessage = ({
         title: "Errore",
         text: error.response?.data?.message || "Si è verificato un errore",
         icon: "error",
-        zIndex: 9999, // Aggiungi questa riga per aumentare lo z-index
+        zIndex: 9999,
       });
     }
   };
@@ -230,23 +230,11 @@ const PollMessage = ({
     }
   };
 
-  // If poll data is not available or incomplete, show loading
-  if (!pollData || !pollData.PollID) {
-    return (
-      <div
-        className="w-full bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center"
-        style={{ zIndex: 1200, position: "relative" }}
-      >
-        <BarChart className="h-5 w-5 text-blue-500 mx-auto mb-2" />
-        <p className="text-gray-500">Caricamento sondaggio...</p>
-      </div>
-    );
-  }
-
-  // Controlla se l'utente è il creatore del sondaggio
-  const isCreator = currentUserId === pollData.CreatedBy;
+  // IMPORTANTE: Calcola tutte le variabili PRIMA dei return condizionali
+  const stats = calculateStats();
+  const isCreator = currentUserId === pollData?.CreatedBy;
   const userVoted = hasUserVoted();
-  const isPollClosed = pollData.Status === "Closed";
+  const isPollClosed = pollData?.Status === "Closed";
 
   // Se l'utente ha votato o il sondaggio è chiuso, mostra i risultati
   useEffect(() => {
@@ -255,10 +243,23 @@ const PollMessage = ({
     }
   }, [userVoted, isPollClosed]);
 
+  // If poll data is not available or incomplete, show loading
+  if (!pollData || !pollData.PollID) {
+    return (
+      <div
+        className="w-full bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center"
+        style={{ position: "relative" }}
+      >
+        <BarChart className="h-5 w-5 text-blue-500 mx-auto mb-2" />
+        <p className="text-gray-500">Caricamento sondaggio...</p>
+      </div>
+    );
+  }
+
   return (
     <div
       className="w-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
-      style={{ zIndex: 1200, position: "relative" }}
+      style={{ position: "relative" }}
     >
       {/* Intestazione */}
       <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">

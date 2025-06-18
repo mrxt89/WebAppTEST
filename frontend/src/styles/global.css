@@ -1247,33 +1247,6 @@ button:disabled {
   white-space: nowrap;
 }
 
-/* Separatore data */
-.chat-date-separator {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  margin: 18px 0 10px 0;
-}
-
-.chat-date-separator span {
-  background: #e5e7eb;
-  color: #64748b;
-  padding: 2px 16px;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin: 0 auto;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-}
-
-.chat-date-separator:before,
-.chat-date-separator:after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: #e5e7eb;
-  margin: 0 8px;
-}
 
 /* Stile per il messaggio citato */
 .message-quote {
@@ -1820,31 +1793,6 @@ button:disabled {
   position: relative;
 }
 
-/* Separatore data */
-.chat-date-separator {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  margin: 18px 0 10px 0;
-}
-.chat-date-separator span {
-  background: #e5e7eb;
-  color: #64748b;
-  padding: 2px 16px;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin: 0 auto;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-}
-.chat-date-separator:before,
-.chat-date-separator:after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: #e5e7eb;
-  margin: 0 8px;
-}
 
 /* Bolle messaggi */
 .message-bubble {
@@ -2358,4 +2306,3 @@ button:disabled {
   25% { transform: rotate(-10deg); }
   75% { transform: rotate(10deg); }
 }
-

@@ -28,13 +28,13 @@ let lastRequestTime = 0;
 
 function logError(...args) {
   const timestamp = new Date().toISOString();
-  console.error(`[NotificationWorker ERROR ${timestamp}]`, ...args);
+ 
 }
 
 function logDebug(...args) {
   if (debugEnabled) {
     const timestamp = new Date().toISOString();
-    console.log(`[NotificationWorker DEBUG ${timestamp}]`, ...args);
+   
   }
 }
 

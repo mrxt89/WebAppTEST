@@ -51,7 +51,6 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import axios from "axios";
 import { config } from "@/config";
-import PollButton from "./PollButton";
 import PollFilter from "./PollFilter";
 import DocumentLinker from "./DocumentLinker";
 import ImprovedSearchBar from "./ImprovedSearchBar";
@@ -618,12 +617,6 @@ const ChatTopBar = ({
     document.dispatchEvent(event);
   };
 
-  const handlePollCreated = (poll, messageResult) => {
-    if (messageResult && messageResult.notificationId) {
-      fetchNotificationById(messageResult.notificationId);
-    }
-  };
-
   // Funzione per gestire l'archiviazione della chat
   const handleArchiveChat = async () => {
     if (!archiveChat || !notificationId) return;
@@ -717,9 +710,9 @@ const ChatTopBar = ({
 
   return (
     <div
-      className="relative flex flex-col shadow-sm"
+      className="relative flex flex-col shadow-sm "
       style={{
-        background: `${categoryColor}15`,
+        background: `${categoryColor}25`,
         borderBottom: `1px solid ${categoryColor}40`,
         zIndex: 1000,
         position: 'relative'
@@ -823,14 +816,6 @@ const ChatTopBar = ({
           {/* Desktop: Mostra tutti i pulsanti */}
           {!isMobile && (
             <>
-              {/* Pulsanti dei sondaggi e archivio */}
-              {!hasLeftChat && notificationId > 0 && (
-                <PollButton
-                  notificationId={notificationId}
-                  onPollCreated={handlePollCreated}
-                  currentUserId={currentUser?.userId}
-                />
-              )}
               {/* PopoutButton solo se non è già modalità standalone */}
               {!isStandalone &&
                 !hasLeftChat &&
@@ -1061,6 +1046,79 @@ const ChatTopBar = ({
                             <span>Abbandona chat</span>
                           </button>
                         )}
+
+                        {/* Pulsanti per le azioni sulla chat */}
+                        <div className="mt-1 pt-3 border-t border-gray-200 space-y-2">
+                          {!hasLeftChat ? (
+                            <>
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => setIsDocumentLinkerOpen(true)}
+                                  className="relative flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full"
+                                  title="Documenti collegati"
+                                >
+                                  <Link className="h-4 w-4" />
+                                  {documents.length > 0 && (
+                                    <span className="absolute top-0 right-0 bg-blue-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
+                                      {documents.length}
+                                    </span>
+                                  )}
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    document.dispatchEvent(
+                                      new CustomEvent("show-poll-modal"),
+                                    );
+                                  }}
+                                  className="relative flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full"
+                                  title="Crea sondaggio"
+                                >
+                                  <BarChart className="h-4 w-4" />
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    document.dispatchEvent(
+                                      new CustomEvent("show-polls-list"),
+                                    );
+                                  }}
+                                  className="relative flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full"
+                                  title="Visualizza sondaggi"
+                                >
+                                  <MessageSquareText className="h-4 w-4" />
+                                </button>
+                              </div>
+
+                              {isArchived ? (
+                                <button
+                                  onClick={handleUnarchiveChat}
+                                  className="w-full py-2 px-3 flex items-center justify-center gap-2 rounded bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors"
+                                >
+                                  <ArchiveX className="h-4 w-4" />
+                                  <span className="text-sm font-medium">
+                                    Rimuovi dall'archivio
+                                  </span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={handleArchiveChat}
+                                  className="w-full py-2 px-3 flex items-center justify-center gap-2 rounded bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors"
+                                >
+                                  <Archive className="h-4 w-4" />
+                                  <span className="text-sm font-medium">
+                                    Archivia chat
+                                  </span>
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <div className="p-2 bg-yellow-50 rounded-lg text-yellow-800 text-center text-sm">
+                              <AlertOctagon className="h-4 w-4 mb-1 mx-auto" />
+                              Hai abbandonato questa chat
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </motion.div>
                   )}
@@ -1174,7 +1232,7 @@ const ChatTopBar = ({
             </div>
 
             {/* Tab content container */}
-            <div className="overflow-y-auto" style={{ maxHeight: "50vh" }}>
+            <div className="overflow-y-auto" style={{ maxHeight: "55vh" }}>
               {/* INFO TAB */}
               {activeTab === "info" && (
                 <div className="p-4">
@@ -1252,21 +1310,48 @@ const ChatTopBar = ({
                   </div>
 
                   {/* Pulsanti per le azioni sulla chat */}
-                  <div className="mt-5 pt-3 border-t border-gray-200 space-y-2">
+                  <div className="mt-1 pt-3 border-t border-gray-200 space-y-2">
                     {!hasLeftChat ? (
                       <>
-                        <button
-                          onClick={() => setIsDocumentLinkerOpen(true)}
-                          className="relative flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full"
-                          title="Documenti collegati"
-                        >
-                          <Link className="h-4 w-4" />
-                          {documents.length > 0 && (
-                            <span className="absolute top-0 right-0 bg-blue-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
-                              {documents.length}
-                            </span>
-                          )}
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => setIsDocumentLinkerOpen(true)}
+                            className="relative flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full"
+                            title="Documenti collegati"
+                          >
+                            <Link className="h-4 w-4" />
+                            {documents.length > 0 && (
+                              <span className="absolute top-0 right-0 bg-blue-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
+                                {documents.length}
+                              </span>
+                            )}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              document.dispatchEvent(
+                                new CustomEvent("show-poll-modal"),
+                              );
+                            }}
+                            className="relative flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full"
+                            title="Crea sondaggio"
+                          >
+                            <BarChart className="h-4 w-4" />
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              document.dispatchEvent(
+                                new CustomEvent("show-polls-list"),
+                              );
+                            }}
+                            className="relative flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full"
+                            title="Visualizza sondaggi"
+                          >
+                            <MessageSquareText className="h-4 w-4" />
+                          </button>
+                        </div>
+
                         {isArchived ? (
                           <button
                             onClick={handleUnarchiveChat}
@@ -1288,15 +1373,6 @@ const ChatTopBar = ({
                             </span>
                           </button>
                         )}
-                        <button
-                          onClick={() => leaveChat && leaveChat(notificationId)}
-                          className="w-full py-2 px-3 flex items-center justify-center gap-2 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                        >
-                          <LogOut className="h-4 w-4" />
-                          <span className="text-sm font-medium">
-                            Abbandona chat
-                          </span>
-                        </button>
                       </>
                     ) : (
                       <div className="p-2 bg-yellow-50 rounded-lg text-yellow-800 text-center text-sm">

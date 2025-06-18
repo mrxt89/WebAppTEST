@@ -73,21 +73,19 @@ export const useOpenChat = (notificationId, options = {}) => {
   // CORREZIONE: Parse dei messaggi direttamente da Redux
   const messages = useMemo(() => {
     if (!chatData?.messages) {
-      console.log(`[useOpenChat] Nessun messaggio in chatData per ${notificationId}`);
+     
       return [];
     }
     
     const parsedMessages = Array.isArray(chatData.messages) 
       ? chatData.messages 
       : JSON.parse(chatData.messages || "[]");
-    
-    console.log(`[useOpenChat] Messaggi parsati per chat ${notificationId}:`, parsedMessages.length);
     return parsedMessages;
   }, [chatData?.messages, notificationId]);
   
   // Parse dei membri
   const membersInfo = useMemo(() => {
-    console.log("useOpenChat - Membri:", chatData?.membersInfo);
+   
     if (!chatData?.membersInfo) return [];
     
     // Se è già un array, usalo direttamente
@@ -116,7 +114,7 @@ export const useOpenChat = (notificationId, options = {}) => {
 
   // NUOVO: Funzione per rimuovere un messaggio localmente
   const removeMessageLocally = useCallback((messageId) => {
-    console.log(`[useOpenChat] Rimuovendo messaggio ${messageId} localmente`);
+   
     dispatch(removeMessageFromOpenChat({ 
       notificationId: parseInt(notificationId), 
       messageId: parseInt(messageId) 
@@ -125,7 +123,7 @@ export const useOpenChat = (notificationId, options = {}) => {
   
   // NUOVO: Funzione per aggiornare il colore localmente
   const updateMessageColorLocally = useCallback((messageId, color) => {
-    console.log(`[useOpenChat] Aggiornando colore messaggio ${messageId} a ${color} localmente`);
+   
     dispatch(updateMessageColorInOpenChat({ 
       notificationId: parseInt(notificationId), 
       messageId: parseInt(messageId),
@@ -135,7 +133,7 @@ export const useOpenChat = (notificationId, options = {}) => {
 
   // NUOVO: Funzione per aggiornare un messaggio localmente
   const updateMessageLocally = useCallback((messageId, updatedMessage) => {
-    console.log(`[useOpenChat] Aggiornando messaggio ${messageId} localmente`);
+   
     dispatch(updateMessageInOpenChat({ 
       notificationId: parseInt(notificationId), 
       messageId: parseInt(messageId),
@@ -157,7 +155,7 @@ export const useOpenChat = (notificationId, options = {}) => {
     const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
     
     if (!force && timeSinceLastRefresh < 1000) {
-      console.log('Refresh skipped: too soon since last refresh');
+     
       return;
     }
     
@@ -167,17 +165,14 @@ export const useOpenChat = (notificationId, options = {}) => {
     lastRefreshTimeRef.current = now;
     
     try {
-      console.log(`[useOpenChat] Refresh dati per chat ${notificationId}`);
+     
       
       const updatedData = await dispatch(
         fetchNotificationById(parseInt(notificationId), true)
       ).unwrap();
       
       if (updatedData) {
-        console.log(`[useOpenChat] Dati aggiornati ricevuti:`, {
-          messageCount: updatedData.messageCount,
-          lastMessage: updatedData.lastMessage
-        });
+       
         
         // I dati sono già stati aggiornati in Redux tramite fetchNotificationById
         // Non serve fare altro qui
@@ -205,7 +200,7 @@ export const useOpenChat = (notificationId, options = {}) => {
     const currentMessageCount = messages.length;
     
     if (currentMessageCount > previousMessageCountRef.current) {
-      console.log(`[useOpenChat] Nuovi messaggi rilevati: ${previousMessageCountRef.current} -> ${currentMessageCount}`);
+     
       
       // Trova il primo nuovo messaggio
       const newStartIndex = previousMessageCountRef.current;
@@ -234,7 +229,7 @@ export const useOpenChat = (notificationId, options = {}) => {
     
     try {
       const result = await dispatch(fetchChatParticipants(notificationId)).unwrap();
-      console.log("useOpenChat - Aggiornamento partecipanti:", result);
+     
       if (result && result.participants) {
         return result.participants;
       }
@@ -249,7 +244,7 @@ export const useOpenChat = (notificationId, options = {}) => {
       const { notificationId: eventNotificationId } = event.detail;
       
       if (parseInt(eventNotificationId) === parseInt(notificationId)) {
-        console.log(`[useOpenChat] Aggiornamento partecipanti richiesto per chat ${notificationId}`);
+       
         refreshParticipants();
       }
     };
@@ -286,8 +281,7 @@ export const useOpenChat = (notificationId, options = {}) => {
     setError(null);
     
     try {
-      console.log(`[useOpenChat] Caricamento iniziale dati per chat ${notificationId}`);
-      
+    
       const response = await axios.get(
         `${config.API_BASE_URL}/notifications/${notificationId}?pageSize=25&openChat=1&t=${Date.now()}`,
         {
@@ -299,10 +293,7 @@ export const useOpenChat = (notificationId, options = {}) => {
       );
       
       if (response.data) {
-        console.log(`[useOpenChat] Dati iniziali ricevuti:`, {
-          messageCount: response.data.messageCount,
-          hasMessages: !!response.data.messages
-        });
+       
         
         dispatch(setOpenChatData({
           notificationId: parseInt(notificationId),
@@ -418,7 +409,7 @@ export const useOpenChat = (notificationId, options = {}) => {
         replyToMessageId
       };
       
-      console.log('useOpenChat - Invio messaggio con dati:', notificationData);
+     
       
       // Invia messaggio
       const result = await dispatch(sendNotification(notificationData)).unwrap();
@@ -426,7 +417,7 @@ export const useOpenChat = (notificationId, options = {}) => {
       if (result && result.success) {
         // Se abbiamo il messaggio reale dal server, sostituisci quello temporaneo
         if (result.lastMessage && result.realMessageId) {
-          console.log('Sostituendo messaggio temporaneo con ID reale:', result.realMessageId);
+         
           
           dispatch(replaceTemporaryMessage({
             notificationId: parseInt(notificationId),
@@ -536,7 +527,7 @@ export const useOpenChat = (notificationId, options = {}) => {
       const { notificationId: eventNotificationId } = event.detail;
       
       if (parseInt(eventNotificationId) === parseInt(notificationId)) {
-        console.log(`[useOpenChat] Nuovo messaggio per chat aperta ${notificationId}`);
+       
         
         // Refresh immediato per chat aperte
         refreshData({ force: true, playSound: false });

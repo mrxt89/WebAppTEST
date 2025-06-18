@@ -82,7 +82,6 @@ function cleanupWorkerResources() {
         delete window.notificationWorker;
       }
       
-      console.log("[NotificationsWorker] Worker globale terminato");
       return true;
     }
     return false;
@@ -96,7 +95,6 @@ const notificationsWorkerMiddleware = (store) => {
   document.addEventListener("stop-notification-worker", () => {
     if (globalWorkerRefCount > 0) {
       globalWorkerRefCount--;
-      console.log(`[NotificationsWorker] RefCount decrementato a ${globalWorkerRefCount}`);
     }
     
     if (globalWorkerRefCount === 0) {
@@ -114,7 +112,6 @@ const notificationsWorkerMiddleware = (store) => {
       const state = store.getState();
       const openChatIds = Array.from(state.notifications?.openChatIds || []);
       
-      console.log("[NotificationsWorker] Sincronizzando chat aperte con worker:", openChatIds);
       
       worker.postMessage({
         type: "update_open_chats",
@@ -127,7 +124,6 @@ const notificationsWorkerMiddleware = (store) => {
 
   // NUOVO: Ascolta richieste di sincronizzazione manuale
   document.addEventListener("sync-open-chats", () => {
-    console.log("[NotificationsWorker] Sincronizzazione manuale richiesta");
     updateWorkerOpenChats();
   });
 
@@ -139,13 +135,11 @@ const notificationsWorkerMiddleware = (store) => {
     const isStandalone = window.location.pathname.includes('standalone-chat');
     
     if (isStandalone) {
-      console.log("[NotificationsWorker] Standalone window - usando worker esistente");
       return;
     }
 
     // Se esiste già un worker globale, riusalo
     if (globalWorker && !globalWorker.terminated) {
-      console.log("[NotificationsWorker] Riutilizzo worker esistente");
       worker = globalWorker;
       isWorkerInitialized = true;
       globalWorkerRefCount++;
@@ -157,7 +151,6 @@ const notificationsWorkerMiddleware = (store) => {
     }
 
     // Crea nuovo worker solo se non esiste
-    console.log("[NotificationsWorker] Creazione nuovo worker singleton");
     globalWorker = new NotificationWorker();
     worker = globalWorker;
     isWorkerInitialized = true;
@@ -181,8 +174,6 @@ const notificationsWorkerMiddleware = (store) => {
       }
 
       // Log iniziale delle chat aperte
-      console.log("[NotificationsWorker] Inizializzazione con chat aperte:", 
-        Array.from(store.getState().notifications?.openChatIds || []));
 
       worker.postMessage({
         type: "init",
@@ -281,7 +272,6 @@ const notificationsWorkerMiddleware = (store) => {
               
               // Se c'è una modifica locale recente, ignora l'update del worker
               if (unreadCountLastModified && Date.now() - unreadCountLastModified < 5000) {
-                console.log('[Middleware] Ignorando unread_count_update dal worker, modifica locale in corso');
                 return;
               }
               
@@ -348,7 +338,6 @@ const notificationsWorkerMiddleware = (store) => {
           case "open_chat_update":
             // Gestione aggiornamenti per chat aperte
             if (updates && updates.length > 0) {
-              console.log(`[Middleware] Ricevuti aggiornamenti per ${updates.length} chat aperte`);
               
               updates.forEach(update => {
                 // Fetch completo per ogni chat aperta con nuovi messaggi
@@ -380,7 +369,6 @@ const notificationsWorkerMiddleware = (store) => {
             break;
       
             case "new_message":
-              console.log("🚨 NEW_MESSAGE EVENT RICEVUTO:", event.data);
               if (event.data.newMessagesInfo) {
                 try {
                   const state = store.getState();
@@ -391,7 +379,6 @@ const notificationsWorkerMiddleware = (store) => {
                   const doNotDisturbEnabled = localStorage.getItem("doNotDisturbEnabled") === "true";
                   
                   if (doNotDisturbEnabled) {
-                    console.log("⚠️ Non disturbare attivo - skip notifiche web/audio");
                   }
             
                   let currentUserId = null;
@@ -418,16 +405,15 @@ const notificationsWorkerMiddleware = (store) => {
                     } = messageInfo;
             
                     if (isOwnMessage) {
-                      console.log(`Skipping notification for own message in chat ${notificationId}`);
+                    
                       return;
                     }
             
                     const isActuallyOpen = state.notifications.openChatIds.has(parseInt(notificationId));
                     
-                    console.log(`📊 Chat ${notificationId} - Worker dice: ${isOpenChat}, Redux dice: ${isActuallyOpen}`);
+                   
             
                     if (isActuallyOpen) {
-                      console.log(`🔄 Middleware: Chat ${notificationId} è aperta, ricaricando dati completi...`);
                       
                       store.dispatch(fetchNotificationById(parseInt(notificationId), true));
                       
@@ -474,7 +460,7 @@ const notificationsWorkerMiddleware = (store) => {
                     }
                     
                     if (!notification) {
-                      console.log(`⚠️ Notifica ${notificationId} non trovata nello state, ma procedo con la notifica`);
+                    
                     }
             
                     const notificationCache = (window._notificationCache = window._notificationCache || {});
@@ -484,7 +470,7 @@ const notificationsWorkerMiddleware = (store) => {
                       notificationCache[notificationId] &&
                       now - notificationCache[notificationId].timestamp < 30000
                     ) {
-                      console.log(`⏭️ Skip notifica per chat ${notificationId} - già notificata recentemente`);
+                   
                       return;
                     }
             
@@ -492,24 +478,13 @@ const notificationsWorkerMiddleware = (store) => {
                       currentUserId = -1;
                     }
             
-                    // IMPORTANTE: Mostra la notifica per chat NON aperte
-                    console.log("🔔 Nuovo messaggio per chat CHIUSA, mostrando notifica:", {
-                      notificationId,
-                      senderName,
-                      messagePreview,
-                      hasNotificationService: !!window.notificationService,
-                      permission: Notification.permission,
-                      doNotDisturbEnabled,
-                      webNotificationsEnabled: localStorage.getItem('webNotificationsEnabled')
-                    });
-            
                     if (!doNotDisturbEnabled) {
                       // RIMOSSO: La creazione diretta della notifica web qui!
                       // Lasciamo che sia SOLO il NotificationService a gestire le notifiche
                       
                       // Usa SOLO il NotificationService per notifiche
                       if (window.notificationService && typeof window.notificationService.notifyNewMessage === 'function') {
-                        console.log("📢 Chiamata a NotificationService.notifyNewMessage");
+                     
                         window.notificationService.notifyNewMessage(
                           messagePreview,
                           senderName,
@@ -517,10 +492,10 @@ const notificationsWorkerMiddleware = (store) => {
                           senderId
                         );
                       } else {
-                        console.log("⚠️ NotificationService non disponibile");
+                       
                       }
                     } else {
-                      console.log("🔕 Non disturbare attivo - notifica salvata ma non mostrata");
+                     
                       
                       if (window.notificationService && window.notificationService.dndNotifiedChatIds) {
                         window.notificationService.dndNotifiedChatIds.add(notificationId);
@@ -553,11 +528,11 @@ const notificationsWorkerMiddleware = (store) => {
               break;
 
           case "ready":
-            console.log("[NotificationsWorker] Worker ready and initialized");
+           
             break;
       
           case "pong":
-            console.log("[NotificationsWorker] Received pong response");
+           
             break;
       
           case "attachments_update":
@@ -580,7 +555,7 @@ const notificationsWorkerMiddleware = (store) => {
         if (currentToken && isWorkerInitialized) {
           setTimeout(() => {
             if (localStorage.getItem("token")) {
-              console.log("[NotificationsWorker] Attempting to restart worker after error");
+             
               globalWorker = null;
               globalWorkerRefCount = 0;
               store.dispatch({

@@ -683,9 +683,12 @@ const ChatWindow = ({
 
   // Contenuto della finestra
   const windowContent = (
-    <div className="flex flex-col w-full h-full bg-white overflow-hidden">
+    <div className="flex flex-col w-full h-full overflow-hidden" style={{
+      backgroundColor: 'rgba(255, 255, 255, 0.6)',
+      backdropFilter: 'blur(4px)'
+    }}>
       <div
-        className={`${isStandalone ? "" : "chat-window-handle cursor-move"}`}
+        className={`${isStandalone ? "" : "chat-window-handle cursor-move border-b"}`}
         ref={dragHandleRef}
         onMouseDown={isStandalone ? null : handleDragStart}
       >
@@ -825,9 +828,13 @@ const ChatWindow = ({
   if (isMaximized) {
     return (
       <div
-        className="fixed inset-0 z-[1100] bg-white"
+        className="fixed inset-0 z-[1100]"
         ref={windowRef}
         onClick={handleActivate}
+        style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.6)',
+          backdropFilter: 'blur(4px)'
+        }}
       >
         {windowContent}
       </div>
