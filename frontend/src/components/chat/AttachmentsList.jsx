@@ -92,6 +92,7 @@ const AttachmentsList = ({ notificationId, onAttachmentUploaded }) => {
         await refreshAttachments(notificationId);
 
         onAttachmentUploaded?.(); // Ricarica la lista se necessario
+        
       }
     } catch (error) {
       swal.fire(

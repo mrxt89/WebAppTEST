@@ -538,7 +538,7 @@ const MyTasksPage = () => {
   };
 
   return (
-    <div className=" flex flex-col p-2 gap-2" style={{ height: "calc(100vh - 110px)" }} >
+    <div className=" flex flex-col p-2 gap-2" style={{ height: "calc(100vh - 105px)" }} >
       {/* Header con titolo e pulsante creazione */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Le mie attività</h1>

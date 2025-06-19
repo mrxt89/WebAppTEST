@@ -887,8 +887,8 @@ const ProjectGanttView = ({
   // Showing loading screen when tasks are not available
   if (!tasks.length) {
     return (
-      <Card className="border rounded-lg bg-white">
-        <CardContent className="p-6 text-center">
+      <Card className="border rounded-lg bg-white h-full">
+        <CardContent className="p-6 text-center h-full flex items-center justify-center">
           <div className="text-gray-500">
             Nessuna attività presente nel progetto
           </div>
@@ -1002,485 +1002,542 @@ const ProjectGanttView = ({
   }, [tasks]);
 
   return (
-    <Card className="border rounded-lg bg-white relative h-full flex flex-col">
-      {/* Loading Overlay */}
-      <AnimatePresence>
-        {isLoading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg"
-          >
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-              <p className="text-sm font-medium text-gray-700">{loadingMessage || "Caricamento..."}</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Header Controls */}
-      <div className="border-b flex-none">
-        <div className="flex flex-wrap items-center justify-between gap-2 p-2">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant={viewMode === ViewMode.Day ? "default" : "outline"}
-              onClick={() => setViewMode(ViewMode.Day)}
-              className="flex-shrink-0"
-              disabled={isLoading}
+    <div className="h-full flex flex-col" style={{ height: 'calc(100vh - 110px - 60px - 48px - 40px - 40px)' }}>
+      <Card className="border rounded-lg bg-white relative flex-1 flex flex-col">
+        {/* Loading Overlay */}
+        <AnimatePresence>
+          {isLoading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg"
             >
-              Giorno
-            </Button>
-            <Button
-              variant={viewMode === ViewMode.Week ? "default" : "outline"}
-              onClick={() => setViewMode(ViewMode.Week)}
-              className="flex-shrink-0"
-              disabled={isLoading}
-            >
-              Settimana
-            </Button>
-            <Button
-              variant={viewMode === ViewMode.Month ? "default" : "outline"}
-              onClick={() => setViewMode(ViewMode.Month)}
-              className="flex-shrink-0"
-              disabled={isLoading}
-            >
-              Mese
-            </Button>
-            
-            <div className="border-l pl-4">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                <p className="text-sm font-medium text-gray-700">{loadingMessage || "Caricamento..."}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+   
+        {/* Header Controls */}
+        <div className="border-b flex-none">
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2">
+            <div className="flex items-center space-x-4">
               <Button
-                variant={showDependencies ? "default" : "outline"}
-                onClick={() => setShowDependencies(!showDependencies)}
+                variant={viewMode === ViewMode.Day ? "default" : "outline"}
+                onClick={() => setViewMode(ViewMode.Day)}
                 className="flex-shrink-0"
-                size="sm"
                 disabled={isLoading}
               >
-                <Link2 className="h-4 w-4 mr-2" />
-                Dipendenze
+                Giorno
               </Button>
-            </div>
-
-            {isReadOnly && (
+              <Button
+                variant={viewMode === ViewMode.Week ? "default" : "outline"}
+                onClick={() => setViewMode(ViewMode.Week)}
+                className="flex-shrink-0"
+                disabled={isLoading}
+              >
+                Settimana
+              </Button>
+              <Button
+                variant={viewMode === ViewMode.Month ? "default" : "outline"}
+                onClick={() => setViewMode(ViewMode.Month)}
+                className="flex-shrink-0"
+                disabled={isLoading}
+              >
+                Mese
+              </Button>
+              
               <div className="border-l pl-4">
-                <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-300">
-                  <Lock className="h-3 w-3 mr-1" />
-                  Sola lettura
-                </Badge>
+                <Button
+                  variant={showDependencies ? "default" : "outline"}
+                  onClick={() => setShowDependencies(!showDependencies)}
+                  className="flex-shrink-0"
+                  size="sm"
+                  disabled={isLoading}
+                >
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Dipendenze
+                </Button>
               </div>
-            )}
-          </div>
-          {/* Filters */}
-          <div className="flex items-center gap-2 p-2">
-            <Select
-              value={filters.status}
-              onValueChange={(value) =>
-                setFilters((prev) => ({ ...prev, status: value }))
-              }
-              disabled={isLoading}
-            >
-              <SelectTrigger className="h-8 w-[120px]">
-                <SelectValue placeholder="Stato" />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters.priority}
-              onValueChange={(value) =>
-                setFilters((prev) => ({ ...prev, priority: value }))
-              }
-              disabled={isLoading}
-            >
-              <SelectTrigger className="h-8 w-[120px]">
-                <SelectValue placeholder="Priorità" />
-              </SelectTrigger>
-              <SelectContent>
-                {priorityOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters.assignedTo?.toString() || "all"}
-              onValueChange={(value) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  assignedTo: value === "all" ? null : parseInt(value),
-                }))
-              }
-              disabled={isLoading}
-            >
-              <SelectTrigger className="h-8 w-[150px]">
-                <SelectValue placeholder="Assegnato a" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tutti gli utenti</SelectItem>
-                {users
-                  .filter((user) =>
-                    displayTasks.some((task) => task.AssignedTo === user.userId),
-                  )
-                  .map((user) => (
-                    <SelectItem
-                      key={user.userId}
-                      value={user.userId.toString()}
-                    >
-                      {user.firstName} {user.lastName}
+   
+              {isReadOnly && (
+                <div className="border-l pl-4">
+                  <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-300">
+                    <Lock className="h-3 w-3 mr-1" />
+                    Sola lettura
+                  </Badge>
+                </div>
+              )}
+            </div>
+            {/* Filters */}
+            <div className="flex items-center gap-2 p-2">
+              <Select
+                value={filters.status}
+                onValueChange={(value) =>
+                  setFilters((prev) => ({ ...prev, status: value }))
+                }
+                disabled={isLoading}
+              >
+                <SelectTrigger className="h-8 w-[120px]">
+                  <SelectValue placeholder="Stato" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
-              </SelectContent>
-            </Select>
-
-            <div className="relative">
-              <Input
-                placeholder="Cerca..."
-                value={filters.search}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, search: e.target.value }))
+                </SelectContent>
+              </Select>
+   
+              <Select
+                value={filters.priority}
+                onValueChange={(value) =>
+                  setFilters((prev) => ({ ...prev, priority: value }))
                 }
-                className="h-8 w-[150px] pl-8 pr-2"
                 disabled={isLoading}
-              />
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            </div>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={resetFilters}
-              className="h-8 w-8"
-              title="Resetta filtri"
-              disabled={isLoading}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-
-            <Button
-              size="icon"
-              variant={filters.showDelayed ? "default" : "outline"}
-              onClick={() =>
-                setFilters((prev) => ({
-                  ...prev,
-                  showDelayed: !prev.showDelayed,
-                }))
-              }
-              className={`h-8 w-8 ${
-                filters.showDelayed ? "bg-amber-600 hover:bg-amber-700" : ""
-              }`}
-              title="Mostra attività in ritardo"
-              disabled={isLoading}
-            >
-              <AlertTriangle className="h-4 w-4" />
-            </Button>
-
-            {filters.showDelayed && (
-              <Badge
-                variant="outline"
-                className="bg-amber-50 text-amber-700 border-amber-200"
               >
-                Solo attività in ritardo
-              </Badge>
-            )}
+                <SelectTrigger className="h-8 w-[120px]">
+                  <SelectValue placeholder="Priorità" />
+                </SelectTrigger>
+                <SelectContent>
+                  {priorityOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+   
+              <Select
+                value={filters.assignedTo?.toString() || "all"}
+                onValueChange={(value) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    assignedTo: value === "all" ? null : parseInt(value),
+                  }))
+                }
+                disabled={isLoading}
+              >
+                <SelectTrigger className="h-8 w-[150px]">
+                  <SelectValue placeholder="Assegnato a" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutti gli utenti</SelectItem>
+                  {users
+                    .filter((user) =>
+                      displayTasks.some((task) => task.AssignedTo === user.userId),
+                    )
+                    .map((user) => (
+                      <SelectItem
+                        key={user.userId}
+                        value={user.userId.toString()}
+                      >
+                        {user.firstName} {user.lastName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+   
+              <div className="relative">
+                <Input
+                  placeholder="Cerca..."
+                  value={filters.search}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, search: e.target.value }))
+                  }
+                  className="h-8 w-[150px] pl-8 pr-2"
+                  disabled={isLoading}
+                />
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              </div>
+   
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={resetFilters}
+                className="h-8 w-8"
+                title="Resetta filtri"
+                disabled={isLoading}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+   
+              <Button
+                size="icon"
+                variant={filters.showDelayed ? "default" : "outline"}
+                onClick={() =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    showDelayed: !prev.showDelayed,
+                  }))
+                }
+                className={`h-8 w-8 ${
+                  filters.showDelayed ? "bg-amber-600 hover:bg-amber-700" : ""
+                }`}
+                title="Mostra attività in ritardo"
+                disabled={isLoading}
+              >
+                <AlertTriangle className="h-4 w-4" />
+              </Button>
+   
+              {filters.showDelayed && (
+                <Badge
+                  variant="outline"
+                  className="bg-amber-50 text-amber-700 border-amber-200"
+                >
+                  Solo attività in ritardo
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Leggenda colori */}
-        <div className="p-2 border-b flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-gray-50 text-xs text-gray-600 flex-none">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <div className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 bg-gray-400 rounded-sm"></span>
-              <span>Da fare</span>
+   
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Leggenda colori */}
+          <div className="p-2 border-b flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-gray-50 text-xs text-gray-600 flex-none">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <div className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 bg-gray-400 rounded-sm"></span>
+                <span>Da fare</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 bg-blue-500 rounded-sm"></span>
+                <span>In esecuzione</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 bg-green-500 rounded-sm"></span>
+                <span>Completata</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 bg-red-500 rounded-sm"></span>
+                <span>Bloccata</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 bg-yellow-500 rounded-sm"></span>
+                <span>Sospesa</span>
+              </div>
+              <div className="border-l pl-4 flex items-center gap-1">
+                <GitBranch className="h-3 w-3 text-gray-600" />
+                <span>Linee = Dipendenze (FS)</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 bg-blue-500 rounded-sm"></span>
-              <span>In esecuzione</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 bg-green-500 rounded-sm"></span>
-              <span>Completata</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 bg-red-500 rounded-sm"></span>
-              <span>Bloccata</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 bg-yellow-500 rounded-sm"></span>
-              <span>Sospesa</span>
-            </div>
-            <div className="border-l pl-4 flex items-center gap-1">
-              <GitBranch className="h-3 w-3 text-gray-600" />
-              <span>Linee = Dipendenze (FS)</span>
+            
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <span>Ctrl + Rotella per zoom</span>
+              {customZoomLevel !== 1 && (
+                <Badge variant="outline" className="text-xs">
+                  Zoom: {Math.round(customZoomLevel * 100)}%
+                </Badge>
+              )}
             </div>
           </div>
-          
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span>Ctrl + Rotella per zoom</span>
-            {customZoomLevel !== 1 && (
-              <Badge variant="outline" className="text-xs">
-                Zoom: {Math.round(customZoomLevel * 100)}%
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        {/* Gantt Chart Container */}
-        <div 
-          ref={ganttWrapperRef}
-          className="flex-1 relative overflow-hidden"
-          style={{
-            minHeight: 0,
-          }}
-        >
+   
+          {/* Gantt Chart Container */}
           <div 
-            className="gantt-container absolute inset-0 overflow-auto"
+            ref={ganttWrapperRef}
+            className="flex-1 relative overflow-hidden bg-gray-50"
             style={{
-              transform: `scale(${customZoomLevel})`,
-              transformOrigin: 'top left',
-              width: `${100 / customZoomLevel}%`,
-              height: `${100 / customZoomLevel}%`,
-              opacity: isLoading ? 0.5 : 1,
-              transition: "opacity 0.3s ease",
+              minHeight: 0,
             }}
           >
-            {ganttTasks.length > 0 ? (
-              <Gantt
-                id="gantt-container"
-                tasks={ganttTasks}
-                viewMode={viewMode}
-                rowHeight={90}
-                onDateChange={isReadOnly ? undefined : handleTaskChangeWrapper}
-                onDoubleClick={handleDoubleClick}
-                onTaskMove={isReadOnly ? undefined : handleTaskMove}
-                barCornerRadius={4}
-                barProgressColor={null}
-                barProgressSelectedColor={null}
-                projectProgressColor={null}
-                projectProgressSelectedColor={null}
-                arrow={showDependencies}
-                arrowColor="#6366f1"
-                arrowIndent={20}
-                TooltipContent={({ task }) => {
-                  const originalTask = task.originalTask;
-                  const status = originalTask.Status;
-                  const priority = originalTask.Priority;
-                  const assignedTo = originalTask.AssignedToName;
-                  const predecessors = task.predecessorsData;
-
-                  return (
-                    <div className="p-3 bg-white shadow-lg rounded-lg border max-w-sm">
-                      <div className="font-bold text-base mb-2">{task.name}</div>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Inizio:</span>
-                          <span className="font-medium">
-                            {new Date(task.start).toLocaleDateString('it-IT')}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Fine:</span>
-                          <span className="font-medium">
-                            {new Date(task.end).toLocaleDateString('it-IT')}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Stato:</span>
-                          <Badge 
-                            variant="outline"
-                            className={
-                              status === "COMPLETATA" ? "bg-green-50 text-green-700 border-green-300" :
-                              status === "IN ESECUZIONE" ? "bg-blue-50 text-blue-700 border-blue-300" :
-                              status === "BLOCCATA" ? "bg-red-50 text-red-700 border-red-300" :
-                              status === "SOSPESA" ? "bg-yellow-50 text-yellow-700 border-yellow-300" :
-                              "bg-gray-50 text-gray-700 border-gray-300"
-                            }
-                          >
-                            {status}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Priorità:</span>
-                          <Badge 
-                            variant="outline"
-                            className={
-                              priority === "ALTA" ? "bg-red-50 text-red-700 border-red-300" :
-                              priority === "MEDIA" ? "bg-yellow-50 text-yellow-700 border-yellow-300" :
-                              "bg-green-50 text-green-700 border-green-300"
-                            }
-                          >
-                            {priority}
-                          </Badge>
-                        </div>
-                        {assignedTo && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Assegnato a:</span>
-                            <span className="font-medium">{assignedTo}</span>
-                          </div>
-                        )}
-                      </div>
+            <div 
+              className="gantt-container absolute inset-0 overflow-auto"
+              style={{
+                transform: `scale(${customZoomLevel})`,
+                transformOrigin: 'top left',
+                width: `${100 / customZoomLevel}%`,
+                height: `${100 / customZoomLevel}%`,
+                opacity: isLoading ? 0.5 : 1,
+                transition: "opacity 0.3s ease",
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              {ganttTasks.length > 0 ? (
+                <div className="flex-1 flex flex-col" style={{ minHeight: '100%' }}>
+                  <style>
+                    {`
+                      /* Forza il Gantt a occupare tutto lo spazio disponibile */
+                      .gantt-container-wrapper {
+                        height: 100% !important;
+                        display: flex !important;
+                        flex-direction: column !important;
+                      }
                       
-                      {predecessors && predecessors.length > 0 && (
-                        <div className="mt-3 pt-3 border-t">
-                          <div className="text-sm font-medium mb-1 flex items-center gap-1">
-                            <GitBranch className="h-3 w-3" />
-                            Dipendenze:
-                          </div>
-                          <div className="space-y-1">
-                            {formatDependencyInfo(predecessors)}
-                          </div>
-                        </div>
-                      )}
+                      .gantt-container-wrapper > div {
+                        flex: 1 !important;
+                        height: 100% !important;
+                      }
                       
-                      {originalTask.Description && (
-                        <div className="mt-3 pt-3 border-t">
-                          <div className="text-xs text-gray-600 font-medium mb-1">
-                            Descrizione:
-                          </div>
-                          <div className="text-sm text-gray-700 max-w-xs overflow-hidden">
-                            {originalTask.Description.substring(0, 150)}
-                            {originalTask.Description.length > 150 ? "..." : ""}
-                          </div>
-                        </div>
-                      )}
+                      /* Assicura che la griglia si espanda */
+                      .gantt-container-wrapper svg {
+                        height: 100% !important;
+                        min-height: 100% !important;
+                      }
                       
-                      {isReadOnly && (
-                        <div className="mt-3 pt-3 border-t text-xs text-gray-500 flex items-center gap-1">
-                          <Lock className="h-3 w-3" />
-                          Modalità di sola lettura
-                        </div>
-                      )}
-                    </div>
-                  );
-                }}
-                TaskListTable={() => (
-                  <div className="p-2 border-r h-full">
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragStart={handleDragStart}
-                      onDragEnd={handleDragEnd}
-                      modifiers={[]}
-                    >
-                      <table className="w-full h-full border-spacing-0 border-separate">
-                        <tbody>
-                          <SortableContext
-                            items={ganttTasks.map(t => t.id)}
-                            strategy={verticalListSortingStrategy}
-                          >
-                            {ganttTasks.map((task, index) => (
-                              <SortableTaskRow
-                                key={task.id}
-                                task={task}
-                                index={index}
-                                ganttTasks={ganttTasks}
-                                canMove={
-                                  !isReadOnly && (checkAdminPermission(project) ||
-                                  isOwnTask(task.originalTask))
+                      /* Background per le aree vuote */
+                      .gantt-container-wrapper .gantt-grid-row:last-child {
+                        height: 100% !important;
+                      }
+                      
+                      /* Stile per il container della lista task */
+                      .gantt-task-list-wrapper {
+                        height: 100% !important;
+                        background: white;
+                      }
+                      
+                      /* Assicura che anche con poche task, il background riempia tutto */
+                      .gantt-grid {
+                        min-height: 100% !important;
+                        background-image: 
+                          linear-gradient(to right, #f3f4f6 1px, transparent 1px),
+                          linear-gradient(to bottom, #f3f4f6 1px, transparent 1px);
+                        background-size: 24px 90px;
+                      }
+                    `}
+                  </style>
+                  <Gantt
+                    id="gantt-container"
+                    tasks={ganttTasks}
+                    viewMode={viewMode}
+                    rowHeight={90}
+                    onDateChange={isReadOnly ? undefined : handleTaskChangeWrapper}
+                    onDoubleClick={handleDoubleClick}
+                    onTaskMove={isReadOnly ? undefined : handleTaskMove}
+                    barCornerRadius={4}
+                    barProgressColor={null}
+                    barProgressSelectedColor={null}
+                    projectProgressColor={null}
+                    projectProgressSelectedColor={null}
+                    arrow={showDependencies}
+                    arrowColor="#6366f1"
+                    arrowIndent={20}
+                    ganttHeight={0}
+                    rootStyle={{
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}
+                    wrapperClassName="gantt-container-wrapper"
+                    TooltipContent={({ task }) => {
+                      const originalTask = task.originalTask;
+                      const status = originalTask.Status;
+                      const priority = originalTask.Priority;
+                      const assignedTo = originalTask.AssignedToName;
+                      const predecessors = task.predecessorsData;
+   
+                      return (
+                        <div className="p-3 bg-white shadow-lg rounded-lg border max-w-sm">
+                          <div className="font-bold text-base mb-2">{task.name}</div>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Inizio:</span>
+                              <span className="font-medium">
+                                {new Date(task.start).toLocaleDateString('it-IT')}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Fine:</span>
+                              <span className="font-medium">
+                                {new Date(task.end).toLocaleDateString('it-IT')}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Stato:</span>
+                              <Badge 
+                                variant="outline"
+                                className={
+                                  status === "COMPLETATA" ? "bg-green-50 text-green-700 border-green-300" :
+                                  status === "IN ESECUZIONE" ? "bg-blue-50 text-blue-700 border-blue-300" :
+                                  status === "BLOCCATA" ? "bg-red-50 text-red-700 border-red-300" :
+                                  status === "SOSPESA" ? "bg-yellow-50 text-yellow-700 border-yellow-300" :
+                                  "bg-gray-50 text-gray-700 border-gray-300"
                                 }
-                                isLoading={isLoading}
-                                checkAdminPermission={checkAdminPermission}
-                                isOwnTask={isOwnTask}
-                                project={project}
-                                handleMoveButtonClick={handleMoveButtonClick}
-                                isReadOnly={isReadOnly}
-                              />
-                            ))}
-                          </SortableContext>
-                        </tbody>
-                      </table>
-                      <DragOverlay 
-                        dropAnimation={{
-                          duration: 250,
-                          easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-                        }}
-                      >
-                        {draggedTaskId ? (
-                          <div 
-                            className="bg-white shadow-2xl rounded-lg p-4 border-2 border-blue-500 min-w-[300px]"
-                            style={{
-                              cursor: 'grabbing',
-                              maxWidth: '400px',
-                            }}
-                          >
-                            <div className="flex items-center gap-3">
-                              <GripVertical className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-base truncate">
-                                  {ganttTasks.find(t => t.id === draggedTaskId)?.name}
-                                </div>
-                                {ganttTasks.find(t => t.id === draggedTaskId)?.assignedToName && (
-                                  <div className="text-sm text-gray-600 mt-1 truncate">
-                                    Assegnato a: {ganttTasks.find(t => t.id === draggedTaskId)?.assignedToName}
-                                  </div>
-                                )}
+                              >
+                                {status}
+                              </Badge>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Priorità:</span>
+                              <Badge 
+                                variant="outline"
+                                className={
+                                  priority === "ALTA" ? "bg-red-50 text-red-700 border-red-300" :
+                                  priority === "MEDIA" ? "bg-yellow-50 text-yellow-700 border-yellow-300" :
+                                  "bg-green-50 text-green-700 border-green-300"
+                                }
+                              >
+                                {priority}
+                              </Badge>
+                            </div>
+                            {assignedTo && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Assegnato a:</span>
+                                <span className="font-medium">{assignedTo}</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {predecessors && predecessors.length > 0 && (
+                            <div className="mt-3 pt-3 border-t">
+                              <div className="text-sm font-medium mb-1 flex items-center gap-1">
+                                <GitBranch className="h-3 w-3" />
+                                Dipendenze:
+                              </div>
+                              <div className="space-y-1">
+                                {formatDependencyInfo(predecessors)}
                               </div>
                             </div>
+                          )}
+                          
+                          {originalTask.Description && (
+                            <div className="mt-3 pt-3 border-t">
+                              <div className="text-xs text-gray-600 font-medium mb-1">
+                                Descrizione:
+                              </div>
+                              <div className="text-sm text-gray-700 max-w-xs overflow-hidden">
+                                {originalTask.Description.substring(0, 150)}
+                                {originalTask.Description.length > 150 ? "..." : ""}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {isReadOnly && (
+                            <div className="mt-3 pt-3 border-t text-xs text-gray-500 flex items-center gap-1">
+                              <Lock className="h-3 w-3" />
+                              Modalità di sola lettura
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }}
+                    TaskListTable={() => (
+                      <div className="p-2 border-r h-full bg-white">
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          modifiers={[]}
+                        >
+                          <div className="h-full flex flex-col">
+                            <table className="w-full border-spacing-0 border-separate">
+                              <tbody>
+                                <SortableContext
+                                  items={ganttTasks.map(t => t.id)}
+                                  strategy={verticalListSortingStrategy}
+                                >
+                                  {ganttTasks.map((task, index) => (
+                                    <SortableTaskRow
+                                      key={task.id}
+                                      task={task}
+                                      index={index}
+                                      ganttTasks={ganttTasks}
+                                      canMove={
+                                        !isReadOnly && (checkAdminPermission(project) ||
+                                        isOwnTask(task.originalTask))
+                                      }
+                                      isLoading={isLoading}
+                                      checkAdminPermission={checkAdminPermission}
+                                      isOwnTask={isOwnTask}
+                                      project={project}
+                                      handleMoveButtonClick={handleMoveButtonClick}
+                                      isReadOnly={isReadOnly}
+                                    />
+                                  ))}
+                                </SortableContext>
+                              </tbody>
+                            </table>
+                            {/* Spacer per riempire lo spazio vuoto quando ci sono poche task */}
+                            <div className="flex-1 bg-white border-b"></div>
                           </div>
-                        ) : null}
-                      </DragOverlay>
-                    </DndContext>
-                  </div>
-                )}
-                barFill={90}
-                handleWidth={8}
-                columnWidth={
-                  viewMode === ViewMode.Month
-                    ? 300
-                    : viewMode === ViewMode.Week
-                      ? 170
-                      : 60
-                }
-                listCellWidth="100px"
-                todayColor="rgba(252, 165, 165, 0.5)"
-                onTimeChange={handleTimeChange}
-                TaskListHeader={() => (
-                  <div className="sticky top-0 z-10 bg-white">
-                    <table className="w-full h-full">
-                      <thead>
-                        <tr>
-                          <th className="p-1 border-r">Attività</th>
-                        </tr>
-                      </thead>
-                    </table>
-                  </div>
-                )}
-                ganttHeight={0}
-                timeStep={10000}
-                fontFamily="Inter, system-ui, sans-serif"
-                fontSize="12px"
-                preStepsCount={1}
-                rtl={false}
-                locale="it-IT"
-              />
-            ) : (
-              <div className="p-4 text-center text-gray-500">
-                Nessuna attività corrispondente ai filtri selezionati
-              </div>
-            )}
+                          <DragOverlay 
+                            dropAnimation={{
+                              duration: 250,
+                              easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+                            }}
+                          >
+                            {draggedTaskId ? (
+                              <div 
+                                className="bg-white shadow-2xl rounded-lg p-4 border-2 border-blue-500 min-w-[300px]"
+                                style={{
+                                  cursor: 'grabbing',
+                                  maxWidth: '400px',
+                                }}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <GripVertical className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-semibold text-base truncate">
+                                      {ganttTasks.find(t => t.id === draggedTaskId)?.name}
+                                    </div>
+                                    {ganttTasks.find(t => t.id === draggedTaskId)?.assignedToName && (
+                                      <div className="text-sm text-gray-600 mt-1 truncate">
+                                        Assegnato a: {ganttTasks.find(t => t.id === draggedTaskId)?.assignedToName}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
+                          </DragOverlay>
+                        </DndContext>
+                      </div>
+                    )}
+                    barFill={90}
+                    handleWidth={8}
+                    columnWidth={
+                      viewMode === ViewMode.Month
+                        ? 300
+                        : viewMode === ViewMode.Week
+                          ? 170
+                          : 60
+                    }
+                    listCellWidth="100px"
+                    todayColor="rgba(252, 165, 165, 0.5)"
+                    onTimeChange={handleTimeChange}
+                    TaskListHeader={() => (
+                      <div className="sticky top-0 z-10 bg-white">
+                        <table className="w-full h-full">
+                          <thead>
+                            <tr>
+                              <th className="p-1 border-r">Attività</th>
+                            </tr>
+                          </thead>
+                        </table>
+                      </div>
+                    )}
+                    timeStep={10000}
+                    fontFamily="Inter, system-ui, sans-serif"
+                    fontSize="12px"
+                    preStepsCount={1}
+                    rtl={false}
+                    locale="it-IT"
+                  />
+                </div>
+              ) : (
+                <div className="p-4 text-center text-gray-500">
+                  Nessuna attività corrispondente ai filtri selezionati
+                </div>
+              )}
+            </div>
           </div>
+   
+          {/* Stato operazione (visibile solo durante un'operazione) */}
+          {moveInProgress.current && (
+            <div className="p-2 border-t bg-blue-50 text-blue-700 text-sm flex items-center justify-center flex-none">
+              <span className="animate-pulse">Aggiornamento in corso...</span>
+            </div>
+          )}
         </div>
-
-        {/* Stato operazione (visibile solo durante un'operazione) */}
-        {moveInProgress.current && (
-          <div className="p-2 border-t bg-blue-50 text-blue-700 text-sm flex items-center justify-center flex-none">
-            <span className="animate-pulse">Aggiornamento in corso...</span>
-          </div>
-        )}
-      </div>
-    </Card>
-  );
+      </Card>
+    </div>
+   );
 };
 
 // Ottimizzazione per evitare re-render inutili, ma garantendo aggiornamenti quando necessario

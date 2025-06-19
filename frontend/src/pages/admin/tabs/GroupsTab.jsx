@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { swal } from "../../../lib/common";
@@ -223,10 +222,8 @@ const GroupsTab = ({
           </Button>
         </div>
 
-        <Separator />
-
         <div>
-          <div className="flex justify-between items-center mb-2 h-14">
+          <div className="flex justify-content-around items-center mb-2 h-11">
             <h4 className="text-md font-medium">Membri del gruppo</h4>
             {selectedUsers.length > 0 && (
               <Button
@@ -273,10 +270,8 @@ const GroupsTab = ({
           </ScrollArea>
         </div>
 
-        <Separator />
-
         <div>
-          <div className="flex justify-between items-center mb-2 h-14">
+          <div className="flex justify-content-around items-center mb-2 h-11">
             <h4 className="text-md font-medium">Utenti disponibili</h4>
             {selectedUsers.length > 0 && (
               <Button

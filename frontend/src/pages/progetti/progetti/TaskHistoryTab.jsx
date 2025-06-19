@@ -9,22 +9,30 @@ import {
   MessageSquare,
   Edit,
   Plus,
-  Trash2
+  Trash2,
+  AlertCircle,
+  CheckCircle2,
+  Play,
+  User
 } from "lucide-react";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
 
 const TaskHistoryTab = ({ task }) => {
   const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { getTaskHistory } = useProjectActions();
 
   useEffect(() => {
     const loadHistory = async () => {
       if (task?.TaskID) {
         try {
+          setLoading(true);
           const data = await getTaskHistory(task.TaskID);
           setHistory(data);
         } catch (error) {
           console.error("Error loading task history:", error);
+        } finally {
+          setLoading(false);
         }
       }
     };
@@ -95,8 +103,8 @@ const TaskHistoryTab = ({ task }) => {
   const renderLogEntry = (entry) => {
     switch (entry.LogType) {
       case "TASK":
-        // Per le modifiche task, usa la logica esistente
-        return null; // Gestito dal renderChanges esistente
+        // Per i log TASK, mostriamo sempre i cambiamenti
+        return renderTaskChanges(entry);
       
       case "COST":
         return (
@@ -131,190 +139,191 @@ const TaskHistoryTab = ({ task }) => {
     }
   };
 
-  // Funzione per evidenziare i cambiamenti (per i log TASK)
-  const renderChanges = (current, previous) => {
+  // Funzione per renderizzare i cambiamenti dei task
+  const renderTaskChanges = (currentEntry) => {
+    // Trova la voce precedente dello stesso tipo TASK
+    const taskLogs = history.filter(h => h.LogType === 'TASK').sort((a, b) => 
+      new Date(b.ActionDate || b.TBCreated) - new Date(a.ActionDate || a.TBCreated)
+    );
+    const currentTaskIndex = taskLogs.findIndex(t => t.LogID === currentEntry.LogID);
+    const previousEntry = taskLogs[currentTaskIndex + 1];
+    
     const changes = [];
 
-    // Verifica ogni campo e aggiunge i cambiamenti alla lista
-    if (current.Title !== previous?.Title) {
+    // Se è la prima entry (creazione task)
+    if (!previousEntry || currentTaskIndex === taskLogs.length - 1) {
+      return (
+        <div className="bg-blue-50 p-3 rounded-md text-sm">
+          <span className="font-medium">✨ Creazione attività</span>
+          {currentEntry.Title && (
+            <div className="mt-2 text-xs text-gray-600">
+              <div><strong>Titolo:</strong> {currentEntry.Title}</div>
+              <div><strong>Stato:</strong> <Badge className={getStatusBadgeColor(currentEntry.Status)}>{currentEntry.Status}</Badge></div>
+              <div><strong>Priorità:</strong> <Badge className={getPriorityBadgeColor(currentEntry.Priority)}>{currentEntry.Priority}</Badge></div>
+              {currentEntry.AssignedToName && <div><strong>Assegnato a:</strong> {currentEntry.AssignedToName}</div>}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Confronta i campi per trovare le modifiche (solo se abbiamo i dati)
+    if (currentEntry.Title !== undefined && previousEntry?.Title !== undefined && currentEntry.Title !== previousEntry.Title) {
       changes.push({
         field: "Titolo",
-        oldValue: previous?.Title,
-        newValue: current.Title,
+        oldValue: previousEntry.Title || "Non impostato",
+        newValue: currentEntry.Title || "Non impostato",
       });
     }
 
-    if (current.Description !== previous?.Description) {
+    if (currentEntry.Description !== undefined && previousEntry?.Description !== undefined && currentEntry.Description !== previousEntry.Description) {
       changes.push({
         field: "Descrizione",
-        oldValue: previous?.Description || "Nessuna descrizione",
-        newValue: current.Description || "Nessuna descrizione",
+        oldValue: previousEntry.Description || "Nessuna descrizione",
+        newValue: currentEntry.Description || "Nessuna descrizione",
       });
     }
 
-    if (current.AssignedToName !== previous?.AssignedToName) {
+    if (currentEntry.AssignedTo !== undefined && previousEntry?.AssignedTo !== undefined && currentEntry.AssignedTo !== previousEntry.AssignedTo) {
       changes.push({
         field: "Responsabile",
-        oldValue: previous?.AssignedToName,
-        newValue: current.AssignedToName,
+        oldValue: previousEntry.AssignedToName || "Non assegnato",
+        newValue: currentEntry.AssignedToName || "Non assegnato",
       });
     }
 
-    if (current.Status !== previous?.Status) {
+    if (currentEntry.Status !== undefined && previousEntry?.Status !== undefined && currentEntry.Status !== previousEntry.Status) {
       changes.push({
         field: "Stato",
-        oldValue: previous?.Status,
-        newValue: current.Status,
+        oldValue: previousEntry.Status,
+        newValue: currentEntry.Status,
         isBadge: true,
         type: "status",
       });
     }
 
-    if (current.Priority !== previous?.Priority) {
+    if (currentEntry.Priority !== undefined && previousEntry?.Priority !== undefined && currentEntry.Priority !== previousEntry.Priority) {
       changes.push({
         field: "Priorità",
-        oldValue: previous?.Priority,
-        newValue: current.Priority,
+        oldValue: previousEntry.Priority,
+        newValue: currentEntry.Priority,
         isBadge: true,
         type: "priority",
       });
     }
 
-    if (current.StartDate !== previous?.StartDate) {
+    if (currentEntry.StartDate !== undefined && previousEntry?.StartDate !== undefined && currentEntry.StartDate !== previousEntry.StartDate) {
       changes.push({
         field: "Data Inizio",
-        oldValue: previous?.StartDate
-          ? new Date(previous.StartDate).toLocaleDateString()
-          : "",
-        newValue: new Date(current.StartDate).toLocaleDateString(),
+        oldValue: previousEntry.StartDate
+          ? new Date(previousEntry.StartDate).toLocaleDateString()
+          : "Non impostata",
+        newValue: currentEntry.StartDate
+          ? new Date(currentEntry.StartDate).toLocaleDateString()
+          : "Non impostata",
       });
     }
 
-    if (current.DueDate !== previous?.DueDate) {
+    if (currentEntry.DueDate !== undefined && previousEntry?.DueDate !== undefined && currentEntry.DueDate !== previousEntry.DueDate) {
       changes.push({
         field: "Data Fine",
-        oldValue: previous?.DueDate
-          ? new Date(previous.DueDate).toLocaleDateString()
-          : "",
-        newValue: new Date(current.DueDate).toLocaleDateString(),
+        oldValue: previousEntry.DueDate
+          ? new Date(previousEntry.DueDate).toLocaleDateString()
+          : "Non impostata",
+        newValue: currentEntry.DueDate
+          ? new Date(currentEntry.DueDate).toLocaleDateString()
+          : "Non impostata",
       });
     }
 
-    return changes;
+    // Se non ci sono cambiamenti visibili, mostra almeno che c'è stata una modifica
+    if (changes.length === 0) {
+      return (
+        <div className="bg-blue-50 p-3 rounded-md text-sm">
+          <span className="font-medium">Attività modificata</span>
+          <div className="text-xs text-gray-500 mt-1">
+            Nessun cambiamento visibile nei dati principali
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {changes.map((change, i) => (
+          <div key={i} className="bg-blue-50 p-3 rounded-md">
+            <div className="text-sm font-medium mb-1">
+              Ha modificato: {change.field}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <div className="flex-1">
+                <div className="text-gray-500 text-xs">Da:</div>
+                {change.isBadge ? (
+                  <Badge
+                    variant="secondary"
+                    className={
+                      change.type === "status"
+                        ? getStatusBadgeColor(change.oldValue)
+                        : getPriorityBadgeColor(change.oldValue)
+                    }
+                  >
+                    {change.oldValue || "Non impostato"}
+                  </Badge>
+                ) : (
+                  <div className="text-gray-700">
+                    {change.oldValue || "Non impostato"}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="text-gray-500 text-xs">A:</div>
+                {change.isBadge ? (
+                  <Badge
+                    variant="secondary"
+                    className={
+                      change.type === "status"
+                        ? getStatusBadgeColor(change.newValue)
+                        : getPriorityBadgeColor(change.newValue)
+                    }
+                  >
+                    {change.newValue}
+                  </Badge>
+                ) : (
+                  <div className="text-gray-700">
+                    {change.newValue}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
-  // Separa i log per tipo
-  const taskLogs = history.filter(h => h.LogType === 'TASK');
-  const otherLogs = history.filter(h => h.LogType !== 'TASK');
-
-  // Combina tutti i log ordinati per data
-  const allLogs = [...history].sort((a, b) => 
+  // Ordina tutti i log per data
+  const sortedHistory = [...history].sort((a, b) => 
     new Date(b.ActionDate || b.TBCreated) - new Date(a.ActionDate || a.TBCreated)
   );
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[65vh]">
+        <div className="text-gray-500">Caricamento cronologia...</div>
+      </div>
+    );
+  }
+
   return (
-    <ScrollArea className="h-[500px] pr-4 mx-4">
+    <ScrollArea className="h-[65vh] pr-4 mx-4">
       <div className="space-y-6">
-        {allLogs.map((entry, index) => {
+        {sortedHistory.map((entry, index) => {
           const logColor = getLogColor(entry.LogType);
+          const renderedContent = renderLogEntry(entry);
           
-          // Per i log TASK, usa la logica esistente
-          if (entry.LogType === 'TASK') {
-            const taskLogIndex = taskLogs.findIndex(t => t.LogID === entry.LogID);
-            const previousEntry = taskLogs[taskLogIndex + 1];
-            const changes = renderChanges(entry, previousEntry);
+          // Se non c'è contenuto da mostrare, non renderizzare l'entry
+          if (!renderedContent) return null;
 
-            if (changes.length === 0 && taskLogIndex !== taskLogs.length - 1) return null;
-
-            return (
-              <div
-                key={`task-${entry.LogID}`}
-                className={`relative border-l-2 ${logColor} pl-5 pb-2 pt-2`}
-              >
-                {/* Cerchio con icona della cronologia */}
-                <div className={`absolute -left-[7px] top-0 bg-white border-2 ${logColor} rounded-full p-1`}>
-                  {getLogIcon('TASK', entry.Action)}
-                </div>
-
-                {/* Header con utente e data */}
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-medium">
-                    {entry.ActionByName?.split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </div>
-                  <div>
-                    <div className="font-medium">{entry.ActionByName}</div>
-                    <div className="text-sm text-gray-500 flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {new Date(entry.TBCreated).toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Riepilogo modifiche */}
-                {taskLogIndex === taskLogs.length - 1 ? (
-                  <div className="bg-blue-50 p-3 rounded-md text-sm">
-                    <span className="font-medium">✨ Creazione attività</span>
-                  </div>
-                ) : (
-                  changes.length > 0 && (
-                    <div className="space-y-2">
-                      {changes.map((change, i) => (
-                        <div key={i} className="bg-blue-50 p-3 rounded-md">
-                          <div className="text-sm font-medium mb-1">
-                            Ha modificato: {change.field}
-                          </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className="flex-1">
-                              <div className="text-gray-500 text-xs">Da:</div>
-                              {change.isBadge ? (
-                                <Badge
-                                  variant="secondary"
-                                  className={
-                                    change.type === "status"
-                                      ? getStatusBadgeColor(change.oldValue)
-                                      : getPriorityBadgeColor(change.oldValue)
-                                  }
-                                >
-                                  {change.oldValue || "Non impostato"}
-                                </Badge>
-                              ) : (
-                                <div className="text-gray-700">
-                                  {change.oldValue || "Non impostato"}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <div className="text-gray-500 text-xs">A:</div>
-                              {change.isBadge ? (
-                                <Badge
-                                  variant="secondary"
-                                  className={
-                                    change.type === "status"
-                                      ? getStatusBadgeColor(change.newValue)
-                                      : getPriorityBadgeColor(change.newValue)
-                                  }
-                                >
-                                  {change.newValue}
-                                </Badge>
-                              ) : (
-                                <div className="text-gray-700">
-                                  {change.newValue}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                )}
-              </div>
-            );
-          }
-
-          // Per gli altri tipi di log
           return (
             <div
               key={`${entry.LogType}-${entry.LogID}`}
@@ -336,13 +345,13 @@ const TaskHistoryTab = ({ task }) => {
                   <div className="font-medium">{entry.ActionByName}</div>
                   <div className="text-sm text-gray-500 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {new Date(entry.ActionDate).toLocaleString()}
+                    {new Date(entry.ActionDate || entry.TBCreated).toLocaleString()}
                   </div>
                 </div>
               </div>
 
               {/* Contenuto del log */}
-              {renderLogEntry(entry)}
+              {renderedContent}
             </div>
           );
         })}
