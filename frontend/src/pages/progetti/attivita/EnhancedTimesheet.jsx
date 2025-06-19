@@ -415,7 +415,7 @@ const openAddDialog = async (date, taskId = null) => {
   }, [weekData.dailyTotals]);
 
   return (
-    <div className="" style={{ height: "calc(100vh - 110px)" }}>
+    <div className="" style={{ height: "calc(100vh - 105px)" }}>
       {/* Intestazione */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-2">

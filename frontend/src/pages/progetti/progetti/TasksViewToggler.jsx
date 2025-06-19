@@ -64,7 +64,7 @@ const TasksViewToggler = ({
   };
 
   return (
-    <div className="mb-4 space-y-4">
+    <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <RadioGroup
           value={viewMode}

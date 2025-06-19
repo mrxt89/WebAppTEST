@@ -237,6 +237,7 @@ const ChatSidebar = forwardRef((props, ref) => {
         // Aggiorna la lista degli allegati
         const updatedAttachments = await refreshAttachments(notificationId);
         setAttachments(updatedAttachments || []);
+       
         // Aggiorna gli allegati
         getNotificationAttachments(notificationId)
           .then((data) => {

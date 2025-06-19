@@ -18,7 +18,7 @@ import {
   canEditTask,
 } from "@/lib/taskPermissionsUtils";
 
-const UpdatedProjectTasksTable = ({
+const ProjectTasksTableImproved = ({
   project,
   tasks = [],
   onTaskClick,
@@ -34,18 +34,16 @@ const UpdatedProjectTasksTable = ({
   const [filter, setFilter] = useState("");
   const [showDelayedOnly, setShowDelayedOnly] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { users } = useNotifications(); // Ottieni tutti gli utenti dal contesto
+  const { users } = useNotifications();
 
   useEffect(() => {
     setLocalTasks(tasks);
   }, [tasks]);
 
-  // Ottieni il ruolo dell'utente corrente per autorizzazioni
   const isAdminOrManager = useMemo(() => {
     return hasAdminOrManagerPermission(project, currentUserId);
   }, [project, currentUserId]);
 
-  // Aggiorniamo immediatamente i task locali quando l'utente ne modifica uno
   const updateLocalTask = (updatedTask) => {
     setLocalTasks((prev) =>
       prev.map((task) =>
@@ -54,12 +52,10 @@ const UpdatedProjectTasksTable = ({
     );
   };
 
-  // Versione modificata della funzione onTaskUpdate che controlla i permessi
-  const handleTaskUpdate = async (taskData) => {
+  const handleTaskUpdate = async (taskData, shouldCloseModal = false) => {
     try {
       setIsRefreshing(true);
 
-      // Verifica permessi in base al campo che si sta aggiornando
       const task = localTasks.find((t) => t.TaskID === taskData.TaskID);
       const canEdit = canEditTask(project, task, currentUserId);
 
@@ -68,7 +64,6 @@ const UpdatedProjectTasksTable = ({
         return { success: false, error: "Permission denied" };
       }
 
-      // Controlli specifici per campi sensibili
       if (taskData.AssignedTo !== task.AssignedTo && !isAdminOrManager) {
         console.error(
           "Permission denied: Only admin/manager can change task assignee",
@@ -94,13 +89,11 @@ const UpdatedProjectTasksTable = ({
         return { success: false, error: "Permission denied" };
       }
 
-      // Assicuriamoci che formattedTaskData.ProjectID sia definito
       const formattedTaskData = {
         ...taskData,
         ProjectID: project.ProjectID,
       };
 
-      // Assicuriamoci che AssignedTo sia un numero
       if (
         formattedTaskData.AssignedTo &&
         typeof formattedTaskData.AssignedTo === "string"
@@ -108,19 +101,15 @@ const UpdatedProjectTasksTable = ({
         formattedTaskData.AssignedTo = parseInt(formattedTaskData.AssignedTo);
       }
 
-      // Log dei dati che stiamo inviando
-      console.log("UpdatedProjectTasksTable invia:", formattedTaskData);
+      console.log("ProjectTasksTableImproved invia:", formattedTaskData);
 
-      // Aggiorna immediatamente il task locale per un feedback più veloce
       updateLocalTask(formattedTaskData);
 
-      // Chiama la funzione onTaskUpdate del componente padre
       const result = await onTaskUpdate(formattedTaskData);
 
       if (result && result.success) {
         console.log("Aggiornamento riuscito:", result);
 
-        // Aggiorna nuovamente i dati locali con i dati ritornati
         if (result.task) {
           updateLocalTask(result.task);
         }
@@ -140,7 +129,6 @@ const UpdatedProjectTasksTable = ({
     }
   };
 
-  // Verifica se una task è in ritardo
   const isTaskDelayed = (task) => {
     if (task.Status === "COMPLETATA") return false;
     const dueDate = new Date(task.DueDate);
@@ -148,16 +136,13 @@ const UpdatedProjectTasksTable = ({
     return dueDate < new Date();
   };
 
-  // Funzione per ordinare i task
   const sortedAndFilteredTasks = useMemo(() => {
     let result = [...localTasks];
 
-    // Filtra per task in ritardo se checkbox selezionata
     if (showDelayedOnly) {
       result = result.filter((task) => isTaskDelayed(task));
     }
 
-    // Filtra per testo di ricerca
     if (filter.trim()) {
       const lowerFilter = filter.toLowerCase();
       result = result.filter(
@@ -168,7 +153,6 @@ const UpdatedProjectTasksTable = ({
       );
     }
 
-    // Ordina
     if (sortConfig.key) {
       result.sort((a, b) => {
         if (a[sortConfig.key] === null) return 1;
@@ -195,7 +179,6 @@ const UpdatedProjectTasksTable = ({
     return result;
   }, [localTasks, sortConfig, filter, showDelayedOnly]);
 
-  // Funzione per gestire il click sulla intestazione di colonna per ordinare
   const requestSort = (key) => {
     let direction = "asc";
     if (sortConfig.key === key && sortConfig.direction === "asc") {
@@ -204,21 +187,22 @@ const UpdatedProjectTasksTable = ({
     setSortConfig({ key, direction });
   };
 
-  // Calcola il numero di task in ritardo
   const delayedTasksCount = localTasks.filter(isTaskDelayed).length;
 
   return (
-    <div className="space-y-4">
+    <div className="h-full flex flex-col space-y-2">
       {/* Legenda con filtro di ricerca integrato */}
-      <TasksLegend
-        tasks={localTasks}
-        searchValue={filter}
-        onSearchChange={setFilter}
-      />
+      <div className="flex-shrink-0">
+        <TasksLegend
+          tasks={localTasks}
+          searchValue={filter}
+          onSearchChange={setFilter}
+        />
+      </div>
 
       {/* Checkbox per filtrare le attività in ritardo */}
       {delayedTasksCount > 0 && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Checkbox
             id="show-delayed"
             checked={showDelayedOnly}
@@ -239,93 +223,101 @@ const UpdatedProjectTasksTable = ({
 
       {/* Indicatore di aggiornamento */}
       {isRefreshing && (
-        <div className="flex items-center justify-center py-2">
+        <div className="flex items-center justify-center py-2 flex-shrink-0">
           <span className="text-sm text-blue-500">Aggiornamento...</span>
         </div>
       )}
 
-      {/* Tabella */}
-      <div className="rounded-md border overflow-auto">
-        <Table>
-          <TableHeader className="bg-gray-50">
-            <TableRow>
-              <TableHead
-                className="cursor-pointer hover:bg-gray-100"
-                onClick={() => requestSort("Title")}
-              >
-                Titolo{" "}
-                {sortConfig.key === "Title" &&
-                  (sortConfig.direction === "asc" ? "↑" : "↓")}
-              </TableHead>
-              <TableHead
-                className="cursor-pointer hover:bg-gray-100"
-                onClick={() => requestSort("AssignedToName")}
-              >
-                Responsabile{" "}
-                {sortConfig.key === "AssignedToName" &&
-                  (sortConfig.direction === "asc" ? "↑" : "↓")}
-              </TableHead>
-              <TableHead
-                className="cursor-pointer hover:bg-gray-100"
-                onClick={() => requestSort("Status")}
-              >
-                Stato{" "}
-                {sortConfig.key === "Status" &&
-                  (sortConfig.direction === "asc" ? "↑" : "↓")}
-              </TableHead>
-              <TableHead
-                className="cursor-pointer hover:bg-gray-100"
-                onClick={() => requestSort("DueDate")}
-              >
-                Scadenza{" "}
-                {sortConfig.key === "DueDate" &&
-                  (sortConfig.direction === "asc" ? "↑" : "↓")}
-              </TableHead>
-              <TableHead
-                className="cursor-pointer hover:bg-gray-100"
-                onClick={() => requestSort("Priority")}
-              >
-                Priorità{" "}
-                {sortConfig.key === "Priority" &&
-                  (sortConfig.direction === "asc" ? "↑" : "↓")}
-              </TableHead>
-              <TableHead className="text-center">Commenti</TableHead>
-              <TableHead className="text-center">Allegati</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedAndFilteredTasks.map((task) => (
-              <TaskRow
-                key={task.TaskID}
-                task={task}
-                onTaskClick={onTaskClick}
-                onTaskUpdate={handleTaskUpdate}
-                canEdit={canEditTask(project, task, currentUserId)}
-                isAdminOrManager={isAdminOrManager}
-                project={{ ...project, allUsers: users }} // Passa il progetto con tutti gli utenti
-                editingCell={editingCell}
-                setEditingCell={setEditingCell}
-                currentUserId={currentUserId}
-              />
-            ))}
-
-            {sortedAndFilteredTasks.length === 0 && (
+      {/* Contenitore tabella con altezza calcolata dinamicamente */}
+      <div 
+        className="border rounded-md flex-1 min-h-0 overflow-hidden" 
+        id="tasks-table-container"
+        style={{ 
+          height: 'calc(100vh - 105px - 60px - 48px - 40px - 180px)' 
+        }}
+      >
+        <div className="relative w-full h-full overflow-auto">
+          <Table id="tasks-table" className="w-full">
+            <TableHeader className="sticky top-0 z-10 bg-gray-50">
               <TableRow>
-                <TableCell
-                  colSpan={7}
-                  className="text-center py-10 text-gray-500"
+                <TableHead
+                  className="cursor-pointer hover:bg-gray-100"
+                  onClick={() => requestSort("Title")}
                 >
-                  {filter
-                    ? "Nessuna attività corrisponde ai criteri di ricerca"
-                    : "Nessuna attività disponibile per questo progetto"}
-                </TableCell>
+                  Titolo{" "}
+                  {sortConfig.key === "Title" &&
+                    (sortConfig.direction === "asc" ? "↑" : "↓")}
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-gray-100"
+                  onClick={() => requestSort("AssignedToName")}
+                >
+                  Responsabile{" "}
+                  {sortConfig.key === "AssignedToName" &&
+                    (sortConfig.direction === "asc" ? "↑" : "↓")}
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-gray-100"
+                  onClick={() => requestSort("Status")}
+                >
+                  Stato{" "}
+                  {sortConfig.key === "Status" &&
+                    (sortConfig.direction === "asc" ? "↑" : "↓")}
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-gray-100"
+                  onClick={() => requestSort("DueDate")}
+                >
+                  Scadenza{" "}
+                  {sortConfig.key === "DueDate" &&
+                    (sortConfig.direction === "asc" ? "↑" : "↓")}
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-gray-100"
+                  onClick={() => requestSort("Priority")}
+                >
+                  Priorità{" "}
+                  {sortConfig.key === "Priority" &&
+                    (sortConfig.direction === "asc" ? "↑" : "↓")}
+                </TableHead>
+                <TableHead className="text-center">Commenti</TableHead>
+                <TableHead className="text-center">Allegati</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {sortedAndFilteredTasks.map((task) => (
+                <TaskRow
+                  key={task.TaskID}
+                  task={task}
+                  onTaskClick={onTaskClick}
+                  onTaskUpdate={handleTaskUpdate}
+                  canEdit={canEditTask(project, task, currentUserId)}
+                  isAdminOrManager={isAdminOrManager}
+                  project={{ ...project, allUsers: users }}
+                  editingCell={editingCell}
+                  setEditingCell={setEditingCell}
+                  currentUserId={currentUserId}
+                />
+              ))}
+
+              {sortedAndFilteredTasks.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    className="text-center py-10 text-gray-500"
+                  >
+                    {filter
+                      ? "Nessuna attività corrisponde ai criteri di ricerca"
+                      : "Nessuna attività disponibile per questo progetto"}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );
 };
 
-export default UpdatedProjectTasksTable;
+export default ProjectTasksTableImproved;

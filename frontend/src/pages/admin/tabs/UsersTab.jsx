@@ -11,7 +11,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { swal } from "../../../lib/common";
@@ -33,7 +32,7 @@ const UsersTab = ({
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [selectedCompanies, setSelectedCompanies] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [showDisabled, setShowDisabled] = useState(true);
+  const [showDisabled, setShowDisabled] = useState(false);
 
   // Funzione di ordinamento
   const sortUsers = (users) => {
@@ -381,7 +380,7 @@ const UsersTab = ({
 
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between h-14">
+        <div className="flex items-center justify-content-around h-11">
           <h3 className="text-lg font-medium">
             {selectedUser.firstName} {selectedUser.lastName}
           </h3>
@@ -415,8 +414,6 @@ const UsersTab = ({
           </div>
         </div>
 
-        <Separator />
-
         <div className="flex space-x-2">
           <Button
             variant="outline"
@@ -445,8 +442,6 @@ const UsersTab = ({
           </Button>
         </div>
 
-        <Separator />
-
         <div>
           <h4 className="text-md font-medium mb-2">Gruppi assegnati</h4>
           {selectedUser.groups && selectedUser.groups.length > 0 ? (
@@ -466,11 +461,9 @@ const UsersTab = ({
           )}
         </div>
 
-        <Separator />
-
         {/* Gestione aziende */}
         <div>
-          <div className="flex justify-between items-center mb-2 h-14">
+          <div className="flex justify-content-around items-center mb-2 h-11">
             <h4 className="text-md font-medium">Aziende associate</h4>
             {selectedCompanies.length > 0 && (
               <Button
@@ -546,7 +539,7 @@ const UsersTab = ({
         </div>
 
         <div>
-          <div className="flex justify-between items-center mb-2 h-14">
+          <div className="flex justify-content-around items-center mb-2 h-11">
             <h4 className="text-md font-medium">Aziende disponibili</h4>
             {selectedCompanies.length > 0 && (
               <Button

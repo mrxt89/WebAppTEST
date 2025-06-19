@@ -974,7 +974,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
   }
 
   return (
-    <div className=" flex flex-col p-2 gap-2" style={{ height: "calc(100vh - 110px)" }} id="project-management-split-view">
+    <div className=" flex flex-col p-2 gap-2" style={{ height: "calc(100vh - 105px)" }} id="project-management-split-view">
       {/* Header minimalista con dashboard, titolo e modifica */}
       <div className="flex items-center justify-between py-2 px-4 bg-[var(--primary)] text-white border rounded-md shadow-sm">
         <h1 className="text-lg font-medium truncate max-w-md mx-2">
@@ -995,7 +995,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-h-0 overflow-hidden" style={{ height: "calc(100vh - 110px)" }} id="project-management-split-view-content1">
+      <div className="flex-1 min-h-0 overflow-hidden" id="project-management-split-view-content1">
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
@@ -1064,7 +1064,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
 
             {/* Tab Attività */}
             <TabsContent value="tasks" className="h-full flex flex-col">
-              <div className="flex justify-between items-center mb-1">
+              <div className="flex justify-between items-center my-2 mx-4">
                 {/* Sostituisci il Dialog con un semplice Button */}
                 <Button onClick={() => setIsAddTaskPanelOpen(true)}>
                   Aggiungi Attività
@@ -1078,7 +1078,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
                 />
               </div>
 
-              <div className="flex-1 min-h-0 overflow-hidden" style={{ height: "calc(100vh - 120px)" }} id="project-management-split-view-content3">
+              <div className="flex-1 min-h-0 overflow-hidden" style={{ height: "calc(100vh - 105px)" }} id="project-management-split-view-content3">
                 {/* Visualizzazione condizionale in base al viewMode */}
                 {tasksViewMode === "kanban" && (
                   <TasksKanban
@@ -1103,7 +1103,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
                 )}
                   {tasksViewMode === "gantt" && (
                     <ProjectGanttView
-                      id="project-gantt-view"
                       project={project}
                       tasks={project.tasks || []}
                       onTaskClick={handleTaskClick}
@@ -1629,11 +1628,11 @@ const ProjectManagementSplitView = () => {
 
   // Rendering
   return (
-    <div className="flex" style={{ height: "calc(100vh - 110px)" }} ref={containerRef}>
+    <div className="flex" style={{ height: "calc(100vh - 105px)" }} ref={containerRef}>
       {/* Sezione sinistra (resizable) */}
       <div 
         className="h-full flex flex-col p-4" 
-        style={{ width: `${leftPanelWidth}%`, height: "calc(100vh - 110px)" }}
+        style={{ width: `${leftPanelWidth}%`, height: "calc(100vh - 105px)" }}
       >
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Progetti</h2>
@@ -2041,7 +2040,7 @@ const ProjectManagementSplitView = () => {
       {/* Sezione destra (resizable) */}
       <div 
         className="h-full flex flex-col overflow-hidden" 
-        style={{ width: `${100 - leftPanelWidth}%`, height: "calc(100vh - 110px)" }}
+        style={{ width: `${100 - leftPanelWidth}%`, height: "calc(100vh - 105px)" }}
       >
         {selectedProjectId ? (
           <ProjectDetailContainer 

@@ -17,7 +17,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -395,10 +394,8 @@ const PagesTab = ({
           </div>
         )}
 
-        <Separator />
-
         <div>
-          <div className="flex justify-between items-center mb-2 h-14">
+          <div className="flex justify-content-around items-center mb-2 h-11">
             <h4 className="text-md font-medium">Gruppi con accesso</h4>
             {selectedGroups.length > 0 && (
               <Button
@@ -448,7 +445,7 @@ const PagesTab = ({
         </div>
 
         <div>
-          <div className="flex justify-between items-center mb-2 h-14">
+          <div className="flex justify-content-around items-center mb-2 h-11">
             <h4 className="text-md font-medium">Gruppi disponibili</h4>
             {selectedGroups.length > 0 && (
               <Button
