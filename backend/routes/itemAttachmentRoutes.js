@@ -151,12 +151,8 @@ router.get('/item-attachments/item-code/:itemCode', authenticateToken, async (re
             isErpAttachment
         );
 
-        // Se non ci sono allegati, restituisci un messaggio di errore
-        if (!attachments || attachments.length === 0) {
-            return res.status(404).json({ success: 0, message: 'Nessun allegato trovato' });
-        }
-        
-        res.json(attachments);
+        // Restituisci sempre un array (vuoto se non ci sono allegati)
+        res.json(attachments || []);
     } catch (error) {
         console.error('Error fetching item attachments:', error);
         res.status(500).json({ success: 0, message: 'Errore nel recupero degli allegati dell\'articolo' });

@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Clock,
   GanttChartSquare,
+  LayoutDashboard,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -78,8 +79,8 @@ const TasksViewToggler = ({
               htmlFor="kanban"
               className="flex items-center gap-2 cursor-pointer"
             >
-              <LayoutGrid className="h-4 w-4" />
-              Schede
+              <LayoutDashboard className="h-4 w-4" />
+              Lavagna
             </Label>
           </div>
 

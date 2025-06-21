@@ -42,6 +42,11 @@ export const buildBOMTree = (components, routing = []) => {
 
   // Normalize data to ensure consistency
   componentsToProcess.forEach((comp) => {
+    // IMPORTANTE: Per il livello 0, usa ItemId invece di ComponentId se non presente
+    if (comp.Level === 0 && !comp.ComponentId && comp.ItemId) {
+      comp.ComponentId = comp.ItemId;
+    }
+    
     // Ensure key fields exist
     comp.ComponentId =
       comp.ComponentId ||
@@ -52,7 +57,7 @@ export const buildBOMTree = (components, routing = []) => {
     comp.Level = comp.Level !== undefined ? comp.Level : 0;
 
     // Normalize display fields
-    comp.ComponentItemCode = comp.ComponentItemCode || comp.ComponentCode || "";
+    comp.ComponentItemCode = comp.ComponentItemCode || comp.ComponentCode || comp.Item || "";
     comp.ComponentItemDescription =
       comp.ComponentItemDescription ||
       comp.Description ||
@@ -111,18 +116,20 @@ export const buildBOMTree = (components, routing = []) => {
       pathMap[comp.Path] = node;
     }
 
-    // Root nodes (Level 0 or 1 depending on structure)
-    if (comp.Level === 0 || comp.Level === 1) {
+    // MODIFICA CHIAVE: Considera SOLO il livello 0 come root
+    if (comp.Level === 0) {
       rootNodes.push(node);
+      console.log(`[buildTree-${debugId}] Added root node at level 0:`, comp.ComponentItemCode || comp.ComponentId);
     }
   });
 
   // Second pass: build parent-child relationships
   componentsToProcess.forEach((comp) => {
-    // Skip root nodes
-    if (comp.Level <= 1) return;
+    // MODIFICA: Il livello 0 non ha parent, quindi skip
+    if (comp.Level === 0) return;
 
     // Find parent using Path if available
+    let parentFound = false;
     if (comp.Path) {
       const pathParts = comp.Path.split(".");
       // Remove last element to get parent path
@@ -155,50 +162,81 @@ export const buildBOMTree = (components, routing = []) => {
           }
 
           parentNode.children.push(nodeToAdd);
+          parentFound = true;
         }
       }
     }
-    // Otherwise, try to infer parent from level
-    else {
-      // Look back in the array until finding a component with level = level-1
-      for (let i = componentsToProcess.indexOf(comp) - 1; i >= 0; i--) {
-        const potentialParent = componentsToProcess[i];
-        if (potentialParent.Level === comp.Level - 1) {
-          // Cerca il nodo padre nel nodeMap
-          let parentNode = null;
-          for (const [id, node] of Object.entries(nodeMap)) {
-            if (
-              node.data.ComponentId === potentialParent.ComponentId &&
-              node.data.Line === potentialParent.Line
-            ) {
-              parentNode = node;
-              break;
-            }
-          }
-
-          // Cerca il nodo figlio nel nodeMap
+    
+    // If parent not found via Path, use level-based logic
+    if (!parentFound) {
+      // MODIFICA: Per componenti senza Path, usa la logica basata sul livello
+      if (comp.Level === 1) {
+        // Trova il nodo di livello 0 (dovrebbe essercene solo uno)
+        const level0Node = rootNodes.find(n => n.data.Level === 0);
+        if (level0Node) {
           let childNode = null;
           for (const [id, node] of Object.entries(nodeMap)) {
             if (
               node.data.ComponentId === comp.ComponentId &&
-              node.data.Line === comp.Line
+              node.data.Line === comp.Line &&
+              node.data.Level === 1
             ) {
               childNode = node;
               break;
             }
           }
-
-          if (parentNode && childNode) {
-            // IMPORTANT: Propagate BOMId from parent to child if not already set
-            if (parentNode.data.BOMId && !childNode.data.BOMId) {
-              childNode.data.BOMId = parentNode.data.BOMId;
+          
+          if (childNode) {
+            if (level0Node.data.BOMId && !childNode.data.BOMId) {
+              childNode.data.BOMId = level0Node.data.BOMId;
               console.log(
-                `[buildTree-${debugId}] Propagated BOMId ${parentNode.data.BOMId} to child ${childNode.id}`,
+                `[buildTree-${debugId}] Propagated BOMId ${level0Node.data.BOMId} to level 1 child ${childNode.id}`,
               );
             }
+            level0Node.children.push(childNode);
+          }
+        }
+      } else {
+        // Per livelli > 1, usa la logica esistente
+        for (let i = componentsToProcess.indexOf(comp) - 1; i >= 0; i--) {
+          const potentialParent = componentsToProcess[i];
+          if (potentialParent.Level === comp.Level - 1) {
+            // Cerca il nodo padre nel nodeMap
+            let parentNode = null;
+            for (const [id, node] of Object.entries(nodeMap)) {
+              if (
+                node.data.ComponentId === potentialParent.ComponentId &&
+                node.data.Line === potentialParent.Line
+              ) {
+                parentNode = node;
+                break;
+              }
+            }
 
-            parentNode.children.push(childNode);
-            break;
+            // Cerca il nodo figlio nel nodeMap
+            let childNode = null;
+            for (const [id, node] of Object.entries(nodeMap)) {
+              if (
+                node.data.ComponentId === comp.ComponentId &&
+                node.data.Line === comp.Line
+              ) {
+                childNode = node;
+                break;
+              }
+            }
+
+            if (parentNode && childNode) {
+              // IMPORTANT: Propagate BOMId from parent to child if not already set
+              if (parentNode.data.BOMId && !childNode.data.BOMId) {
+                childNode.data.BOMId = parentNode.data.BOMId;
+                console.log(
+                  `[buildTree-${debugId}] Propagated BOMId ${parentNode.data.BOMId} to child ${childNode.id}`,
+                );
+              }
+
+              parentNode.children.push(childNode);
+              break;
+            }
           }
         }
       }
@@ -238,6 +276,12 @@ export const buildBOMTree = (components, routing = []) => {
   console.log(
     `[buildTree-${debugId}] BOMId propagation stats: ${nodesWithBOMId}/${totalNodes} nodes have BOMId (${Math.round((nodesWithBOMId / totalNodes) * 100)}%)`,
   );
+
+  // AGGIUNTA: Log per debug
+  console.log(`[buildTree-${debugId}] Tree built with ${rootNodes.length} root nodes`);
+  if (rootNodes.length > 0 && rootNodes[0].data.Level === 0) {
+    console.log(`[buildTree-${debugId}] Root node is at level 0 with ${rootNodes[0].children.length} children`);
+  }
 
   return rootNodes;
 };

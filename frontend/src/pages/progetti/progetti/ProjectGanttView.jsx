@@ -29,13 +29,10 @@ import {
   Search,
   Filter,
   AlertTriangle,
-  ZoomIn,
-  ZoomOut,
   Calendar,
   ArrowUp,
   X,
   ArrowDown,
-  MoveVertical,
   GitBranch,
   Link2,
   Loader2,
@@ -51,6 +48,7 @@ import {
   useSensor,
   useSensors,
   DragOverlay,
+  defaultDropAnimationSideEffects,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -71,6 +69,36 @@ const debounce = (func, wait) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => func.apply(context, args), wait);
   };
+};
+
+// Componente personalizzato per il DragOverlay che gestisce il posizionamento
+const CustomDragOverlay = ({ children }) => {
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      setPosition({ x: e.clientX, y: e.clientY });
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        left: position.x - 150,
+        top: position.y - 30,
+        pointerEvents: 'none',
+        zIndex: 10000,
+      }}
+    >
+      {children}
+    </div>
+  );
 };
 
 // Componente per task sortable nella lista
@@ -257,16 +285,13 @@ const ProjectGanttView = ({
   checkCircularDependencies,
   calculateProjectDates,
 }) => {
-  // Contatori di debug
-  const renderCount = useRef(0);
-  const clickCount = useRef(0);
-
   // Refs per mantenere lo stato tra aggiornamenti
   const isTaskUpdating = useRef(false);
   const ganttContainerRef = useRef(null);
   const ganttWrapperRef = useRef(null);
   const moveInProgress = useRef(false);
   const clickHandledRef = useRef(false);
+  const dndContainerRef = useRef(null);
 
   // Stato per loading overlay
   const [isLoading, setIsLoading] = useState(false);
@@ -279,11 +304,10 @@ const ProjectGanttView = ({
     return saved ? ViewMode[saved] : ViewMode.Week;
   });
   const [scrollPosition, setScrollPosition] = useState(0);
-  const [visibleTimeStart, setVisibleTimeStart] = useState(null);
-  const [visibleTimeEnd, setVisibleTimeEnd] = useState(null);
   const [showDependencies, setShowDependencies] = useState(true);
   const [customZoomLevel, setCustomZoomLevel] = useState(1);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [draggedTask, setDraggedTask] = useState(null);
 
   // Stato per i filtri
   const [filters, setFilters] = useState({
@@ -296,13 +320,12 @@ const ProjectGanttView = ({
 
   // Determina se l'utente è in modalità read-only
   const isReadOnly = useMemo(() => {
-    // L'utente è in read-only se non è admin e non ha task propri
     const hasEditPermission = checkAdminPermission(project) || 
       tasks.some(task => isOwnTask(task));
     return !hasEditPermission;
   }, [checkAdminPermission, isOwnTask, project, tasks]);
 
-  // Setup sensori per drag & drop
+  // Setup sensori per drag & drop con configurazione ottimizzata
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -400,13 +423,21 @@ const ProjectGanttView = ({
 
   // Gestione del drag start
   const handleDragStart = (event) => {
-    setDraggedTaskId(event.active.id);
+    const taskId = event.active.id;
+    setDraggedTaskId(taskId);
+    
+    // Trova il task completo per il DragOverlay
+    const task = ganttTasks.find(t => t.id === taskId);
+    if (task) {
+      setDraggedTask(task);
+    }
   };
 
   // Gestione del drag end
   const handleDragEnd = async (event) => {
     const { active, over } = event;
     setDraggedTaskId(null);
+    setDraggedTask(null);
 
     if (active.id !== over.id) {
       const oldIndex = ganttTasks.findIndex((t) => t.id === active.id);
@@ -488,12 +519,6 @@ const ProjectGanttView = ({
     }
   };
 
-  // Salva l'intervallo di tempo visibile
-  const handleTimeChange = (start, end) => {
-    setVisibleTimeStart(start);
-    setVisibleTimeEnd(end);
-  };
-
   // Filtra le task
   const filteredTasks = useMemo(() => {
     let result = [...displayTasks];
@@ -541,7 +566,6 @@ const ProjectGanttView = ({
     if (!predecessors || predecessors.length === 0) return [];
     
     // gantt-task-react supporta solo dipendenze FS semplici
-    // quindi prendiamo solo le dipendenze FS
     return predecessors
       .filter(dep => dep.dependencyType === 'FS')
       .map(dep => dep.taskId.toString());
@@ -567,7 +591,7 @@ const ProjectGanttView = ({
                   ? 0
                   : task.Status === "SOSPESA"
                     ? 25
-                    : 10, // Per "DA FARE"
+                    : 10,
           type: "task",
           project: project.ProjectID.toString(),
           dependencies: buildDependencies(task),
@@ -575,10 +599,9 @@ const ProjectGanttView = ({
           displayOrder: task.TaskSequence,
           isDisabled: isReadOnly,
 
-          // Dati personalizzati per preservare tutte le informazioni originali
+          // Dati personalizzati
           originalTask: task,
           canInteract: !isReadOnly && (checkAdminPermission(project) || isOwnTask(task)),
-          // Status dell'attività
           status: task.Status,
           priority: task.Priority,
           isDelayed:
@@ -738,24 +761,7 @@ const ProjectGanttView = ({
     }
   };
 
-  // Gestisce il click singolo
-  const handleClick = (task) => {
-    const originalTask = displayTasks.find((t) => t.TaskID.toString() === task.id);
-    if (originalTask) {
-      // Salva la posizione corrente prima di aprire il modal
-      if (ganttContainerRef.current) {
-        const horizontalScroll = ganttContainerRef.current.querySelector(
-          ".gantt-horizontal-scroll",
-        );
-        if (horizontalScroll) {
-          setScrollPosition(horizontalScroll.scrollLeft);
-        }
-      }
-      onTaskClick(originalTask);
-    }
-  };
-
-  // Funzione diretta per l'aggiornamento della sequenza senza debounce
+  // Funzione diretta per l'aggiornamento della sequenza
   const executeTaskSequenceUpdate = async (taskId, projectId, newIndex) => {
     try {
       // Mostra loading overlay
@@ -788,71 +794,6 @@ const ProjectGanttView = ({
       console.error("[GANTT] Errore in executeTaskSequenceUpdate:", error);
       setIsLoading(false);
       return { success: false };
-    }
-  };
-
-  // Callback per lo spostamento tramite drag (aggiorna la sequenza)
-  const handleTaskMove = async (task, orderIndex) => {
-    if (isReadOnly) return;
-
-    // Imposta la flag di elaborazione immediata
-    clickHandledRef.current = true;
-    moveInProgress.current = true;
-
-    try {
-      // Converti l'ID del task da stringa a numero se necessario
-      const taskId = typeof task.id === "string" ? parseInt(task.id) : task.id;
-
-      // Trova il task originale usando l'ID corretto
-      const originalTask = displayTasks.find((t) => t.TaskID === taskId);
-      if (!originalTask) {
-        moveInProgress.current = false;
-        clickHandledRef.current = false;
-        return;
-      }
-
-      // Controllo permessi
-      if (!checkAdminPermission(project) && !isOwnTask(originalTask)) {
-        console.error("Permessi insufficienti");
-        swal.fire(
-          "Attenzione",
-          "Non hai i permessi per spostare questa attività",
-          "warning",
-        );
-        moveInProgress.current = false;
-        clickHandledRef.current = false;
-        return;
-      }
-
-      // Salva la posizione di scroll corrente
-      if (ganttContainerRef.current) {
-        const horizontalScroll = ganttContainerRef.current.querySelector(
-          ".gantt-horizontal-scroll",
-        );
-        if (horizontalScroll) {
-          setScrollPosition(horizontalScroll.scrollLeft);
-        }
-      }
-
-      // Usa la funzione diretta invece di quella debounced
-      const result = await executeTaskSequenceUpdate(
-        taskId,
-        project.ProjectID,
-        orderIndex,
-      );
-    } catch (error) {
-      console.error("[GANTT] Errore aggiornamento sequenza:", error);
-      swal.fire(
-        "Errore",
-        "Non è stato possibile aggiornare la sequenza delle attività",
-        "error",
-      );
-    } finally {
-      // Ripristina i flag dopo un ritardo
-      setTimeout(() => {
-        moveInProgress.current = false;
-        clickHandledRef.current = false;
-      }, 800);
     }
   };
 
@@ -950,7 +891,7 @@ const ProjectGanttView = ({
       // Trasforma il task in un oggetto con TaskID numerico
       const taskId = parseInt(task.id);
 
-      // Chiamata diretta all'API (senza debounce)
+      // Chiamata diretta all'API
       executeTaskSequenceUpdate(taskId, project.ProjectID, newSequenceValue);
     }, 100);
   };
@@ -1308,7 +1249,6 @@ const ProjectGanttView = ({
                     rowHeight={90}
                     onDateChange={isReadOnly ? undefined : handleTaskChangeWrapper}
                     onDoubleClick={handleDoubleClick}
-                    onTaskMove={isReadOnly ? undefined : handleTaskMove}
                     barCornerRadius={4}
                     barProgressColor={null}
                     barProgressSelectedColor={null}
@@ -1417,14 +1357,14 @@ const ProjectGanttView = ({
                       );
                     }}
                     TaskListTable={() => (
-                      <div className="p-2 border-r h-full bg-white">
-                        <DndContext
-                          sensors={sensors}
-                          collisionDetection={closestCenter}
-                          onDragStart={handleDragStart}
-                          onDragEnd={handleDragEnd}
-                          modifiers={[]}
-                        >
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        autoScroll={false}
+                      >
+                        <div className="p-2 border-r h-full bg-white" ref={dndContainerRef}>
                           <div className="h-full flex flex-col">
                             <table className="w-full border-spacing-0 border-separate">
                               <tbody>
@@ -1456,38 +1396,36 @@ const ProjectGanttView = ({
                             {/* Spacer per riempire lo spazio vuoto quando ci sono poche task */}
                             <div className="flex-1 bg-white border-b"></div>
                           </div>
-                          <DragOverlay 
-                            dropAnimation={{
-                              duration: 250,
-                              easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-                            }}
-                          >
-                            {draggedTaskId ? (
-                              <div 
-                                className="bg-white shadow-2xl rounded-lg p-4 border-2 border-blue-500 min-w-[300px]"
-                                style={{
-                                  cursor: 'grabbing',
-                                  maxWidth: '400px',
-                                }}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <GripVertical className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-semibold text-base truncate">
-                                      {ganttTasks.find(t => t.id === draggedTaskId)?.name}
-                                    </div>
-                                    {ganttTasks.find(t => t.id === draggedTaskId)?.assignedToName && (
-                                      <div className="text-sm text-gray-600 mt-1 truncate">
-                                        Assegnato a: {ganttTasks.find(t => t.id === draggedTaskId)?.assignedToName}
-                                      </div>
-                                    )}
+                        </div>
+                        
+                        {/* DragOverlay personalizzato */}
+                        {draggedTaskId && draggedTask && (
+                          <CustomDragOverlay>
+                            <div 
+                              className="bg-white shadow-2xl rounded-lg p-3 border-2 border-blue-500"
+                              style={{
+                                width: '300px',
+                                cursor: 'grabbing',
+                                opacity: 0.95,
+                              }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <GripVertical className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-sm truncate">
+                                    {draggedTask.name}
                                   </div>
+                                  {draggedTask.assignedToName && (
+                                    <div className="text-xs text-gray-600 truncate">
+                                      {draggedTask.assignedToName}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                            ) : null}
-                          </DragOverlay>
-                        </DndContext>
-                      </div>
+                            </div>
+                          </CustomDragOverlay>
+                        )}
+                      </DndContext>
                     )}
                     barFill={90}
                     handleWidth={8}
@@ -1500,7 +1438,6 @@ const ProjectGanttView = ({
                     }
                     listCellWidth="100px"
                     todayColor="rgba(252, 165, 165, 0.5)"
-                    onTimeChange={handleTimeChange}
                     TaskListHeader={() => (
                       <div className="sticky top-0 z-10 bg-white">
                         <table className="w-full h-full">
@@ -1540,10 +1477,9 @@ const ProjectGanttView = ({
    );
 };
 
-// Ottimizzazione per evitare re-render inutili, ma garantendo aggiornamenti quando necessario
+// Ottimizzazione per evitare re-render inutili
 export default React.memo(ProjectGanttView, (prevProps, nextProps) => {
   // Controlla se le props principali sono cambiate
-  // Verifica più completa includendo tutti i campi rilevanti dei task
   const tasksUnchanged =
     prevProps.tasks.length === nextProps.tasks.length &&
     JSON.stringify(

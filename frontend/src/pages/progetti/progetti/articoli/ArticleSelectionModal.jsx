@@ -262,9 +262,9 @@ const ArticleSelectionModal = ({
         onClose();
         
         // Notifica il parent per aggiornare la lista
-        // IMPORTANTE: Passa false come terzo parametro per evitare una seconda importazione
+        // IMPORTANTE: Usa "already_imported" per evitare una seconda importazione
         if (onSelectItem && result.item) {
-          onSelectItem(result.item, "defined", false);
+          onSelectItem(result.item, "already_imported", false);
         }
       } else {
         throw new Error(result?.msg || "Errore durante l'importazione");

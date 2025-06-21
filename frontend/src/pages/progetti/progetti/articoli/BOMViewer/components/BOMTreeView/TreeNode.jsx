@@ -1,4 +1,4 @@
-// TreeNode.jsx - Versione con supporto drag and drop per gestire le due zone di drop
+// TreeNode.jsx - Versione completa con supporto per livello 0 non eliminabile
 import React, { useEffect, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import {
@@ -11,6 +11,7 @@ import {
   Settings,
   Factory,
   AlertTriangle,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBOMViewer } from "../../context/BOMViewerContext";
@@ -27,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 const getLevelColor = (level) => {
   // Colori per i vari livelli
   const LEVEL_COLORS = [
-    "#6b7280", // Livello 0 - gray-500
+    "#1f2937", // Livello 0 - gray-800 (più scuro per il root)
     "#3b82f6", // Livello 1 - blue-500
     "#22c55e", // Livello 2 - green-500
     "#f59e0b", // Livello 3 - amber-500
@@ -46,7 +47,12 @@ const getLevelColor = (level) => {
 };
 
 // Component for node icon based on type
-const NodeIcon = ({ node }) => {
+const NodeIcon = ({ node, isRootNode }) => {
+  // NUOVO: Icona speciale per il livello 0
+  if (isRootNode) {
+    return <Home className="h-4 w-4 text-gray-700" />;
+  }
+
   if (node.type === "cycle") {
     return <Factory className="h-4 w-4 text-green-500" />;
   }
@@ -180,6 +186,9 @@ const TreeNode = ({
   const [nodeCycles, setNodeCycles] = useState([]);
   const [debug, setDebug] = useState(false);
 
+  // NUOVO: Verifica se è il nodo root (livello 0)
+  const isRootNode = node.type === "component" && node.data.Level === 0;
+
   // Configura la droppable area per questo nodo
   const { setNodeRef, isOver } = useDroppable({
     id: `droppable-${node.id}`,
@@ -190,10 +199,12 @@ const TreeNode = ({
   });
 
   // Determina se il componente è in uno stato che ne impedisce la modifica
+  // MODIFICA: Il livello 0 è sempre bloccato
   const isLocked =
-    node.type === "component" &&
-    (node.data.parentBOMStato_erp === "1" ||
-      node.data.parentBOMStato_erp === 1);
+    isRootNode || // Livello 0 sempre bloccato
+    (node.type === "component" &&
+      (node.data.parentBOMStato_erp === "1" ||
+        node.data.parentBOMStato_erp === 1));
 
   // Verifica se il componente ha una distinta in MAGO (ERP)
   const hasMagoBOM =
@@ -221,6 +232,7 @@ const TreeNode = ({
   // Check if node is selected via checkbox
   const isChecked =
     node.type === "component" &&
+    !isRootNode && // Non permettere la selezione del root
     selectedComponents.some((comp) => {
       const compUniqueId =
         comp._uniqueSelectionId || generateUniqueNodeId(comp);
@@ -248,7 +260,8 @@ const TreeNode = ({
 
   const handleCheckboxChange = (e) => {
     e.stopPropagation(); // Prevent node selection
-    if (onNodeCheck && !isLocked) {
+    // MODIFICA: Non permettere la selezione del livello 0
+    if (onNodeCheck && !isLocked && !isRootNode) {
       onNodeCheck(node, e.target.checked);
     }
   };
@@ -283,7 +296,7 @@ const TreeNode = ({
 
   // Get formatted quantity
   const getQuantity = () => {
-    if (node.type === "component" && node.data.Quantity) {
+    if (node.type === "component" && node.data.Quantity && !isRootNode) {
       const qty = parseFloat(node.data.Quantity);
       if (isNaN(qty)) return "";
 
@@ -300,7 +313,8 @@ const TreeNode = ({
       "flex items-center py-1 rounded cursor-pointer hover:bg-gray-100 transition-colors relative",
       selected && "bg-blue-50 text-blue-700 font-medium",
       node.type === "cycle" && "italic text-green-700", // Special styling for cycles
-      isLocked && "opacity-75", // Lower opacity for locked components
+      isLocked && !isRootNode && "opacity-75", // Lower opacity for locked components (ma non per il root)
+      isRootNode && "bg-gray-50 hover:bg-gray-100", // Sfondo speciale per il root
       isCurrentDragOver && "ring-1 ring-gray-300", // Sottile bordo per indicare che è possibile fare drop
     );
   };
@@ -310,6 +324,7 @@ const TreeNode = ({
     const attrs = {
       "data-node-type": node.type,
       "data-node-id": node.id,
+      "data-is-root": isRootNode ? "true" : "false",
     };
 
     if (node.type === "component") {
@@ -345,7 +360,9 @@ const TreeNode = ({
 
     let message = "Componente non modificabile";
 
-    if (node.data.bomStato_erp === "1" || node.data.bomStato_erp === 1) {
+    if (isRootNode) {
+      message = "L'articolo principale non può essere eliminato o modificato";
+    } else if (node.data.bomStato_erp === "1" || node.data.bomStato_erp === 1) {
       message =
         "Questo componente è presente in ERP (Mago) e non può essere modificato";
     } else if (
@@ -396,6 +413,20 @@ const TreeNode = ({
     );
   };
 
+  // NUOVO: Badge per il livello 0
+  const getRootBadge = () => {
+    if (!isRootNode) return null;
+
+    return (
+      <Badge
+        variant="outline"
+        className="ml-2 px-1 py-0 h-4 text-xs bg-gray-50 text-gray-800 border-gray-300"
+      >
+        PRINCIPALE
+      </Badge>
+    );
+  };
+
   // Render the component
   return (
     <div>
@@ -405,9 +436,12 @@ const TreeNode = ({
         style={{
           paddingLeft: `${indent}px`,
           paddingRight: "8px",
+          // MODIFICA: Bordo diverso per il livello 0
           borderLeft:
             node.type === "component"
-              ? `2px solid ${getLevelColor(level)}`
+              ? isRootNode
+                ? `3px solid #1f2937` // Bordo più spesso e scuro per il root
+                : `2px solid ${getLevelColor(level)}`
               : "none",
         }}
         onClick={handleSelect}
@@ -429,8 +463,8 @@ const TreeNode = ({
           )}
         </div>
 
-        {/* Checkbox for components */}
-        {node.type === "component" && (
+        {/* Checkbox for components - NASCOSTO per il livello 0 */}
+        {node.type === "component" && !isRootNode && (
           <Checkbox
             className={`mr-1.5 h-3.5 w-3.5 ${isChecked ? "bg-primary" : ""}`}
             checked={isChecked}
@@ -440,27 +474,42 @@ const TreeNode = ({
           />
         )}
 
+        {/* Spazio vuoto al posto della checkbox per il root */}
+        {node.type === "component" && isRootNode && (
+          <span className="w-5 h-3.5 mr-1.5" />
+        )}
+
         {/* Node icon */}
-        <NodeIcon node={node} />
+        <NodeIcon node={node} isRootNode={isRootNode} />
 
         {/* Node text */}
         <div className="ml-2 flex-1">
           <div
             className="flex items-center justify-between"
-            style={{ fontSize: "13px" }}
+            style={{ fontSize: isRootNode ? "14px" : "13px" }}
           >
             <div className="flex items-center">
-              <span className="truncate max-w-[280px]">{getNodeText()}</span>
+              <span
+                className={cn(
+                  "truncate max-w-[280px]",
+                  isRootNode && "font-semibold text-gray-800",
+                )}
+              >
+                {getNodeText()}
+              </span>
               {isLocked && getLockedTooltip()}
               {hasMagoBOM && getMagoBadge()}
+              {getRootBadge()}
             </div>
 
-            {/* Quantity for components */}
-            {node.type === "component" && node.data.Quantity && (
-              <span className="text-xs text-gray-500 ml-2">
-                {getQuantity()}
-              </span>
-            )}
+            {/* Quantity for components - nascosta per il root */}
+            {node.type === "component" &&
+              node.data.Quantity &&
+              !isRootNode && (
+                <span className="text-xs text-gray-500 ml-2">
+                  {getQuantity()}
+                </span>
+              )}
           </div>
         </div>
       </div>
