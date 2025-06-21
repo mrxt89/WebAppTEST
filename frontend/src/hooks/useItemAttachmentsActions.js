@@ -75,7 +75,7 @@ const useItemAttachmentsActions = () => {
       } catch (err) {
         setError(err.message);
         console.error("Error fetching attachments by item code:", err);
-        showError("Errore nel recupero degli allegati per codice articolo");
+        
         return [];
       } finally {
         setLoading(false);
@@ -595,7 +595,7 @@ const useItemAttachmentsActions = () => {
       } catch (err) {
         setError(err.message);
         console.error("Error getting attachments by category:", err);
-        showError("Errore nel recupero degli allegati per categoria");
+       
         throw err;
       } finally {
         setLoading(false);

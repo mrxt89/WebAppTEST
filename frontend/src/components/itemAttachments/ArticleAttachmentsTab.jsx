@@ -33,7 +33,7 @@ function ArticleAttachmentsTab({ article, canEdit = false }) {
           // Per articoli da ERP, usa il codice articolo
           <ItemAttachmentsPanel
             itemCode={article.Item}
-            readOnly={!canEdit}
+            readOnly={false}
             showHeader={false}
             maxHeight={600}
           />
@@ -41,7 +41,7 @@ function ArticleAttachmentsTab({ article, canEdit = false }) {
           // Per articoli temporanei, usa l'ID dell'articolo progetto
           <ItemAttachmentsPanel
             projectItemId={article.Id}
-            readOnly={!canEdit}
+            readOnly={false}
             showHeader={false}
             maxHeight={600}
           />

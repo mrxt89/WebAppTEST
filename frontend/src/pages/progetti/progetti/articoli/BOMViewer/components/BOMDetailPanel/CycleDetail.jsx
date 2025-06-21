@@ -30,6 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { swal } from "@/lib/common";
 
 // Funzione di utilità per convertire secondi in formato HH:mm:ss
 const formatTimeHHMMSS = (seconds) => {
@@ -226,7 +227,11 @@ const CyclesTab = () => {
       setIsEditingCycles(false);
     } catch (error) {
       console.error("Errore nel salvataggio delle modifiche ai cicli:", error);
-      alert(`Errore nel salvataggio: ${error.message}`);
+      swal.fire(
+        "Errore",
+        `Errore nel salvataggio: ${error.message}`,
+        "error"
+      );
     }
   };
 
@@ -291,17 +296,28 @@ const CyclesTab = () => {
       await loadBOMData();
     } catch (error) {
       console.error("Errore nell'aggiunta del ciclo:", error);
-      alert(`Errore nell'aggiunta del ciclo: ${error.message}`);
+      swal.fire(
+        "Errore",
+        `Errore nell'aggiunta del ciclo: ${error.message}`,
+        "error"
+      );
     }
   };
 
   // Gestione eliminazione ciclo
   const handleDeleteCycle = async (rtgStep) => {
     try {
-      const confirm = window.confirm(
-        "Sei sicuro di voler eliminare questa fase?",
-      );
-      if (!confirm) return;
+      const result = await swal.fire({
+        title: "Conferma eliminazione",
+        text: "Sei sicuro di voler eliminare questa fase?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sì, elimina",
+        cancelButtonText: "Annulla",
+        confirmButtonColor: "#d33",
+      });
+
+      if (!result.isConfirmed) return;
 
       await deleteRouting(rtgStep);
 
@@ -309,7 +325,11 @@ const CyclesTab = () => {
       await loadBOMData();
     } catch (error) {
       console.error("Errore nell'eliminazione del ciclo:", error);
-      alert(`Errore nell'eliminazione del ciclo: ${error.message}`);
+      swal.fire(
+        "Errore",
+        `Errore nell'eliminazione del ciclo: ${error.message}`,
+        "error"
+      );
     }
   };
 
@@ -346,7 +366,11 @@ const CyclesTab = () => {
       await loadBOMData();
     } catch (error) {
       console.error("Errore nello spostamento del ciclo:", error);
-      alert(`Errore nello spostamento del ciclo: ${error.message}`);
+      swal.fire(
+        "Errore",
+        `Errore nello spostamento del ciclo: ${error.message}`,
+        "error"
+      );
     }
   };
 

@@ -464,7 +464,7 @@ const MyTasksPage = () => {
           shouldCloseModal ||
           completeTaskData.Status !== selectedTask?.Status
         ) {
-          setIsTaskDialogOpen(false);
+          setIsTaskPanelOpen(false);
           setSelectedTask(null);
         } else if (selectedTask?.TaskID === completeTaskData.TaskID) {
           setSelectedTask((prev) => ({ ...prev, ...completeTaskData }));

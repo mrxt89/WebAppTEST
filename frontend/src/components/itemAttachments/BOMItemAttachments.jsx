@@ -48,6 +48,7 @@ import ItemAttachmentSharing from "./ItemAttachmentSharing";
 import ItemAttachmentCategories from "./ItemAttachmentCategories";
 import FileViewer from "../ui/fileViewer";
 import { useAuth } from "../../context/AuthContext";
+import { swal } from "@/lib/common";
 
 /**
  * BOMItemAttachments - Componente specializzato per mostrare gli allegati nel contesto della distinta base
@@ -221,37 +222,24 @@ function BOMItemAttachments({
 
   // Eliminazione dell'allegato
   const handleDelete = (attachment) => {
-    if (readOnly) return; // Non permettere eliminazione in modalità sola lettura
-
     setSelectedAttachment(attachment);
 
     // Usiamo sempre SweetAlert
-    if (window.swal && window.swal.fire) {
-      window.swal
-        .fire({
-          title: "Conferma eliminazione",
-          text: `Sei sicuro di voler eliminare l'allegato "${attachment.FileName}"?`,
-          icon: "warning",
-          showCancelButton: true,
-          confirmButtonText: "Sì, elimina",
-          cancelButtonText: "Annulla",
-          confirmButtonColor: "#d33",
-        })
-        .then((result) => {
-          if (result.isConfirmed) {
-            performDelete(attachment);
-          }
-        });
-    } else {
-      // Fallback su conferma standard se swal non è disponibile
-      if (
-        window.confirm(
-          `Sei sicuro di voler eliminare l'allegato "${attachment.FileName}"?`,
-        )
-      ) {
-        performDelete(attachment);
-      }
-    }
+    swal
+      .fire({
+        title: "Conferma eliminazione",
+        text: `Sei sicuro di voler eliminare l'allegato "${attachment.FileName}"?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sì, elimina",
+        cancelButtonText: "Annulla",
+        confirmButtonColor: "#d33",
+      })
+      .then((result) => {
+        if (result.isConfirmed) {
+          performDelete(attachment);
+        }
+      });
 
     handleMenuClose();
   };
@@ -264,27 +252,21 @@ function BOMItemAttachments({
         refreshAttachments();
 
         // Mostra messaggio di successo
-        if (window.swal && window.swal.fire) {
-          window.swal.fire(
-            "Eliminato!",
-            "L'allegato è stato eliminato con successo.",
-            "success",
-          );
-        }
+        swal.fire(
+          "Eliminato!",
+          "L'allegato è stato eliminato con successo.",
+          "success",
+        );
       })
       .catch((error) => {
         console.error("Errore nell'eliminazione dell'allegato:", error);
 
         // Mostra messaggio di errore
-        if (window.swal && window.swal.fire) {
-          window.swal.fire(
-            "Errore",
-            "Si è verificato un errore durante l'eliminazione dell'allegato.",
-            "error",
-          );
-        } else {
-          alert("Errore nell'eliminazione dell'allegato");
-        }
+        swal.fire(
+          "Errore",
+          "Si è verificato un errore durante l'eliminazione dell'allegato.",
+          "error",
+        );
       });
   };
 
@@ -303,32 +285,21 @@ function BOMItemAttachments({
     setSelectedAttachment(attachment);
 
     // Usiamo sempre SweetAlert
-    if (window.swal && window.swal.fire) {
-      window.swal
-        .fire({
-          title: "Conferma ripristino",
-          text: `Sei sicuro di voler ripristinare l'allegato "${attachment.FileName}"?`,
-          icon: "question",
-          showCancelButton: true,
-          confirmButtonText: "Sì, ripristina",
-          cancelButtonText: "Annulla",
-          confirmButtonColor: "#4caf50",
-        })
-        .then((result) => {
-          if (result.isConfirmed) {
-            performRestore(attachment);
-          }
-        });
-    } else {
-      // Fallback su conferma standard
-      if (
-        window.confirm(
-          `Sei sicuro di voler ripristinare l'allegato "${attachment.FileName}"?`,
-        )
-      ) {
-        performRestore(attachment);
-      }
-    }
+    swal
+      .fire({
+        title: "Conferma ripristino",
+        text: `Sei sicuro di voler ripristinare l'allegato "${attachment.FileName}"?`,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Sì, ripristina",
+        cancelButtonText: "Annulla",
+        confirmButtonColor: "#4caf50",
+      })
+      .then((result) => {
+        if (result.isConfirmed) {
+          performRestore(attachment);
+        }
+      });
 
     handleMenuClose();
   };
@@ -341,27 +312,21 @@ function BOMItemAttachments({
         refreshAttachments();
 
         // Mostra messaggio di successo
-        if (window.swal && window.swal.fire) {
-          window.swal.fire(
-            "Ripristinato!",
-            "L'allegato è stato ripristinato con successo.",
-            "success",
-          );
-        }
+        swal.fire(
+          "Ripristinato!",
+          "L'allegato è stato ripristinato con successo.",
+          "success",
+        );
       })
       .catch((error) => {
         console.error("Errore nel ripristino dell'allegato:", error);
 
         // Mostra messaggio di errore
-        if (window.swal && window.swal.fire) {
-          window.swal.fire(
-            "Errore",
-            "Si è verificato un errore durante il ripristino dell'allegato.",
-            "error",
-          );
-        } else {
-          alert("Errore nel ripristino dell'allegato");
-        }
+        swal.fire(
+          "Errore",
+          "Si è verificato un errore durante il ripristino dell'allegato.",
+          "error",
+        );
       });
   };
 
@@ -432,17 +397,15 @@ function BOMItemAttachments({
         }}
       >
         <Box sx={{ display: "flex", gap: 1 }}>
-          {!readOnly && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<UploadIcon />}
-              onClick={handleUploaderOpen}
-              size={compact ? "small" : "medium"}
-            >
-              Carica
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<UploadIcon />}
+            onClick={handleUploaderOpen}
+            size={compact ? "small" : "medium"}
+          >
+            Carica
+          </Button>
 
           {attachments.length > 0 && (
             <Button
@@ -491,18 +454,16 @@ function BOMItemAttachments({
             Nessun allegato disponibile per questo{" "}
             {isComponentItem ? "componente" : "articolo"}
           </Typography>
-          {!readOnly && (
-            <Button
-              variant="outlined"
-              color="primary"
-              startIcon={<UploadIcon />}
-              onClick={handleUploaderOpen}
-              sx={{ mt: 2 }}
-              size="small"
-            >
-              Carica un allegato
-            </Button>
-          )}
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<UploadIcon />}
+            onClick={handleUploaderOpen}
+            sx={{ mt: 2 }}
+            size="small"
+          >
+            Carica un allegato
+          </Button>
         </Paper>
       ) : (
         <List
@@ -595,31 +556,29 @@ function BOMItemAttachments({
                           </IconButton>
                         </Tooltip>
                         {!readOnly && (
-                          <>
-                            <Tooltip title="Modifica">
-                              <IconButton
-                                edge="end"
-                                aria-label="edit"
-                                onClick={() => handleEdit(attachment)}
-                                size="small"
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-
-                            <Tooltip title="Elimina">
-                              <IconButton
-                                edge="end"
-                                aria-label="delete"
-                                onClick={() => handleDelete(attachment)}
-                                size="small"
-                                color="error"
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </>
+                          <Tooltip title="Modifica">
+                            <IconButton
+                              edge="end"
+                              aria-label="edit"
+                              onClick={() => handleEdit(attachment)}
+                              size="small"
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                         )}
+
+                        <Tooltip title="Elimina">
+                          <IconButton
+                            edge="end"
+                            aria-label="delete"
+                            onClick={() => handleDelete(attachment)}
+                            size="small"
+                            color="error"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Altre opzioni">
                           <IconButton
                             edge="end"
@@ -699,18 +658,18 @@ function BOMItemAttachments({
               </ListItemIcon>
               <ListItemText>Modifica</ListItemText>
             </MenuItem>
-
-            <MenuItem
-              onClick={() => handleDelete(selectedAttachment)}
-              sx={{ color: "error.main" }}
-            >
-              <ListItemIcon sx={{ color: "error.main" }}>
-                <DeleteIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Elimina</ListItemText>
-            </MenuItem>
           </>
         )}
+
+        <MenuItem
+          onClick={() => handleDelete(selectedAttachment)}
+          sx={{ color: "error.main" }}
+        >
+          <ListItemIcon sx={{ color: "error.main" }}>
+            <DeleteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Elimina</ListItemText>
+        </MenuItem>
       </Menu>
 
       {/* Rimossi dialog di conferma, utilizziamo SweetAlert */}
