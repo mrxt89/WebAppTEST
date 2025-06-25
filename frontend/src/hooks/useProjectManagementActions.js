@@ -139,31 +139,30 @@ const useProjectActions = () => {
     [makeRequest],
   );
 
-  const getProjectById = async (projectId) => {
+  const getProjectById = async (projectId, includeDisabled = false) => {
     try {
-      setLoading(true);
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        `${config.API_BASE_URL}/projects/${projectId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        },
-      );
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        const url = `${config.API_BASE_URL}/projects/${projectId}${includeDisabled ? '?includeDisabled=true' : ''}`;
+        
+        const response = await fetch(url, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        });
 
-      if (!response.ok) throw new Error("Error fetching project details");
+        if (!response.ok) throw new Error("Error fetching project details");
 
-      const data = await response.json();
-      return data;
+        const data = await response.json();
+        return data;
     } catch (error) {
-      console.error("Error fetching project details:", error);
-      return null;
+        console.error("Error fetching project details:", error);
+        return null;
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
 
   const addUpdateProject = useCallback(
     async (projectData) => {
@@ -739,6 +738,57 @@ const getTaskDependenciesLog = async (taskId) => {
   }
 };
 
+const toggleTaskDisabled = async (taskId, disable = true) => {
+  try {
+      const url = `${config.API_BASE_URL}/projects/tasks/${taskId}/disable`;
+      return await makeRequest(url, {
+          method: "PATCH",
+          body: JSON.stringify({ disable }),
+      });
+  } catch (error) {
+      console.error("Error toggling task disabled state:", error);
+      throw error;
+  }
+};
+
+const manageTaskPin = async (taskId, action, newOrder = null) => {
+  try {
+      const url = `${config.API_BASE_URL}/projects/tasks/${taskId}/pin`;
+      return await makeRequest(url, {
+          method: "POST",
+          body: JSON.stringify({ action, newOrder }),
+      });
+  } catch (error) {
+      console.error("Error managing task pin:", error);
+      throw error;
+  }
+};
+
+const toggleProjectLock = async (projectId) => {
+  try {
+      const url = `${config.API_BASE_URL}/projects/${projectId}/lock`;
+      return await makeRequest(url, {
+          method: "PATCH",
+      });
+  } catch (error) {
+      console.error("Error toggling project lock:", error);
+      throw error;
+  }
+};
+
+const manageProjectPin = async (projectId, action, newOrder = null) => {
+  try {
+      const url = `${config.API_BASE_URL}/projects/${projectId}/pin`;
+      return await makeRequest(url, {
+          method: "POST",
+          body: JSON.stringify({ action, newOrder }),
+      });
+  } catch (error) {
+      console.error("Error managing project pin:", error);
+      throw error;
+  }
+};
+
 
   return {
     projects,
@@ -780,7 +830,10 @@ const getTaskDependenciesLog = async (taskId) => {
     calculateProjectDates,
     getTaskCostsLog,
     getTaskDependenciesLog,
-    
+    toggleTaskDisabled,
+    manageTaskPin,
+    toggleProjectLock,
+    manageProjectPin
   };
 };
 

@@ -26,7 +26,8 @@ router.get('/projectsCategories/categories', authenticateToken, async (req, res)
 router.post('/projectsCategories/categories', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.UserId;
-        const result = await addUpdateCategory(req.body, userId);
+        const companyId = req.user.CompanyId;
+        const result = await addUpdateCategory(req.body, userId, companyId);
         res.json(result);
     } catch (err) {
         console.error('Error saving category:', err);

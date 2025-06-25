@@ -25,12 +25,12 @@ const getUserTasksWithFilters = async (
   assignedTo = null,
   involvedUser = null,
   sortBy = 'DueDate',
-  sortDirection = 'ASC'
+  sortDirection = 'ASC',
+  includeDisabled = false  // Nuovo parametro
 ) => {
   try {
     let pool = await sql.connect(config.dbConfig);
     
-    // Esegui la stored procedure con i filtri
     const result = await pool.request()
       .input('UserID', sql.Int, userId)
       .input('SearchText', sql.NVarChar(100), searchText)
@@ -42,6 +42,7 @@ const getUserTasksWithFilters = async (
       .input('InvolvedUserID', sql.Int, involvedUser)
       .input('SortBy', sql.VarChar(20), sortBy)
       .input('SortDirection', sql.VarChar(4), sortDirection)
+      .input('IncludeDisabled', sql.Bit, includeDisabled)  // Nuovo input
       .execute('MA_GetUserTasksWithFilters');
     
     return result.recordset;

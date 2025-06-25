@@ -288,158 +288,172 @@ const ChatBottomBar = ({
 
   // IMPORTANTE: Funzione per gestire l'invio con allegati - AGGIORNATA
 
-const handleSendWithAttachments = async () => {
-  if (disabled) return;
-
-  // Verifica per nuovi messaggi
-  if (isNewMessage && !localReceiversList && notificationCategoryId <= 1) {
-    swal.fire("Errore", "Assicurati di aver selezionato almeno un destinatario", "error");
-    return;
-  }
-
-  if (isNewMessage && !title) {
-    swal.fire("Errore", "Attenzione: il titolo è obbligatorio", "error");
-    return;
-  }
-
-  // Consenti l'invio se c'è un testo O almeno un allegato
-  if (message.trim() || attachments.length > 0) {
-    // Crea e mostra lo spinner
-    const spinner = document.createElement('div');
-    spinner.id = 'message-sending-spinner';
-    spinner.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-      flex-direction: column;
-      color: white;
-      font-size: 1.2rem;
-    `;
-    
-    spinner.innerHTML = `
-      <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mb-4"></div>
-      <div>Invio messaggio in corso...</div>
-    `;
-    
-    document.body.appendChild(spinner);
-    document.body.style.overflow = 'hidden';
-
-    const notificationData = {
-      notificationId,
-      message: message.trim() || (attachments.length > 0 ? "Ha condiviso allegati" : ""),
-      responseOptionId: 3,
-      eventId: 0,
-      title,
-      notificationCategoryId,
-      receiversList: localReceiversList,
-      replyToMessageId: replyToMessage ? replyToMessage.messageId : 0,
-    };
-
-    console.log("Invio con allegati - Dati notifica:", notificationData);
-
-    if (typeof setSending === "function") {
-      setSending(true);
+  const handleSendWithAttachments = async () => {
+    if (disabled) return;
+  
+    // Verifica per nuovi messaggi
+    if (isNewMessage && !localReceiversList && notificationCategoryId <= 1) {
+      swal.fire("Errore", "Assicurati di aver selezionato almeno un destinatario", "error");
+      return;
     }
-    setLoading(true);
-
-    try {
-      let result;
-
-      result = await sendNotificationWithAttachments(notificationData, attachments);
-
-      if (result && (result.success || result.notificationId)) {
-        // IMPORTANTE: Reset SOLO dopo invio riuscito per chat esistenti
-        if (!isNewMessage) {
-          if (typeof updateReceiversList === "function") {
-            updateReceiversList("");
-          }
-          setLocalReceiversList("");
-        }
-        
-        setMessage("");
-        setIsUpdatingContentEditable(true);
-        setAttachments([]);
-
-        if (typeof setReplyToMessage === "function") {
-          setReplyToMessage(null);
-        }
-
-        setPlaceholderVisible(true);
-
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
-
-        if (inputRef.current) {
-          inputRef.current.focus();
-        }
-
-        if (isNewMessage && (result.notificationId > 0 || result.Success)) {
-          if (typeof updateReceiversList === "function") {
-            updateReceiversList("");
-          }
-          setLocalReceiversList("");
-          
-          if (onRequestClose) {
-            onRequestClose();
-            setTimeout(() => {
-              if (openChatModal) openChatModal(result.notificationId || result.id);
-            }, 100);
-          }
-        }
-
-        document.dispatchEvent(
-          new CustomEvent("chat-message-sent", {
-            detail: {
-              notificationId: result.notificationId || notificationData.notificationId,
-              highPriority: true,
-            },
-          }),
-        );
-
-        document.dispatchEvent(
-          new CustomEvent("reload-open-chat", {
-            detail: {
-              notificationId: result.notificationId || notificationId,
-              reason: "message-sent",
-              forceComplete: true
-            },
-          }),
-        );
-        
-        if (refreshAttachments) {
-          setTimeout(() => {
-            refreshAttachments(result.notificationId || notificationId);
-          }, 500);
-        }
-      }
-
-      return result;
-    } catch (error) {
-      console.error("Error sending message with attachments:", error);
-      swal.fire("Errore", "Impossibile inviare il messaggio", "error");
-    } finally {
-      // Rimuovi lo spinner
-      const spinner = document.getElementById('message-sending-spinner');
-      if (spinner) {
-        spinner.remove();
-      }
-      document.body.style.overflow = '';
-
+  
+    if (isNewMessage && !title) {
+      swal.fire("Errore", "Attenzione: il titolo è obbligatorio", "error");
+      return;
+    }
+  
+    // Consenti l'invio se c'è un testo O almeno un allegato
+    if (message.trim() || attachments.length > 0) {
+      // Crea e mostra lo spinner
+      const spinner = document.createElement('div');
+      spinner.id = 'message-sending-spinner';
+      spinner.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        flex-direction: column;
+        color: white;
+        font-size: 1.2rem;
+      `;
+      
+      spinner.innerHTML = `
+        <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mb-4"></div>
+        <div>Invio messaggio in corso...</div>
+      `;
+      
+      document.body.appendChild(spinner);
+      document.body.style.overflow = 'hidden';
+  
+      const notificationData = {
+        notificationId,
+        message: message.trim() || (attachments.length > 0 ? "Ha condiviso allegati" : ""),
+        responseOptionId: 3,
+        eventId: 0,
+        title,
+        notificationCategoryId,
+        receiversList: localReceiversList,
+        replyToMessageId: replyToMessage ? replyToMessage.messageId : 0,
+      };
+  
+      console.log("Invio con allegati - Dati notifica:", notificationData);
+  
       if (typeof setSending === "function") {
-        setSending(false);
+        setSending(true);
       }
-      setLoading(false);
+      setLoading(true);
+  
+      try {
+        let result;
+  
+        result = await sendNotificationWithAttachments(notificationData, attachments);
+  
+        if (result && (result.success || result.notificationId)) {
+          // IMPORTANTE: Reset SOLO dopo invio riuscito per chat esistenti
+          if (!isNewMessage) {
+            if (typeof updateReceiversList === "function") {
+              updateReceiversList("");
+            }
+            setLocalReceiversList("");
+          }
+          
+          setMessage("");
+          setIsUpdatingContentEditable(true);
+          setAttachments([]);
+  
+          if (typeof setReplyToMessage === "function") {
+            setReplyToMessage(null);
+          }
+  
+          setPlaceholderVisible(true);
+  
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+  
+          if (inputRef.current) {
+            inputRef.current.focus();
+          }
+  
+          if (isNewMessage && (result.notificationId > 0 || result.Success)) {
+            if (typeof updateReceiversList === "function") {
+              updateReceiversList("");
+            }
+            setLocalReceiversList("");
+            
+            if (onRequestClose) {
+              onRequestClose();
+              setTimeout(() => {
+                if (openChatModal) openChatModal(result.notificationId || result.id);
+              }, 100);
+            }
+          }
+  
+          // MODIFICHE QUI - Emetti eventi per aggiornare la sidebar
+          document.dispatchEvent(
+            new CustomEvent("chat-message-sent", {
+              detail: {
+                notificationId: result.notificationId || notificationData.notificationId,
+                highPriority: true,
+                hasAttachments: attachments.length > 0  // AGGIUNTO
+              },
+            }),
+          );
+  
+          // AGGIUNTO - Evento specifico per allegati
+          if (attachments.length > 0) {
+            document.dispatchEvent(
+              new CustomEvent("attachment-uploaded", {
+                detail: {
+                  notificationId: result.notificationId || notificationId
+                },
+              }),
+            );
+          }
+  
+          document.dispatchEvent(
+            new CustomEvent("reload-open-chat", {
+              detail: {
+                notificationId: result.notificationId || notificationId,
+                reason: "message-sent",
+                forceComplete: true
+              },
+            }),
+          );
+          
+          // MODIFICATO - Chiama refreshAttachments solo se ci sono allegati
+          if (refreshAttachments && attachments.length > 0) {
+            setTimeout(() => {
+              refreshAttachments(result.notificationId || notificationId);
+            }, 500);
+          }
+        }
+  
+        return result;
+      } catch (error) {
+        console.error("Error sending message with attachments:", error);
+        swal.fire("Errore", "Impossibile inviare il messaggio", "error");
+      } finally {
+        // Rimuovi lo spinner
+        const spinner = document.getElementById('message-sending-spinner');
+        if (spinner) {
+          spinner.remove();
+        }
+        document.body.style.overflow = '';
+  
+        if (typeof setSending === "function") {
+          setSending(false);
+        }
+        setLoading(false);
+      }
     }
-  }
-};
+  };
 
 
   // Invio messaggio normale o con allegati - AGGIORNATA

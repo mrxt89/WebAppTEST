@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -10,6 +10,20 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import TasksLegend from "./TasksLegend";
 import TaskRow from "./TaskRow";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
@@ -17,12 +31,16 @@ import {
   hasAdminOrManagerPermission,
   canEditTask,
 } from "@/lib/taskPermissionsUtils";
+import { MoreVertical, Eye, Ban, CheckCircle2, Pin, PinOff } from "lucide-react";
+import useProjectActions from "../../../hooks/useProjectManagementActions";
+import { toast } from "@/components/ui/use-toast";
 
 const ProjectTasksTableImproved = ({
   project,
   tasks = [],
   onTaskClick,
   onTaskUpdate,
+  onTaskDisable,
   currentUserId,
 }) => {
   const [localTasks, setLocalTasks] = useState([]);
@@ -35,8 +53,32 @@ const ProjectTasksTableImproved = ({
   const [showDelayedOnly, setShowDelayedOnly] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { users } = useNotifications();
+  const { manageTaskPin } = useProjectActions();
+
+  // Stati per gestire i pin
+  const [pinnedTasks, setPinnedTasks] = useState(new Set());
+  const [pinLoading, setPinLoading] = useState(null);
+
+  // Stati per il ridimensionamento delle colonne
+  const [columnWidths, setColumnWidths] = useState([
+    250, // title
+    200, // responsible
+    150, // status
+    120, // dueDate
+    100, // priority
+    80,  // comments
+    80,  // attachments
+    60   // actions
+  ]);
+  const [isResizing, setIsResizing] = useState(null);
+  const tableRef = useRef(null);
 
   useEffect(() => {
+    // Estrai i task già pinnati dai dati
+    const pinned = new Set(
+      tasks.filter(task => task.IsPinned).map(task => task.TaskID)
+    );
+    setPinnedTasks(pinned);
     setLocalTasks(tasks);
   }, [tasks]);
 
@@ -129,8 +171,51 @@ const ProjectTasksTableImproved = ({
     }
   };
 
+  const handlePinTask = async (taskId, isPinned) => {
+    try {
+      setPinLoading(taskId);
+      const action = isPinned ? 'UNPIN' : 'PIN';
+      const result = await manageTaskPin(taskId, action);
+      
+      if (result.success) {
+        setPinnedTasks(prev => {
+          const newSet = new Set(prev);
+          if (isPinned) {
+            newSet.delete(taskId);
+          } else {
+            newSet.add(taskId);
+          }
+          return newSet;
+        });
+        
+        // Aggiorna lo stato locale del task
+        setLocalTasks(prev => prev.map(task => 
+          task.TaskID === taskId 
+            ? { ...task, IsPinned: !isPinned, PinOrder: isPinned ? null : Date.now() }
+            : task
+        ));
+        
+        toast({
+          title: isPinned ? "Pin rimosso" : "Attività fissata",
+          description: result.msg,
+          variant: "success",
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error("Error pinning task:", error);
+      toast({
+        title: "Errore",
+        description: "Errore nella gestione del pin",
+        variant: "destructive",
+      });
+    } finally {
+      setPinLoading(null);
+    }
+  };
+
   const isTaskDelayed = (task) => {
-    if (task.Status === "COMPLETATA") return false;
+    if (task.Status === "COMPLETATA" || task.TaskDisabled) return false;
     const dueDate = new Date(task.DueDate);
     dueDate.setHours(23, 59, 59);
     return dueDate < new Date();
@@ -153,8 +238,16 @@ const ProjectTasksTableImproved = ({
       );
     }
 
+    // Separa i task pinnati da quelli non pinnati
+    const pinnedTasksList = result.filter(task => pinnedTasks.has(task.TaskID));
+    const unpinnedTasksList = result.filter(task => !pinnedTasks.has(task.TaskID));
+
+    // Ordina i task pinnati per PinOrder
+    pinnedTasksList.sort((a, b) => (a.PinOrder || 0) - (b.PinOrder || 0));
+
+    // Ordina i task non pinnati secondo il criterio selezionato
     if (sortConfig.key) {
-      result.sort((a, b) => {
+      unpinnedTasksList.sort((a, b) => {
         if (a[sortConfig.key] === null) return 1;
         if (b[sortConfig.key] === null) return -1;
 
@@ -176,8 +269,9 @@ const ProjectTasksTableImproved = ({
       });
     }
 
-    return result;
-  }, [localTasks, sortConfig, filter, showDelayedOnly]);
+    // Combina prima i pinnati, poi i non pinnati
+    return [...pinnedTasksList, ...unpinnedTasksList];
+  }, [localTasks, sortConfig, filter, showDelayedOnly, pinnedTasks]);
 
   const requestSort = (key) => {
     let direction = "asc";
@@ -188,6 +282,53 @@ const ProjectTasksTableImproved = ({
   };
 
   const delayedTasksCount = localTasks.filter(isTaskDelayed).length;
+
+  // Gestione del ridimensionamento delle colonne
+  const handleMouseDown = (e, index) => {
+    e.preventDefault();
+    setIsResizing(index);
+  };
+
+  const handleMouseMove = useCallback(
+    (e) => {
+      if (isResizing === null) return;
+
+      const table = tableRef.current?.querySelector('table');
+      if (!table) return;
+
+      const ths = table.querySelectorAll('thead th');
+      const startX = ths[isResizing].getBoundingClientRect().left;
+      const currentX = e.clientX;
+      const diff = currentX - startX;
+      
+      setColumnWidths(prev => {
+        const newWidths = [...prev];
+        newWidths[isResizing] = Math.max(50, diff);
+        return newWidths;
+      });
+    },
+    [isResizing]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(null);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing !== null) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
   return (
     <div className="h-full flex flex-col space-y-2">
@@ -235,75 +376,236 @@ const ProjectTasksTableImproved = ({
         style={{ 
           height: 'calc(100vh - 105px - 60px - 48px - 40px - 180px)' 
         }}
+        ref={tableRef}
       >
         <div className="relative w-full h-full overflow-auto">
           <Table id="tasks-table" className="w-full">
             <TableHeader className="sticky top-0 z-10 bg-gray-50">
               <TableRow>
                 <TableHead
+                  style={{ width: `${columnWidths[0]}px`, position: 'relative' }}
                   className="cursor-pointer hover:bg-gray-100"
                   onClick={() => requestSort("Title")}
                 >
                   Titolo{" "}
                   {sortConfig.key === "Title" &&
                     (sortConfig.direction === "asc" ? "↑" : "↓")}
+                  <div
+                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                    onMouseDown={(e) => handleMouseDown(e, 0)}
+                  />
                 </TableHead>
                 <TableHead
+                  style={{ width: `${columnWidths[1]}px`, position: 'relative' }}
                   className="cursor-pointer hover:bg-gray-100"
                   onClick={() => requestSort("AssignedToName")}
                 >
                   Responsabile{" "}
                   {sortConfig.key === "AssignedToName" &&
                     (sortConfig.direction === "asc" ? "↑" : "↓")}
+                  <div
+                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                    onMouseDown={(e) => handleMouseDown(e, 1)}
+                  />
                 </TableHead>
                 <TableHead
+                  style={{ width: `${columnWidths[2]}px`, position: 'relative' }}
                   className="cursor-pointer hover:bg-gray-100"
                   onClick={() => requestSort("Status")}
                 >
                   Stato{" "}
                   {sortConfig.key === "Status" &&
                     (sortConfig.direction === "asc" ? "↑" : "↓")}
+                  <div
+                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                    onMouseDown={(e) => handleMouseDown(e, 2)}
+                  />
                 </TableHead>
                 <TableHead
+                  style={{ width: `${columnWidths[3]}px`, position: 'relative' }}
                   className="cursor-pointer hover:bg-gray-100"
                   onClick={() => requestSort("DueDate")}
                 >
                   Scadenza{" "}
                   {sortConfig.key === "DueDate" &&
                     (sortConfig.direction === "asc" ? "↑" : "↓")}
+                  <div
+                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                    onMouseDown={(e) => handleMouseDown(e, 3)}
+                  />
                 </TableHead>
                 <TableHead
+                  style={{ width: `${columnWidths[4]}px`, position: 'relative' }}
                   className="cursor-pointer hover:bg-gray-100"
                   onClick={() => requestSort("Priority")}
                 >
                   Priorità{" "}
                   {sortConfig.key === "Priority" &&
                     (sortConfig.direction === "asc" ? "↑" : "↓")}
+                  <div
+                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                    onMouseDown={(e) => handleMouseDown(e, 4)}
+                  />
                 </TableHead>
-                <TableHead className="text-center">Commenti</TableHead>
-                <TableHead className="text-center">Allegati</TableHead>
+                <TableHead 
+                  style={{ width: `${columnWidths[5]}px`, position: 'relative' }}
+                  className="text-center"
+                >
+                  Commenti
+                  <div
+                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                    onMouseDown={(e) => handleMouseDown(e, 5)}
+                  />
+                </TableHead>
+                <TableHead 
+                  style={{ width: `${columnWidths[6]}px`, position: 'relative' }}
+                  className="text-center"
+                >
+                  Allegati
+                  <div
+                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                    onMouseDown={(e) => handleMouseDown(e, 6)}
+                  />
+                </TableHead>
+                <TableHead style={{ width: `${columnWidths[7]}px` }} className="text-center">
+                  Azioni
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedAndFilteredTasks.map((task) => (
-                <TaskRow
-                  key={task.TaskID}
-                  task={task}
-                  onTaskClick={onTaskClick}
-                  onTaskUpdate={handleTaskUpdate}
-                  canEdit={canEditTask(project, task, currentUserId)}
-                  isAdminOrManager={isAdminOrManager}
-                  project={{ ...project, allUsers: users }}
-                  editingCell={editingCell}
-                  setEditingCell={setEditingCell}
-                  currentUserId={currentUserId}
-                />
-              ))}
+              {sortedAndFilteredTasks.map((task) => {
+                const canManageTask = canEditTask(project, task, currentUserId);
+                const isPinned = pinnedTasks.has(task.TaskID);
+                
+                return (
+                  <TableRow 
+                    key={task.TaskID}
+                    className={`
+                      relative
+                      ${task.TaskDisabled ? 'opacity-50 bg-gray-50' : ''}
+                      ${isPinned ? 'bg-yellow-50 border-l-4 border-l-yellow-400' : ''}
+                    `}
+                    onClick={() => onTaskClick(task)}
+                  >
+                    <TaskRow
+                      task={task}
+                      onTaskClick={onTaskClick}
+                      onTaskUpdate={handleTaskUpdate}
+                      canEdit={canManageTask && !task.TaskDisabled}
+                      isAdminOrManager={isAdminOrManager}
+                      project={{ ...project, allUsers: users }}
+                      editingCell={editingCell}
+                      setEditingCell={setEditingCell}
+                      currentUserId={currentUserId}
+                    />
+                    
+                    {/* Colonna azioni */}
+                    <TableCell className="text-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onTaskClick(task);
+                            }}
+                          >
+                            <Eye className="mr-2 h-4 w-4" />
+                            Visualizza
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuSeparator />
+                          
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePinTask(task.TaskID, isPinned);
+                            }}
+                            disabled={pinLoading === task.TaskID}
+                          >
+                            {isPinned ? (
+                              <>
+                                <PinOff className="mr-2 h-4 w-4" />
+                                Rimuovi pin
+                              </>
+                            ) : (
+                              <>
+                                <Pin className="mr-2 h-4 w-4" />
+                                Fissa in alto
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          
+                          {canManageTask && onTaskDisable && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onTaskDisable(task);
+                                }}
+                                className={task.TaskDisabled ? "text-green-600" : "text-red-600"}
+                              >
+                                {task.TaskDisabled ? (
+                                  <>
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    Riabilita
+                                  </>
+                                ) : (
+                                  <>
+                                    <Ban className="mr-2 h-4 w-4" />
+                                    Disabilita
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                    
+                    {/* Badge disabilitata sovrapposto */}
+                    {task.TaskDisabled && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <Badge 
+                          variant="secondary" 
+                          className="bg-red-100 text-red-700 border-red-200"
+                        >
+                          Disabilitata
+                        </Badge>
+                      </div>
+                    )}
+                    
+                    {/* Indicatore pin */}
+                    {isPinned && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Pin className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-yellow-600" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Attività fissata</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </TableRow>
+                );
+              })}
 
               {sortedAndFilteredTasks.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="text-center py-10 text-gray-500"
                   >
                     {filter

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { TableRow, TableCell } from "@/components/ui/table";
+import { TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/use-toast";
 
-const UpdatedTaskRow = ({
+const TaskRow = ({
   task,
   onTaskClick,
   onTaskUpdate,
@@ -89,14 +89,16 @@ const UpdatedTaskRow = ({
   const canEditField = (fieldName) => {
     if (!canEdit) return false;
 
-    // Gli admin e manager possono modificare tutti i campi
+    // Il campo 'AssignedTo' (Responsabile) non può essere modificato da questa vista.
+    if (fieldName === "AssignedTo") {
+      return false;
+    }
+
+    // Se è admin/manager del progetto, può modificare gli altri campi.
     if (isAdminOrManager) return true;
 
-    // Gli utenti normali possono modificare solo lo stato delle proprie task
-    if (fieldName === "Status") return true;
-
-    // Per tutti gli altri campi, solo admin e manager possono modificarli
-    return false;
+    // L'utente standard può modificare solo lo stato.
+    return fieldName === "Status";
   };
 
   // Formatta le date in formato italiano
@@ -122,10 +124,15 @@ const UpdatedTaskRow = ({
   // Gestisce il click su una cella per iniziare la modifica
   const handleCellClick = (e, field, currentValue) => {
     e.stopPropagation(); // Ferma la propagazione dell'evento
-
     if (!canEditField(field) || isUpdating) {
-      // Mostra un tooltip o un messaggio per informare l'utente
-      if (!canEditField(field)) {
+      if (field === "AssignedTo") {
+        toast({
+          title: "Modifica non permessa",
+          description:
+            "Il responsabile può essere modificato solo dal dettaglio del task.",
+          duration: 3000,
+        });
+      } else if (!canEditField(field)) {
         toast({
           title: "Permessi insufficienti",
           description: "Non hai i permessi per modificare questo campo",
@@ -356,7 +363,7 @@ const UpdatedTaskRow = ({
       setEditValue("");
       // Piccolo ritardo per evitare problemi di UI
       setTimeout(() => {
-        setIsRefreshing(false);
+        setIsUpdating(false);
       }, 300);
     }
   };
@@ -392,6 +399,11 @@ const UpdatedTaskRow = ({
     editableContent,
     locked = !canEditField(field),
   ) => {
+    const message =
+      field === "AssignedTo"
+        ? "Il responsabile può essere modificato solo dal dettaglio del task."
+        : "Solo Admin o Manager possono modificare questo campo";
+
     return (
       <div className="relative">
         {locked && (
@@ -401,7 +413,7 @@ const UpdatedTaskRow = ({
                 <LockIcon className="h-3 w-3 absolute right-1 top-1 text-gray-400" />
               </TooltipTrigger>
               <TooltipContent>
-                <p>Solo Admin o Manager possono modificare questo campo</p>
+                <p>{message}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -412,10 +424,7 @@ const UpdatedTaskRow = ({
   };
 
   return (
-    <TableRow
-      className={`hover:bg-blue-50 ${isDelayed() ? "bg-red-50/30" : ""}`}
-      onClick={handleRowClick}
-    >
+    <>
       {/* Titolo */}
       <TableCell
         className="font-medium cursor-pointer"
@@ -651,8 +660,8 @@ const UpdatedTaskRow = ({
           <span className="text-gray-400">-</span>
         )}
       </TableCell>
-    </TableRow>
+    </>
   );
 };
 
-export default UpdatedTaskRow;
+export default TaskRow;

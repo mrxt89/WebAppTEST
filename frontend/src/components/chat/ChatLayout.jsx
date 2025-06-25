@@ -3,7 +3,7 @@ import { useNotifications } from "@/redux/features/notifications/notificationsHo
 import ModernChatList from "./ModernChatList";
 import { motion, AnimatePresence } from "framer-motion";
 import FileViewer from "@/components/ui/fileViewer";
-import ChatSidebar from "./ChatSidebar";
+import ChatSidebar from "./sidebar/ChatSidebar";
 import ChatBottomBar from "./ChatBottomBar";
 import PollButton from "./PollButton";
 

@@ -71,6 +71,7 @@ const NewTaskPanel = ({
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [openCombobox, setOpenCombobox] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const [participantSearchValue, setParticipantSearchValue] = useState("");
   const [assignmentType, setAssignmentType] = useState("individual");
   const [availableGroups, setAvailableGroups] = useState([]);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
@@ -164,6 +165,7 @@ const NewTaskPanel = ({
     setSelectedGroupId(null);
     setAssignmentType("individual");
     setSearchValue("");
+    setParticipantSearchValue("");
     setShowSelectedOnly(false);
     setIsClosing(false);
   };
@@ -279,10 +281,10 @@ const NewTaskPanel = ({
     return true;
   };
 
-  // Submit form - VERSIONE CORRETTA
+  // Submit form 
   const handleSubmit = async () => {
     if (!validateForm()) return;
-
+  
     setIsSubmitting(true);
     try {
       const formattedData = {
@@ -293,22 +295,27 @@ const NewTaskPanel = ({
         DefaultGroupId: taskData.DefaultGroupId,
         ProjectID: taskData.ProjectID || projectId,
       };
-
+  
       const result = await onTaskCreated(formattedData);
       
       if (result && result.success) {
-        toast({
-          title: "Attività creata",
-          description: "L'attività è stata creata con successo",
-          variant: "success",
-        });
-
-        // Chiama refreshProject se disponibile per aggiornare la vista
-        if (refreshProject) {
-          await refreshProject();
-        }
-
-        handleClose();
+        // Reset immediato del form per evitare il swal
+        resetForm();
+        
+        // Chiudi direttamente senza controlli
+        setIsClosing(true);
+        onClose();
+        
+        // Mostra il toast dopo la chiusura
+        setTimeout(() => {
+          toast({
+            title: "Attività creata",
+            description: "L'attività è stata creata con successo",
+            variant: "success",
+          });
+        }, 100);
+        
+        return { success: true };
       } else {
         throw new Error("Creazione attività fallita");
       }
@@ -326,6 +333,9 @@ const NewTaskPanel = ({
 
   // Chiusura pannello
   const handleClose = () => {
+    // Se stiamo già chiudendo dopo il submit, non fare nulla
+    if (isClosing || isSubmitting) return;
+    
     if (taskData.Title || taskData.Description) {
       swal.fire({
         title: "Conferma chiusura",
@@ -346,9 +356,10 @@ const NewTaskPanel = ({
 
   const performClose = () => {
     setIsClosing(true);
+    // Reset immediato dei dati per evitare il swal di conferma
+    resetForm();
     setTimeout(() => {
       onClose();
-      resetForm();
     }, 300);
   };
 
@@ -378,10 +389,16 @@ const NewTaskPanel = ({
   // Filtra partecipanti
   const filteredParticipants = users.filter(user => {
     const isNotLeader = user.userId.toString() !== taskData.AssignedTo;
+    const matchesSearch = participantSearchValue
+      ? `${user.firstName} ${user.lastName}`
+          .toLowerCase()
+          .includes(participantSearchValue.toLowerCase())
+      : true;
+    
     if (showSelectedOnly) {
-      return isNotLeader && taskData.Participants.includes(user.userId.toString());
+      return isNotLeader && taskData.Participants.includes(user.userId.toString()) && matchesSearch;
     }
-    return isNotLeader;
+    return isNotLeader && matchesSearch;
   });
 
   // Calcola dimensioni pannello
@@ -809,6 +826,15 @@ const NewTaskPanel = ({
                                           </Label>
                                         </div>
                                       </div>
+                                      
+                                      {/* Campo di ricerca per partecipanti */}
+                                      <Input
+                                        placeholder="Cerca partecipante..."
+                                        value={participantSearchValue}
+                                        onChange={(e) => setParticipantSearchValue(e.target.value)}
+                                        className="w-full mb-2"
+                                      />
+                                      
                                       <Card className="border-dashed">
                                         <ScrollArea className="h-[120px]">
                                           <div className="p-2 space-y-1">

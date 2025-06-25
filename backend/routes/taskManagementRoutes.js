@@ -23,7 +23,6 @@ router.get('/tasks', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.UserId;
     
-    // Estrai i parametri di query
     const {
       searchText,
       priority,
@@ -33,15 +32,15 @@ router.get('/tasks', authenticateToken, async (req, res) => {
       assignedTo,
       involvedUser,
       sortBy = 'DueDate',
-      sortDirection = 'ASC'
+      sortDirection = 'ASC',
+      includeDisabled = 'false'  // Nuovo parametro query
     } = req.query;
     
-    // Converti gli ID in numeri se presenti
     const projectIdNum = projectId && projectId !== 'all' ? parseInt(projectId) : null;
     const assignedToNum = assignedTo ? parseInt(assignedTo) : null;
     const involvedUserNum = involvedUser ? parseInt(involvedUser) : null;
+    const includeDisabledBool = includeDisabled === 'true';  // Conversione a boolean
     
-    // Esegui la query con i filtri
     const tasks = await getUserTasksWithFilters(
       userId,
       searchText,
@@ -52,7 +51,8 @@ router.get('/tasks', authenticateToken, async (req, res) => {
       assignedToNum,
       involvedUserNum,
       sortBy,
-      sortDirection
+      sortDirection,
+      includeDisabledBool  // Passa il nuovo parametro
     );
     
     res.json(tasks);
@@ -64,6 +64,7 @@ router.get('/tasks', authenticateToken, async (req, res) => {
     });
   }
 });
+
 
 /**
  * Ottieni statistiche sulle attività con filtri applicati

@@ -178,7 +178,7 @@ export const fetchNotificationAttachments = createAsyncThunk(
       );
 
       if (response.data) {
-        // Memorizzare i risultati
+        // I dati ora includono HasBeenViewed, FirstViewedAt, LastViewedAt per ogni allegato
         dispatch(
           setNotificationAttachments({
             notificationId,
@@ -189,7 +189,7 @@ export const fetchNotificationAttachments = createAsyncThunk(
         return response.data;
       }
 
-      return {};
+      return [];
     } catch (error) {
       console.error("Error fetching notification attachments:", error);
       throw new Error("Errore nel recupero degli allegati");
@@ -344,6 +344,13 @@ export const downloadNotificationAttachment = createAsyncThunk(
         },
       );
 
+      // Il backend registra automaticamente la visualizzazione durante il download
+      // Emetti evento per aggiornare l'UI
+      const viewEvent = new CustomEvent("attachment-downloaded", {
+        detail: { attachmentId },
+      });
+      document.dispatchEvent(viewEvent);
+
       // Crea un URL per il blob e avvia il download
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
@@ -360,6 +367,79 @@ export const downloadNotificationAttachment = createAsyncThunk(
       throw new Error("Errore nel download dell'allegato");
     } finally {
       dispatch(setAttachmentsLoading(false));
+    }
+  },
+);
+
+// Nuova azione per registrare la visualizzazione di un allegato
+export const recordAttachmentView = createAsyncThunk(
+  "notifications/recordAttachmentView",
+  async (attachmentId, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return rejectWithValue("No token available");
+
+      const response = await axios.post(
+        `${config.API_BASE_URL}/attachments/${attachmentId}/view`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (response.data.success) {
+        // Emetti un evento per aggiornare le visualizzazioni
+        const event = new CustomEvent("attachment-viewed", {
+          detail: {
+            attachmentId,
+            isFirstView: response.data.data.IsFirstView,
+            viewedAt: response.data.data.FirstViewedAt,
+          },
+        });
+        document.dispatchEvent(event);
+
+        return response.data.data;
+      }
+
+      throw new Error("Failed to record attachment view");
+    } catch (error) {
+      console.error("Error recording attachment view:", error);
+      return rejectWithValue(
+        error.response?.data?.message || "Error recording attachment view",
+      );
+    }
+  },
+);
+
+// Nuova azione per ottenere le statistiche di visualizzazione
+export const fetchAttachmentViewStats = createAsyncThunk(
+  "notifications/fetchAttachmentViewStats",
+  async (attachmentId, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return rejectWithValue("No token available");
+
+      const response = await axios.get(
+        `${config.API_BASE_URL}/attachments/${attachmentId}/view-stats`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (response.data.success) {
+        return response.data.data;
+      }
+
+      throw new Error("Failed to fetch attachment view stats");
+    } catch (error) {
+      console.error("Error fetching attachment view stats:", error);
+      return rejectWithValue(
+        error.response?.data?.message || "Error fetching view statistics",
+      );
     }
   },
 );

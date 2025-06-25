@@ -52,11 +52,13 @@ const { getNotifications
         , getReadReceipts
       } = require('../queries/notificationsManagement');
 
-const {
+      const {
         getAttachments,
         addAttachment,
         deleteAttachment,
-        getAttachmentById
+        getAttachmentById,
+        recordAttachmentView,
+        getAttachmentViewStats
     } = require('../queries/attachmentQueries');
 
 const authenticateToken = require('../authenticateToken');
@@ -651,14 +653,53 @@ const upload = multer({
 router.get('/notifications/:notificationId/attachments', authenticateToken, async (req, res) => {
   try {
     const notificationId = parseInt(req.params.notificationId);
-    // Usa getAttachments dalla funzione unificata, passando null per projectId e taskId
-    const attachments = await getAttachments(null, null, notificationId);
+    const currentUserId = req.user.UserId; // Ottieni l'ID utente dal token
+    
+    // Passa currentUserId per ottenere le info di visualizzazione
+    const attachments = await getAttachments(null, null, notificationId, null, null, currentUserId);
     res.json(attachments);
   } catch (error) {
     console.error('Error fetching notification attachments:', error);
     res.status(500).json({ success: 0, message: 'Error fetching attachments' });
   }
 });
+
+// Registra la visualizzazione di un allegato
+router.post('/attachments/:attachmentId/view', authenticateToken, async (req, res) => {
+  try {
+    const attachmentId = parseInt(req.params.attachmentId);
+    const userId = req.user.UserId;
+    
+    const result = await recordAttachmentView(attachmentId, userId);
+    res.json(result);
+  } catch (error) {
+    console.error('Error recording attachment view:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error recording attachment view' 
+    });
+  }
+});
+
+// Ottieni statistiche di visualizzazione per un allegato
+router.get('/attachments/:attachmentId/view-stats', authenticateToken, async (req, res) => {
+  try {
+    const attachmentId = parseInt(req.params.attachmentId);
+    const stats = await getAttachmentViewStats(attachmentId);
+    
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error fetching attachment view stats:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching view statistics' 
+    });
+  }
+});
+
 
 // Carica un nuovo allegato per una notifica
 router.post('/notifications/:notificationId/attachments', authenticateToken, upload.single('file'), async (req, res) => {
@@ -749,14 +790,23 @@ router.delete('/notifications/attachments/:attachmentId', authenticateToken, asy
   }
 });
 
-// Download di un allegato
+// Download di un allegato (MODIFICATO per registrare la visualizzazione)
 router.get('/notifications/attachments/:attachmentId/download', authenticateToken, async (req, res) => {
   try {
     const attachmentId = parseInt(req.params.attachmentId);
+    const userId = req.user.UserId;
     const attachment = await getAttachmentById(attachmentId);
     
     if (!attachment) {
       return res.status(404).json({ success: 0, message: 'Attachment not found' });
+    }
+
+    // Registra la visualizzazione quando l'utente scarica il file
+    try {
+      await recordAttachmentView(attachmentId, userId);
+    } catch (viewError) {
+      // Non bloccare il download se il tracking fallisce
+      console.error('Error recording view:', viewError);
     }
 
     const fileStream = await fileService.getFileStream(attachment.FilePath);
