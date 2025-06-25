@@ -92,15 +92,15 @@ const getPaginatedProjects = async (page = 0, pageSize = 50, filters = {}, userI
 };
 
 // Ottieni dettagli progetto con task e membri
-const getProjectById = async (projectId, userId) => {
+const getProjectById = async (projectId, userId, includeDisabled = false) => {
     try {
         let pool = await sql.connect(config.dbConfig);
         const result = await pool.request()
             .input('ProjectID', sql.Int, projectId)
             .input('UserId', sql.Int, userId)
+            .input('IncludeDisabled', sql.Bit, includeDisabled)  // Nuovo parametro
             .execute('MA_GetProjectById');
 
-        // La SP restituisce 3 result set: project, members, tasks
         const project = result.recordsets[0][0];
         if (project) {
             project.members = result.recordsets[1];
@@ -110,6 +110,23 @@ const getProjectById = async (projectId, userId) => {
         return project;
     } catch (err) {
         console.error('Error in getProjectById:', err);
+        throw err;
+    }
+};
+
+// Nuova funzione per disabilitare/riabilitare task
+const toggleTaskDisabled = async (taskId, userId, disable = true) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('TaskID', sql.Int, taskId)
+            .input('UserID', sql.Int, userId)
+            .input('Disable', sql.Bit, disable)
+            .execute('MA_ToggleTaskDisabled');
+
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in toggleTaskDisabled:', err);
         throw err;
     }
 };
@@ -648,6 +665,57 @@ const calculateTaskDates = async (projectId) => {
     }
 };
 
+// Gestisce i pin delle attività
+const manageTaskPin = async (taskId, userId, action, newOrder = null) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request()
+            .input('TaskID', sql.Int, taskId)
+            .input('UserID', sql.Int, userId)
+            .input('Action', sql.VarChar(10), action)
+            .input('NewOrder', sql.Int, newOrder);
+
+        const result = await request.execute('MA_ManageTaskPin');
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error managing task pin:', err);
+        throw err;
+    }
+};
+
+const toggleProjectLock = async (projectId, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('ProjectID', sql.Int, projectId)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_ToggleProjectLock');
+        
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error toggling project lock:', err);
+        throw err;
+    }
+};
+
+// Gestisce i pin dei progetti
+const manageProjectPin = async (projectId, userId, action, newOrder = null) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request()
+            .input('ProjectID', sql.Int, projectId)
+            .input('UserID', sql.Int, userId)
+            .input('Action', sql.VarChar(10), action)
+            .input('NewOrder', sql.Int, newOrder);
+
+        const result = await request.execute('MA_ManageProjectPin');
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error managing project pin:', err);
+        throw err;
+    }
+};
+
 module.exports = {
     getPaginatedProjects,   
     getProjectById,
@@ -672,5 +740,9 @@ module.exports = {
     checkCircularDependencies,
     calculateTaskDates,
     getTaskCostsLog,
-    getTaskDependenciesLog
+    getTaskDependenciesLog,
+    toggleTaskDisabled,
+    manageTaskPin,
+    toggleProjectLock,
+    manageProjectPin
 };

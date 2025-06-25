@@ -51,7 +51,7 @@ const useCategoryActions = () => {
         subcategoryData,
       );
 
-      const result = await response.json();
+      const result = response.data;
       await fetchCategories(); // Refresh categories after update
       return result;
     } catch (error) {
@@ -67,7 +67,7 @@ const useCategoryActions = () => {
         `/projectsCategories/categories/${categoryId}/toggle`,
       );
 
-      const result = await response.json();
+      const result = response.data;
       await fetchCategories(); // Refresh categories after update
       return result;
     } catch (error) {
@@ -83,7 +83,7 @@ const useCategoryActions = () => {
         `/projectsCategories/categories/${categoryId}/details/${line}/toggle`,
       );
 
-      const result = await response.json();
+      const result = response.data;
       await fetchCategories(); // Refresh categories after update
       return result;
     } catch (error) {

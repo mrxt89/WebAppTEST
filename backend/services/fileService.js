@@ -27,6 +27,33 @@ class FileService {
     }
 
     /**
+     * Sanitizza il nome del file per filesystem e database
+     * @private
+     */
+    _sanitizeFileName(fileName) {
+        // Estrai estensione
+        const ext = path.extname(fileName);
+        const nameWithoutExt = path.basename(fileName, ext);
+        
+        // Sostituisci caratteri problematici per filesystem Windows/Linux
+        let sanitized = nameWithoutExt
+            .replace(/[<>:"|?*\x00-\x1F]/g, '') // Caratteri non validi per Windows
+            .replace(/[^\w\s\-_.àèéìòùÀÈÉÌÒÙ]/g, '') // Mantieni solo caratteri sicuri inclusi accenti italiani comuni
+            .replace(/\s+/g, '_') // Sostituisci spazi con underscore
+            .replace(/\.+/g, '.') // Rimuovi punti multipli
+            .replace(/_{2,}/g, '_') // Rimuovi underscore multipli
+            .replace(/^[._]|[._]$/g, '') // Rimuovi . e _ iniziali e finali
+            .substring(0, 200); // Limita lunghezza per evitare problemi con path troppo lunghi
+        
+        // Se il nome è vuoto dopo la sanitizzazione, usa un default
+        if (!sanitized) {
+            sanitized = 'file';
+        }
+        
+        return sanitized + ext;
+    }
+
+    /**
      * Salva un file caricato
      * @param {Object} file - File caricato da multer
      * @param {number} projectId - ID del progetto (opzionale)
@@ -108,14 +135,16 @@ class FileService {
                                ', taskId : ' + taskId + ', notificationId : ' + notificationId + ', itemCode : ' + itemCode);
             }
             
-            // Genera timestamp e hash
+            // Genera timestamp e hash con nome sanitizzato
             const timestamp = Date.now();
             const fileHash = crypto.randomBytes(8).toString('hex');
             const ext = path.extname(file.originalname);
-            const fileName = `${timestamp}-${fileHash}${ext}`;
+            const sanitizedBaseName = this._sanitizeFileName(path.basename(file.originalname, ext));
+            const fileName = `${timestamp}-${fileHash}-${sanitizedBaseName}${ext}`;
             const filePath = path.join(uploadDir, fileName);
             
-            console.log('Generated fileName:', fileName);
+            console.log('Original filename:', file.originalname);
+            console.log('Sanitized filename:', fileName);
             console.log('Relative filePath:', filePath);
             
             // Percorso completo per il filesystem
@@ -221,6 +250,17 @@ class FileService {
             console.error('Error saving file:', error);
             console.error('Error stack:', error.stack);
             console.error('==========================');
+            
+            // Prova a eliminare il file temporaneo in caso di errore
+            if (file && file.path) {
+                try {
+                    await fs.unlink(file.path);
+                    console.log('Temp file deleted after error');
+                } catch (unlinkError) {
+                    console.error('Error deleting temp file:', unlinkError);
+                }
+            }
+            
             throw new Error(`Error saving file: ${error.message}`);
         }
     }
@@ -233,6 +273,13 @@ class FileService {
     async deleteFile(filePath) {
         try {
             console.log('Deleting file:', filePath);
+            
+            // Sanitizza il percorso per prevenire path traversal
+            const normalizedPath = path.normalize(filePath);
+            if (normalizedPath.includes('..')) {
+                throw new Error('Invalid file path');
+            }
+            
             await this.storage.deleteFile(filePath);
             console.log('File deleted successfully');
             return true;
@@ -250,6 +297,12 @@ class FileService {
     async getFileStream(filePath) {
         try {
             console.log('Creating read stream for file:', filePath);
+            
+            // Sanitizza il percorso per prevenire path traversal
+            const normalizedPath = path.normalize(filePath);
+            if (normalizedPath.includes('..')) {
+                throw new Error('Invalid file path');
+            }
             
             // Se è storage locale, verifica prima che il file esista
             if (this.storage.getStorageType() === 'local' || config.storage.remoteType === 'mounted') {
@@ -282,6 +335,37 @@ class FileService {
      */
     getStorageType() {
         return this.storage.getStorageType();
+    }
+
+    /**
+     * Ottiene informazioni su un file
+     * @param {string} filePath - Percorso relativo del file
+     * @returns {Promise<Object>} - Informazioni sul file
+     */
+    async getFileInfo(filePath) {
+        try {
+            // Sanitizza il percorso
+            const normalizedPath = path.normalize(filePath);
+            if (normalizedPath.includes('..')) {
+                throw new Error('Invalid file path');
+            }
+
+            const fullPath = path.join(this.baseUploadPath, filePath);
+            const stats = await fs.stat(fullPath);
+
+            return {
+                size: stats.size,
+                sizeKB: Math.round(stats.size / 1024),
+                sizeMB: Math.round(stats.size / (1024 * 1024) * 100) / 100,
+                created: stats.birthtime,
+                modified: stats.mtime,
+                isFile: stats.isFile(),
+                isDirectory: stats.isDirectory()
+            };
+        } catch (error) {
+            console.error('Error getting file info:', error);
+            throw new Error(`Error getting file info: ${error.message}`);
+        }
     }
 }
 

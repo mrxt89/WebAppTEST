@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Triangle,
   TriangleAlert,
+  Lock 
 } from "lucide-react";
 
 // Componente per la card del progetto

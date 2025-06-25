@@ -25,9 +25,22 @@ import {
   hasAdminPermission,
   canEditMemberRole,
 } from "@/lib/taskPermissionsUtils";
-import { User, UserPlus, Shield, Users, AlertTriangle, CheckSquare } from "lucide-react";
+import { User, UserPlus, Shield, Users, AlertTriangle, CheckSquare, ChevronsUpDown, Check } from "lucide-react";
 import { config } from "../../../config";
 import { swal } from "../../../lib/common";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 // Componente per la gestione della selezione dei membri
 const GroupMembersSelector = React.memo(({ 
@@ -113,6 +126,7 @@ const ProjectTeamSection = ({
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [groupMembers, setGroupMembers] = useState([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
+  const [openUserSelect, setOpenUserSelect] = useState(false);
 
   // Reset selected members when group changes
   useEffect(() => {
@@ -344,29 +358,59 @@ const ProjectTeamSection = ({
                             <User className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
                             Utente <span className="text-red-500 ml-1">*</span>
                           </Label>
-                          <Select
-                            value={newMember.userId}
-                            onValueChange={(value) =>
-                              setNewMember({ ...newMember, userId: value })
-                            }
-                          >
-                            <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="Seleziona utente dal team" />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-[200px]">
-                              {getFilteredUsers().map((user) => (
-                                <SelectItem
-                                  key={user.userId}
-                                  value={user.userId.toString()}
-                                >
-                                  <div className="flex items-center">
-                                    <User className="h-3.5 w-3.5 mr-2 text-gray-500" />
-                                    {user.firstName} {user.lastName}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Popover open={openUserSelect} onOpenChange={setOpenUserSelect}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={openUserSelect}
+                                className="w-full justify-between mt-1"
+                              >
+                                {newMember.userId
+                                  ? getFilteredUsers().find(
+                                      (user) => user.userId.toString() === newMember.userId
+                                    )?.firstName +
+                                    " " +
+                                    getFilteredUsers().find(
+                                      (user) => user.userId.toString() === newMember.userId
+                                    )?.lastName
+                                  : "Seleziona utente dal team"}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                              <Command>
+                                <CommandInput placeholder="Cerca utente..." />
+                                <CommandList>
+                                  <CommandEmpty>Nessun utente trovato.</CommandEmpty>
+                                  <CommandGroup>
+                                    {getFilteredUsers().map((user) => (
+                                      <CommandItem
+                                        key={user.userId}
+                                        value={`${user.firstName} ${user.lastName}`}
+                                        onSelect={() => {
+                                          setNewMember({ ...newMember, userId: user.userId.toString() });
+                                          setOpenUserSelect(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={`mr-2 h-4 w-4 ${
+                                            newMember.userId === user.userId.toString()
+                                              ? "opacity-100"
+                                              : "opacity-0"
+                                          }`}
+                                        />
+                                        <div className="flex items-center">
+                                          <User className="h-3.5 w-3.5 mr-2 text-gray-500" />
+                                          {user.firstName} {user.lastName}
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                       </div>
 

@@ -25,7 +25,11 @@ const {
     checkCircularDependencies,
     calculateTaskDates,
     getTaskCostsLog,
-    getTaskDependenciesLog
+    getTaskDependenciesLog,
+    toggleTaskDisabled,
+    manageTaskPin,
+    toggleProjectLock,
+    manageProjectPin
   } = require('../queries/projectManagement');
 
 // Ottieni tutte le unità di misura
@@ -84,7 +88,9 @@ router.get('/projects/:id', authenticateToken, async (req, res) => {
     try {
         const projectId = parseInt(req.params.id);
         const userId = req.user.UserId;
-        const project = await getProjectById(projectId, userId);
+        const includeDisabled = req.query.includeDisabled === 'true';  // Nuovo parametro
+        
+        const project = await getProjectById(projectId, userId, includeDisabled);
         
         if (!project) {
             return res.status(404).json({ error: 'Project not found' });
@@ -545,13 +551,83 @@ router.get('/projects/:projectId/calculate-dates', authenticateToken, async (req
     try {
         const projectId = parseInt(req.params.projectId);
         
-        const result = await calculateTaskDates(projectId);
+        const result = await calculateProjectDates(projectId);
         res.json(result);
     } catch (err) {
         console.error('Error calculating task dates:', err);
         res.status(500).json({ 
             success: 0,
             msg: 'Error calculating task dates'
+        });
+    }
+});
+
+router.patch('/projects/tasks/:taskId/disable', authenticateToken, async (req, res) => {
+    try {
+        const taskId = parseInt(req.params.taskId);
+        const { disable = true } = req.body;
+        const userId = req.user.UserId;
+        
+        const result = await toggleTaskDisabled(taskId, userId, disable);
+        res.json(result);
+    } catch (err) {
+        console.error('Error toggling task disabled state:', err);
+        res.status(500).json({ 
+            success: 0,
+            msg: 'Errore nel cambio stato attività'
+        });
+    }
+});
+
+// Pin/Unpin task
+router.post('/projects/tasks/:taskId/pin', authenticateToken, async (req, res) => {
+    try {
+        const taskId = parseInt(req.params.taskId);
+        const userId = req.user.UserId;
+        const { action, newOrder } = req.body;
+        
+        const result = await manageTaskPin(taskId, userId, action, newOrder);
+        res.json(result);
+    } catch (err) {
+        console.error('Error managing task pin:', err);
+        res.status(500).json({ 
+            success: 0,
+            msg: 'Errore nella gestione del pin'
+        });
+    }
+});
+
+// Toggle project lock
+router.patch('/projects/:projectId/lock', authenticateToken, async (req, res) => {
+    try {
+        const projectId = parseInt(req.params.projectId);
+        const userId = req.user.UserId;
+        
+        const result = await toggleProjectLock(projectId, userId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error toggling project lock:', err);
+        res.status(500).json({ 
+            success: 0,
+            msg: 'Errore nella gestione del lucchetto'
+        });
+    }
+});
+
+// Pin/Unpin project
+router.post('/projects/:projectId/pin', authenticateToken, async (req, res) => {
+    try {
+        const projectId = parseInt(req.params.projectId);
+        const userId = req.user.UserId;
+        const { action, newOrder } = req.body;
+        
+        const result = await manageProjectPin(projectId, userId, action, newOrder);
+        res.json(result);
+    } catch (err) {
+        console.error('Error managing project pin:', err);
+        res.status(500).json({ 
+            success: 0,
+            msg: 'Errore nella gestione del pin'
         });
     }
 });

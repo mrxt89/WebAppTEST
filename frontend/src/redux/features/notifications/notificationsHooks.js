@@ -64,6 +64,8 @@ import {
   sendNotificationWithAttachments,
   removeUserFromChat,
   fetchChatParticipants,
+  recordAttachmentView,
+  fetchAttachmentViewStats,
 } from "./notificationsActions";
 
 // Importa funzionalità da messageReactionsSlice
@@ -674,6 +676,33 @@ export const useNotifications = () => {
     },
     [dispatch],
   );
+
+// funzioni per il tracciamento delle visualizzazioni
+const handleRecordAttachmentView = useCallback(
+  async (attachmentId) => {
+    try {
+      const result = await dispatch(recordAttachmentView(attachmentId)).unwrap();
+      return result;
+    } catch (error) {
+      console.error("Error recording attachment view:", error);
+      throw error;
+    }
+  },
+  [dispatch],
+);
+
+const handleFetchAttachmentViewStats = useCallback(
+  async (attachmentId) => {
+    try {
+      const stats = await dispatch(fetchAttachmentViewStats(attachmentId)).unwrap();
+      return stats;
+    } catch (error) {
+      console.error("Error fetching attachment view stats:", error);
+      throw error;
+    }
+  },
+  [dispatch],
+);
 
   const uploadAttachment = useCallback(
     (notificationId, file, messageId = null) => {
@@ -1431,6 +1460,8 @@ export const useNotifications = () => {
 
     // Attachments
     getNotificationAttachments,
+    recordAttachmentView: handleRecordAttachmentView,
+    fetchAttachmentViewStats: handleFetchAttachmentViewStats,
     uploadNotificationAttachment: uploadAttachment,
     deleteNotificationAttachment: deleteAttachment,
     downloadNotificationAttachment: downloadAttachment,

@@ -4,6 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Loader2,
   AlertCircle,
@@ -17,6 +25,8 @@ import {
   User,
   MoreVertical,
   Sparkles,
+  Ban,
+  Eye,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
@@ -26,9 +36,11 @@ const TaskCard = ({
   task,
   onClick,
   onDragStart,
+  onTaskDisable,
   isDragging,
   isUpdating,
   canDrag,
+  canManage,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   
@@ -57,6 +69,7 @@ const TaskCard = ({
   };
 
   const isDelayed = () => {
+    if (task.TaskDisabled) return false;
     const dueDate = new Date(task.DueDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -84,7 +97,7 @@ const TaskCard = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      whileHover={{ scale: 1.02 }}
+      whileHover={{ scale: task.TaskDisabled ? 1 : 1.02 }}
       whileDrag={{ scale: 1.05, rotate: 2 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
@@ -94,30 +107,92 @@ const TaskCard = ({
           relative overflow-hidden transition-all duration-300
           ${isDragging ? "opacity-40" : "hover:shadow-lg"} 
           ${isUpdating ? "animate-pulse" : ""} 
-          ${canDrag ? "cursor-move" : "cursor-pointer"}
-          bg-white border-gray-200
-          ${isHovered ? "z-10" : "z-0"}
+          ${canDrag && !task.TaskDisabled ? "cursor-move" : "cursor-pointer"}
+          ${task.TaskDisabled ? "bg-gray-50 opacity-60" : "bg-white"}
+          border-gray-200
+          ${isHovered && !task.TaskDisabled ? "z-10" : "z-0"}
         `}
         onClick={(e) => {
           if (!isDragging && !isUpdating) onClick(task);
           e.stopPropagation();
         }}
-        draggable={canDrag && !isUpdating}
+        draggable={canDrag && !isUpdating && !task.TaskDisabled}
         onDragStart={(e) => {
-          onDragStart(e, task);
-          e.stopPropagation();
+          if (!task.TaskDisabled) {
+            onDragStart(e, task);
+            e.stopPropagation();
+          }
         }}
       >
         {/* Priority gradient bar - sempre visibile ma sottile */}
-        <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${priority.color}`} />
+        <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${priority.color} ${task.TaskDisabled ? 'opacity-30' : ''}`} />
+        
+        {/* Badge disabilitata */}
+        {task.TaskDisabled && (
+          <div className="absolute top-2 right-2 z-10">
+            <Badge variant="secondary" className="bg-red-100 text-red-700 text-xs">
+              <Ban className="w-3 h-3 mr-1" />
+              Disabilitata
+            </Badge>
+          </div>
+        )}
+        
+        {/* Menu azioni */}
+        {canManage && onTaskDisable && (
+          <div className="absolute bottom-2 right-2 z-10">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClick(task);
+                  }}
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  Visualizza
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTaskDisable(task);
+                  }}
+                  className={task.TaskDisabled ? "text-green-600" : "text-red-600"}
+                >
+                  {task.TaskDisabled ? (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Riabilita
+                    </>
+                  ) : (
+                    <>
+                      <Ban className="mr-2 h-4 w-4" />
+                      Disabilita
+                    </>
+                  )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
         
         {/* Contenuto compatto di default */}
-        <div className={`transition-all duration-300 ${isHovered ? 'p-3' : 'p-2.5'}`}>
+        <div className={`transition-all duration-300 ${isHovered ? 'p-3' : 'p-2.5'} group`}>
           {/* Versione compatta - sempre visibile */}
           <div className="space-y-1.5">
             {/* Titolo con indicatore ritardo */}
             <div className="flex items-start justify-between gap-2">
-              <h4 className="font-medium text-gray-900 text-sm leading-tight line-clamp-2 flex-1">
+              <h4 className={`font-medium text-gray-900 text-sm leading-tight line-clamp-2 flex-1 ${task.TaskDisabled ? 'line-through' : ''}`}>
                 {task.Title}
               </h4>
               {isDelayed() && (
@@ -137,7 +212,7 @@ const TaskCard = ({
               {task.AssignedToName && (
                 <div className="flex items-center gap-1.5 min-w-0">
                   <Avatar className="h-5 w-5 flex-shrink-0">
-                    <AvatarFallback className="text-[10px] bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                    <AvatarFallback className={`text-[10px] ${task.TaskDisabled ? 'bg-gray-400' : 'bg-gradient-to-br from-blue-500 to-purple-600'} text-white`}>
                       {task.AssignedToName.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -157,7 +232,7 @@ const TaskCard = ({
 
           {/* Contenuto espanso al hover */}
           <AnimatePresence>
-            {isHovered && (
+            {isHovered && !task.TaskDisabled && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -212,6 +287,13 @@ const TaskCard = ({
                       )}
                     </div>
                   )}
+                  
+                  {/* Info disabilitazione */}
+                  {task.TaskDisabled && task.DisabledByName && (
+                    <div className="text-xs text-red-600 pt-1 border-t">
+                      Disabilitata da {task.DisabledByName}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -241,6 +323,7 @@ const TasksKanban = ({
   tasks = [],
   onTaskClick,
   onTaskUpdate,
+  onTaskDisable,
   projectId,
   refreshProject,
 }) => {
@@ -274,6 +357,7 @@ const TasksKanban = ({
   }, []);
 
   const delayedTasksCount = tasks.filter((task) => {
+    if (task.TaskDisabled) return false;
     const dueDate = new Date(task.DueDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -281,6 +365,7 @@ const TasksKanban = ({
   }).length;
 
   const isTaskDelayed = (task) => {
+    if (task.TaskDisabled) return false;
     const dueDate = new Date(task.DueDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -381,7 +466,7 @@ const TasksKanban = ({
       return;
     }
 
-    if (updatingTasks[task.TaskID]) {
+    if (updatingTasks[task.TaskID] || task.TaskDisabled) {
       e.preventDefault();
       return;
     }
@@ -439,7 +524,8 @@ const TasksKanban = ({
     setDraggedTask(null);
     setDropTargetStatus(null);
 
-    if (!task) return;
+    if (!task || task.TaskDisabled) return;
+    
     if (!checkAdminPermission(project) && !isOwnTask(task)) {
       toast({
         title: "Permessi insufficienti",
@@ -543,7 +629,8 @@ const TasksKanban = ({
           {Object.entries(tasksByStatus).map(([status, statusTasks], index) => {
             const config = statusConfig[status];
             const StatusIcon = config.icon;
-            const delayedInSection = statusTasks.filter(isTaskDelayed).length;
+            const delayedInSection = statusTasks.filter(t => !t.TaskDisabled && isTaskDelayed(t)).length;
+            const disabledInSection = statusTasks.filter(t => t.TaskDisabled).length;
             const isDropTarget = dropTargetStatus === status;
 
             return (
@@ -579,12 +666,20 @@ const TasksKanban = ({
                           <p className="text-white/80 text-xs">{statusTasks.length} attività</p>
                         </div>
                       </div>
-                      {delayedInSection > 0 && status !== "COMPLETATA" && (
-                        <Badge className="bg-red-500 text-white border-0 text-xs">
-                          <AlertTriangle className="w-3 h-3 mr-1" />
-                          {delayedInSection}
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {disabledInSection > 0 && (
+                          <Badge className="bg-gray-500 text-white border-0 text-xs">
+                            <Ban className="w-3 h-3 mr-1" />
+                            {disabledInSection}
+                          </Badge>
+                        )}
+                        {delayedInSection > 0 && status !== "COMPLETATA" && (
+                          <Badge className="bg-red-500 text-white border-0 text-xs">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            {delayedInSection}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -593,7 +688,8 @@ const TasksKanban = ({
                     <AnimatePresence>
                       {statusTasks.length > 0 ? (
                         statusTasks.map((task) => {
-                          const canDrag = checkAdminPermission(project) || isOwnTask(task);
+                          const canDrag = (checkAdminPermission(project) || isOwnTask(task)) && !task.TaskDisabled;
+                          const canManage = checkAdminPermission(project) || isOwnTask(task);
                           const isTaskUpdating = updatingTasks[task.TaskID] || false;
 
                           return (
@@ -602,9 +698,11 @@ const TasksKanban = ({
                               task={task}
                               onClick={onTaskClick}
                               onDragStart={handleDragStart}
+                              onTaskDisable={onTaskDisable}
                               isDragging={draggedTask?.TaskID === task.TaskID}
                               isUpdating={isTaskUpdating}
                               canDrag={canDrag && !isTaskUpdating}
+                              canManage={canManage}
                             />
                           );
                         })

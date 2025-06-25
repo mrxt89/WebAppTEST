@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -49,6 +50,18 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Calendar,
   Users,
   AlertCircle,
@@ -69,7 +82,14 @@ import {
   ArrowLeft,
   Circle,
   MoreVertical,
+  Lock,
+  Unlock,
+  Pin,
+  PinOff,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 import ProjectEditModalWithTemplate from "./ProjectEditModalWithTemplate";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
 import { CustomerSearchSelect } from "./ProjectComponents";
@@ -85,7 +105,7 @@ import TasksLegend from "./TasksLegend";
 import TeamMemberWithRole from "./TeamMemberWithRole";
 import useProjectCustomersActions from "../../../hooks/useProjectCustomersActions";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import NewTaskPanel from "./NewTaskPanel"; // Aggiungi questo import
+import NewTaskPanel from "./NewTaskPanel";
 import TaskDetailsPanel from "./TaskDetailsPanel";
 import ProjectArticlesTab from "./articoli/ProjectArticlesTab";
 import ProjectAttachmentsTab from "./ProjectAttachmentsTab";
@@ -372,17 +392,15 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
   const [selectedTask, setSelectedTask] = useState(null);
   const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [taskPanelPosition, setTaskPanelPosition] = useState("right"); // nuova variabile
-  const [taskPanelActiveTab, setTaskPanelActiveTab] = useState("information"); // invece di taskDialogActiveTab
-  const [activeTab, setActiveTab] = useState("overview"); // Inizia con la panoramica
-  // Stato per gestire la vista delle attività (kanban o tabella)
+  const [taskPanelPosition, setTaskPanelPosition] = useState("right");
+  const [taskPanelActiveTab, setTaskPanelActiveTab] = useState("information");
+  const [activeTab, setActiveTab] = useState("overview");
   const [tasksViewMode, setTasksViewMode] = useState("kanban");
-
-  // Aggiungiamo i refs necessari
+  const [showDisabledTasks, setShowDisabledTasks] = useState(false);
   const isMounted = useRef(true);
   const refreshInProgress = useRef(false);
-  const preventDialogOpen = useRef(false); // Per evitare l'apertura del dialog durante modifiche in-line
-  const lastLoadedProjectId = useRef(null); // Per evitare caricamenti ripetuti dello stesso progetto
+  const preventDialogOpen = useRef(false);
+  const lastLoadedProjectId = useRef(null);
 
   const {
     loading,
@@ -397,8 +415,10 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     updateProjectMemberRole,
     updateTaskSequence,
     manageTaskDependencies,
-  checkCircularDependencies,
-  calculateProjectDates,
+    checkCircularDependencies,
+    calculateProjectDates,
+    toggleProjectLock,
+    toggleTaskDisabled,
   } = useProjectActions();
 
   // Get the current user ID from localStorage
@@ -418,113 +438,38 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
 
   const loadProject = useCallback(
     async (forceUpdate = false, callback) => {
-      // Supporto per callback come primo parametro (retrocompatibilità)
       if (typeof forceUpdate === 'function') {
         callback = forceUpdate;
         forceUpdate = false;
       }
       
       if (!isMounted.current || refreshInProgress.current) return;
-
-      // Evita di ricaricare lo stesso progetto se è già in corso e non è forzato
+  
       if (!forceUpdate && lastLoadedProjectId.current === projectId && project) return;
-
+  
       try {
         refreshInProgress.current = true;
         lastLoadedProjectId.current = projectId;
-
-        // Salva lo stato attuale dei task prima di aggiornare
+  
         const currentTaskStates = {};
         if (project?.tasks) {
           project.tasks.forEach((task) => {
             currentTaskStates[task.TaskID] = {
               Status: task.Status,
-              // Altri stati che potremmo voler preservare visivamente
               isUpdating: task.isUpdating || false,
             };
           });
         }
-
-        const projectData = await getProjectById(parseInt(projectId));
+  
+        const projectData = await getProjectById(parseInt(projectId), showDisabledTasks);
         if (!isMounted.current) return;
         
-        // Aggiorna il progetto ma mantiene lo stato delle attività esistenti per evitare
-        // rimontaggi del componente che potrebbero causare problemi con gli eventi UI
         setProject((prevProject) => {
-          // Se è il primo caricamento, usa direttamente i dati
           if (!prevProject) return projectData;
-
-          // Se siamo in visualizzazione Gantt o Kanban e abbiamo già delle attività,
-          // mantieni riferimenti alle attività esistenti per evitare rimontaggio inutile
-          if (
-            activeTab === "tasks" &&
-            (tasksViewMode === "gantt" || tasksViewMode === "kanban") &&
-            prevProject.tasks?.length > 0
-          ) {
-            // Verifica se le attività sono cambiate in modo significativo (nuove attività o rimosse)
-            const prevTaskIds = new Set(prevProject.tasks.map((t) => t.TaskID));
-            const newTaskIds = new Set(projectData.tasks.map((t) => t.TaskID));
-
-            // Confronta gli insiemi per vedere se ci sono differenze
-            const hasNewTasks = [...newTaskIds].some(
-              (id) => !prevTaskIds.has(id),
-            );
-            const hasRemovedTasks = [...prevTaskIds].some(
-              (id) => !newTaskIds.has(id),
-            );
-
-            // Se sono state aggiunte o rimosse attività, aggiorna completamente
-            if (hasNewTasks || hasRemovedTasks) {
-              return projectData;
-            }
-
-            // Altrimenti, fai un aggiornamento "intelligente" che preserva i riferimenti
-            // per le attività che non sono cambiate di stato
-
-            // Crea una mappa delle nuove attività per facile accesso
-            const newTasksMap = {};
-            projectData.tasks.forEach((task) => {
-              newTasksMap[task.TaskID] = task;
-            });
-
-            // Aggiorna selettivamente le attività esistenti
-            const updatedTasks = prevProject.tasks.map((prevTask) => {
-              const newTask = newTasksMap[prevTask.TaskID];
-              if (!newTask) return prevTask; // Questo non dovrebbe accadere dato il controllo precedente
-
-              const prevStatus = prevTask.Status;
-              const newStatus = newTask.Status;
-
-              // Se lo stato non è cambiato, mantieni alcune proprietà dell'interfaccia utente
-              // per evitare scatti visivi durante gli aggiornamenti
-              if (
-                prevStatus === newStatus &&
-                currentTaskStates[prevTask.TaskID]?.isUpdating
-              ) {
-                return {
-                  ...newTask,
-                  // Preserva proprietà di state UI che non vogliamo perdere
-                  isUpdating: currentTaskStates[prevTask.TaskID].isUpdating,
-                };
-              }
-
-              // Se lo stato è cambiato, usa completamente la nuova versione
-              return newTask;
-            });
-
-            // Restituisci la versione aggiornata del progetto con le attività aggiornate
-            return {
-              ...projectData,
-              tasks: updatedTasks,
-            };
-          }
-
-          // Per altre visualizzazioni o se non abbiamo ancora attività, aggiorna tutto
           return projectData;
         });
-
-        // Se c'è un task selezionato, aggiornalo con i nuovi dati
-        if (selectedTask) {
+  
+        if (selectedTask && isTaskPanelOpen) {
           const updatedTask = projectData.tasks.find(
             (t) => t.TaskID === selectedTask.TaskID,
           );
@@ -532,8 +477,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
             setSelectedTask(updatedTask);
           }
         }
-
-        // Esegui la callback opzionale passata
+  
         if (typeof callback === "function") {
           callback();
         }
@@ -543,7 +487,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
           swal.fire("Errore", "Errore nel caricamento del progetto", "error");
         }
       } finally {
-        // Ritarda il reset del flag per dare tempo al browser di processare gli eventi UI
         setTimeout(() => {
           if (isMounted.current) {
             refreshInProgress.current = false;
@@ -553,7 +496,9 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     },
     [
       projectId,
+      showDisabledTasks,
       selectedTask,
+      isTaskPanelOpen,
       activeTab,
       tasksViewMode,
       project,
@@ -562,7 +507,12 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     ],
   );
 
-  // Cleanup effect
+  useEffect(() => {
+    if (projectId) {
+        loadProject(true);
+    }
+  }, [showDisabledTasks]);
+
   useEffect(() => {
     return () => {
       refreshInProgress.current = false;
@@ -571,12 +521,10 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
 
   useEffect(() => {
     const handleResize = () => {
-      // Calcola la posizione ottimale basata sullo spazio disponibile
       const containerWidth = window.innerWidth;
       const leftPanelPixels = (leftPanelWidth / 100) * containerWidth;
       const rightPanelSpace = containerWidth - leftPanelPixels;
       
-      // Se c'è poco spazio a destra o siamo su mobile, usa bottom
       if (rightPanelSpace < 700 || window.innerWidth < 1200) {
         setTaskPanelPosition("bottom");
       } else {
@@ -589,7 +537,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     return () => window.removeEventListener("resize", handleResize);
   }, [leftPanelWidth]);
 
-  // Carica il progetto all'avvio
   useEffect(() => {
     isMounted.current = true;
     return () => {
@@ -609,7 +556,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
 
   const handleProjectUpdate = async () => {
     try {
-      // Puliamo i dati prima di inviarli
       const cleanedProject = {
         ProjectID: editedProject.ProjectID,
         Name: editedProject.Name,
@@ -633,6 +579,12 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         setProject(editedProject);
         setIsEditMode(false);
         setIsEditModalOpen(false);
+        
+        // Aggiorna anche la lista dei progetti nella sezione sinistra
+        if (refreshAllProjects) {
+          await refreshAllProjects();
+        }
+        
         swal.fire("Successo", "Progetto aggiornato con successo", "success");
       }
     } catch (error) {
@@ -649,17 +601,14 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     try {
       const result = await addUpdateProject(disabledProject);
       if (result.success) {
-        // Resettiamo completamente il progetto e il suo stato
         setProject(null);
         setEditedProject(null);
         setIsEditModalOpen(false);
         
-        // Reset della selezione nel componente padre
         if (resetSelectedProject) {
           resetSelectedProject();
         }
         
-        // Aggiorniamo la lista dei progetti nel componente padre
         if (refreshAllProjects) {
           await refreshAllProjects();
         }
@@ -686,17 +635,64 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         AdditionalAssignees: taskData.AdditionalAssignees,
       };
   
+      preventDialogOpen.current = true;
+  
       const result = await addUpdateProjectTask(formattedTask);
       if (result.success) {
-        await loadProject();
-        swal.fire("Successo", "Attività aggiunta con successo", "success");
-        return result; // Importante: restituisci il risultato per il pannello
+        setIsAddTaskPanelOpen(false);
+        
+        setTimeout(async () => {
+          await loadProject(true);
+          setTimeout(() => {
+            preventDialogOpen.current = false;
+          }, 1000);
+        }, 200);
+        
+        return { success: true };
       }
+      
+      preventDialogOpen.current = false;
       return { success: false };
     } catch (error) {
       console.error("Error adding task:", error);
-      swal.fire("Errore", "Errore nell'aggiunta dell'attività", "error");
-      throw error; // Propaga l'errore per il pannello
+      preventDialogOpen.current = false;
+      throw error;
+    }
+  };
+
+  const handleDisableTask = async (task) => {
+    try {
+        const result = await swal.fire({
+            title: task.TaskDisabled ? "Riabilitare attività?" : "Disabilitare attività?",
+            text: task.TaskDisabled 
+                ? `Vuoi riabilitare l'attività "${task.Title}"?`
+                : `Vuoi disabilitare l'attività "${task.Title}"? L'attività non sarà più visibile di default.`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: task.TaskDisabled ? "Riabilita" : "Disabilita",
+            cancelButtonText: "Annulla",
+            confirmButtonColor: task.TaskDisabled ? "#10B981" : "#EF4444",
+        });
+
+        if (result.isConfirmed) {
+            const response = await toggleTaskDisabled(task.TaskID, !task.TaskDisabled);
+            
+            if (response.success) {
+                await loadProject(true);
+                swal.fire({
+                    title: "Successo",
+                    text: response.msg,
+                    icon: "success",
+                    timer: 1500,
+                    showConfirmButton: false,
+                });
+            } else {
+                throw new Error(response.msg);
+            }
+        }
+    } catch (error) {
+        console.error("Error disabling task:", error);
+        swal.fire("Errore", error.message || "Errore nella modifica dello stato dell'attività", "error");
     }
   };
 
@@ -741,7 +737,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
             shouldCloseModal ||
             completeTaskData.Status !== selectedTask?.Status
           ) {
-            setIsTaskPanelOpen(false); // invece di setIsTaskDialogOpen
+            setIsTaskPanelOpen(false);
             setSelectedTask(null);
           } else if (selectedTask?.TaskID === completeTaskData.TaskID) {
             setSelectedTask((prev) => ({ ...prev, ...completeTaskData }));
@@ -784,7 +780,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
 
   const updateMemberRole = async (memberData) => {
     try {
-      // Verifica che l'utente corrente sia un admin del progetto
       if (!hasAdminPermission(project, currentUserId)) {
         swal.fire(
           "Attenzione",
@@ -794,13 +789,11 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         return false;
       }
 
-      // Verifica che l'utente non stia modificando il proprio ruolo
       if (memberData.userId === parseInt(currentUserId)) {
         swal.fire("Attenzione", "Non puoi modificare il tuo ruolo", "warning");
         return false;
       }
 
-      // Ensure updateProjectMemberRole is properly destructured from the hook
       const result = await updateProjectMemberRole(
         project.ProjectID,
         memberData.projectMemberId,
@@ -808,7 +801,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
       );
 
       if (result && result.success) {
-        // Aggiorna i membri del progetto
         await loadProject();
         return true;
       }
@@ -822,10 +814,13 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
   };
 
   const handleTaskClick = (task) => {
-    if (!preventDialogOpen.current) {
-      setSelectedTask(task);
-      setIsTaskPanelOpen(true); // invece di setIsTaskDialogOpen
+    if (preventDialogOpen.current) {
+      console.log("Dialog opening prevented by flag");
+      return;
     }
+    
+    setSelectedTask(task);
+    setIsTaskPanelOpen(true);
   };
 
   const handleTaskPanelTabChange = (tabValue) => {
@@ -836,11 +831,9 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     try {
       const result = await addTaskComment(taskId, comment);
       if (result.success) {
-        // Ricarica i dati del progetto
         const updatedProject = await getProjectById(parseInt(projectId));
         setProject(updatedProject);
 
-        // Aggiorna il task selezionato con i nuovi dati
         const updatedTask = updatedProject.tasks.find(
           (t) => t.TaskID === taskId,
         );
@@ -864,7 +857,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         return;
       }
 
-      // Prendo tutti i membri esistenti e aggiungo quello nuovo
       const allMembers = [
         ...project.members.map((m) => ({
           userId: m.UserID.toString(),
@@ -883,7 +875,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         setProject(updatedProject);
         setIsAddMemberDialogOpen(false);
         setNewMember({ userId: "", role: "USER" });
-        setActiveTab("team"); // Mantiene la tab team attiva
+        setActiveTab("team");
         swal.fire("Successo", "Utente aggiunto con successo", "success");
       }
     } catch (error) {
@@ -892,7 +884,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     }
   };
 
-  // Funzione per aggiornare i dati del progetto (per il gruppo)
   const refreshProjectData = async () => {
     try {
       const updatedProject = await getProjectById(parseInt(projectId));
@@ -903,12 +894,10 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     }
   };
 
-  // Aggiungi la funzione refresh alla handleAddMember
   handleAddMember.refresh = refreshProjectData;
 
   const handleRemoveMember = async (memberId) => {
     try {
-      // Swal di conferma
       const askResult = await swal.fire({
         title: "Sei sicuro?",
         text: "Questa azione rimuoverà l'utente dal progetto",
@@ -921,7 +910,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
 
       if (!askResult.isConfirmed) return;
 
-      // Prendo tutti i membri TRANNE quello da rimuovere
       const remainingMembers = project.members
         .filter((m) => m.ProjectMemberID !== memberId)
         .map((m) => ({
@@ -934,7 +922,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
       if (result.success) {
         const updatedProject = await getProjectById(parseInt(projectId));
         setProject(updatedProject);
-        setActiveTab("team"); // Mantiene la tab team attiva
+        setActiveTab("team");
         swal.fire("Successo", "utente rimosso con successo", "success");
       }
     } catch (error) {
@@ -956,7 +944,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
     }
   };
 
-  // Funzione per filtrare gli utenti (esclusi quelli già nel progetto)
   const getFilteredUsers = useCallback(() => {
     if (!project || !users) return [];
 
@@ -975,13 +962,12 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
 
   return (
     <div className=" flex flex-col p-2 gap-2" style={{ height: "calc(100vh - 105px)" }} id="project-management-split-view">
-      {/* Header minimalista con dashboard, titolo e modifica */}
       <div className="flex items-center justify-between py-2 px-4 bg-[var(--primary)] text-white border rounded-md shadow-sm">
         <h1 className="text-lg font-medium truncate max-w-md mx-2">
           {project.Name} - {project.Description}
         </h1>
 
-        {
+        <div className="flex items-center gap-2">
           <Button
             id="editProjectButton"
             variant=""
@@ -991,10 +977,62 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
           >
             Modifica
           </Button>
-        }
+
+          { (project.TBCreatedId == currentUserId || currentUserId == '0') && (
+            <Button
+              id="lockProjectButton"
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                const result = await swal.fire({
+                  title: project.IsLocked ? "Sbloccare il progetto?" : "Bloccare il progetto?",
+                  text: project.IsLocked 
+                    ? "Il progetto sarà visibile a tutti gli utenti autorizzati." 
+                    : "Il progetto sarà visibile solo ai membri. Gli utenti USER vedranno solo le proprie attività.",
+                  icon: "warning",
+                  showCancelButton: true,
+                  confirmButtonText: project.IsLocked ? "Sblocca" : "Blocca",
+                  cancelButtonText: "Annulla",
+                });
+
+                if (result.isConfirmed) {
+                  try {
+                    const response = await toggleProjectLock(project.ProjectID);
+                    if (response.success) {
+                      await loadProject(true);
+                      swal.fire({
+                        title: "Successo",
+                        text: response.msg,
+                        icon: "success",
+                        timer: 1500,
+                        showConfirmButton: false,
+                      });
+                    } else {
+                      throw new Error(response.msg);
+                    }
+                  } catch (error) {
+                    swal.fire("Errore", error.message || "Errore nella gestione del lucchetto", "error");
+                  }
+                }
+              }}
+              className={project.IsLocked ? "bg-red-50 text-red-700 hover:bg-red-100 border-red-200" : "bg-white text-[var(--primary)]"}
+            >
+              {project.IsLocked ? (
+                <>
+                  <Lock className="h-4 w-4 mr-1" />
+                  Bloccato
+                </>
+              ) : (
+                <>
+                  <Unlock className="h-4 w-4 mr-1" />
+                  Aperto
+                </>
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 min-h-0 overflow-hidden" id="project-management-split-view-content1">
         <Tabs
           value={activeTab}
@@ -1055,22 +1093,32 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
           </div>
 
           <div className="flex-1 min-h-0 overflow-hidden" id="project-management-split-view-content2">
-            {/* Tab Panoramica */}
             <TabsContent value="overview" className="h-full overflow-hidden">
               <div className="h-full overflow-y-auto p-4">
                 <ProjectOverview project={project} />
               </div>
             </TabsContent>
 
-            {/* Tab Attività */}
             <TabsContent value="tasks" className="h-full flex flex-col">
               <div className="flex justify-between items-center my-2 mx-4">
-                {/* Sostituisci il Dialog con un semplice Button */}
-                <Button onClick={() => setIsAddTaskPanelOpen(true)}>
-                  Aggiungi Attività
-                </Button>
+                <div className="flex items-center gap-4">
+                  <Button onClick={() => setIsAddTaskPanelOpen(true)}>
+                    Aggiungi Attività
+                  </Button>
+                  
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      className="bg-primary"
+                      id="showDisabled"
+                      checked={showDisabledTasks}
+                      onCheckedChange={setShowDisabledTasks}
+                    />
+                    <Label htmlFor="showDisabled" className="text-sm cursor-pointer select-none">
+                      Mostra attività disabilitate
+                    </Label>
+                  </div>
+                </div>
                 
-                {/* Componente per cambiare vista */}
                 <TasksViewToggler
                   viewMode={tasksViewMode}
                   setViewMode={setTasksViewMode}
@@ -1079,7 +1127,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
               </div>
 
               <div className="flex-1 min-h-0 overflow-hidden" style={{ height: "calc(100vh - 105px)" }} id="project-management-split-view-content3">
-                {/* Visualizzazione condizionale in base al viewMode */}
                 {tasksViewMode === "kanban" && (
                   <TasksKanban
                     project={project}
@@ -1087,6 +1134,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
                     tasks={project.tasks}
                     onTaskUpdate={handleTaskUpdate}
                     onTaskClick={handleTaskClick}
+                    onTaskDisable={handleDisableTask}
                     refreshProject={(callback) => loadProject(true, callback)}
                   />
                 )}
@@ -1096,32 +1144,32 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
                     tasks={project.tasks}
                     onTaskClick={handleTaskClick}
                     onTaskUpdate={handleTaskUpdate}
+                    onTaskDisable={handleDisableTask}
                     checkAdminPermission={checkAdminPermission}
                     isOwnTask={isOwnTask}
                     currentUserId={currentUserId}
                   />
                 )}
-                  {tasksViewMode === "gantt" && (
-                    <ProjectGanttView
-                      project={project}
-                      tasks={project.tasks || []}
-                      onTaskClick={handleTaskClick}
-                      onTaskUpdate={handleTaskUpdate}
-                      checkAdminPermission={checkAdminPermission}
-                      isOwnTask={isOwnTask}
-                      updateTaskSequence={updateTaskSequence}
-                      getProjectById={getProjectById}
-                      refreshProject={(callback) => loadProject(true, callback)}
-                      users={users}
-                      manageTaskDependencies={manageTaskDependencies}
-                      checkCircularDependencies={checkCircularDependencies}
-                      calculateProjectDates={calculateProjectDates}
-                    />
-                  )}
+                {tasksViewMode === "gantt" && (
+                  <ProjectGanttView
+                    project={project}
+                    tasks={project.tasks || []}
+                    onTaskClick={handleTaskClick}
+                    onTaskUpdate={handleTaskUpdate}
+                    checkAdminPermission={checkAdminPermission}
+                    isOwnTask={isOwnTask}
+                    updateTaskSequence={updateTaskSequence}
+                    getProjectById={getProjectById}
+                    refreshProject={(callback) => loadProject(true, callback)}
+                    users={users}
+                    manageTaskDependencies={manageTaskDependencies}
+                    checkCircularDependencies={checkCircularDependencies}
+                    calculateProjectDates={calculateProjectDates}
+                  />
+                )}
               </div>
             </TabsContent>
 
-            {/* Tab Team */}
             <TabsContent value="team" className="h-full overflow-auto">
               <div className="h-full">
                 <Card className="h-full flex flex-col">
@@ -1144,7 +1192,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
               </div>
             </TabsContent>
 
-            {/* Tab Allegati */}
             <TabsContent value="attachments" className="h-full overflow-auto">
               <div className="h-full">
                 <Card className="h-full flex flex-col">
@@ -1159,12 +1206,10 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
               </div>
             </TabsContent>
 
-            {/* Tab Articoli */}
             <TabsContent value="articles" className="h-full overflow-auto" id="articles-tab">
                 <ProjectArticlesTab project={project} canEdit={true} />
             </TabsContent>
 
-            {/* Tab Statistiche */}
             <TabsContent value="analytics" className="h-full overflow-auto" id="analytics-tab">
               <div className="h-full">
                 <ProjectAnalyticsTab
@@ -1177,7 +1222,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         </Tabs>
       </div>
 
-      {/* Dialogs */}
       <TaskDetailsPanel
         project={project}
         task={selectedTask}
@@ -1200,7 +1244,6 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         maxWidth={900}
       />
 
-      {/* Panel creazione nuova attività */}
       <NewTaskPanel
         isOpen={isAddTaskPanelOpen}
         onClose={() => setIsAddTaskPanelOpen(false)}
@@ -1219,6 +1262,7 @@ const ProjectDetailContainer = ({ projectId, refreshAllProjects, resetSelectedPr
         onChange={setEditedProject}
         onSave={handleProjectUpdate}
         onDisable={handleDisableProject}
+        onProjectUpdated={refreshAllProjects}
       />
     </div>
   );
@@ -1231,8 +1275,12 @@ const ProjectManagementSplitView = () => {
   const location = useLocation();
   const { fetchUsers } = useNotifications();
   const [leftPanelWidth, setLeftPanelWidth] = useState(33.33);
+  const [previousLeftPanelWidth, setPreviousLeftPanelWidth] = useState(33.33);
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef(null);
+  const tableRef = useRef(null);
+  const scrollContainerRef = useRef(null);
   const {
     projects,
     loading: projectsLoading,
@@ -1244,6 +1292,8 @@ const ProjectManagementSplitView = () => {
     fetchCategories,
     projectStatuses,
     fetchProjectStatuses,
+    toggleProjectLock,
+    manageProjectPin,
   } = useProjectActions();
 
   const {
@@ -1296,11 +1346,39 @@ const ProjectManagementSplitView = () => {
     endDate: "",
     erpId: "",
   });
+  
+  // Stati per gestire i pin dei progetti
+  const [pinnedProjects, setPinnedProjects] = useState(new Set());
+  const [pinLoading, setPinLoading] = useState(null);
+  
+  // Stati per il ridimensionamento delle colonne
+  const [columnWidths, setColumnWidths] = useState([
+    250, // name
+    300, // description
+    200, // company
+    120, // status
+    120, // endDate
+    150, // tasks
+    80   // actions
+  ]);
+  const [isResizingColumn, setIsResizingColumn] = useState(null);
 
   // Estrai projectId e autoSelect dall'URL
   const searchParams = new URLSearchParams(location.search);
   const urlProjectId = searchParams.get('projectId');
   const autoSelect = searchParams.get('autoSelect') === 'true';
+
+  // Funzione per gestire il toggle del pannello sinistro
+  const toggleLeftPanel = () => {
+    if (isLeftPanelCollapsed) {
+      setLeftPanelWidth(previousLeftPanelWidth);
+      setIsLeftPanelCollapsed(false);
+    } else {
+      setPreviousLeftPanelWidth(leftPanelWidth);
+      setLeftPanelWidth(0);
+      setIsLeftPanelCollapsed(true);
+    }
+  };
 
   // Funzione per gestire il resize
   const handleMouseDown = (e) => {
@@ -1314,9 +1392,9 @@ const ProjectManagementSplitView = () => {
     const containerRect = containerRef.current.getBoundingClientRect();
     const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
     
-    // Limita il resize tra 20% e 80%
     if (newWidth >= 20 && newWidth <= 80) {
       setLeftPanelWidth(newWidth);
+      setIsLeftPanelCollapsed(false);
     }
   }, [isResizing]);
 
@@ -1335,13 +1413,99 @@ const ProjectManagementSplitView = () => {
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
+  // Gestisce il ridimensionamento delle colonne
+  const handleColumnMouseDown = (e, index) => {
+    e.preventDefault();
+    setIsResizingColumn(index);
+  };
+
+  const handleColumnMouseMove = useCallback(
+    (e) => {
+      if (isResizingColumn === null || !scrollContainerRef.current) return;
+
+      const table = scrollContainerRef.current.querySelector('table');
+      if (!table) return;
+
+      const ths = table.querySelectorAll('thead th');
+      const startX = ths[isResizingColumn].getBoundingClientRect().left;
+      const currentX = e.clientX;
+      const diff = currentX - startX;
+      
+      setColumnWidths(prev => {
+        const newWidths = [...prev];
+        newWidths[isResizingColumn] = Math.max(80, diff);
+        return newWidths;
+      });
+    },
+    [isResizingColumn]
+  );
+
+  const handleColumnMouseUp = useCallback(() => {
+    setIsResizingColumn(null);
+  }, []);
+
+  useEffect(() => {
+    if (isResizingColumn !== null) {
+      document.addEventListener('mousemove', handleColumnMouseMove);
+      document.addEventListener('mouseup', handleColumnMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleColumnMouseMove);
+      document.removeEventListener('mouseup', handleColumnMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingColumn, handleColumnMouseMove, handleColumnMouseUp]);
+
+  // Gestisce il pin dei progetti
+  const handlePinProject = async (projectId, isPinned) => {
+    try {
+      setPinLoading(projectId);
+      const action = isPinned ? 'UNPIN' : 'PIN';
+      const result = await manageProjectPin(projectId, action);
+      
+      if (result.success) {
+        setPinnedProjects(prev => {
+          const newSet = new Set(prev);
+          if (isPinned) {
+            newSet.delete(projectId);
+          } else {
+            newSet.add(projectId);
+          }
+          return newSet;
+        });
+        
+        toast({
+          title: isPinned ? "Pin rimosso" : "Progetto fissato",
+          description: result.msg,
+          variant: "success",
+          duration: 2000,
+        });
+        
+        // Ricarica i progetti per aggiornare l'ordine
+        await fetchProjects(0, 100, filters);
+      }
+    } catch (error) {
+      console.error("Error pinning project:", error);
+      toast({
+        title: "Errore",
+        description: "Errore nella gestione del pin",
+        variant: "destructive",
+      });
+    } finally {
+      setPinLoading(null);
+    }
+  };
+
   // Caricamento iniziale
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         setLoading(true);
 
-        // Carica tutte le informazioni necessarie
         const [
           usersResponse,
           customersResponse,
@@ -1354,21 +1518,23 @@ const ProjectManagementSplitView = () => {
           fetchProjectStatuses(),
         ]);
 
-        // Aggiorna lo stato degli utenti
         if (Array.isArray(usersResponse)) {
           setUsers(usersResponse);
         }
 
-        // Aggiorna le statistiche
         await getUserProjectStatistics().then(setStatistics);
 
-        // Carica i progetti con i filtri attuali
-        await fetchProjects(0, 100, filters);
+        const projectsData = await fetchProjects(0, 100, filters);
+        
+        if (projectsData && projectsData.items) {
+          const pinned = new Set(
+            projectsData.items.filter(p => p.IsPinned).map(p => p.ProjectID)
+          );
+          setPinnedProjects(pinned);
+        }
 
-        // Carica il progetto selezionato se esiste un ID nell'URL
         if (urlProjectId && !isNaN(parseInt(urlProjectId))) {
           selectProject(parseInt(urlProjectId));
-          // Se autoSelect è true, rimuovi il parametro dall'URL
           if (autoSelect) {
             navigate(`/progetti/dashboard?projectId=${urlProjectId}`, { replace: true });
           }
@@ -1391,23 +1557,19 @@ const ProjectManagementSplitView = () => {
       return;
     }
 
-    // Aggiorniamo solo lo stato del progetto selezionato
     setSelectedProjectId(id);
   };
 
   // Filtra e ordina i progetti
   const getFilteredAndSortedProjects = useCallback(() => {
-    // Filtra i progetti
     let filteredProjects = [...projects];
 
-    // Applica filtri generali
     if (filters.status && filters.status !== "all") {
       filteredProjects = filteredProjects.filter(
         (p) => p.Status === filters.status,
       );
     }
 
-    // Altri filtri che non influenzano la ricerca testuale
     if (filters.categoryId && filters.categoryId !== "0") {
       filteredProjects = filteredProjects.filter(
         (p) => p.ProjectCategoryId === parseInt(filters.categoryId),
@@ -1432,7 +1594,6 @@ const ProjectManagementSplitView = () => {
       );
     }
 
-    // Applica filtri delle colonne
     if (columnFilters.name) {
       filteredProjects = filteredProjects.filter((p) =>
         p.Name?.toLowerCase().includes(columnFilters.name.toLowerCase())
@@ -1464,10 +1625,14 @@ const ProjectManagementSplitView = () => {
         p.ProjectErpID?.toLowerCase().includes(columnFilters.erpId.toLowerCase())
       );
     }
+    
+    const pinnedProjectsList = filteredProjects.filter(p => pinnedProjects.has(p.ProjectID));
+    const unpinnedProjectsList = filteredProjects.filter(p => !pinnedProjects.has(p.ProjectID));
 
-    // Ordina i progetti
+    pinnedProjectsList.sort((a, b) => (a.PinOrder || 0) - (b.PinOrder || 0));
+
     if (sortConfig.key) {
-      filteredProjects.sort((a, b) => {
+      unpinnedProjectsList.sort((a, b) => {
         if (a[sortConfig.key] < b[sortConfig.key]) {
           return sortConfig.direction === "ascending" ? -1 : 1;
         }
@@ -1478,8 +1643,8 @@ const ProjectManagementSplitView = () => {
       });
     }
 
-    return filteredProjects;
-  }, [projects, filters, sortConfig, columnFilters]);
+    return [...pinnedProjectsList, ...unpinnedProjectsList];
+  }, [projects, filters, sortConfig, columnFilters, pinnedProjects]);
 
   // Gestisce il clic sull'intestazione per l'ordinamento
   const handleSort = (key) => {
@@ -1518,7 +1683,15 @@ const ProjectManagementSplitView = () => {
           {},
         );
 
-        await fetchProjects(0, 100, cleanedFilters);
+        const projectsData = await fetchProjects(0, 100, cleanedFilters);
+        
+        if (projectsData && projectsData.items) {
+          const pinned = new Set(
+            projectsData.items.filter(p => p.IsPinned).map(p => p.ProjectID)
+          );
+          setPinnedProjects(pinned);
+        }
+        
         await getUserProjectStatistics().then(setStatistics);
       } catch (error) {
         console.error("Error applying filters:", error);
@@ -1533,7 +1706,6 @@ const ProjectManagementSplitView = () => {
 
   // Creazione nuovo progetto
   const handleCreateProject = async () => {
-    // Validazione
     const validationErrors = {};
     if (!newProject.Name?.trim()) validationErrors.Name = "Campo obbligatorio";
     if (!newProject.StartDate)
@@ -1573,7 +1745,6 @@ const ProjectManagementSplitView = () => {
         setFormErrors({});
         swal.fire("Successo", "Progetto creato con successo", "success");
 
-        // Seleziona il nuovo progetto
         if (result.projectId) {
           selectProject(result.projectId);
         }
@@ -1607,7 +1778,15 @@ const ProjectManagementSplitView = () => {
   const refreshAllProjects = useCallback(async () => {
     try {
       setLoading(true);
-      await fetchProjects(0, 100, filters);
+      const projectsData = await fetchProjects(0, 100, filters);
+      
+      if (projectsData && projectsData.items) {
+        const pinned = new Set(
+          projectsData.items.filter(p => p.IsPinned).map(p => p.ProjectID)
+        );
+        setPinnedProjects(pinned);
+      }
+      
       await getUserProjectStatistics().then(setStatistics);
     } catch (error) {
       console.error("Error refreshing projects:", error);
@@ -1628,11 +1807,38 @@ const ProjectManagementSplitView = () => {
 
   // Rendering
   return (
-    <div className="flex" style={{ height: "calc(100vh - 105px)" }} ref={containerRef}>
+    <div className="flex relative" style={{ height: "calc(100vh - 105px)" }} ref={containerRef}>
+      {/* Pulsante toggle pannello sinistro */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={toggleLeftPanel}
+        className={`absolute top-4 z-20 transition-all duration-300 ${
+          isLeftPanelCollapsed ? 'left-2' : 'left-2'
+        }`}
+        style={{
+          left: isLeftPanelCollapsed ? '8px' : `calc(${leftPanelWidth}% - 40px)`,
+          top: '50%',
+          transform: 'translateY(-50%)'
+        }}
+      >
+        {isLeftPanelCollapsed ? (
+          <PanelLeft className="h-5 w-5 text-black-50" />
+        ) : (
+          <PanelLeftClose className="h-5 w-5 text-black-50" />
+        )}
+      </Button>
+
       {/* Sezione sinistra (resizable) */}
       <div 
-        className="h-full flex flex-col p-4" 
-        style={{ width: `${leftPanelWidth}%`, height: "calc(100vh - 105px)" }}
+        className={`h-full flex flex-col p-4 transition-all duration-300 ${
+          isLeftPanelCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
+        style={{ 
+          width: isLeftPanelCollapsed ? '0%' : `${leftPanelWidth}%`, 
+          height: "calc(100vh - 105px)",
+          marginLeft: isLeftPanelCollapsed ? '-20px' : '0'
+        }}
       >
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Progetti</h2>
@@ -1653,6 +1859,7 @@ const ProjectManagementSplitView = () => {
               onChange={setNewProject}
               onSave={handleCreateProject}
               formErrors={formErrors}
+              onProjectUpdated={refreshAllProjects}
             />
           </Dialog>
         </div>
@@ -1862,14 +2069,19 @@ const ProjectManagementSplitView = () => {
               </AlertDescription>
             </Alert>
           ) : (
-            <div className="flex-1 flex flex-col min-h-0" id="project-table-div">
-              <div className="flex-1 overflow-auto" id="project-table-div2">
+            <div className="flex-1 flex flex-col min-h-0" id="project-table-div" ref={tableRef}>
+              <div className="flex-1 overflow-auto overflow-x-auto" id="project-table-div2" ref={scrollContainerRef}>
                 <Table
                  id="project-table"
+                 className="min-w-full"
+                 style={{ 
+                   minWidth: `${columnWidths.reduce((sum, width) => sum + width, 0)}px` 
+                 }}
                 >
                   <TableHeader className="sticky top-0 bg-gray-100 z-10">
                     <TableRow>
                       <TableHead
+                        style={{ width: `${columnWidths[0]}px`, position: 'relative' }}
                         className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
                         onClick={() => handleSort("Name")}
                       >
@@ -1886,8 +2098,13 @@ const ProjectManagementSplitView = () => {
                             onChange={(value) => handleColumnFilter("name", value)}
                           />
                         </div>
+                        <div
+                          className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                          onMouseDown={(e) => handleColumnMouseDown(e, 0)}
+                        />
                       </TableHead>
                       <TableHead
+                        style={{ width: `${columnWidths[1]}px`, position: 'relative' }}
                         className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
                         onClick={() => handleSort("Description")}
                       >
@@ -1904,8 +2121,13 @@ const ProjectManagementSplitView = () => {
                             onChange={(value) => handleColumnFilter("description", value)}
                           />
                         </div>
+                        <div
+                          className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                          onMouseDown={(e) => handleColumnMouseDown(e, 1)}
+                        />
                       </TableHead>
                       <TableHead
+                        style={{ width: `${columnWidths[2]}px`, position: 'relative' }}
                         className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
                         onClick={() => handleSort("CompanyName")}
                       >
@@ -1922,8 +2144,12 @@ const ProjectManagementSplitView = () => {
                             onChange={(value) => handleColumnFilter("company", value)}
                           />
                         </div>
+                        <div
+                          className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                          onMouseDown={(e) => handleColumnMouseDown(e, 2)}
+                        />
                       </TableHead>
-                      <TableHead className="w-24 whitespace-nowrap">
+                      <TableHead style={{ width: `${columnWidths[3]}px`, position: 'relative' }} className="whitespace-nowrap">
                         <div className="flex items-center">
                           Stato
                           <ColumnFilter
@@ -1933,9 +2159,14 @@ const ProjectManagementSplitView = () => {
                             options={statusOptions}
                           />
                         </div>
+                        <div
+                          className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                          onMouseDown={(e) => handleColumnMouseDown(e, 3)}
+                        />
                       </TableHead>
                       <TableHead
-                        className="cursor-pointer hover:bg-gray-200 w-28 whitespace-nowrap"
+                        style={{ width: `${columnWidths[4]}px`, position: 'relative' }}
+                        className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
                         onClick={() => handleSort("EndDate")}
                       >
                         <div className="flex items-center">
@@ -1951,76 +2182,153 @@ const ProjectManagementSplitView = () => {
                             onChange={(value) => handleColumnFilter("endDate", value)}
                           />
                         </div>
+                        <div
+                          className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                          onMouseDown={(e) => handleColumnMouseDown(e, 4)}
+                        />
                       </TableHead>
-                      <TableHead className="w-20 text-right whitespace-nowrap">Attività</TableHead>
+                      <TableHead style={{ width: `${columnWidths[5]}px`, position: 'relative' }} className="text-right whitespace-nowrap">
+                        Attività
+                        <div
+                          className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                          onMouseDown={(e) => handleColumnMouseDown(e, 5)}
+                        />
+                      </TableHead>
+                      <TableHead style={{ width: `${columnWidths[6]}px` }} className="text-center">
+                        Azioni
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {getFilteredAndSortedProjects().map((project) => (
-                      <TableRow
-                        key={project.ProjectID}
-                        className={
-                          selectedProjectId === project.ProjectID
-                            ? "bg-blue-50 hover:bg-blue-100 cursor-pointer"
-                            : "hover:bg-gray-50 cursor-pointer"
-                        }
-                        onClick={() => selectProject(project.ProjectID)}
-                      >
-                        <TableCell className="font-medium py-1 whitespace-nowrap">
-                          <div className="flex items-start gap-1">
-                            <span className="truncate max-w-[120px]">
-                              {project.Name}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px] whitespace-nowrap">
-                          {project.Description || "-"}
-                        </TableCell>
-                        <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px] whitespace-nowrap">
-                          {project.CompanyName || "-"}
-                        </TableCell>
-                        <TableCell className="py-1 whitespace-nowrap">
-                          <div className="flex items-center gap-1">
-                            <div
-                              className="w-2 h-2 rounded-full shrink-0"
-                              style={{
-                                backgroundColor: project.StatusColor || "#CCCCCC",
-                              }}
-                            />
-                            <span className="text-xs truncate max-w-[80px]">
-                              {project.StatusDescription}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-1 text-xs whitespace-nowrap">
-                          {project.EndDate ? new Date(project.EndDate).toLocaleDateString() : "-"}
-                        </TableCell>
-                        <TableCell className="py-1 text-right whitespace-nowrap">
-                          <div className="flex justify-end gap-1 items-center">
-                            <div className="flex items-center px-1.5 py-0.5 rounded-md bg-green-100 text-green-700">
-                              <CheckCircle2 className="w-3 h-3 mr-1" />
-                              <span className="text-xs font-medium">
-                                {project.TaskCompletate || 0}
+                    {getFilteredAndSortedProjects().map((project) => {
+                      const isPinned = pinnedProjects.has(project.ProjectID);
+                      
+                      return (
+                        <TableRow
+                          key={project.ProjectID}
+                          className={`
+                            relative
+                            ${selectedProjectId === project.ProjectID
+                              ? "bg-blue-50 hover:bg-blue-100"
+                              : "hover:bg-gray-50"}
+                            ${isPinned ? "bg-yellow-50 border-l-4 border-l-yellow-400" : ""}
+                            cursor-pointer
+                          `}
+                          onClick={() => selectProject(project.ProjectID)}
+                        >
+                          <TableCell className="font-medium py-1 whitespace-nowrap">
+                            <div className="flex items-start gap-1">
+                              {isPinned && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Pin className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Progetto fissato</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              <span className="truncate max-w-[120px]">
+                                {project.Name}
                               </span>
                             </div>
-                            <div className="flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700">
-                              <ListTodo className="w-3 h-3 mr-1" />
-                              <span className="text-xs font-medium">
-                                {project.TaskAperteNonRitardo || 0}
+                          </TableCell>
+                          <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px] whitespace-nowrap">
+                            {project.Description || "-"}
+                          </TableCell>
+                          <TableCell className="py-1 text-sm text-gray-600 truncate max-w-[120px] whitespace-nowrap">
+                            {project.CompanyName || "-"}
+                          </TableCell>
+                          <TableCell className="py-1 whitespace-nowrap">
+                            <div className="flex items-center gap-1">
+                              <div
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{
+                                  backgroundColor: project.StatusColor || "#CCCCCC",
+                                }}
+                              />
+                              <span className="text-xs truncate max-w-[80px]">
+                                {project.StatusDescription}
                               </span>
                             </div>
-                            {project.TaskAperteInRitardo > 0 && (
-                              <div className="flex items-center px-1.5 py-0.5 rounded-md bg-red-100 text-red-700">
-                                <TriangleAlert className="w-3 h-3 mr-1" />
+                          </TableCell>
+                          <TableCell className="py-1 text-xs whitespace-nowrap">
+                            {project.EndDate ? new Date(project.EndDate).toLocaleDateString() : "-"}
+                          </TableCell>
+                          <TableCell className="py-1 text-right whitespace-nowrap">
+                            <div className="flex justify-end gap-1 items-center">
+                              <div className="flex items-center px-1.5 py-0.5 rounded-md bg-green-100 text-green-700">
+                                <CheckCircle2 className="w-3 h-3 mr-1" />
                                 <span className="text-xs font-medium">
-                                  {project.TaskAperteInRitardo}
+                                  {project.TaskCompletate || 0}
                                 </span>
                               </div>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                              <div className="flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700">
+                                <ListTodo className="w-3 h-3 mr-1" />
+                                <span className="text-xs font-medium">
+                                  {project.TaskAperteNonRitardo || 0}
+                                </span>
+                              </div>
+                              {project.TaskAperteInRitardo > 0 && (
+                                <div className="flex items-center px-1.5 py-0.5 rounded-md bg-red-100 text-red-700">
+                                  <TriangleAlert className="w-3 h-3 mr-1" />
+                                  <span className="text-xs font-medium">
+                                    {project.TaskAperteInRitardo}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-1 text-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-6 w-6 p-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    selectProject(project.ProjectID);
+                                  }}
+                                >
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Visualizza
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePinProject(project.ProjectID, isPinned);
+                                  }}
+                                  disabled={pinLoading === project.ProjectID}
+                                >
+                                  {isPinned ? (
+                                    <>
+                                      <PinOff className="mr-2 h-4 w-4" />
+                                      Rimuovi pin
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Pin className="mr-2 h-4 w-4" />
+                                      Fissa in alto
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -2030,24 +2338,29 @@ const ProjectManagementSplitView = () => {
       </div>
 
       {/* Resize handle */}
-      <div
-        className={`w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors ${
-          isResizing ? 'bg-blue-600' : 'bg-gray-200'
-        }`}
-        onMouseDown={handleMouseDown}
-      />
+      {!isLeftPanelCollapsed && (
+        <div
+          className={`w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors ${
+            isResizing ? 'bg-blue-600' : 'bg-gray-200'
+          }`}
+          onMouseDown={handleMouseDown}
+        />
+      )}
 
       {/* Sezione destra (resizable) */}
       <div 
-        className="h-full flex flex-col overflow-hidden" 
-        style={{ width: `${100 - leftPanelWidth}%`, height: "calc(100vh - 105px)" }}
+        className="h-full flex flex-col overflow-hidden transition-all duration-300" 
+        style={{ 
+          width: isLeftPanelCollapsed ? '100%' : `${100 - leftPanelWidth}%`, 
+          height: "calc(100vh - 105px)" 
+        }}
       >
         {selectedProjectId ? (
           <ProjectDetailContainer 
             projectId={selectedProjectId} 
             refreshAllProjects={refreshAllProjects}
             resetSelectedProject={resetSelectedProject}
-            leftPanelWidth={leftPanelWidth}
+            leftPanelWidth={isLeftPanelCollapsed ? 0 : leftPanelWidth}
           />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
@@ -2062,10 +2375,7 @@ const ProjectManagementSplitView = () => {
           </div>
         )}
       </div>
-   
-    
     </div>
-    
   );
 };
 

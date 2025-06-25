@@ -1,4 +1,3 @@
-// TaskDetailsPanel.jsx
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import {
@@ -24,6 +23,7 @@ import {
   CalendarClock,
   Pin,
   PinOff,
+  Ban,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import TaskInformationTab from "./TaskInformationTab";
 import TaskChatsTab from "./TaskChatsTab";
 import TaskCostsTab from "./TaskCostsTab";
@@ -90,7 +91,7 @@ const TaskDetailsPanel = ({
   const [isClosing, setIsClosing] = useState(false);
   const [showContent, setShowContent] = useState(false);
   
-  const { checkAdminPermission, isOwnTask } = useProjectActions();
+  const { checkAdminPermission, isOwnTask, toggleTaskDisabled } = useProjectActions();
   const { syncCalendarEvent } = useCalendar();
   const canEdit = checkAdminPermission(project) || isOwnTask(task);
 
@@ -229,7 +230,7 @@ const TaskDetailsPanel = ({
 
   // Gestione chiusura con animazione
   const handleClose = useCallback(() => {
-    if (isEditing) {
+    if (isEditing && !editedTask?.TaskDisabled) {
       swal.fire({
         title: "Modifiche non salvate",
         text: "Vuoi salvare le modifiche prima di chiudere?",
@@ -255,7 +256,7 @@ const TaskDetailsPanel = ({
         onClose();
       }, 300);
     }
-  }, [isEditing, onClose]);
+  }, [isEditing, onClose, editedTask]);
 
   // Gestione cambio tab
   const handleTabChange = useCallback((value) => {
@@ -303,7 +304,7 @@ const TaskDetailsPanel = ({
 
   // Gestione cambio stato
   const handleStatusChange = async (newStatus) => {
-    if (!editedTask?.TaskID) return;
+    if (!editedTask?.TaskID || editedTask?.TaskDisabled) return;
 
     try {
       const updatedTaskData = {
@@ -323,7 +324,7 @@ const TaskDetailsPanel = ({
 
   // Gestione cambio priorità
   const handlePriorityChange = async (newPriority) => {
-    if (!editedTask?.TaskID) return;
+    if (!editedTask?.TaskID || editedTask?.TaskDisabled) return;
 
     try {
       const updatedTaskData = {
@@ -338,6 +339,47 @@ const TaskDetailsPanel = ({
       }
     } catch (error) {
       console.error("Error updating task priority:", error);
+    }
+  };
+
+  // Gestione disabilitazione task
+  const handleToggleDisabled = async () => {
+    try {
+      const result = await swal.fire({
+        title: editedTask.TaskDisabled ? "Riabilitare attività?" : "Disabilitare attività?",
+        text: editedTask.TaskDisabled 
+          ? "L'attività tornerà visibile nelle viste di default."
+          : "L'attività non sarà più visibile nelle viste di default.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: editedTask.TaskDisabled ? "Riabilita" : "Disabilita",
+        cancelButtonText: "Annulla",
+        confirmButtonColor: editedTask.TaskDisabled ? "#10B981" : "#EF4444",
+      });
+
+      if (result.isConfirmed) {
+        const response = await toggleTaskDisabled(editedTask.TaskID, !editedTask.TaskDisabled);
+        if (response.success) {
+          toast({
+            title: "Successo",
+            description: response.msg,
+            variant: "success",
+          });
+          // Chiudi il pannello e ricarica il progetto
+          handleClose();
+          if (refreshProject) {
+            refreshProject();
+          }
+        } else {
+          throw new Error(response.msg);
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Errore",
+        description: error.message || "Errore nella modifica dello stato dell'attività",
+        variant: "destructive",
+      });
     }
   };
 
@@ -484,10 +526,20 @@ const TaskDetailsPanel = ({
                   </div>
                 ) : (
                   <>
-                  {/* Titolo attività */}
+                    {/* Titolo attività */}
                     <h2 className="text-xl font-bold text-gray-800 truncate max-w-md">
                       {editedTask?.Title}
                     </h2>
+                    {/* Badge disabilitata */}
+                    {editedTask?.TaskDisabled && (
+                      <Badge 
+                        variant="destructive" 
+                        className="bg-red-100 text-red-700 border-red-200"
+                      >
+                        <Ban className="w-3 h-3 mr-1" />
+                        Disabilitata
+                      </Badge>
+                    )}
                   </>
                 )}
               </div>
@@ -496,6 +548,29 @@ const TaskDetailsPanel = ({
               {!isMinimized && (
                 <div className="flex items-center gap-2">
                   <TooltipProvider>
+                    {/* Toggle Disable/Enable */}
+                    {canEdit && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant={editedTask?.TaskDisabled ? "default" : "destructive"}
+                            size="icon"
+                            onClick={handleToggleDisabled}
+                            className="h-8 w-8"
+                          >
+                            {editedTask?.TaskDisabled ? (
+                              <CheckCircle2 className="h-4 w-4" />
+                            ) : (
+                              <Ban className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {editedTask?.TaskDisabled ? "Riabilita attività" : "Disabilita attività"}
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+
                     {/* Pin/Unpin */}
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -568,6 +643,19 @@ const TaskDetailsPanel = ({
               )}
             </motion.div>
 
+            {/* Alert disabilitazione */}
+            {!isMinimized && showContent && editedTask?.TaskDisabled && (
+              <Alert className="m-4 mb-0 border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertTitle className="text-red-800">Attività Disabilitata</AlertTitle>
+                <AlertDescription className="text-red-700">
+                  Questa attività è stata disabilitata da {editedTask.DisabledByName} 
+                  il {new Date(editedTask.TaskDisabledAt).toLocaleString()}.
+                  Le attività disabilitate non sono visibili nelle viste di default.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Quick actions bar */}
             {!isMinimized && showContent && (
               <motion.div
@@ -582,7 +670,7 @@ const TaskDetailsPanel = ({
                     <Select
                       value={editedTask?.Status || ""}
                       onValueChange={handleStatusChange}
-                      disabled={!canEdit}
+                      disabled={!canEdit || editedTask?.TaskDisabled}
                     >
                       <SelectTrigger className="h-7 w-36 text-xs">
                         <SelectValue />
@@ -602,7 +690,7 @@ const TaskDetailsPanel = ({
                     <Select
                       value={editedTask?.Priority || ""}
                       onValueChange={handlePriorityChange}
-                      disabled={!canEdit}
+                      disabled={!canEdit || editedTask?.TaskDisabled}
                     >
                       <SelectTrigger className="h-7 w-28 text-xs">
                         <SelectValue />
@@ -660,7 +748,7 @@ const TaskDetailsPanel = ({
                       </Button>
                     </>
                   ) : (
-                    canEdit && (
+                    canEdit && !editedTask?.TaskDisabled && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -733,8 +821,8 @@ const TaskDetailsPanel = ({
                     <TabsContent value="information" className="p-4 m-0 h-1">
                       <TaskInformationTab
                         task={editedTask}
-                        isEditing={isEditing}
-                        canEdit={canEdit}
+                        isEditing={isEditing && !editedTask?.TaskDisabled}
+                        canEdit={canEdit && !editedTask?.TaskDisabled}
                         onSave={handleSave}
                         onCancel={() => setIsEditing(false)}
                         assignableUsers={assignableUsers}
@@ -747,13 +835,14 @@ const TaskDetailsPanel = ({
                         task={editedTask}
                         project={project}
                         onAddComment={onAddComment}
+                        disabled={editedTask?.TaskDisabled}
                       />
                     </TabsContent>
 
                     <TabsContent value="costs" className="p-4 m-0">
                       <TaskCostsTab
                         task={editedTask}
-                        canEdit={canEdit}
+                        canEdit={canEdit && !editedTask?.TaskDisabled}
                         onCostChange={async (operation) => {
                           await operation();
                           await refreshProject(activeTab);
@@ -764,7 +853,7 @@ const TaskDetailsPanel = ({
                     <TabsContent value="attachments" className="p-4 m-0">
                       <TaskAttachmentsTab
                         task={editedTask}
-                        canEdit={canEdit}
+                        canEdit={canEdit && !editedTask?.TaskDisabled}
                         onAttachmentChange={() => refreshProject(activeTab)}
                       />
                     </TabsContent>
@@ -801,7 +890,7 @@ const TaskDetailsPanel = ({
                             setCalendarState((prev) => ({ ...prev, loading: false }));
                           }
                         }}
-                        canEdit={canEdit}
+                        canEdit={canEdit && !editedTask?.TaskDisabled}
                         calendarState={calendarState}
                         setCalendarState={setCalendarState}
                       />

@@ -21,8 +21,9 @@ const getProjectIdByTaskId = async (taskId) => {
  * Se fornito projectId, recupera gli allegati di progetto/task.
  * Se fornito notificationId, recupera gli allegati della notifica.
  * Se fornito itemCode, recupera gli allegati dell'articolo.
+ * @param {number} currentUserId - ID dell'utente corrente per tracciare le visualizzazioni
  */
-const getAttachments = async (projectId = null, taskId = null, notificationId = null, itemCode = null, companyId = null) => {
+const getAttachments = async (projectId = null, taskId = null, notificationId = null, itemCode = null, companyId = null, currentUserId = null) => {
     try {
         // Check if at least one identifier is provided
         if (projectId === null && notificationId === null && itemCode === null) {
@@ -36,10 +37,72 @@ const getAttachments = async (projectId = null, taskId = null, notificationId = 
             .input('NotificationID', sql.Int, notificationId)
             .input('ItemCode', sql.NVarChar(50), itemCode)
             .input('CompanyId', sql.Int, companyId)
+            .input('CurrentUserID', sql.Int, currentUserId) // Nuovo parametro
             .execute('MA_GetAttachments');
         return result.recordset;
     } catch (err) {
         console.error('Error in getAttachments:', err);
+        throw err;
+    }
+};
+
+/**
+ * Registra la visualizzazione di un allegato da parte di un utente
+ */
+const recordAttachmentView = async (attachmentId, userId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const result = await pool.request()
+            .input('AttachmentID', sql.Int, attachmentId)
+            .input('UserID', sql.Int, userId)
+            .execute('MA_RecordAttachmentView');
+        
+        return {
+            success: true,
+            data: result.recordset[0]
+        };
+    } catch (err) {
+        console.error('Error in recordAttachmentView:', err);
+        throw err;
+    }
+};
+
+/**
+ * Ottiene le statistiche di visualizzazione per un allegato
+ */
+const getAttachmentViewStats = async (attachmentId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const result = await pool.request()
+            .input('AttachmentID', sql.Int, attachmentId)
+            .query(`
+                SELECT 
+                    COUNT(DISTINCT UserID) as TotalViews,
+                    MIN(FirstViewedAt) as FirstViewedAt,
+                    MAX(LastViewedAt) as LastViewedAt,
+                    (
+                        SELECT 
+                            u.firstName + ' ' + u.lastName as ViewerName,
+                            av.FirstViewedAt,
+                            av.LastViewedAt
+                        FROM MA_AttachmentViews av
+                        JOIN AR_Users u ON u.userId = av.UserID
+                        WHERE av.AttachmentID = @AttachmentID
+                        ORDER BY av.FirstViewedAt DESC
+                        FOR JSON PATH
+                    ) as ViewerDetails
+                FROM MA_AttachmentViews
+                WHERE AttachmentID = @AttachmentID
+            `);
+        
+        return result.recordset[0] || {
+            TotalViews: 0,
+            FirstViewedAt: null,
+            LastViewedAt: null,
+            ViewerDetails: '[]'
+        };
+    } catch (err) {
+        console.error('Error in getAttachmentViewStats:', err);
         throw err;
     }
 };
@@ -111,5 +174,7 @@ module.exports = {
     getAttachments,
     addAttachment,
     deleteAttachment,
-    getAttachmentById
+    getAttachmentById,
+    recordAttachmentView,
+    getAttachmentViewStats
 };

@@ -9,7 +9,7 @@
  * @returns {Boolean} - True if the user has admin or manager permissions
  */
 export const hasAdminOrManagerPermission = (project, userId) => {
-  if (!project || !project.members || !userId) return false;
+  if (!project || !project.members) return false;
 
   const userMember = project.members.find((m) => m.UserID === parseInt(userId));
   return (
@@ -70,8 +70,8 @@ export const canEditMemberRole = (project, currentUserId, targetUserId) => {
  * @returns {Boolean} - True if the user can edit the task
  */
 export const canEditTask = (project, task, userId) => {
-  if (!project || !task || !userId) return false;
-
+  
+  if (!project || !task ) return false;
   // Check if user is admin or manager
   if (hasAdminOrManagerPermission(project, userId)) return true;
 
