@@ -160,6 +160,7 @@ export const BOMViewerProvider = ({
         setBom(null);
         setBomComponents([]);
         setBomRouting([]);
+        setPendingChanges({}); // Reset pending changes
       }
     }
   }, [item?.Id, bom]);
@@ -389,7 +390,7 @@ export const BOMViewerProvider = ({
       const versionToUse =
         options.version !== undefined ? options.version : selectedBomVersion;
 
-      // MODIFICA: Se forceLoad è true, ignora il controllo sui dati già caricati
+      // Se forceLoad è true, ignora il controllo sui dati già caricati
       // Altrimenti verifica che non stiamo ricaricando gli stessi dati
       if (
         !forceLoad &&

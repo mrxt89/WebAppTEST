@@ -35,7 +35,7 @@ function ArticleAttachmentsTab({ article, canEdit = false }) {
             itemCode={article.Item}
             readOnly={false}
             showHeader={false}
-            maxHeight={600}
+            maxHeight="100%"
           />
         ) : (
           // Per articoli temporanei, usa l'ID dell'articolo progetto
@@ -43,7 +43,7 @@ function ArticleAttachmentsTab({ article, canEdit = false }) {
             projectItemId={article.Id}
             readOnly={false}
             showHeader={false}
-            maxHeight={600}
+            maxHeight="100%"
           />
         )}
       </CardContent>

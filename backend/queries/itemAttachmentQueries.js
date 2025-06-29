@@ -407,6 +407,87 @@ const addItemAttachmentVersion = async (attachmentId, fileName, filePath, fileSi
     }
 };
 
+/**
+ * Ottiene un allegato per ID con tutti i dettagli incluse le categorie
+ * @param {number} attachmentId - ID dell'allegato
+ * @param {number} companyId - ID dell'azienda richiedente
+ */
+const getItemAttachmentByIdWithDetails = async (attachmentId, companyId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const result = await pool.request()
+            .input('AttachmentID', sql.Int, attachmentId)
+            .input('CompanyId', sql.Int, companyId)
+            .query(`
+                SELECT 
+                    a.AttachmentID,
+                    a.ProjectItemId,
+                    a.CompanyId AS OwnerCompanyId,
+                    a.ItemCode,
+                    a.FileName,
+                    a.FilePath,
+                    a.FileType,
+                    a.FileSizeKB,
+                    a.UploadedBy,
+                    a.UploadedAt,
+                    a.Description,
+                    a.IsPublic,
+                    a.StorageLocation,
+                    a.IsVisible,
+                    a.IsErpAttachment,
+                    a.Tags,
+                    u.username AS UploadedByUsername,
+                    u.firstName + ' ' + u.lastName AS UploadedByFullName,
+                    c.Description AS OwnerCompanyName,
+                    CASE 
+                        WHEN a.CompanyId = @CompanyId THEN 'owner' 
+                        ELSE COALESCE(s.AccessLevel, 'read') 
+                    END AS AccessLevel,
+                    -- Ottieni le categorie associate
+                    STUFF((
+                        SELECT ',' + CAST(m.CategoryID AS VARCHAR(10))
+                        FROM dbo.MA_ItemAttachmentCategoryMap m
+                        WHERE m.AttachmentID = a.AttachmentID
+                        FOR XML PATH('')
+                    ), 1, 1, '') AS Categories
+                FROM 
+                    dbo.MA_ItemAttachments a
+                JOIN 
+                    dbo.AR_Users u ON a.UploadedBy = u.userId
+                JOIN 
+                    dbo.AR_Companies c ON a.CompanyId = c.CompanyId
+                LEFT JOIN 
+                    dbo.MA_ItemAttachmentSharing s ON a.AttachmentID = s.AttachmentID AND s.TargetCompanyId = @CompanyId
+                WHERE 
+                    a.AttachmentID = @AttachmentID
+                    AND a.IsVisible = 1
+                    AND (
+                        a.CompanyId = @CompanyId 
+                        OR a.IsPublic = 1
+                        OR s.AttachmentID IS NOT NULL
+                    )
+            `);
+        
+        if (!result.recordset || result.recordset.length === 0) {
+            return null;
+        }
+        
+        const attachment = result.recordset[0];
+        
+        // Converti la stringa Categories in array di numeri
+        if (attachment.Categories) {
+            attachment.Categories = attachment.Categories.split(',').map(id => parseInt(id));
+        } else {
+            attachment.Categories = [];
+        }
+        
+        return attachment;
+    } catch (err) {
+        console.error('Error in getItemAttachmentByIdWithDetails:', err);
+        throw err;
+    }
+};
+
 module.exports = {
     getItemAttachments,
     addItemAttachment,
@@ -423,5 +504,6 @@ module.exports = {
     updateItemAttachment,
     updateItemAttachmentCodeMap,
     getItemAttachmentVersions,
-    addItemAttachmentVersion
+    addItemAttachmentVersion,
+    getItemAttachmentByIdWithDetails
 };
