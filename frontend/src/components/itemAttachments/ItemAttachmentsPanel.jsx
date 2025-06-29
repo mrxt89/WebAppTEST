@@ -74,6 +74,7 @@ import FileViewer from "../ui/fileViewer";
  * @param {boolean} showHeader - Mostra l'intestazione del componente
  * @param {number} maxHeight - Altezza massima del pannello
  * @param {number} companyId - ID dell'azienda (opzionale, altrimenti usa quello dell'utente corrente)
+ * @param {function} onAttachmentsChange - Callback chiamata quando cambia il numero di allegati
  */
 function ItemAttachmentsPanel({
   itemCode = null,
@@ -82,7 +83,9 @@ function ItemAttachmentsPanel({
   showHeader = true,
   maxHeight = 400,
   companyId = null,
+  onAttachmentsChange = null,
 }) {
+  
   const { authState } = useAuthContext();
   const [userCompanyId] = useState(companyId || authState.user?.CompanyId);
 
@@ -499,7 +502,7 @@ function ItemAttachmentsPanel({
   // Render della lista allegati
   const renderAttachmentsList = () => {
     const filteredList = filteredAttachments();
-
+  
     if (loading) {
       return (
         <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
@@ -507,7 +510,7 @@ function ItemAttachmentsPanel({
         </Box>
       );
     }
-
+  
     if (filteredList.length === 0) {
       return (
         <Paper
@@ -544,11 +547,12 @@ function ItemAttachmentsPanel({
         </Paper>
       );
     }
-
+  
     return (
       <List
         sx={{
-          maxHeight: maxHeight,
+          maxHeight: maxHeight === "100%" ? "calc(100vh - 50px)" : maxHeight,
+          height: maxHeight === "100%" ? "100%" : "100%",
           overflow: "auto",
           border: "1px solid",
           borderColor: "divider",
@@ -585,6 +589,7 @@ function ItemAttachmentsPanel({
                     }}
                   >
                     {attachment.FileName}
+                    
                     {attachment.IsPublic && (
                       <Tooltip title="Allegato pubblico">
                         <PublicIcon
@@ -618,6 +623,18 @@ function ItemAttachmentsPanel({
                 }
                 secondary={
                   <React.Fragment>
+                    {/* Descrizione dell'allegato */}
+                    {attachment.Description && (
+                      <Typography
+                        variant="body2"
+                        color="text.primary"
+                        sx={{ mb: 0.5 }}
+                      >
+                        {attachment.Description}
+                      </Typography>
+                    )}
+                    
+                    {/* Informazioni file */}
                     <Box
                       sx={{ display: "flex", alignItems: "center", mt: 0.5 }}
                     >
@@ -638,15 +655,8 @@ function ItemAttachmentsPanel({
                           ` (${attachment.OwnerCompanyName})`}
                       </Typography>
                     </Box>
-                    {attachment.Description && (
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mt: 0.5, fontSize: "0.75rem" }}
-                      >
-                        {attachment.Description}
-                      </Typography>
-                    )}
+                    
+                    {/* Tags */}
                     {attachment.Tags && (
                       <Box
                         sx={{
@@ -669,7 +679,7 @@ function ItemAttachmentsPanel({
                   </React.Fragment>
                 }
               />
-              <ListItem>
+              <ListItemSecondaryAction>
                 <Box sx={{ display: "flex" }}>
                   {/* Per allegati nascosti, mostra un pulsante di ripristino se l'utente è autorizzato */}
                   {attachment.IsVisible === false &&
@@ -686,7 +696,7 @@ function ItemAttachmentsPanel({
                         </IconButton>
                       </Tooltip>
                     )}
-
+  
                   {/* Per gli allegati visibili, mostra le azioni standard */}
                   {attachment.IsVisible !== false && (
                     <>
@@ -712,7 +722,7 @@ function ItemAttachmentsPanel({
                       </Tooltip>
                     </>
                   )}
-
+  
                   <IconButton
                     edge="end"
                     aria-label="more"
@@ -722,7 +732,7 @@ function ItemAttachmentsPanel({
                     <MoreIcon fontSize="small" />
                   </IconButton>
                 </Box>
-              </ListItem>
+              </ListItemSecondaryAction>
             </ListItem>
             <Divider component="li" />
           </React.Fragment>

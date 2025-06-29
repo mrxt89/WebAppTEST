@@ -1,4 +1,4 @@
-// ComponentDetail.jsx - Aggiornato per supportare le nuove funzionalità di sostituzione
+// ComponentDetail.jsx - Aggiornato per supportare il tracciamento delle modifiche
 
 import React, { useState, useEffect } from "react";
 import { useBOMViewer } from "../../context/BOMViewerContext";
@@ -13,28 +13,25 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Info,
   Package,
   ShoppingCart,
   CircuitBoard,
   AlertTriangle,
-  Code,
 } from "lucide-react";
 
 const ComponentDetail = ({ component, editMode }) => {
   const {
-    updateComponent,
-    updateItemDetails,
     unitsOfMeasure,
     pendingChanges,
     setPendingChanges,
-    bomComponents, // Aggiungiamo questa proprietà dal contesto
+    bomComponents,
   } = useBOMViewer();
 
   // Aggiungiamo uno stato per monitorare il componente padre
   const [parentComponent, setParentComponent] = useState(null);
+  
   // Stato per i valori attualmente visualizzati nei campi
   const [formData, setFormData] = useState({
     // Campi BOM Component
@@ -45,7 +42,7 @@ const ComponentDetail = ({ component, editMode }) => {
 
     // Campi Item
     Code: component?.ComponentItemCode || component?.ComponentCode || "",
-    Description: component?.ComponentItemDescription,
+    Description: component?.ComponentItemDescription || component?.Description || "",
     Notes: component?.Notes || "",
     Nature: component?.ComponentNature || component?.Nature || 22413312,
     Diameter: component?.Diameter || 0,
@@ -111,7 +108,7 @@ const ComponentDetail = ({ component, editMode }) => {
         // Campi Item
         Code: component.ComponentItemCode || component.ComponentCode || "",
         Description:
-          component.Description || component.ComponentItemDescription,
+          component.Description || component.ComponentItemDescription || "",
         Notes: component.Notes || "",
         Nature: component.ComponentNature || component.Nature || 22413312,
         Diameter: component.Diameter || 0,
@@ -124,16 +121,10 @@ const ComponentDetail = ({ component, editMode }) => {
 
       setFormData(newData);
 
-      // Rimuovi le eventuali modifiche in sospeso per questo componente quando cambia
-      if (pendingChanges[component.ComponentId]) {
-        setPendingChanges((prev) => {
-          const newChanges = { ...prev };
-          delete newChanges[component.ComponentId];
-          return newChanges;
-        });
-      }
+      // NON rimuovere le modifiche pendenti quando cambia il componente
+      // Questo permette di mantenere le modifiche mentre si naviga tra i componenti
     }
-  }, [component, setPendingChanges]);
+  }, [component]);
 
   // Gestisce il cambiamento nei campi del form
   const handleChange = (field, value) => {
@@ -149,26 +140,54 @@ const ComponentDetail = ({ component, editMode }) => {
 
       // Aggiorna le modifiche in sospeso per questo componente
       setPendingChanges((prev) => {
+        const newChanges = { ...prev };
+        
         // Se non ci sono modifiche precedenti per questo componente, inizializza
-        if (!prev[componentId]) {
-          prev[componentId] = {
+        if (!newChanges[componentId]) {
+          newChanges[componentId] = {
             bomComponentChanges: {},
             itemDetailsChanges: {},
             original: component,
-            bomId: component.BOMId,
+            bomId: component.BOMId || component.ParentBOMId,
             line: component.Line,
-            parentBOMId: parentComponent?.BOMId || null, // Aggiungiamo il parentBOMId
+            parentBOMId: parentComponent?.BOMId || null,
           };
         }
 
-        // Aggiungi il campo modificato all'insieme appropriato
-        if (["ComponentType", "Quantity", "UoM"].includes(field)) {
-          prev[componentId].bomComponentChanges[field] = value;
-        } else {
-          prev[componentId].itemDetailsChanges[field] = value;
+        // Determina se il campo appartiene ai componenti BOM o ai dettagli dell'articolo
+        const bomFields = ["ComponentType", "Quantity", "UoM"];
+        const itemFields = ["Code", "Description", "Notes", "Nature", "Diameter", "Bxh", "Depth", "Length", "MediumRadius", "CustomerItemReference"];
+
+        if (bomFields.includes(field)) {
+          // Controlla se il valore è diverso dall'originale
+          if (component[field] !== value) {
+            newChanges[componentId].bomComponentChanges[field] = value;
+          } else {
+            // Se il valore è tornato all'originale, rimuovi la modifica
+            delete newChanges[componentId].bomComponentChanges[field];
+          }
+        } else if (itemFields.includes(field)) {
+          // Per i campi dell'articolo, controlla contro i valori originali
+          const originalField = field === "Code" ? (component.ComponentItemCode || component.ComponentCode) :
+                               field === "Description" ? (component.ComponentItemDescription || component.Description) :
+                               component[field];
+          
+          if (originalField !== value) {
+            newChanges[componentId].itemDetailsChanges[field] = value;
+          } else {
+            delete newChanges[componentId].itemDetailsChanges[field];
+          }
         }
 
-        return { ...prev };
+        // Se non ci sono più modifiche per questo componente, rimuovilo
+        if (
+          Object.keys(newChanges[componentId].bomComponentChanges).length === 0 &&
+          Object.keys(newChanges[componentId].itemDetailsChanges).length === 0
+        ) {
+          delete newChanges[componentId];
+        }
+
+        return newChanges;
       });
     }
   };
@@ -210,6 +229,15 @@ const ComponentDetail = ({ component, editMode }) => {
     }
   };
 
+  // Helper per verificare se un campo ha modifiche pendenti
+  const hasFieldChange = (field) => {
+    if (!component || !pendingChanges[component.ComponentId]) return false;
+    
+    const changes = pendingChanges[component.ComponentId];
+    return changes.bomComponentChanges[field] !== undefined || 
+           changes.itemDetailsChanges[field] !== undefined;
+  };
+
   // If no component is selected, show placeholder
   if (!component) {
     return (
@@ -222,8 +250,8 @@ const ComponentDetail = ({ component, editMode }) => {
   // Aggiungiamo informazioni sul componente padre (se presente)
   const parentInfo = parentComponent ? (
     <div className="mb-3 p-2 bg-blue-50 rounded text-sm">
-      <span className="font-medium">Componente padre:</span>
-      {parentComponent.ComponentItemCode || "N/A"} -
+      <span className="font-medium">Componente padre:</span>{" "}
+      {parentComponent.ComponentItemCode || "N/A"} -{" "}
       {parentComponent.ComponentItemDescription || "N/A"}
       {parentComponent.stato_erp === 1 && (
         <Badge className="ml-2 bg-blue-100 text-blue-700">ERP</Badge>
@@ -246,16 +274,22 @@ const ComponentDetail = ({ component, editMode }) => {
       {/* Component details */}
       <div className="d-flex gap-x-6 gap-y-4">
         <div className="w-50">
-          <Label htmlFor="componentCode">Codice</Label>
+          <Label htmlFor="componentCode">
+            Codice
+            {hasFieldChange("Code") && (
+              <span className="ml-1 text-amber-600">*</span>
+            )}
+          </Label>
           <div className="flex items-center gap-2">
             <Input
               id="componentCode"
               value={formData.Code || ""}
               onChange={(e) => handleChange("Code", e.target.value)}
               disabled={!editMode || component?.stato_erp == "1"}
-              className={
-                component?.stato_erp == "1" ? "bg-gray-200" : "bg-white"
-              }
+              className={cn(
+                component?.stato_erp == "1" ? "bg-gray-200" : "bg-white",
+                hasFieldChange("Code") && "ring-2 ring-amber-500"
+              )}
             />
             {component.stato_erp == "1" && (
               <Badge className="ml-1 bg-blue-100 text-blue-700">ERP</Badge>
@@ -264,19 +298,33 @@ const ComponentDetail = ({ component, editMode }) => {
         </div>
 
         <div className="w-full">
-          <Label htmlFor="Description">Descrizione</Label>
+          <Label htmlFor="Description">
+            Descrizione
+            {hasFieldChange("Description") && (
+              <span className="ml-1 text-amber-600">*</span>
+            )}
+          </Label>
           <Textarea
             id="description"
             value={formData.Description || ""}
             onChange={(e) => handleChange("Description", e.target.value)}
             rows={3}
             disabled={!editMode || component?.stato_erp == "1"}
+            className={cn(
+              hasFieldChange("Description") && "ring-2 ring-amber-500"
+            )}
           />
         </div>
       </div>
+      
       <div className="grid grid-cols-4 gap-x-6 gap-y-3">
         <div>
-          <Label htmlFor="componentType">Tipo</Label>
+          <Label htmlFor="componentType">
+            Tipo
+            {hasFieldChange("ComponentType") && (
+              <span className="ml-1 text-amber-600">*</span>
+            )}
+          </Label>
           <Select
             value={String(formData.ComponentType)}
             onValueChange={(v) =>
@@ -284,7 +332,12 @@ const ComponentDetail = ({ component, editMode }) => {
             }
             disabled={!editMode || component?.parentBOMStato_erp == "1"}
           >
-            <SelectTrigger id="componentType">
+            <SelectTrigger 
+              id="componentType"
+              className={cn(
+                hasFieldChange("ComponentType") && "ring-2 ring-amber-500"
+              )}
+            >
               <SelectValue placeholder="Tipo componente" />
             </SelectTrigger>
             <SelectContent>
@@ -296,14 +349,24 @@ const ComponentDetail = ({ component, editMode }) => {
         </div>
 
         <div>
-          <Label htmlFor="nature">Natura</Label>
+          <Label htmlFor="nature">
+            Natura
+            {hasFieldChange("Nature") && (
+              <span className="ml-1 text-amber-600">*</span>
+            )}
+          </Label>
           {editMode && !component?.stato_erp == "1" ? (
             <Select
               value={String(formData.Nature)}
               onValueChange={(v) => handleChange("Nature", parseInt(v, 10))}
               disabled={!editMode || component?.stato_erp == "1"}
             >
-              <SelectTrigger id="nature">
+              <SelectTrigger 
+                id="nature"
+                className={cn(
+                  hasFieldChange("Nature") && "ring-2 ring-amber-500"
+                )}
+              >
                 <SelectValue placeholder="Natura articolo" />
               </SelectTrigger>
               <SelectContent>
@@ -320,7 +383,12 @@ const ComponentDetail = ({ component, editMode }) => {
         </div>
 
         <div>
-          <Label htmlFor="quantity">Quantità</Label>
+          <Label htmlFor="quantity">
+            Quantità
+            {hasFieldChange("Quantity") && (
+              <span className="ml-1 text-amber-600">*</span>
+            )}
+          </Label>
           <Input
             id="quantity"
             type="number"
@@ -330,18 +398,31 @@ const ComponentDetail = ({ component, editMode }) => {
               handleChange("Quantity", parseFloat(e.target.value))
             }
             disabled={!editMode || parentComponent?.parentBOMStato_erp == "1"}
+            className={cn(
+              hasFieldChange("Quantity") && "ring-2 ring-amber-500"
+            )}
           />
         </div>
 
         <div>
-          <Label htmlFor="uom">Unità di Misura</Label>
+          <Label htmlFor="uom">
+            Unità di Misura
+            {hasFieldChange("UoM") && (
+              <span className="ml-1 text-amber-600">*</span>
+            )}
+          </Label>
           {editMode && unitsOfMeasure && unitsOfMeasure.length > 0 ? (
             <Select
               value={formData.UoM}
               onValueChange={(v) => handleChange("UoM", v)}
               disabled={!editMode || component?.parentBOMStato_erp == "1"}
             >
-              <SelectTrigger id="uom">
+              <SelectTrigger 
+                id="uom"
+                className={cn(
+                  hasFieldChange("UoM") && "ring-2 ring-amber-500"
+                )}
+              >
                 <SelectValue placeholder="Unità di misura" />
               </SelectTrigger>
               <SelectContent>
@@ -358,6 +439,9 @@ const ComponentDetail = ({ component, editMode }) => {
               value={formData.UoM}
               onChange={(e) => handleChange("UoM", e.target.value)}
               disabled={!editMode || component?.parentBOMStato_erp == "1"}
+              className={cn(
+                hasFieldChange("UoM") && "ring-2 ring-amber-500"
+              )}
             />
           )}
         </div>
@@ -365,13 +449,21 @@ const ComponentDetail = ({ component, editMode }) => {
 
       {/* Note */}
       <div>
-        <Label htmlFor="notes">Note</Label>
+        <Label htmlFor="notes">
+          Note
+          {hasFieldChange("Notes") && (
+            <span className="ml-1 text-amber-600">*</span>
+          )}
+        </Label>
         <Textarea
           id="notes"
           value={formData.Notes || ""}
           onChange={(e) => handleChange("Notes", e.target.value)}
           rows={3}
           disabled={!editMode || component?.parentBOMStato_erp == "1"}
+          className={cn(
+            hasFieldChange("Notes") && "ring-2 ring-amber-500"
+          )}
         />
       </div>
 
@@ -382,6 +474,9 @@ const ComponentDetail = ({ component, editMode }) => {
           <div>
             <Label htmlFor="diameter" className="text-xs">
               Diametro
+              {hasFieldChange("Diameter") && (
+                <span className="ml-1 text-amber-600">*</span>
+              )}
             </Label>
             <Input
               id="diameter"
@@ -392,7 +487,10 @@ const ComponentDetail = ({ component, editMode }) => {
               onChange={(e) =>
                 handleChange("Diameter", parseFloat(e.target.value))
               }
-              className="bg-white h-8 text-sm"
+              className={cn(
+                "bg-white h-8 text-sm",
+                hasFieldChange("Diameter") && "ring-2 ring-amber-500"
+              )}
               disabled={!editMode || component?.stato_erp == "1"}
             />
           </div>
@@ -400,12 +498,18 @@ const ComponentDetail = ({ component, editMode }) => {
           <div>
             <Label htmlFor="bxh" className="text-xs">
               Base x Altezza
+              {hasFieldChange("Bxh") && (
+                <span className="ml-1 text-amber-600">*</span>
+              )}
             </Label>
             <Input
               id="bxh"
               value={formData.Bxh || ""}
               onChange={(e) => handleChange("Bxh", e.target.value)}
-              className="bg-white h-8 text-sm"
+              className={cn(
+                "bg-white h-8 text-sm",
+                hasFieldChange("Bxh") && "ring-2 ring-amber-500"
+              )}
               disabled={!editMode || component?.stato_erp == "1"}
             />
           </div>
@@ -413,6 +517,9 @@ const ComponentDetail = ({ component, editMode }) => {
           <div>
             <Label htmlFor="depth" className="text-xs">
               Profondità
+              {hasFieldChange("Depth") && (
+                <span className="ml-1 text-amber-600">*</span>
+              )}
             </Label>
             <Input
               id="depth"
@@ -423,7 +530,10 @@ const ComponentDetail = ({ component, editMode }) => {
               onChange={(e) =>
                 handleChange("Depth", parseFloat(e.target.value))
               }
-              className="bg-white h-8 text-sm"
+              className={cn(
+                "bg-white h-8 text-sm",
+                hasFieldChange("Depth") && "ring-2 ring-amber-500"
+              )}
               disabled={!editMode || component?.stato_erp == "1"}
             />
           </div>
@@ -431,6 +541,9 @@ const ComponentDetail = ({ component, editMode }) => {
           <div>
             <Label htmlFor="length" className="text-xs">
               Lunghezza
+              {hasFieldChange("Length") && (
+                <span className="ml-1 text-amber-600">*</span>
+              )}
             </Label>
             <Input
               id="length"
@@ -441,7 +554,10 @@ const ComponentDetail = ({ component, editMode }) => {
               onChange={(e) =>
                 handleChange("Length", parseFloat(e.target.value))
               }
-              className="bg-white h-8 text-sm"
+              className={cn(
+                "bg-white h-8 text-sm",
+                hasFieldChange("Length") && "ring-2 ring-amber-500"
+              )}
               disabled={!editMode || component?.stato_erp == "1"}
             />
           </div>
@@ -449,6 +565,9 @@ const ComponentDetail = ({ component, editMode }) => {
           <div>
             <Label htmlFor="radius" className="text-xs">
               Raggio Medio
+              {hasFieldChange("MediumRadius") && (
+                <span className="ml-1 text-amber-600">*</span>
+              )}
             </Label>
             <Input
               id="radius"
@@ -459,22 +578,28 @@ const ComponentDetail = ({ component, editMode }) => {
               onChange={(e) =>
                 handleChange("MediumRadius", parseFloat(e.target.value))
               }
-              className="bg-white h-8 text-sm"
+              className={cn(
+                "bg-white h-8 text-sm",
+                hasFieldChange("MediumRadius") && "ring-2 ring-amber-500"
+              )}
               disabled={!editMode || component?.stato_erp == "1"}
             />
           </div>
         </div>
       </div>
+      
       {/* Customer Reference */}
-
       <div className="border rounded-md p-3 bg-blue-50">
         <h4 className="text-sm font-medium mb-2 text-blue-700">
-          Riferimento Cliente ff
+          Riferimento Cliente
         </h4>
         <div className="space-y-2">
           <div>
             <Label htmlFor="customerRef" className="text-xs text-blue-700">
               Codice Cliente
+              {hasFieldChange("CustomerItemReference") && (
+                <span className="ml-1 text-amber-600">*</span>
+              )}
             </Label>
             <Input
               id="customerRef"
@@ -483,13 +608,31 @@ const ComponentDetail = ({ component, editMode }) => {
                 handleChange("CustomerItemReference", e.target.value)
               }
               disabled={!editMode || component?.stato_erp == "1"}
-              className="bg-white h-8 text-sm"
+              className={cn(
+                "bg-white h-8 text-sm",
+                hasFieldChange("CustomerItemReference") && "ring-2 ring-amber-500"
+              )}
             />
           </div>
         </div>
       </div>
+
+      {/* Indicatore modifiche pendenti */}
+      {editMode && pendingChanges[component.ComponentId] && (
+        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+          <div className="flex items-center gap-2 text-sm text-amber-700">
+            <AlertTriangle className="h-4 w-4" />
+            <span className="font-medium">Modifiche non salvate per questo componente</span>
+          </div>
+        </div>
+      )}
     </div>
   );
+};
+
+// Helper function
+const cn = (...classes) => {
+  return classes.filter(Boolean).join(' ');
 };
 
 export default ComponentDetail;

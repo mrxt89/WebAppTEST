@@ -26,7 +26,8 @@ const {
     updateItemAttachment,
     updateItemAttachmentCodeMap,
     getItemAttachmentVersions,
-    addItemAttachmentVersion
+    addItemAttachmentVersion,
+    getItemAttachmentByIdWithDetails
 } = require('../queries/itemAttachmentQueries');
 
 const fileService = new FileService();
@@ -722,6 +723,31 @@ router.get('/item-attachments/project-item/:projectItemId/download-all', authent
     } catch (error) {
         console.error('Error creating zip archive:', error);
         res.status(500).json({ success: 0, message: 'Errore nella creazione dell\'archivio zip' });
+    }
+});
+
+// Ottieni un singolo allegato per ID con tutti i dettagli
+router.get('/item-attachments/:attachmentId', authenticateToken, async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        const companyId = req.user.CompanyId;
+        
+        const attachment = await getItemAttachmentByIdWithDetails(attachmentId, companyId);
+        
+        if (!attachment) {
+            return res.status(404).json({ 
+                success: 0, 
+                message: 'Allegato non trovato o non accessibile' 
+            });
+        }
+        
+        res.json(attachment);
+    } catch (error) {
+        console.error('Error fetching attachment by ID:', error);
+        res.status(500).json({ 
+            success: 0, 
+            message: 'Errore nel recupero dell\'allegato' 
+        });
     }
 });
 

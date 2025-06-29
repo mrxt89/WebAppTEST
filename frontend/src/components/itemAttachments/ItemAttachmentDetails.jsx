@@ -119,15 +119,16 @@ function ItemAttachmentDetails({
       const userCompanyId = auth.user.CompanyId;
       // L'utente può modificare se appartiene all'azienda proprietaria
       const hasEditPermission =
-        !readOnly && userCompanyId === attachment.OwnerCompanyId;
+        userCompanyId == attachment.OwnerCompanyId;
       setCanEdit(hasEditPermission);
 
-      // Se l'utente non può modificare ma il tab è impostato per modifica, forzare il ritorno a visualizzazione
+      // Se l'utente non può modificare e il tab è impostato per modifica, forzare il ritorno a visualizzazione
+      // Solo se i permessi sono cambiati (non quando cambia tabValue)
       if (!hasEditPermission && tabValue === 1 && onTabChange) {
         onTabChange(0);
       }
     }
-  }, [attachment, readOnly, auth.user, tabValue, onTabChange]);
+  }, [attachment, readOnly, auth.user, onTabChange]); // Rimosso tabValue dalle dipendenze
 
   // Aggiorna i campi del form quando cambia l'allegato
   useEffect(() => {
@@ -1044,9 +1045,7 @@ function ItemAttachmentDetails({
           sx={{ borderBottom: 1, borderColor: "divider", px: 2 }}
         >
           <Tab icon={<ViewIcon />} iconPosition="start" label="Visualizza" />
-          {canEdit && (
-            <Tab icon={<EditIcon />} iconPosition="start" label="Modifica" />
-          )}
+          <Tab icon={<EditIcon />} iconPosition="start" label="Modifica" />
         </Tabs>
 
         <DialogContent
