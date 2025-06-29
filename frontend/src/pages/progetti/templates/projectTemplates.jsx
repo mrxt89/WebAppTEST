@@ -27,6 +27,7 @@ import {
   ChevronDown,
   ChevronRight,
   AlertTriangle,
+  Layers,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -40,6 +41,7 @@ import useTemplateActions from "../../../hooks/useTemplateActions";
 import { swal } from "../../../lib/common";
 import { toast } from "@/components/ui/use-toast";
 import TemplateDialog from "./TemplateDialog";
+import TemplateStagesDialog from "./TemplateStagesDialog";
 
 const TemplatesPage = () => {
   const {
@@ -57,9 +59,10 @@ const TemplatesPage = () => {
 
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
-  const [groups, setGroups] = useState([]); // Add this state for groups
+  const [groups, setGroups] = useState([]);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [isStagesDialogOpen, setIsStagesDialogOpen] = useState(false);
   const [currentTemplate, setCurrentTemplate] = useState(null);
   const [currentTask, setCurrentTask] = useState(null);
   const [expandedTemplates, setExpandedTemplates] = useState({});
@@ -77,10 +80,10 @@ const TemplatesPage = () => {
       console.log("templates:", templates);
       const categoriesData = await fetchCategories();
       const usersData = await fetchUsers();
-      const groupsData = await fetchGroups(); // Add this line
+      const groupsData = await fetchGroups();
       setCategories(categoriesData);
       setUsers(usersData);
-      setGroups(groupsData); // Add this line
+      setGroups(groupsData);
     } catch (error) {
       console.error("Error loading initial data:", error);
       swal.fire("Errore", "Errore nel caricamento dei dati", "error");
@@ -177,7 +180,7 @@ const TemplatesPage = () => {
         Title: currentTask.Title,
         Description: currentTask.Description,
         DefaultAssignedTo: currentTask.DefaultAssignedTo,
-        DefaultGroupId: currentTask.DefaultGroupId, // Add this line for group
+        DefaultGroupId: currentTask.DefaultGroupId,
         Priority: currentTask.Priority || "MEDIA",
         StandardDays: currentTask.StandardDays || 1,
         PredecessorDetailID: currentTask.PredecessorDetailID,
@@ -259,6 +262,11 @@ const TemplatesPage = () => {
     }));
   };
 
+  const handleOpenStagesDialog = (template) => {
+    setCurrentTemplate(template);
+    setIsStagesDialogOpen(true);
+  };
+
   if (loading && templates.length === 0) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -303,14 +311,15 @@ const TemplatesPage = () => {
             <TableHead>Categoria</TableHead>
             <TableHead>Sottocategoria</TableHead>
             <TableHead>Num. Attività</TableHead>
+            <TableHead>Fasi</TableHead>
             <TableHead>Stato</TableHead>
-            <TableHead className="w-[120px]">Azioni</TableHead>
+            <TableHead className="w-[160px]">Azioni</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {templates.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-4">
+              <TableCell colSpan={8} className="text-center py-4">
                 Nessun template disponibile. Clicca su "Nuovo Template" per
                 crearne uno.
               </TableCell>
@@ -350,6 +359,16 @@ const TemplatesPage = () => {
                     {template.Details?.length || 0}
                   </TableCell>
                   <TableCell>
+                    {(template.UseStages === 1 || template.UseStages === true) ? (
+                      <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                        <Layers className="h-3 w-3 mr-1" />
+                        Attive
+                      </Badge>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Badge
                       variant={
                         template.IsActive == "1" ? "success" : "destructive"
@@ -360,6 +379,14 @@ const TemplatesPage = () => {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenStagesDialog(template)}
+                        title="Gestisci fasi"
+                      >
+                        <Layers className="h-4 w-4 text-purple-600" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -401,7 +428,7 @@ const TemplatesPage = () => {
                 {/* Template details/tasks */}
                 {expandedTemplates[template.TemplateID] && (
                   <TableRow>
-                    <TableCell colSpan={7} className="p-0 border-t-0">
+                    <TableCell colSpan={8} className="p-0 border-t-0">
                       <div className="bg-gray-50 p-4">
                         <div className="flex justify-between items-center mb-3">
                           <h3 className="text-md font-semibold">
@@ -431,8 +458,7 @@ const TemplatesPage = () => {
                                 <TableHead>Titolo</TableHead>
                                 <TableHead>Priorità</TableHead>
                                 <TableHead>Assegnato a</TableHead>
-                                <TableHead>Gruppo</TableHead>{" "}
-                                {/* Add this column */}
+                                <TableHead>Gruppo</TableHead>
                                 <TableHead>Giorni</TableHead>
                                 <TableHead>Predecessore</TableHead>
                                 <TableHead className="w-[100px]">
@@ -463,8 +489,7 @@ const TemplatesPage = () => {
                                   <TableCell>
                                     {task.AssigneeName || "-"}
                                   </TableCell>
-                                  <TableCell>{task.GroupName || "-"}</TableCell>{" "}
-                                  {/* Add this cell */}
+                                  <TableCell>{task.GroupName || "-"}</TableCell>
                                   <TableCell>{task.StandardDays}</TableCell>
                                   <TableCell>
                                     {task.PredecessorTitle || "-"}
@@ -716,6 +741,14 @@ const TemplatesPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog per gestione stages */}
+      <TemplateStagesDialog
+        open={isStagesDialogOpen}
+        onOpenChange={setIsStagesDialogOpen}
+        template={currentTemplate}
+        onUpdate={fetchTemplates}
+      />
     </div>
   );
 };

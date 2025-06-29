@@ -236,10 +236,9 @@ const generateExcelReport = async (reportData, user, timeBucket, period) => {
   }
 };
 
-
-
 /**
  * Ottieni le attività disponibili per un utente
+ * Ora include anche le attività completate che hanno ore registrate nella settimana corrente
  * @param {number} userId - ID dell'utente
  * @returns {Promise<Array>} - Array di attività disponibili
  */
@@ -247,14 +246,24 @@ const getUserAvailableTasks = async (userId) => {
   try {
     let pool = await sql.connect(config.dbConfig);
     
+    // Calcola la settimana corrente
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay() + 1); // Lunedì
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6); // Domenica
+    
     const result = await pool.request()
       .input('UserID', sql.Int, userId)
+      .input('WeekStartDate', sql.Date, weekStart)
+      .input('WeekEndDate', sql.Date, weekEnd)
       .query(`
         SELECT DISTINCT
           t.TaskID,
           t.Title AS TaskTitle,
           p.ProjectID,
-          p.Name AS ProjectName
+          p.Name AS ProjectName,
+          t.Status
         FROM MA_ProjectTasks t
         JOIN MA_Projects p ON t.ProjectID = p.ProjectID
         WHERE 
@@ -270,8 +279,23 @@ const getUserAvailableTasks = async (userId) => {
           )
           -- Solo progetti attivi
           AND p.Status NOT IN ('CHIUSO', 'CANCELLATO', 'SOSPESO', 'RIFIUTATO', 'ANNULLATO')
-          -- Solo attività che non sono state completate
-          AND t.Status NOT IN ('COMPLETATA', 'BLOCCATA', 'SOSPESA')
+          -- Attività non disabilitate
+          AND t.TaskDisabled = 0
+          AND (
+            -- Attività che non sono completate, bloccate o sospese
+            t.Status NOT IN ('BLOCCATA', 'SOSPESA')
+            -- OPPURE attività completate che hanno ore registrate nella settimana corrente
+            OR (
+              t.Status = 'COMPLETATA' 
+              AND EXISTS (
+                SELECT 1 
+                FROM AR_UserTaskTimeEntries e 
+                WHERE e.TaskID = t.TaskID 
+                AND e.UserID = @UserID 
+                AND e.WorkDate BETWEEN @WeekStartDate AND @WeekEndDate
+              )
+            )
+          )
         ORDER BY p.Name, t.Title
       `);
     

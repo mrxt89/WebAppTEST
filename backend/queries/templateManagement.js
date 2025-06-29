@@ -16,6 +16,7 @@ const getTemplates = async (userId) => {
                     t.ProjectCategoryId,
                     t.ProjectCategoryDetailLine,
                     t.IsActive,
+                    t.UseStages,
                     t.TBCreated,
                     pc.Description AS CategoryName,
                     pcd.Description AS SubCategoryName,
@@ -32,11 +33,15 @@ const getTemplates = async (userId) => {
                             td.Priority, 
                             td.StandardDays,
                             td.PredecessorDetailID,
-                            pred.Title AS PredecessorTitle
+                            pred.Title AS PredecessorTitle,
+                            tts.StageTemplateID,
+                            st.StageName AS StageName
                         FROM MA_TasksTemplatesDetail td
                         LEFT JOIN AR_Users u ON td.DefaultAssignedTo = u.userId
                         LEFT JOIN AR_Groups g ON td.DefaultGroupId = g.groupId
                         LEFT JOIN MA_TasksTemplatesDetail pred ON td.PredecessorDetailID = pred.TemplateDetailID
+                        LEFT JOIN MA_TaskTemplateStages tts ON td.TemplateDetailID = tts.TemplateDetailID
+                        LEFT JOIN MA_StageTemplates st ON tts.StageTemplateID = st.StageTemplateID
                         WHERE td.TemplateID = t.TemplateID
                         ORDER BY td.TaskSequence
                         FOR JSON PATH
@@ -73,6 +78,7 @@ const getFilteredTemplates = async (userId, categoryId = null, detailLine = null
             t.ProjectCategoryId,
             t.ProjectCategoryDetailLine,
             t.IsActive,
+            t.UseStages,
             t.TBCreated,
             pc.Description AS CategoryName,
             pcd.Description AS SubCategoryName,
@@ -213,11 +219,165 @@ const deleteTemplateDetail = async (templateDetailId) => {
     }
 };
 
+// ===== NUOVE FUNZIONI PER STAGES =====
+
+// Get stage templates
+const getStageTemplates = async (templateId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('TemplateID', sql.Int, templateId)
+            .execute('MA_GetStageTemplates');
+        
+        return result.recordset;
+    } catch (err) {
+        console.error('Error in getStageTemplates:', err);
+        throw err;
+    }
+};
+
+// Add/Update stage template
+const addUpdateStageTemplate = async (stageData, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('StageTemplateID', sql.Int, stageData.StageTemplateID || null)
+            .input('TemplateID', sql.Int, stageData.TemplateID)
+            .input('StageName', sql.NVarChar(255), stageData.StageName)
+            .input('StageDescription', sql.NVarChar(sql.MAX), stageData.StageDescription || null)
+            .input('StageSequence', sql.Int, stageData.StageSequence)
+            .input('HexColor', sql.VarChar(7), stageData.HexColor || '#3B82F6')
+            .input('Notes', sql.NVarChar(sql.MAX), stageData.Notes || null)
+            .input('IsGateRequired', sql.Bit, stageData.IsGateRequired !== false)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_AddUpdateStageTemplate');
+        
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in addUpdateStageTemplate:', err);
+        throw err;
+    }
+};
+
+// Delete stage template
+const deleteStageTemplate = async (stageTemplateId, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('StageTemplateID', sql.Int, stageTemplateId)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_DeleteStageTemplate');
+        
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in deleteStageTemplate:', err);
+        throw err;
+    }
+};
+
+// Reorder stage templates
+const reorderStageTemplates = async (templateId, stageOrders, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('TemplateID', sql.Int, templateId)
+            .input('StageOrders', sql.NVarChar(sql.MAX), JSON.stringify(stageOrders))
+            .input('UserId', sql.Int, userId)
+            .execute('MA_ReorderStageTemplates');
+        
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in reorderStageTemplates:', err);
+        throw err;
+    }
+};
+
+// Add/Update stage checklist template
+const addUpdateStageChecklistTemplate = async (checklistData, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('ChecklistTemplateID', sql.Int, checklistData.ChecklistTemplateID || null)
+            .input('StageTemplateID', sql.Int, checklistData.StageTemplateID)
+            .input('CheckItemText', sql.NVarChar(500), checklistData.CheckItemText)
+            .input('CheckItemDescription', sql.NVarChar(sql.MAX), checklistData.CheckItemDescription || null)
+            .input('IsRequired', sql.Bit, checklistData.IsRequired !== false)
+            .input('ItemSequence', sql.Int, checklistData.ItemSequence || null)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_AddUpdateStageChecklistTemplate');
+        
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in addUpdateStageChecklistTemplate:', err);
+        throw err;
+    }
+};
+
+// Delete checklist template
+const deleteStageChecklistTemplate = async (checklistTemplateId, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('ChecklistTemplateID', sql.Int, checklistTemplateId)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_DeleteStageChecklistTemplate');
+        
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in deleteStageChecklistTemplate:', err);
+        throw err;
+    }
+};
+
+// Assign task template to stage
+const assignTaskTemplateToStage = async (templateDetailId, stageTemplateId, taskSequenceInStage, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('TemplateDetailID', sql.Int, templateDetailId)
+            .input('StageTemplateID', sql.Int, stageTemplateId || null)
+            .input('TaskSequenceInStage', sql.Int, taskSequenceInStage || null)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_AssignTaskTemplateToStage');
+        
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in assignTaskTemplateToStage:', err);
+        throw err;
+    }
+};
+
+// Toggle template use stages
+const toggleTemplateUseStages = async (templateId, useStages, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('TemplateID', sql.Int, templateId)
+            .input('UseStages', sql.Bit, useStages)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_ToggleTemplateUseStages');
+        
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in toggleTemplateUseStages:', err);
+        throw err;
+    }
+};
+
 module.exports = {
     getTemplates,
     addUpdateTemplate,
     addUpdateTemplateDetail,
     toggleTemplateStatus,
     deleteTemplateDetail,
-    getFilteredTemplates
+    getFilteredTemplates,
+    // Nuove funzioni per stages
+    getStageTemplates,
+    addUpdateStageTemplate,
+    deleteStageTemplate,
+    reorderStageTemplates,
+    addUpdateStageChecklistTemplate,
+    deleteStageChecklistTemplate,
+    assignTaskTemplateToStage,
+    toggleTemplateUseStages
 };

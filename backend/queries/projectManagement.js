@@ -149,9 +149,10 @@ const addUpdateProject = async (projectData, userId) => {
             ProjectCategoryId: { type: sql.Int },
             ProjectCategoryDetailLine: { type: sql.Int },
             Disabled : { type: sql.Int },
-            CustSupp : { type: sql.Int },
+            CustSupp : { type: sql.Int }, // CustSupp INT
             ProjectErpID : { type: sql.NVarChar },
-            TemplateID : { type: sql.Int }
+            TemplateID : { type: sql.Int },
+            UseStages : { type: sql.Bit } // AGGIUNTO UseStages
         };
 
         // Aggiunge i parametri per i campi presenti
@@ -209,6 +210,7 @@ const addUpdateProjectTask = async (taskData, userId) => {
         request.input('UserId', sql.Int, userId);
         request.input('AdditionalAssignees', sql.NVarChar(sql.MAX), taskData.AdditionalAssignees ? taskData.AdditionalAssignees : null);
         request.input('PredecessorTasks', sql.NVarChar(sql.MAX), taskData.PredecessorTasks ? taskData.PredecessorTasks : null); // Nuovo parametro
+
         const result = await request.execute('MA_AddUpdateProjectTask');
         console.log("[DEBUG] Result:", result.recordset[0]);
         return result.recordset[0];
@@ -716,8 +718,198 @@ const manageProjectPin = async (projectId, userId, action, newOrder = null) => {
     }
 };
 
+/********** STAGING **********/
+// Gestione Stage
+const addUpdateProjectStage = async (stageData, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request()
+            .input('StageID', sql.Int, stageData.StageID || null)
+            .input('ProjectID', sql.Int, stageData.ProjectID)
+            .input('StageName', sql.NVarChar(255), stageData.StageName)
+            .input('StageDescription', sql.NVarChar(sql.MAX), stageData.StageDescription || null)
+            .input('StageSequence', sql.Int, stageData.StageSequence)
+            .input('HexColor', sql.VarChar(7), stageData.HexColor || '#3B82F6')
+            .input('Notes', sql.NVarChar(sql.MAX), stageData.Notes || null)
+            .input('IsGateRequired', sql.Bit, stageData.IsGateRequired !== false)
+            .input('UserId', sql.Int, userId);
+
+        const result = await request.execute('MA_AddUpdateProjectStage');
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in addUpdateProjectStage:', err);
+        throw err;
+    }
+};
+
+// Ottieni stage del progetto
+const getProjectStages = async (projectId, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('ProjectID', sql.Int, projectId)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_GetProjectStages');
+
+        return {
+            stages: result.recordsets[0] || [],
+            unassignedTasks: result.recordsets[1] || []
+        };
+    } catch (err) {
+        console.error('Error in getProjectStages:', err);
+        throw err;
+    }
+};
+
+// Assegna task a stage
+const assignTaskToStage = async (taskId, stageId, taskSequenceInStage, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('TaskID', sql.Int, taskId)
+            .input('StageID', sql.Int, stageId || null)
+            .input('TaskSequenceInStage', sql.Int, taskSequenceInStage || null)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_AssignTaskToStage');
+
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in assignTaskToStage:', err);
+        throw err;
+    }
+};
+
+// Gestione checklist
+const addUpdateStageChecklist = async (checklistData, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('ChecklistID', sql.Int, checklistData.ChecklistID || null)
+            .input('StageID', sql.Int, checklistData.StageID)
+            .input('CheckItemText', sql.NVarChar(500), checklistData.CheckItemText)
+            .input('CheckItemDescription', sql.NVarChar(sql.MAX), checklistData.CheckItemDescription || null)
+            .input('IsRequired', sql.Bit, checklistData.IsRequired !== false)
+            .input('ItemSequence', sql.Int, checklistData.ItemSequence || null)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_AddUpdateStageChecklist');
+
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in addUpdateStageChecklist:', err);
+        throw err;
+    }
+};
+
+// Aggiorna stato checklist
+const updateChecklistItem = async (checklistId, isChecked, checkNotes, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('ChecklistID', sql.Int, checklistId)
+            .input('IsChecked', sql.Bit, isChecked)
+            .input('CheckNotes', sql.NVarChar(sql.MAX), checkNotes || null)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_UpdateChecklistItem');
+
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in updateChecklistItem:', err);
+        throw err;
+    }
+};
+
+// Approva/Rifiuta Gate
+const approveRejectStageGate = async (stageId, action, notes, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('StageID', sql.Int, stageId)
+            .input('Action', sql.VarChar(20), action) // APPROVED, REJECTED, REOPENED
+            .input('Notes', sql.NVarChar(sql.MAX), notes || null)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_ApproveRejectStageGate');
+
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in approveRejectStageGate:', err);
+        throw err;
+    }
+};
+
+// Elimina stage
+const deleteProjectStage = async (stageId, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('StageID', sql.Int, stageId)
+            .input('UserId', sql.Int, userId)
+            .execute('MA_DeleteProjectStage');
+
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in deleteProjectStage:', err);
+        throw err;
+    }
+};
+
+// Riordina stages
+const reorderProjectStages = async (projectId, stageOrders, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('ProjectID', sql.Int, projectId)
+            .input('StageOrders', sql.NVarChar(sql.MAX), JSON.stringify(stageOrders))
+            .input('UserId', sql.Int, userId)
+            .execute('MA_ReorderProjectStages');
+
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in reorderProjectStages:', err);
+        throw err;
+    }
+};
+
+// Template stages
+const getStageTemplates = async (templateId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const result = await pool.request()
+            .input('TemplateID', sql.Int, templateId)
+            .execute('MA_GetStageTemplates');
+
+        return result.recordset;
+    } catch (err) {
+        console.error('Error in getStageTemplates:', err);
+        throw err;
+    }
+};
+
+const addUpdateStageTemplate = async (stageTemplateData, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request()
+            .input('StageTemplateID', sql.Int, stageTemplateData.StageTemplateID || null)
+            .input('TemplateID', sql.Int, stageTemplateData.TemplateID)
+            .input('StageName', sql.NVarChar(255), stageTemplateData.StageName)
+            .input('StageDescription', sql.NVarChar(sql.MAX), stageTemplateData.StageDescription || null)
+            .input('StageSequence', sql.Int, stageTemplateData.StageSequence)
+            .input('HexColor', sql.VarChar(7), stageTemplateData.HexColor || '#3B82F6')
+            .input('Notes', sql.NVarChar(sql.MAX), stageTemplateData.Notes || null)
+            .input('IsGateRequired', sql.Bit, stageTemplateData.IsGateRequired !== false)
+            .input('UserId', sql.Int, userId);
+
+        const result = await request.execute('MA_AddUpdateStageTemplate');
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in addUpdateStageTemplate:', err);
+        throw err;
+    }
+};
+
+/********** STAGING **********/
+
 module.exports = {
-    getPaginatedProjects,   
+    getPaginatedProjects,
     getProjectById,
     addUpdateProject,
     updateProjectMembers,
@@ -744,5 +936,15 @@ module.exports = {
     toggleTaskDisabled,
     manageTaskPin,
     toggleProjectLock,
-    manageProjectPin
+    manageProjectPin,
+    addUpdateProjectStage,
+    getProjectStages,
+    assignTaskToStage,
+    addUpdateStageChecklist,
+    updateChecklistItem,
+    approveRejectStageGate,
+    deleteProjectStage,
+    reorderProjectStages,
+    getStageTemplates,
+    addUpdateStageTemplate
 };

@@ -82,10 +82,17 @@ const ChatBottomBar = ({
 
   const categoryColor = hexColor || "#3b82f6";
 
-  // Sincronizza receiversList prop con stato locale
+  // Sincronizza receiversList prop con stato locale - CORRETTO
   useEffect(() => {
     setLocalReceiversList(receiversList || "");
   }, [receiversList]);
+
+  // IMPORTANTE: Inizializzazione immediata per nuovi messaggi
+  useEffect(() => {
+    if (isNewMessage && receiversList && !localReceiversList) {
+      setLocalReceiversList(receiversList);
+    }
+  }, [isNewMessage, receiversList, localReceiversList]);
 
   // Gestione drag & drop
   const handleDragEnter = useCallback((e) => {
@@ -282,7 +289,6 @@ const ChatBottomBar = ({
         updateReceiversList(newReceiversList);
       }
       
-      console.log("Destinatari aggiornati dopo menzione:", newReceiversList);
     }
   }, [disabled, mentionIndex, message, localReceiversList, updateReceiversList, saveSelection]);
 
@@ -291,8 +297,11 @@ const ChatBottomBar = ({
   const handleSendWithAttachments = async () => {
     if (disabled) return;
   
-    // Verifica per nuovi messaggi
+
+  
+    // Verifica per nuovi messaggi - MODIFICATA per essere più robusta
     if (isNewMessage && !localReceiversList && notificationCategoryId <= 1) {
+
       swal.fire("Errore", "Assicurati di aver selezionato almeno un destinatario", "error");
       return;
     }
@@ -342,7 +351,6 @@ const ChatBottomBar = ({
         replyToMessageId: replyToMessage ? replyToMessage.messageId : 0,
       };
   
-      console.log("Invio con allegati - Dati notifica:", notificationData);
   
       if (typeof setSending === "function") {
         setSending(true);
@@ -465,6 +473,8 @@ const ChatBottomBar = ({
       return handleSendWithAttachments();
     }
 
+   
+
     // Validazioni per messaggi senza allegati
     if (isNewMessage && !title) {
       swal.fire("Errore", "Attenzione: il titolo è obbligatorio", "error");
@@ -475,6 +485,7 @@ const ChatBottomBar = ({
       return;
     }
     if (isNewMessage && !localReceiversList && notificationCategoryId <= 1) {
+
       swal.fire("Errore", "Assicurati di aver selezionato almeno un destinatario", "error");
       return;
     }
@@ -517,8 +528,6 @@ const ChatBottomBar = ({
         receiversList: localReceiversList,
         replyToMessageId: replyToMessage ? replyToMessage.messageId : 0,
       };
-
-      console.log("Invio messaggio - Dati notifica:", notificationData);
 
       if (typeof setSending === "function") {
         setSending(true);
@@ -644,7 +653,7 @@ const ChatBottomBar = ({
     
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      console.log("Invio messaggio - receiversList:", localReceiversList);
+
       handleSend();
     }
     

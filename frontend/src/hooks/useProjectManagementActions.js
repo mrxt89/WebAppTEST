@@ -164,39 +164,40 @@ const useProjectActions = () => {
     }
 };
 
-  const addUpdateProject = useCallback(
-    async (projectData) => {
-      try {
-        const cleanedData = {
-          ProjectID: parseInt(projectData.ProjectID) || null,
-          Name: projectData.Name?.trim(),
-          Description: projectData.Description?.trim() || "",
-          StartDate: projectData.StartDate || null,
-          EndDate: projectData.EndDate || null,
-          Status: projectData.Status?.toUpperCase(),
-          ProjectCategoryId: parseInt(projectData.ProjectCategoryId) || 0,
-          ProjectCategoryDetailLine:
-            parseInt(projectData.ProjectCategoryDetailLine) || 0,
-          Disabled: parseInt(projectData.Disabled) || 0,
-          CustSupp: parseInt(projectData.CustSupp) || 0,
-          TBCreatedId: parseInt(projectData.TBCreatedId) || null,
-          ProjectErpID: projectData.ProjectErpID?.trim() || "",
-          TemplateID: projectData.TemplateID
-            ? parseInt(projectData.TemplateID)
-            : null, // Aggiunto TemplateID
-        };
-        const url = `${config.API_BASE_URL}/projects`;
-        return await makeRequest(url, {
-          method: "POST",
-          body: JSON.stringify(cleanedData),
-        });
-      } catch (error) {
-        console.error("Error saving project:", error);
-        throw error;
-      }
-    },
-    [makeRequest],
-  );
+const addUpdateProject = useCallback(
+  async (projectData) => {
+    try {
+      const cleanedData = {
+        ProjectID: parseInt(projectData.ProjectID) || null,
+        Name: projectData.Name?.trim(),
+        Description: projectData.Description?.trim() || "",
+        StartDate: projectData.StartDate || null,
+        EndDate: projectData.EndDate || null,
+        Status: projectData.Status?.toUpperCase(),
+        ProjectCategoryId: parseInt(projectData.ProjectCategoryId) || 0,
+        ProjectCategoryDetailLine:
+          parseInt(projectData.ProjectCategoryDetailLine) || 0,
+        Disabled: parseInt(projectData.Disabled) || 0,
+        CustSupp: projectData.CustSupp || 0,
+        TBCreatedId: parseInt(projectData.TBCreatedId) || null,
+        ProjectErpID: projectData.ProjectErpID?.trim() || "",
+        TemplateID: projectData.TemplateID
+          ? parseInt(projectData.TemplateID)
+          : null, // Aggiunto TemplateID
+        UseStages: projectData.UseStages === true || projectData.UseStages === 1 ? 1 : 0, // Aggiunto UseStages
+      };
+      const url = `${config.API_BASE_URL}/projects`;
+      return await makeRequest(url, {
+        method: "POST",
+        body: JSON.stringify(cleanedData),
+      });
+    } catch (error) {
+      console.error("Error saving project:", error);
+      throw error;
+    }
+  },
+  [makeRequest],
+);
 
   const updateProjectMembers = async (projectId, members) => {
     try {

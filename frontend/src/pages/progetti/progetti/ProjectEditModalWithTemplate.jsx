@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -16,6 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { 
   Trash2, 
   FileText, 
@@ -25,15 +32,16 @@ import {
   Tag, 
   ListTodo, 
   Info,
-  Hash
+  Hash,
+  Building2,
+  Layers,
+  HelpCircle, 
 } from "lucide-react";
 import useCategoryActions from "../../../hooks/useCategoryActions";
 import { CustomerSearchSelect } from "./ProjectComponents";
 import useTemplateActions from "../../../hooks/useTemplateActions";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
-import useProjectCustomersActions, {
-  CUSTOMER_TYPE,
-} from "../../../hooks/useProjectCustomersActions";
+import useProjectCustomersActions from "../../../hooks/useProjectCustomersActions";
 
 const ProjectEditModalWithTemplate = ({
   project,
@@ -43,29 +51,36 @@ const ProjectEditModalWithTemplate = ({
   onChange,
   onDisable,
   formErrors = {},
+  onProjectUpdated,
+  customers,
 }) => {
   const {
     projectCustomers,
-    loading: loadingCustomers,
+    loading: loadingProjectCustomers,
     fetchProjectCustomers,
   } = useProjectCustomersActions();
+  
   const {
     categories,
     loading: loadingCategories,
     fetchCategories,
   } = useCategoryActions();
+  
   const {
     templates,
     loading: loadingTemplates,
     fetchTemplates,
     fetchFilteredTemplates,
   } = useTemplateActions();
+  
   const { projectStatuses, fetchProjectStatuses } = useProjectActions();
+  
   // Stato principale del progetto
   const [localProject, setLocalProject] = useState({
     ...project,
     Disabled: project?.Disabled || 0,
     TemplateID: project?.TemplateID || null,
+    UseStages: project?.UseStages || false,
   });
 
   // Stati separati per l'interfaccia utente
@@ -79,13 +94,18 @@ const ProjectEditModalWithTemplate = ({
     project?.ProjectCategoryDetailLine || 0,
   );
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [templateHasStages, setTemplateHasStages] = useState(false);
+
+  // Usa customers o projectCustomers in base a quale è disponibile
+  const availableCustomers = customers || projectCustomers || [];
+  const loadingCustomers = !customers ? loadingProjectCustomers : false;
 
   // Caricamento dati iniziale
   useEffect(() => {
     const loadData = async () => {
       await Promise.all([
         fetchCategories(),
-        fetchProjectCustomers(),
+        !customers && fetchProjectCustomers(), // Carica solo se non abbiamo già customers
         fetchTemplates(),
         fetchProjectStatuses(),
       ]);
@@ -96,6 +116,7 @@ const ProjectEditModalWithTemplate = ({
     fetchProjectCustomers,
     fetchTemplates,
     fetchProjectStatuses,
+    customers,
   ]);
 
   // Inizializzazione progetto quando si apre
@@ -108,6 +129,7 @@ const ProjectEditModalWithTemplate = ({
         Disabled: project.Disabled || 0,
         ProjectErpID: project?.ProjectErpID || "",
         TemplateID: project?.TemplateID || null,
+        UseStages: project?.UseStages === 1 || project?.UseStages === true,
         // Se è un nuovo progetto e non ha uno stato, usa il primo stato attivo
         Status:
           project.Status ||
@@ -122,6 +144,24 @@ const ProjectEditModalWithTemplate = ({
       onChange && onChange(updatedProject);
     }
   }, [project, onChange, projectStatuses]);
+
+  // Controlla se il template selezionato ha stages
+  useEffect(() => {
+    if (selectedTemplateId && templates.length > 0) {
+      const selectedTemplate = templates.find(t => t.TemplateID === selectedTemplateId);
+      if (selectedTemplate && selectedTemplate.UseStages) {
+        setTemplateHasStages(true);
+        // Se il template ha stages, abilita automaticamente UseStages
+        const updatedProject = { ...localProject, UseStages: true };
+        setLocalProject(updatedProject);
+        onChange && onChange(updatedProject);
+      } else {
+        setTemplateHasStages(false);
+      }
+    } else {
+      setTemplateHasStages(false);
+    }
+  }, [selectedTemplateId, templates]);
 
   // Gestione generica delle modifiche ai campi
   const handleChange = (field, value) => {
@@ -317,6 +357,20 @@ const ProjectEditModalWithTemplate = ({
                     </Select>
                   </div>
                 </div>
+
+                <div>
+                  <Label htmlFor="customer" className="flex items-center text-sm">
+                    <Building2 className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                    Cliente
+                  </Label>
+                  <CustomerSearchSelect
+                    value={localProject.CustSupp}
+                    onChange={(value) => handleChange("CustSupp", value)}
+                    projectCustomers={availableCustomers}
+                    loading={loadingCustomers}
+                    className="mt-1"
+                  />
+                </div>
               </div>
             </div>
             
@@ -337,20 +391,6 @@ const ProjectEditModalWithTemplate = ({
                     rows={2}
                     className="mt-1"
                     placeholder="Inserisci descrizione progetto"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="customer" className="flex items-center text-sm">
-                    <User className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
-                    Cliente
-                  </Label>
-                  <CustomerSearchSelect
-                    value={localProject.CustSupp}
-                    onChange={(value) => handleChange("CustSupp", value)}
-                    projectCustomers={projectCustomers}
-                    loading={loadingCustomers}
-                    className="mt-1"
                   />
                 </div>
               </div>
@@ -500,10 +540,17 @@ const ProjectEditModalWithTemplate = ({
                             display: template.IsActive == "1" ? "block" : "none",
                           }}
                         >
-                          {template.Description}{" "}
-                          {template.TaskCount > 0
-                            ? `(${template.TaskCount} attività)`
-                            : ""}
+                          <div className="flex items-center gap-2">
+                            {template.Description}
+                            {template.TaskCount > 0 && (
+                              <span className="text-gray-500">
+                                ({template.TaskCount} attività)
+                              </span>
+                            )}
+                            {template.UseStages && (
+                              <Layers className="h-3 w-3 text-purple-600" />
+                            )}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -513,9 +560,72 @@ const ProjectEditModalWithTemplate = ({
                     <p className="text-xs text-gray-500 mt-1 px-2 py-1 bg-blue-50 rounded border border-blue-100">
                       <Info className="h-3 w-3 inline mr-1" />
                       Le attività verranno create automaticamente dal template.
+                      {templateHasStages && " Il template include fasi di lavoro."}
                     </p>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Opzioni avanzate */}
+            <div className="bg-gray-50 p-3 rounded-lg space-y-3">
+              <h3 className="text-xs font-medium text-gray-500">Opzioni avanzate</h3>
+              
+              <div className="space-y-3">
+                <div className="flex items-start space-x-2">
+                  <Checkbox
+                    id="useStages"
+                    checked={localProject.UseStages}
+                    onCheckedChange={(checked) => handleChange("UseStages", checked)}
+                    disabled={templateHasStages} // Disabilita se il template ha già stages
+                    className="mt-0.5 bg-primary"
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor="useStages" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                      <Layers className="h-3.5 w-3.5 text-purple-600" />
+                      Usa fasi di lavoro
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-3 w-3 text-gray-400" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-xs">
+                            <p>Le fasi di lavoro ti permettono di organizzare il progetto in momenti ben definiti (es. Analisi, Sviluppo, Test) con checklist di completamento per ogni fase.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </Label>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Organizza il progetto in fasi con checklist di completamento
+                    </p>
+                    {templateHasStages && (
+                      <p className="text-xs text-purple-600 mt-1">
+                        <Info className="h-3 w-3 inline mr-1" />
+                        Abilitato automaticamente dal template selezionato
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {!project?.ProjectID && localProject.UseStages && !selectedTemplateId && (
+                  <div className="ml-6 p-2 bg-purple-50 rounded-md border border-purple-200">
+                    <p className="text-xs text-purple-700">
+                      <Info className="h-3 w-3 inline mr-1" />
+                      Potrai definire le fasi dopo la creazione del progetto
+                    </p>
+                  </div>
+                )}
+
+                {project?.ProjectID && project?.UseStages !== localProject.UseStages && (
+                  <div className="ml-6 p-2 bg-yellow-50 rounded-md border border-yellow-200">
+                    <p className="text-xs text-yellow-700">
+                      <Info className="h-3 w-3 inline mr-1" />
+                      {localProject.UseStages 
+                        ? "Abilitando le fasi, le attività esistenti dovranno essere assegnate manualmente alle varie fasi."
+                        : "Disabilitando le fasi, le attività torneranno alla vista standard senza raggruppamenti."}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -524,7 +634,10 @@ const ProjectEditModalWithTemplate = ({
             <Button variant="outline" onClick={onClose} className="px-4">
               Annulla
             </Button>
-            <Button onClick={() => onSave(localProject)} className="px-5 shadow-sm">
+            <Button onClick={() => {
+              onSave(localProject);
+              onProjectUpdated && onProjectUpdated();
+            }} className="px-5 shadow-sm">
               {project?.ProjectID ? "Salva Modifiche" : "Crea Progetto"}
             </Button>
           </div>

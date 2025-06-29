@@ -78,7 +78,14 @@ const NewMessageWindow = ({
       setCurrentNotificationCategoryId(notificationCategoryId || 1);
       setWasOpen(true);
     }
-  }, [wasOpen, defaultTitle, defaultReceivers, notificationCategoryId]);
+  }, [wasOpen, defaultTitle, defaultReceivers, notificationCategoryId, type, metadata]);
+
+  // IMPORTANTE: Assicurati che receivers riceva i defaultReceivers anche se arrivano dopo
+  useEffect(() => {
+    if (defaultReceivers && defaultReceivers.length > 0 && receivers.length === 0) {
+      setReceivers(defaultReceivers);
+    }
+  }, [defaultReceivers, receivers.length]);
 
   // Carica utenti e opzioni
   useEffect(() => {
@@ -232,7 +239,6 @@ const NewMessageWindow = ({
               }
             );
 
-            console.log(`Chat collegata automaticamente a ${metadata.documentType} ${metadata.documentId || metadata.taskId}`);
           } catch (error) {
             console.error("Errore nel collegamento automatico del documento:", error);
             // Non bloccare il flusso se il collegamento fallisce
