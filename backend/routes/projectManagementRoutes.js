@@ -29,7 +29,17 @@ const {
     toggleTaskDisabled,
     manageTaskPin,
     toggleProjectLock,
-    manageProjectPin
+    manageProjectPin,
+    addUpdateProjectStage,
+    getProjectStages,
+    assignTaskToStage,
+    addUpdateStageChecklist,
+    updateChecklistItem,
+    approveRejectStageGate,
+    deleteProjectStage,
+    reorderProjectStages,
+    getStageTemplates,
+    addUpdateStageTemplate
   } = require('../queries/projectManagement');
 
 // Ottieni tutte le unità di misura
@@ -631,5 +641,182 @@ router.post('/projects/:projectId/pin', authenticateToken, async (req, res) => {
         });
     }
 });
+
+/********** STAGING **********/
+// Ottieni stages del progetto
+router.get('/projects/:projectId/stages', authenticateToken, async (req, res) => {
+    try {
+        const projectId = parseInt(req.params.projectId);
+        const userId = req.user.UserId;
+        
+        const result = await getProjectStages(projectId, userId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error fetching project stages:', err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Crea/Modifica stage
+router.post('/projects/:projectId/stages', authenticateToken, async (req, res) => {
+    try {
+        const projectId = parseInt(req.params.projectId);
+        const userId = req.user.UserId;
+        const stageData = {
+            ...req.body,
+            ProjectID: projectId
+        };
+        
+        const result = await addUpdateProjectStage(stageData, userId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error creating/updating stage:', err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Elimina stage
+router.delete('/stages/:stageId', authenticateToken, async (req, res) => {
+    try {
+        const stageId = parseInt(req.params.stageId);
+        const userId = req.user.UserId;
+        
+        const result = await deleteProjectStage(stageId, userId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error deleting stage:', err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Riordina stages
+router.put('/projects/:projectId/stages/reorder', authenticateToken, async (req, res) => {
+    try {
+        const projectId = parseInt(req.params.projectId);
+        const { stageOrders } = req.body; // Array di {stageId, sequence}
+        const userId = req.user.UserId;
+        
+        const result = await reorderProjectStages(projectId, stageOrders, userId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error reordering stages:', err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Assegna task a stage
+router.put('/tasks/:taskId/stage', authenticateToken, async (req, res) => {
+    try {
+        const taskId = parseInt(req.params.taskId);
+        const { stageId, taskSequenceInStage } = req.body;
+        const userId = req.user.UserId;
+        
+        const result = await assignTaskToStage(
+            taskId, 
+            stageId ? parseInt(stageId) : null,
+            taskSequenceInStage,
+            userId
+        );
+        res.json(result);
+    } catch (err) {
+        console.error('Error assigning task to stage:', err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Routes per Checklist
+
+// Aggiungi/Modifica checklist item
+router.post('/stages/:stageId/checklist', authenticateToken, async (req, res) => {
+    try {
+        const stageId = parseInt(req.params.stageId);
+        const userId = req.user.UserId;
+        const checklistData = {
+            ...req.body,
+            StageID: stageId
+        };
+        
+        const result = await addUpdateStageChecklist(checklistData, userId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error managing checklist:', err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Aggiorna stato checklist item
+router.patch('/checklist/:checklistId', authenticateToken, async (req, res) => {
+    try {
+        const checklistId = parseInt(req.params.checklistId);
+        const { isChecked, checkNotes } = req.body;
+        const userId = req.user.UserId;
+        
+        const result = await updateChecklistItem(checklistId, isChecked, checkNotes, userId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error updating checklist item:', err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Approva/Rifiuta Gate
+router.post('/stages/:stageId/gate', authenticateToken, async (req, res) => {
+    try {
+        const stageId = parseInt(req.params.stageId);
+        const { action, notes } = req.body; // action: APPROVED, REJECTED, PENDING
+        const userId = req.user.UserId;
+        
+        // Accetta sia REOPENED che PENDING per retrocompatibilità
+        if (!['APPROVED', 'REJECTED', 'REOPENED', 'PENDING'].includes(action)) {
+            return res.status(400).json({ 
+                success: 0, 
+                msg: 'Invalid action. Must be APPROVED, REJECTED, or PENDING' 
+            });
+        }
+        
+        // Mappa REOPENED a PENDING per retrocompatibilità
+        const mappedAction = action === 'REOPENED' ? 'PENDING' : action;
+        
+        const result = await approveRejectStageGate(stageId, mappedAction, notes, userId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error managing gate:', err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Routes per Template Stages
+
+// Ottieni stages di un template
+router.get('/templates/:templateId/stages', authenticateToken, async (req, res) => {
+    try {
+        const templateId = parseInt(req.params.templateId);
+        const stages = await getStageTemplates(templateId);
+        res.json(stages);
+    } catch (err) {
+        console.error('Error fetching template stages:', err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Crea/Modifica stage template
+router.post('/templates/:templateId/stages', authenticateToken, async (req, res) => {
+    try {
+        const templateId = parseInt(req.params.templateId);
+        const userId = req.user.UserId;
+        const stageTemplateData = {
+            ...req.body,
+            TemplateID: templateId
+        };
+        
+        const result = await addUpdateStageTemplate(stageTemplateData, userId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error managing stage template:', err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+/********** STAGING **********/
 
 module.exports = router;

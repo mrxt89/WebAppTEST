@@ -81,7 +81,7 @@ const BOMImportWizard = ({
         const allOptions = {};
         const processNode = (node) => {
           allSelected[node.id] = false;
-          allOptions[node.id] = { useOriginalCode: true };
+          allOptions[node.id] = { useOriginalCode: false };
           if (node.children) {
             node.children.forEach(processNode);
           }

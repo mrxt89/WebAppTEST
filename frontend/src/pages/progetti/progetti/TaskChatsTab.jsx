@@ -13,15 +13,52 @@ const TaskChatsTab = ({ task, project, onRefresh }) => {
 
   // Prepara i partecipanti di default per nuove chat
   const getDefaultParticipants = () => {
-    const participants = task?.Participants 
-      ? JSON.parse(task.Participants).map(p => p.userId) 
-      : [];
+    const participants = [];
     
+    // 1. Aggiungi i partecipanti dell'attività
+    if (task?.Participants) {
+      try {
+        const taskParticipants = typeof task.Participants === 'string' 
+          ? JSON.parse(task.Participants) 
+          : task.Participants;
+        
+        if (Array.isArray(taskParticipants)) {
+          taskParticipants.forEach(p => {
+            const userId = p.userId || p;
+            if (userId && !participants.includes(userId)) {
+              participants.push(userId);
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Errore nel parsing dei partecipanti:", e);
+      }
+    }
+    
+    // 2. Aggiungi il responsabile dell'attività se non è già presente
     if (task?.AssignedTo && !participants.includes(task.AssignedTo)) {
       participants.push(task.AssignedTo);
     }
     
-    return participants;
+    // 3. Aggiungi tutti gli admin e manager del progetto
+    if (project?.members && Array.isArray(project.members)) {
+      project.members.forEach(member => {
+        // Aggiungi solo admin e manager
+        if ((member.Role === 'ADMIN' || member.Role === 'MANAGER') && 
+            member.UserID && 
+            !participants.includes(member.UserID)) {
+          participants.push(member.UserID);
+        }
+      });
+    }
+    
+    // 4. Aggiungi il creatore del progetto se non è già presente
+    if (project?.TBCreatedId && !participants.includes(project.TBCreatedId)) {
+      participants.push(project.TBCreatedId);
+    }
+    
+    // Converti tutti gli ID in stringhe e rimuovi duplicati
+    return [...new Set(participants.map(id => String(id)))];
   };
 
   // Titolo di default per nuove chat
@@ -38,25 +75,25 @@ const TaskChatsTab = ({ task, project, onRefresh }) => {
     );
   }
 
+  const defaultParticipants = getDefaultParticipants();
+
   return (
     <DocumentChats.Task
       documentId={task.TaskID}
       documentData={documentData}
       showHeader={false} // Non mostriamo l'header perché siamo già in un tab
       defaultChatTitle={defaultChatTitle}
-      defaultParticipants={getDefaultParticipants()}
+      defaultParticipants={defaultParticipants}
       defaultCategoryId={1}
       enableAutoLink={true} // Abilita il collegamento automatico
       onChatCreated={(notificationId) => {
         // Callback opzionale quando viene creata una nuova chat
-        console.log('Nuova chat creata:', notificationId);
         if (onRefresh) {
           onRefresh();
         }
       }}
       onChatUnlinked={(chat) => {
         // Callback opzionale quando una chat viene scollegata
-        console.log('Chat scollegata:', chat);
         if (onRefresh) {
           onRefresh();
         }

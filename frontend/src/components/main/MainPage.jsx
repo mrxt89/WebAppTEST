@@ -177,6 +177,8 @@ const MainPage = () => {
     const handleOpenNewMessageModal = (event) => {
       const props = event.detail || {};
       
+      console.log("MainPage - Evento openNewMessageModal ricevuto:", props);
+      
       const newWindowId = `new-message-${Date.now()}`;
       
       // Crea la finestra nel window manager
@@ -340,7 +342,6 @@ const openChatModal = async (notificationId) => {
         );
         
         if (!existingChat) {
-
           return [...prevChats, initialData];
         }
         
@@ -821,18 +822,6 @@ const openChatModal = async (notificationId) => {
       };
     }
   }, [dropdownVisible, windowManagerMenuOpen]);
-
-  useEffect(() => {
-    if (location?.state?.pageComponent !== undefined) {
-      setIsPageComponent(location.state.pageComponent);
-      if (location.state.breadcrumb) {
-        setBreadcrumb(location.state.breadcrumb);
-      }
-      if (location.state.selectedOrder) {
-        setPageTitle("Avanzamento ODP");
-      }
-    }
-  }, [location]);
 
   useEffect(() => {
     if (!isDBNotificationsViewExecuted) {

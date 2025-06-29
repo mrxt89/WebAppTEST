@@ -167,9 +167,6 @@ const ChatTopBar = ({
 
   // IMPORTANTE: Rimuovi il loop problematico
   useEffect(() => {
-    // NON fare console.log continuamente per membersInfo
-    // Questo useEffect dovrebbe essere rimosso o modificato per non causare loop
-    
     if (waitingForMembersUpdate && membersInfo.length > 0) {
       setSelectedUsers([]);
       if (typeof updateReceiversList === "function") {

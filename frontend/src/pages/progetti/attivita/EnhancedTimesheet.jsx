@@ -363,52 +363,52 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
     loadWeekData();
   }, [weekStartDate, selectedUserId]);
 
-// Gestione cambio stato attività
-const handleTaskStatusChange = async (taskId, projectId, newStatus, taskData) => {
-  try {
-    setEditingTaskStatus(prev => ({ ...prev, [taskId]: true }));
-    
-    // Prepara il payload completo per l'aggiornamento
-    const updatePayload = {
-      TaskID: taskId,
-      ProjectID: projectId,
-      Title: taskData.TaskTitle || taskData.Title,
-      Description: taskData.Description || '',
-      Status: newStatus,
-      Priority: taskData.Priority || 'MEDIA',
-      AssignedTo: taskData.AssignedTo || null,
-      StartDate: taskData.StartDate || null,
-      DueDate: taskData.DueDate || null,
-      PredecessorTaskID: taskData.PredecessorTaskID || null,
-      AdditionalAssignees: taskData.AdditionalAssignees || JSON.stringify([]),
-      PredecessorTasks: taskData.PredecessorTasks || null
-    };
-
-    // Usa addUpdateProjectTask invece di updateTaskStatus
-    const result = await addUpdateProjectTask(updatePayload);
-
-    if (result?.success) {
-      toast({
-        title: "✨ Stato aggiornato",
-        description: "Lo stato dell'attività è stato aggiornato con successo",
-      });
+  // Gestione cambio stato attività
+  const handleTaskStatusChange = async (taskId, projectId, newStatus, taskData) => {
+    try {
+      setEditingTaskStatus(prev => ({ ...prev, [taskId]: true }));
       
-      // Ricarica i dati
-      await loadWeekData();
-    } else {
-      throw new Error(result?.msg || "Errore nell'aggiornamento");
+      // Prepara il payload completo per l'aggiornamento
+      const updatePayload = {
+        TaskID: taskId,
+        ProjectID: projectId,
+        Title: taskData.TaskTitle || taskData.Title,
+        Description: taskData.Description || '',
+        Status: newStatus,
+        Priority: taskData.Priority || 'MEDIA',
+        AssignedTo: taskData.AssignedTo || null,
+        StartDate: taskData.StartDate || null,
+        DueDate: taskData.DueDate || null,
+        PredecessorTaskID: taskData.PredecessorTaskID || null,
+        AdditionalAssignees: taskData.AdditionalAssignees || JSON.stringify([]),
+        PredecessorTasks: taskData.PredecessorTasks || null
+      };
+
+      // Usa addUpdateProjectTask invece di updateTaskStatus
+      const result = await addUpdateProjectTask(updatePayload);
+
+      if (result?.success) {
+        toast({
+          title: "✨ Stato aggiornato",
+          description: "Lo stato dell'attività è stato aggiornato con successo",
+        });
+        
+        // Ricarica i dati
+        await loadWeekData();
+      } else {
+        throw new Error(result?.msg || "Errore nell'aggiornamento");
+      }
+    } catch (error) {
+      console.error("Error updating task status:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Errore nell'aggiornamento dello stato",
+        variant: "destructive",
+      });
+    } finally {
+      setEditingTaskStatus(prev => ({ ...prev, [taskId]: false }));
     }
-  } catch (error) {
-    console.error("Error updating task status:", error);
-    toast({
-      title: "Errore",
-      description: error.message || "Errore nell'aggiornamento dello stato",
-      variant: "destructive",
-    });
-  } finally {
-    setEditingTaskStatus(prev => ({ ...prev, [taskId]: false }));
-  }
-};
+  };
 
   // Funzioni di navigazione settimana
   const navigateToPreviousWeek = () => {
@@ -849,6 +849,23 @@ const handleTaskStatusChange = async (taskId, projectId, newStatus, taskData) =>
             </CardTitle>
 
             <div className="flex items-center gap-4">
+              {/* Indicatore per attività completate */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Info className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">
+                        Include attività completate con ore registrate
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Le attività completate vengono mostrate se hanno ore registrate nella settimana corrente</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
               <Button
                 variant="outline"
                 onClick={() => setIsTaskPanelOpen(true)}
@@ -939,43 +956,50 @@ const handleTaskStatusChange = async (taskId, projectId, newStatus, taskData) =>
                             <div className="text-xs text-gray-500 truncate">
                               {taskTotal.ProjectName}
                             </div>
-                            <div className="font-medium truncate mt-1" title={taskTotal.TaskTitle}>
+                            <div 
+                              className={`font-medium truncate mt-1 ${
+                                taskTotal.Status === 'COMPLETATA' ? 'line-through opacity-75' : ''
+                              }`} 
+                              title={taskTotal.TaskTitle}
+                            >
                               {taskTotal.TaskTitle}
                             </div>
                             
-{/* Select per lo stato dell'attività */}
-<div className="mt-1">
-  <Select
-    value={taskTotal.Status || "DA FARE"}
-    onValueChange={(value) => 
-      handleTaskStatusChange(taskTotal.TaskID, taskTotal.ProjectID, value, taskTotal)
-    }
-    disabled={editingTaskStatus[taskTotal.TaskID]}
-  >
-    <SelectTrigger className="h-7 w-full">
-      <SelectValue>
-        {taskTotal.Status && statusConfig[taskTotal.Status] ? (
-          <div className="flex items-center gap-1">
-            {statusConfig[taskTotal.Status].icon}
-            <span className="text-xs">{taskTotal.Status}</span>
-          </div>
-        ) : (
-          <span className="text-xs text-gray-500">Seleziona stato</span>
-        )}
-      </SelectValue>
-    </SelectTrigger>
-    <SelectContent>
-      {Object.entries(statusConfig).map(([status, config]) => (
-        <SelectItem key={status} value={status}>
-          <div className="flex items-center gap-1">
-            {config.icon}
-            <span className="text-xs">{status}</span>
-          </div>
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</div>
+                            {/* Select per lo stato dell'attività */}
+                            <div className="mt-1">
+                              <Select
+                                value={taskTotal.Status || "DA FARE"}
+                                onValueChange={(value) => 
+                                  handleTaskStatusChange(taskTotal.TaskID, taskTotal.ProjectID, value, taskTotal)
+                                }
+                                disabled={editingTaskStatus[taskTotal.TaskID] || taskTotal.Status === 'COMPLETATA'}
+                              >
+                                <SelectTrigger className={`h-7 w-full ${
+                                  taskTotal.Status === 'COMPLETATA' ? 'opacity-75' : ''
+                                }`}>
+                                  <SelectValue>
+                                    {taskTotal.Status && statusConfig[taskTotal.Status] ? (
+                                      <div className="flex items-center gap-1">
+                                        {statusConfig[taskTotal.Status].icon}
+                                        <span className="text-xs">{taskTotal.Status}</span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-xs text-gray-500">Seleziona stato</span>
+                                    )}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(statusConfig).map(([status, config]) => (
+                                    <SelectItem key={status} value={status}>
+                                      <div className="flex items-center gap-1">
+                                        {config.icon}
+                                        <span className="text-xs">{status}</span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                         </TableCell>
 
