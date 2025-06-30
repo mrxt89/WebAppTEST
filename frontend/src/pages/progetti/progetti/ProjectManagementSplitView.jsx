@@ -13,7 +13,7 @@ import useProjectCustomersActions from "../../../hooks/useProjectCustomersAction
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import useUsers from "../../../hooks/useUsersActions";
 import ProjectDetailContainer from "./ProjectDetailContainer";
-import ProjectListSection from "./ProjectListSection";
+import ProjectListSection from "./ProjectListSection/ProjectListSection";
 
 const ProjectManagementSplitView = () => {
   const navigate = useNavigate();

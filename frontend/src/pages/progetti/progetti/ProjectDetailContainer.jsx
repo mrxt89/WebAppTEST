@@ -22,7 +22,6 @@ import {
   Users,
   Info,
   Layout,
-  Package,
   PieChart,
   Lock,
   Unlock,
@@ -43,7 +42,6 @@ import ProjectTasksTableImproved from "./ProjectTasksTable";
 import TasksViewToggler from "./TasksViewToggler";
 import NewTaskPanel from "./NewTaskPanel";
 import TaskDetailsPanel from "./TaskDetailsPanel";
-import ProjectArticlesTab from "./articoli/ProjectArticlesTab";
 import ProjectAttachmentsTab from "./ProjectAttachmentsTab";
 import ProjectTeamSection from "./ProjectTeamSection";
 import ProjectAnalyticsTab from "./analytics/ProjectAnalyticsTab";
@@ -346,14 +344,12 @@ const ProjectDetailContainer = ({
         ProjectCategoryId: parseInt(editedProject.ProjectCategoryId) || 0,
         ProjectCategoryDetailLine: parseInt(editedProject.ProjectCategoryDetailLine) || 0,
         Disabled: parseInt(editedProject.Disabled) || 0,
-        CustSupp: Array.isArray(editedProject.CustSupp)
-          ? editedProject.CustSupp[0] || 0
-          : parseInt(editedProject.CustSupp) || 0,
+        CustSupp: editedProject.CustSupp || "",
         TBCreatedId: editedProject.TBCreatedId,
         ProjectErpID: editedProject.ProjectErpID || "",
         UseStages: editedProject.UseStages || false,
       };
-
+      console.log(cleanedProject);
       const result = await addUpdateProject(cleanedProject);
       if (result.success) {
         setProject(editedProject);
@@ -778,7 +774,7 @@ const ProjectDetailContainer = ({
           >
             Modifica
           </Button>
-
+    
           {(project.TBCreatedId == currentUserId || currentUserId == '0') && (
             <Button
               id="lockProjectButton"
@@ -897,10 +893,6 @@ const ProjectDetailContainer = ({
                     {project.AttachmentsCount}
                   </Badge>
                 )}
-              </TabsTrigger>
-              <TabsTrigger value="articles" id="project-articles-tab">
-                <Package className="h-4 w-4 mr-2" />
-                Articoli
               </TabsTrigger>
               <TabsTrigger value="analytics" id="project-analytics-tab">
                 <PieChart className="h-4 w-4 mr-2" />
@@ -1058,50 +1050,50 @@ const ProjectDetailContainer = ({
                   />
                 </div>
 
-              <div className="flex-1 min-h-0 overflow-hidden" style={{ height: "calc(100vh - 105px)" }} id="project-management-split-view-content3">
-                {tasksViewMode === "kanban" && (
-                  <TasksKanban
-                    project={project}
-                    projectId={projectId}
-                    tasks={project.tasks}
-                    onTaskUpdate={handleTaskUpdate}
-                    onTaskClick={handleTaskClick}
-                    onTaskDisable={handleDisableTask}
-                    refreshProject={(callback) => loadProject(true, callback)}
-                  />
-                )}
-                {tasksViewMode === "table" && (
-                  <ProjectTasksTableImproved
-                    project={project}
-                    tasks={project.tasks}
-                    onTaskClick={handleTaskClick}
-                    onTaskUpdate={handleTaskUpdate}
-                    onTaskDisable={handleDisableTask}
-                    checkAdminPermission={checkAdminPermission}
-                    isOwnTask={isOwnTask}
-                    currentUserId={currentUserId}
-                  />
-                )}
-                {tasksViewMode === "gantt" && (
-                  <ProjectGanttView
-                    project={project}
-                    tasks={project.tasks || []}
-                    onTaskClick={handleTaskClick}
-                    onTaskUpdate={handleTaskUpdate}
-                    checkAdminPermission={checkAdminPermission}
-                    isOwnTask={isOwnTask}
-                    updateTaskSequence={updateTaskSequence}
-                    getProjectById={getProjectById}
-                    refreshProject={(callback) => loadProject(true, callback)}
-                    users={users}
-                    manageTaskDependencies={manageTaskDependencies}
-                    checkCircularDependencies={checkCircularDependencies}
-                    calculateProjectDates={calculateProjectDates}
-                  />
-                )}
-              </div>
-            </TabsContent>
- )}
+                <div className="flex-1 min-h-0 overflow-hidden" style={{ height: "calc(100vh - 105px)" }} id="project-management-split-view-content3">
+                  {tasksViewMode === "kanban" && (
+                    <TasksKanban
+                      project={project}
+                      projectId={projectId}
+                      tasks={project.tasks}
+                      onTaskUpdate={handleTaskUpdate}
+                      onTaskClick={handleTaskClick}
+                      onTaskDisable={handleDisableTask}
+                      refreshProject={(callback) => loadProject(true, callback)}
+                    />
+                  )}
+                  {tasksViewMode === "table" && (
+                    <ProjectTasksTableImproved
+                      project={project}
+                      tasks={project.tasks}
+                      onTaskClick={handleTaskClick}
+                      onTaskUpdate={handleTaskUpdate}
+                      onTaskDisable={handleDisableTask}
+                      checkAdminPermission={checkAdminPermission}
+                      isOwnTask={isOwnTask}
+                      currentUserId={currentUserId}
+                    />
+                  )}
+                  {tasksViewMode === "gantt" && (
+                    <ProjectGanttView
+                      project={project}
+                      tasks={project.tasks || []}
+                      onTaskClick={handleTaskClick}
+                      onTaskUpdate={handleTaskUpdate}
+                      checkAdminPermission={checkAdminPermission}
+                      isOwnTask={isOwnTask}
+                      updateTaskSequence={updateTaskSequence}
+                      getProjectById={getProjectById}
+                      refreshProject={(callback) => loadProject(true, callback)}
+                      users={users}
+                      manageTaskDependencies={manageTaskDependencies}
+                      checkCircularDependencies={checkCircularDependencies}
+                      calculateProjectDates={calculateProjectDates}
+                    />
+                  )}
+                </div>
+              </TabsContent>
+            )}
 
             {/* Team Tab */}
             <TabsContent value="team" className="h-full overflow-auto">
@@ -1139,11 +1131,6 @@ const ProjectDetailContainer = ({
                   </CardContent>
                 </Card>
               </div>
-            </TabsContent>
-
-            {/* Articles Tab */}
-            <TabsContent value="articles" className="h-full overflow-auto" id="articles-tab">
-              <ProjectArticlesTab project={project} canEdit={true} />
             </TabsContent>
 
             {/* Analytics Tab */}

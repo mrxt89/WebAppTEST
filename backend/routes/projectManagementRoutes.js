@@ -267,11 +267,18 @@ router.post('/projects/tasks/:taskId/attachments', authenticateToken, async (req
 router.get('/projects/statistics/user', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.UserId;
-        const stats = await getUserProjectStatistics(userId);
+        // Ricevi i filtri come query parameter
+        const filters = req.query.filters ? JSON.parse(req.query.filters) : {};
+        
+        const stats = await getUserProjectStatistics(userId, filters);
         res.json(stats);
     } catch (err) {
         console.error('Error fetching project statistics:', err);
-        res.status(500).send('Internal server error');
+        res.status(500).json({ 
+            success: 0, 
+            msg: 'Error fetching project statistics',
+            error: err.message 
+        });
     }
 });
 
