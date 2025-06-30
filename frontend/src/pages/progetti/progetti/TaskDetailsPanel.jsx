@@ -24,6 +24,7 @@ import {
   Pin,
   PinOff,
   Ban,
+  Trash,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -561,7 +562,7 @@ const TaskDetailsPanel = ({
                             {editedTask?.TaskDisabled ? (
                               <CheckCircle2 className="h-4 w-4" />
                             ) : (
-                              <Ban className="h-4 w-4" />
+                              <Trash className="h-4 w-4" />
                             )}
                           </Button>
                         </TooltipTrigger>

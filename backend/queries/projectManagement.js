@@ -15,68 +15,86 @@ const getProjectStatuses = async () => {
 };
 
 // Ottieni progetti con paginazione e filtri
-const getPaginatedProjects = async (page = 0, pageSize = 50, filters = {}, userId) => {
+const getPaginatedProjects = async (page = 0, pageSize = 100, filters = {}, userId) => {
     try {
+        console.log('Filters received:', filters); // DEBUG
+        
         let pool = await sql.connect(config.dbConfig);
         const request = pool.request()
             .input('Page', sql.Int, page)
             .input('PageSize', sql.Int, pageSize)
             .input('UserId', sql.Int, userId);
 
-        // Aggiunta parametri dai filtri - Status è ora VARCHAR(5) invece di VARCHAR(20)
-        if (filters.status && filters.status !== 'all') {
-            request.input('Status', sql.VarChar(5), filters.status);
+        // Status - ora supporta array
+        if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
+            request.input('Status', sql.NVarChar(sql.MAX), JSON.stringify(filters.status));
+        } else if (filters.status && typeof filters.status === 'string' && filters.status !== 'all') {
+            request.input('Status', sql.NVarChar(sql.MAX), JSON.stringify([filters.status]));
         } else {
-            request.input('Status', sql.VarChar(5), null);
+            request.input('Status', sql.NVarChar(sql.MAX), null);
         }
 
-        // Aggiunta filtro per categoria
-        if (filters.categoryId && filters.categoryId !== '0') {
-            request.input('CategoryId', sql.Int, parseInt(filters.categoryId));
+        // CategoryId - mantieni come stringhe
+        if (filters.categoryId && Array.isArray(filters.categoryId) && filters.categoryId.length > 0) {
+            request.input('CategoryId', sql.NVarChar(sql.MAX), JSON.stringify(filters.categoryId));
+        } else if (filters.categoryId && typeof filters.categoryId === 'string' && filters.categoryId !== '0') {
+            request.input('CategoryId', sql.NVarChar(sql.MAX), JSON.stringify([filters.categoryId]));
         } else {
-            request.input('CategoryId', sql.Int, null);
+            request.input('CategoryId', sql.NVarChar(sql.MAX), null);
         }
 
-        // Aggiunta filtro per cliente
+        // CustSupp - rimane singolo
         if (filters.custSupp && filters.custSupp !== '0') {
             request.input('CustSupp', sql.Int, parseInt(filters.custSupp));
         } else {
             request.input('CustSupp', sql.Int, null);
         }
 
-        // Aggiunta filtro di ricerca testo
+        // SearchText
         if (filters.searchText && filters.searchText.trim() !== '') {
             request.input('SearchText', sql.NVarChar(100), filters.searchText.trim());
         } else {
             request.input('SearchText', sql.NVarChar(100), null);
         }
 
-        // Se c'è una data di scadenza nel filtro, la usiamo come EndDate
+        // EndDate
         if (filters.dueDate && filters.dueDate.trim() !== '') {
             request.input('EndDate', sql.Date, new Date(filters.dueDate));
         } else {
             request.input('EndDate', sql.Date, null);
         }
 
-        // Filtro ID Progetto su ERP aziendale "ProjectErpID" VARCHAR(20)
+        // ProjectErpID
         if (filters.projectErpId && filters.projectErpId.trim() !== '') {
             request.input('ProjectErpID', sql.NVarChar(20), filters.projectErpId.trim());
         } else {
             request.input('ProjectErpID', sql.NVarChar(20), null);
         }
 
-        // Filtro utente assegnato a una attività @TaskAssignedTo INT
-        if (filters.taskAssignedTo && filters.taskAssignedTo !== '0') {
-            request.input('TaskAssignedTo', sql.Int, parseInt(filters.taskAssignedTo));
+        // TaskAssignedTo - MANTIENI COME STRINGHE
+        if (filters.taskAssignedTo && Array.isArray(filters.taskAssignedTo) && filters.taskAssignedTo.length > 0) {
+            // NON convertire in numeri, mantieni come stringhe
+            const jsonString = JSON.stringify(filters.taskAssignedTo);
+            console.log('TaskAssignedTo filter being sent:', jsonString); // DEBUG
+            request.input('TaskAssignedTo', sql.NVarChar(sql.MAX), jsonString);
+        } else if (filters.taskAssignedTo && typeof filters.taskAssignedTo === 'string' && filters.taskAssignedTo !== '0') {
+            const jsonString = JSON.stringify([filters.taskAssignedTo]);
+            console.log('TaskAssignedTo filter (single) being sent:', jsonString); // DEBUG
+            request.input('TaskAssignedTo', sql.NVarChar(sql.MAX), jsonString);
         } else {
-            request.input('TaskAssignedTo', sql.Int, null);
+            console.log('TaskAssignedTo filter is NULL'); // DEBUG
+            request.input('TaskAssignedTo', sql.NVarChar(sql.MAX), null);
         }
 
-        // StartDate non è nei filtri ma è previsto dalla SP
+        // StartDate
         request.input('StartDate', sql.Date, null);
+
+        console.log('About to execute MA_GetPaginatedProjects'); // DEBUG
 
         // Esegui la stored procedure
         const result = await request.execute('MA_GetPaginatedProjects');
+
+        console.log('SP executed, records found:', result.recordset.length); // DEBUG
 
         return {
             items: result.recordset,
@@ -281,46 +299,58 @@ const getUserProjectStatistics = async (userId, filters = {}) => {
         const request = pool.request()
             .input('UserId', sql.Int, userId);
 
-        // Aggiunta parametri dai filtri - Status è ora VARCHAR(5)
-        if (filters.status && filters.status !== 'all') {
-            request.input('Status', sql.VarChar(5), filters.status);
+        // Status - ora supporta array
+        if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
+            request.input('Status', sql.NVarChar(sql.MAX), JSON.stringify(filters.status));
+        } else if (filters.status && typeof filters.status === 'string' && filters.status !== 'all') {
+            request.input('Status', sql.NVarChar(sql.MAX), JSON.stringify([filters.status]));
         } else {
-            request.input('Status', sql.VarChar(5), null);
+            request.input('Status', sql.NVarChar(sql.MAX), null);
         }
 
-        if (filters.categoryId && filters.categoryId !== '0') {
-            request.input('CategoryId', sql.Int, parseInt(filters.categoryId));
+        // CategoryId - ora supporta array
+        if (filters.categoryId && Array.isArray(filters.categoryId) && filters.categoryId.length > 0) {
+            const categoryIds = filters.categoryId.map(id => parseInt(id));
+            request.input('CategoryId', sql.NVarChar(sql.MAX), JSON.stringify(categoryIds));
+        } else if (filters.categoryId && typeof filters.categoryId === 'string' && filters.categoryId !== '0') {
+            request.input('CategoryId', sql.NVarChar(sql.MAX), JSON.stringify([parseInt(filters.categoryId)]));
         } else {
-            request.input('CategoryId', sql.Int, null);
+            request.input('CategoryId', sql.NVarChar(sql.MAX), null);
         }
 
+        // CustSupp
         if (filters.custSupp) {
             request.input('CustSupp', sql.Int, filters.custSupp);
         } else {
             request.input('CustSupp', sql.Int, null);
         }
 
+        // SearchText
         if (filters.searchText?.trim()) {
             request.input('SearchText', sql.NVarChar(100), filters.searchText.trim());
         } else {
             request.input('SearchText', sql.NVarChar(100), null);
         }
 
+        // ProjectErpID
         if (filters.projectErpId?.trim()) {
             request.input('ProjectErpID', sql.NVarChar(20), filters.projectErpId.trim());
         } else {
             request.input('ProjectErpID', sql.NVarChar(20), null);
         }
 
-        if (filters.taskAssignedTo) {
-            request.input('TaskAssignedTo', sql.Int, filters.taskAssignedTo);
+        // TaskAssignedTo - ora supporta array
+        if (filters.taskAssignedTo && Array.isArray(filters.taskAssignedTo) && filters.taskAssignedTo.length > 0) {
+            const userIds = filters.taskAssignedTo.map(id => parseInt(id));
+            request.input('TaskAssignedTo', sql.NVarChar(sql.MAX), JSON.stringify(userIds));
+        } else if (filters.taskAssignedTo && typeof filters.taskAssignedTo === 'string' && filters.taskAssignedTo !== '0') {
+            request.input('TaskAssignedTo', sql.NVarChar(sql.MAX), JSON.stringify([parseInt(filters.taskAssignedTo)]));
         } else {
-            request.input('TaskAssignedTo', sql.Int, null);
+            request.input('TaskAssignedTo', sql.NVarChar(sql.MAX), null);
         }
 
         const result = await request.execute('MA_GetUserProjectStatistics');
 
-        // Ora riceviamo un singolo recordset con tutte le statistiche
         return {
             activeProjects: result.recordset[0].ActiveProjects,
             activeTasks: result.recordset[0].ActiveTasks,
