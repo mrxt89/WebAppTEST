@@ -119,6 +119,8 @@ const TaskInformationTab = ({
   // Effetto per inizializzare i dati del task
   useEffect(() => {
     if (task) {
+      console.log("TaskInformationTab - Initializing task data:", task);
+      
       setEditedData({
         Description: task.Description || "",
         StartDate: task.StartDate?.split("T")[0] || "",
@@ -383,6 +385,7 @@ const TaskInformationTab = ({
           ) : (
             <div className="prose prose-sm max-w-none">
               <p className="text-gray-700 whitespace-pre-wrap">
+                
                 {task?.Description || (
                   <span className="text-gray-400 italic">
                     Nessuna descrizione disponibile

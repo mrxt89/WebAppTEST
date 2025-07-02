@@ -122,6 +122,13 @@ const ProjectEditModalWithTemplate = ({
   // Inizializzazione progetto quando si apre
   useEffect(() => {
     if (project) {
+      // Gestione CustSupp: se è un array, prendi il primo valore
+      let custSuppValue = project.CustSupp;
+      if (Array.isArray(custSuppValue)) {
+        custSuppValue = custSuppValue[0];
+      }
+      const custSuppInt = custSuppValue && custSuppValue !== "" ? parseInt(custSuppValue) : 0;
+
       const updatedProject = {
         ...project,
         ProjectCategoryId: project.ProjectCategoryId || 0,
@@ -130,6 +137,7 @@ const ProjectEditModalWithTemplate = ({
         ProjectErpID: project?.ProjectErpID || "",
         TemplateID: project?.TemplateID || null,
         UseStages: project?.UseStages === 1 || project?.UseStages === true,
+        CustSupp: custSuppInt, // Usa il valore convertito
         // Se è un nuovo progetto e non ha uno stato, usa il primo stato attivo
         Status:
           project.Status ||
@@ -166,8 +174,12 @@ const ProjectEditModalWithTemplate = ({
   // Gestione generica delle modifiche ai campi
   const handleChange = (field, value) => {
     if (field === "CustSupp") {
+      // Se è un array, prendi sempre e solo il primo valore
       const custSuppValue = Array.isArray(value) ? value[0] : value;
-      const updatedProject = { ...localProject, [field]: custSuppValue };
+      
+      // Converti in intero se è un valore valido, altrimenti usa 0 (non null)
+      const custSuppInt = custSuppValue && custSuppValue !== "" ? parseInt(custSuppValue) : 0;
+      const updatedProject = { ...localProject, [field]: custSuppInt };
       setLocalProject(updatedProject);
       onChange && onChange(updatedProject);
     } else {

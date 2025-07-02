@@ -159,7 +159,7 @@ const addUpdateProject = async (projectData, userId) => {
         const fieldMappings = {
             ProjectID: { type: sql.Int },
             Name: { type: sql.NVarChar },
-            Description: { type: sql.NVarChar },
+            Description: { type: sql.NVarChar(sql.MAX) },
             StartDate: { type: sql.Date },
             EndDate: { type: sql.Date },
             Status: { type: sql.VarChar(5) }, // Aggiornato a VARCHAR(5)
@@ -218,7 +218,7 @@ const addUpdateProjectTask = async (taskData, userId) => {
         request.input('TaskID', sql.Int, taskData.TaskID || null);
         request.input('ProjectID', sql.Int, taskData.ProjectID);
         request.input('Title', sql.NVarChar, taskData.Title);
-        request.input('Description', sql.NVarChar, taskData.Description);
+        request.input('Description', sql.NVarChar(sql.MAX), taskData.Description);
         request.input('AssignedTo', sql.Int, taskData.AssignedTo || null);
         request.input('Priority', sql.VarChar, taskData.Priority);
         request.input('Status', sql.VarChar, taskData.Status);
@@ -262,7 +262,7 @@ const addTaskComment = async (commentData) => {
         const result = await pool.request()
             .input('TaskID', sql.Int, commentData.TaskId)
             .input('UserID', sql.Int, commentData.UserId)
-            .input('Comment', sql.NVarChar, commentData.Comment)
+            .input('Comment', sql.NVarChar(sql.MAX), commentData.Comment)
             .execute('MA_AddTaskComment');
 
         return result.recordset[0];

@@ -83,16 +83,44 @@ const getStageIcon = (stageName, sequence) => {
 
 // Componente per visualizzare un singolo task
 const TaskCard = ({ task, onTaskClick, isStageBlocked, onRemoveFromStage, canEdit }) => {
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case "ALTA":
-        return "border-red-200 bg-red-50";
-      case "MEDIA":
-        return "border-yellow-200 bg-yellow-50";
-      case "BASSA":
-        return "border-green-200 bg-green-50";
+  // Configurazione priorità con icone e colori
+  const priorityConfig = {
+    ALTA: { 
+      color: "from-red-500 to-red-600",
+      bgColor: "bg-red-50",
+      borderColor: "border-red-200",
+      textColor: "text-red-700",
+      icon: "🔥"
+    },
+    MEDIA: { 
+      color: "from-amber-500 to-amber-600",
+      bgColor: "bg-amber-50",
+      borderColor: "border-amber-200",
+      textColor: "text-amber-700",
+      icon: "⚡"
+    },
+    BASSA: { 
+      color: "from-emerald-500 to-emerald-600",
+      bgColor: "bg-emerald-50",
+      borderColor: "border-emerald-200",
+      textColor: "text-emerald-700",
+      icon: "🌱"
+    },
+  };
+
+  // Configurazione stato per lo sfondo della card
+  const getStatusBackground = (status) => {
+    switch (status) {
+      case "COMPLETATA":
+        return "bg-green-50 border-green-200";
+      case "IN ESECUZIONE":
+        return "bg-blue-50 border-blue-200";
+      case "BLOCCATA":
+        return "bg-red-50 border-red-200";
+      case "SOSPESA":
+        return "bg-amber-50 border-amber-200";
       default:
-        return "border-gray-200";
+        return "bg-gray-50 border-gray-200";
     }
   };
 
@@ -104,25 +132,43 @@ const TaskCard = ({ task, onTaskClick, isStageBlocked, onRemoveFromStage, canEdi
         return <Play className="h-4 w-4 text-blue-600" />;
       case "BLOCCATA":
         return <AlertCircle className="h-4 w-4 text-red-600" />;
+      case "SOSPESA":
+        return <Clock className="h-4 w-4 text-amber-600" />;
       default:
-        return <Clock className="h-4 w-4 text-gray-600" />;
+        return <ListTodo className="h-4 w-4 text-gray-600" />;
     }
   };
+
+  const priority = priorityConfig[task.Priority] || priorityConfig.MEDIA;
 
   return (
     <div
       className={`p-3 border rounded-md cursor-pointer hover:shadow-md transition-all relative group ${
         isStageBlocked ? "opacity-50 cursor-not-allowed" : ""
-      } ${getPriorityColor(task.Priority)} ${task.TaskDisabled ? "opacity-50" : ""}`}
+      } ${getStatusBackground(task.Status)} ${task.TaskDisabled ? "opacity-50" : ""}`}
       onClick={() => !isStageBlocked && onTaskClick(task)}
     >
+      {/* Priority gradient bar - sempre visibile ma sottile */}
+      <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${priority.color} ${task.TaskDisabled ? 'opacity-30' : ''}`} />
+      
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <h4 className="font-medium text-sm line-clamp-2">{task.Title}</h4>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <Badge variant="outline" className="text-xs">
-              {isStageBlocked ? "BLOCCATA" : task.Status}
+              {getStatusIcon(task.Status)}
+              <span className="ml-1">{isStageBlocked ? "BLOCCATA" : task.Status}</span>
             </Badge>
+            
+            {/* Priorità con icona e testo */}
+            <Badge 
+              variant="secondary"
+              className={`${priority.bgColor} ${priority.textColor} ${priority.borderColor} border text-xs px-2 py-0.5`}
+            >
+              <span className="mr-1">{priority.icon}</span>
+              {task.Priority}
+            </Badge>
+            
             {task.AssignedToName && (
               <span className="text-xs text-gray-500 flex items-center gap-1">
                 <Users className="h-3 w-3" />
@@ -295,17 +341,25 @@ const StageCard = ({
     stage.TotalChecklistItems > 0 && 
     stage.CheckedItems >= stage.TotalChecklistItems;
 
-  // Determina il colore dello stage in base al completamento della checklist
+  // Determina il colore dello stage in base al completamento
   const getStageColor = () => {
+    // Se la fase è approvata, usa sempre verde
     if (stage.GateStatus === "APPROVED") {
       return "#10B981"; // Verde per fasi approvate
-    } else if (isChecklistCompleted) {
-      return "#10B981"; // Verde per checklist completate
-    } else if (stage.CheckedItems > 0) {
-      return "#3B82F6"; // Blu per checklist parzialmente completate
-    } else {
-      return stage.HexColor; // Colore originale per checklist vuote
     }
+    
+    // Se la checklist è completata (se richiesta), usa verde
+    if (stage.IsGateRequired && isChecklistCompleted) {
+      return "#10B981"; // Verde per checklist completate
+    }
+    
+    // Se ci sono elementi checklist completati, usa blu
+    if (stage.IsGateRequired && stage.CheckedItems > 0) {
+      return "#3B82F6"; // Blu per checklist parzialmente completate
+    }
+    
+    // Altrimenti usa il colore personalizzato dello stage
+    return stage.HexColor || "#3B82F6";
   };
 
   const getGateStatusBadge = (status) => {
@@ -379,10 +433,10 @@ const StageCard = ({
 
   return (
     <Card className={`mb-4 transition-all ${isDragOver ? "ring-2 ring-blue-400 shadow-lg" : ""} ${
-      stage.GateStatus === "APPROVED" ? "opacity-75" : ""
+      stage.GateStatus === "APPROVED" ? "border-green-200 bg-green-50/30" : "border-gray-200"
     }`}>
       <CardHeader 
-        className="pb-3 cursor-pointer"
+        className="pb-3 cursor-pointer bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200"
         onDragOver={handleHeaderDragOver}
         onDragLeave={handleHeaderDragLeave}
         onDrop={handleHeaderDrop}
@@ -405,9 +459,11 @@ const StageCard = ({
             <div className="flex items-center gap-2">
               {getStageIcon(stage.StageName, stageIndex)}
               <div
-                className="w-4 h-4 rounded-full shrink-0"
-                style={{ backgroundColor: getStageColor() }}
+                className="w-4 h-4 rounded-full shrink-0 border border-gray-200"
+                style={{ backgroundColor: stage.HexColor }}
+                title={`Colore personalizzato: ${stage.HexColor}`}
               />
+              <Layers className="h-5 w-5 text-gray-600" />
             </div>
             
             <div className="flex-1">
@@ -422,45 +478,67 @@ const StageCard = ({
                     Checklist completata
                   </Badge>
                 )}
+                {stage.taskProgress === 100 && !stage.IsGateRequired && (
+                  <Badge className="ml-2 bg-green-100 text-green-800 border-green-200">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Completata
+                  </Badge>
+                )}
               </CardTitle>
               {stage.StageDescription && (
-                <p className="text-sm text-gray-600 mt-1">{stage.StageDescription}</p>
+                <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{stage.StageDescription}</p>
               )}
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            {stage.IsGateRequired && (
-              <div className="flex items-center gap-2">
-                {getGateStatusBadge(stage.GateStatus)}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowChecklist(!showChecklist)}
-                  className="flex items-center gap-1"
-                >
-                  {showChecklist ? (
-                    <>
-                      <EyeOff className="h-4 w-4" />
-                      Nascondi
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="h-4 w-4" />
-                      Checklist ({stage.CheckedItems || 0}/{stage.TotalChecklistItems || 0})
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
+                            <div className="flex items-center gap-3">
+                    {stage.IsGateRequired && stage.GateStatus === "APPROVED" && (
+                      <Badge className="bg-green-100 text-green-800 border-green-200">
+                        <Lock className="h-3 w-3 mr-1" />
+                        Approvata
+                      </Badge>
+                    )}
+                    <Badge variant="outline">
+                      {stage.CompletedTasks || 0}/{stage.TotalTasks || 0} completate
+                    </Badge>
+                    {stage.IsGateRequired && (
+                      <div className="flex items-center gap-2">
+                        {getGateStatusBadge(stage.GateStatus)}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowChecklist(!showChecklist)}
+                          className="flex items-center gap-1"
+                        >
+                          {showChecklist ? (
+                            <>
+                              <EyeOff className="h-4 w-4" />
+                              Nascondi
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="h-4 w-4" />
+                              Checklist ({stage.CheckedItems || 0}/{stage.TotalChecklistItems || 0})
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
             
             <div className="flex flex-col items-end gap-1 min-w-[120px]">
               <Progress 
                 value={completionPercentage} 
-                className="w-full h-2"
+                className={`w-full h-2 ${
+                  completionPercentage === 100 ? 'bg-green-100' : ''
+                }`}
               />
-              <span className="text-xs text-gray-500">
+              <span className={`text-xs ${
+                completionPercentage === 100 ? 'text-green-600 font-medium' : 'text-gray-500'
+              }`}>
                 {completionPercentage}% completato
+                {completionPercentage === 100 && !stage.IsGateRequired && (
+                  <span className="ml-1">✓</span>
+                )}
               </span>
             </div>
             
@@ -533,7 +611,7 @@ const StageCard = ({
                     </Badge>
                   </h4>
                   <p className="text-sm text-gray-600 mt-1">
-                    Completa tutti gli elementi richiesti per poter procedere alla fase successiva
+                    Completa tutti gli elementi richiesti per poter segnare lo stage come completato
                   </p>
                 </div>
                 
@@ -1141,36 +1219,65 @@ const ProjectStages = ({ project, onTaskClick, canEdit, refreshProject }) => {
               </span>
             </div>
             <div className="flex gap-2">
-              {enrichedStages.map((stage, index) => (
-                <TooltipProvider key={stage.StageID}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div 
-                        className={`flex-1 h-2 rounded-full transition-all cursor-pointer hover:h-3 hover:shadow-sm ${
-                          stage.GateStatus === "APPROVED" 
-                            ? "bg-green-500" 
-                            : stage.isChecklistCompleted
-                            ? "bg-green-500"
-                            : index === enrichedStages.findIndex(s => s.GateStatus !== "APPROVED")
-                            ? "bg-blue-500 animate-pulse"
-                            : "bg-gray-300"
-                        }`}
-                        onClick={() => scrollToStage(stage.StageID)}
-                        title={`Clicca per andare a ${stage.StageName}`}
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{stage.StageName}</p>
-                      <p className="text-xs">
-                        {stage.isChecklistCompleted && stage.GateStatus !== "APPROVED"
-                          ? "Checklist completata - Pronta per approvazione"
-                          : `${stage.taskProgress}% completato`}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">Clicca per espandere e andare alla fase</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ))}
+              {enrichedStages.map((stage, index) => {
+                // Determina il colore e lo stato della barra
+                let barColor = "bg-gray-300";
+                let barText = `${stage.taskProgress}% completato`;
+                let isCompleted = false;
+                
+                if (stage.GateStatus === "APPROVED") {
+                  barColor = "bg-green-500";
+                  barText = "Fase approvata";
+                  isCompleted = true;
+                } else if (stage.IsGateRequired && stage.isChecklistCompleted) {
+                  barColor = "bg-green-500";
+                  barText = "Checklist completata - Pronta per approvazione";
+                  isCompleted = true;
+                } else if (stage.taskProgress === 100 && !stage.IsGateRequired) {
+                  barColor = "bg-green-500";
+                  barText = "Tutte le attività completate";
+                  isCompleted = true;
+                } else if (stage.taskProgress > 0) {
+                  barColor = "bg-blue-500";
+                  barText = `${stage.taskProgress}% completato`;
+                } else {
+                  barColor = "bg-gray-300";
+                  barText = "Nessuna attività completata";
+                }
+                
+                return (
+                  <TooltipProvider key={stage.StageID}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div 
+                          className={`flex-1 h-2 rounded-full transition-all cursor-pointer hover:h-3 hover:shadow-sm relative ${
+                            barColor
+                          } ${isCompleted ? 'ring-2 ring-green-200' : ''}`}
+                          onClick={() => scrollToStage(stage.StageID)}
+                          title={`Clicca per andare a ${stage.StageName}`}
+                        >
+                          {/* Indicatore di completamento */}
+                          {isCompleted && (
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                              <CheckCircle className="w-2 h-2 text-white" />
+                            </div>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="font-medium">{stage.StageName}</p>
+                        <p className="text-xs">{barText}</p>
+                        {stage.IsGateRequired && (
+                          <p className="text-xs text-gray-500">
+                            Checklist: {stage.CheckedItems || 0}/{stage.TotalChecklistItems || 0}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">Clicca per espandere e andare alla fase</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -1179,7 +1286,7 @@ const ProjectStages = ({ project, onTaskClick, canEdit, refreshProject }) => {
       {/* Unassigned Tasks */}
       {enrichedStages.length > 0 && (
         <Card className={`border-orange-200 bg-orange-50 ${unassignedTasksFixed ? 'sticky z-10 shadow-sm' : ''}`} style={unassignedTasksFixed ? { top: '120px' } : {}}>
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-3 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-200">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-orange-600" />

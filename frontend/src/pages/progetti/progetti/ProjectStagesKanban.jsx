@@ -486,7 +486,7 @@ const ProjectStagesKanban = ({
                 <CollapsibleContent>
                   <div className="mt-4">
                     {stage.StageDescription && (
-                      <p className="text-sm text-gray-600 mb-4">{stage.StageDescription}</p>
+                      <p className="text-sm text-gray-600 mb-4 whitespace-pre-wrap">{stage.StageDescription}</p>
                     )}
                     
                     <ScrollArea orientation="horizontal" className="pb-4">

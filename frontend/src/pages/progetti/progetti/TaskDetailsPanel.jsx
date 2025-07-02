@@ -173,10 +173,7 @@ const TaskDetailsPanel = ({
   // Sincronizza task quando cambia
   useEffect(() => {
     if (task && Object.keys(task).length > 0) {
-      setEditedTask({
-        ...task,
-        PredecessorTaskID: task.PredecessorTaskID,
-      });
+      setEditedTask(task);
       if (task.CalendarEventsCount > 0) {
         setCalendarState((prev) => ({ ...prev, eventSynced: true }));
       }
@@ -186,12 +183,19 @@ const TaskDetailsPanel = ({
   // Effetto per mostrare contenuto con delay per animazione
   useEffect(() => {
     if (isOpen) {
-      const timer = setTimeout(() => setShowContent(true), 100);
+      const timer = setTimeout(() => {
+        setShowContent(true);
+        // Assicurati che il task sia sincronizzato quando si mostra il contenuto
+        if (task && (!editedTask || editedTask.TaskID !== task.TaskID)) {
+          console.log("TaskDetailsPanel - Syncing task on content show:", task);
+          setEditedTask(task);
+        }
+      }, 100);
       return () => clearTimeout(timer);
     } else {
       setShowContent(false);
     }
-  }, [isOpen]);
+  }, [isOpen, task, editedTask]);
 
   // Reset stato quando si chiude
   useEffect(() => {
@@ -199,8 +203,12 @@ const TaskDetailsPanel = ({
       setIsEditing(false);
       setIsClosing(false);
       setShowContent(false);
+    } else if (task && (!editedTask || editedTask.TaskID !== task.TaskID)) {
+      // Quando si apre il pannello, assicurati che il task sia sincronizzato
+      console.log("TaskDetailsPanel - Panel opened with task:", task);
+      setEditedTask(task);
     }
-  }, [isOpen]);
+  }, [isOpen, task, editedTask]);
 
   // Gestione resize del pannello
   const handleResizeStart = useCallback((e) => {
@@ -828,6 +836,7 @@ const TaskDetailsPanel = ({
                         onCancel={() => setIsEditing(false)}
                         assignableUsers={assignableUsers}
                         tasks={tasks}
+                        key={editedTask?.TaskID} // Forza il re-render quando cambia il task
                       />
                     </TabsContent>
 

@@ -341,7 +341,7 @@ const TemplatesPage = () => {
                     className="font-medium"
                     onClick={() => toggleExpandTemplate(template.TemplateID)}
                   >
-                    {template.Description}
+                    <div className="whitespace-pre-wrap">{template.Description}</div>
                   </TableCell>
                   <TableCell
                     onClick={() => toggleExpandTemplate(template.TemplateID)}

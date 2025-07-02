@@ -346,6 +346,8 @@ const fetchProjectStages = useCallback(async (projectId) => {
     canApproveGate,
     getStageProgress,
     getChecklistProgress,
+    setStages,
+    setUnassignedTasks,
   };
 };
 
