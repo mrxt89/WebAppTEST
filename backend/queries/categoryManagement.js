@@ -24,15 +24,14 @@ const getCategories = async (userId) => {
 };
 
 // Add or update category
-const addUpdateCategory = async (categoryData, userId, companyId) => {
+const addUpdateCategory = async (categoryData) => {
     try {
         let pool = await sql.connect(config.dbConfig);
         const result = await pool.request()
             .input('ProjectCategoryId', sql.Int, categoryData.ProjectCategoryId)
-            .input('Description', sql.NVarChar, categoryData.Description)
+            .input('Description', sql.NVarChar(sql.MAX), categoryData.Description)
             .input('HexColor', sql.VarChar(7), categoryData.HexColor)
-            .input('UserId', sql.Int, userId)
-            .input('CompanyId', sql.Int, companyId)
+            .input('UserId', sql.Int, categoryData.UserId)
             .execute('MA_AddUpdateProjectCategory');
 
         return result.recordset[0];
@@ -49,7 +48,7 @@ const addUpdateCategoryDetail = async (detailData) => {
         const result = await pool.request()
             .input('ProjectCategoryId', sql.Int, detailData.ProjectCategoryId)
             .input('Line', sql.Int, detailData.Line)
-            .input('Description', sql.NVarChar, detailData.Description)
+            .input('Description', sql.NVarChar(sql.MAX), detailData.Description)
             .execute('MA_AddUpdateProjectCategoryDetail');
 
         return result.recordset[0];

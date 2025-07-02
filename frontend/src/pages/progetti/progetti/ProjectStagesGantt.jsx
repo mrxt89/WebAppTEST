@@ -1368,7 +1368,7 @@ const ProjectStagesGantt = ({
                                 <div className="text-xs text-gray-600 font-medium mb-1">
                                   Descrizione:
                                 </div>
-                                <div className="text-sm text-gray-700 max-w-xs overflow-hidden">
+                                <div className="text-sm text-gray-700 max-w-xs overflow-hidden whitespace-pre-wrap">
                                   {originalTask.Description.substring(0, 150)}
                                   {originalTask.Description.length > 150 ? "..." : ""}
                                 </div>

@@ -249,7 +249,7 @@ const ProjectTable = ({
                           </Tooltip>
                         </TooltipProvider>
                       )}
-                      <span className="truncate max-w-[120px]">
+                      <span className="truncate" style={{ maxWidth: `${columnWidths[0] - 40}px` }}>
                         {project.Name}
                       </span>
                     </div>

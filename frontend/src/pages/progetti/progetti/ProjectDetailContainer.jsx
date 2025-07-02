@@ -242,7 +242,7 @@ const ProjectDetailContainer = ({
 
   // Hooks
   const { users, loading: loadingUsers, fetchUsers } = useUsers();
-  const { fetchProjectStages, stages, unassignedTasks } = useProjectStages();
+  const { fetchProjectStages, stages, unassignedTasks, setStages, setUnassignedTasks } = useProjectStages();
   const {
     loading,
     getProjectById,
@@ -300,6 +300,25 @@ const ProjectDetailContainer = ({
         if (projectData?.UseStages) {
           const stagesData = await fetchProjectStages(projectData.ProjectID);
           console.log("Loaded stages data:", stagesData);
+          
+          // IMPORTANTE: Assicurati che i task negli stages abbiano tutti i campi completi
+          // I task negli stages potrebbero non avere tutti i campi (Description, Participants, etc.)
+          // quindi usiamo sempre i task completi dal progetto principale
+          if (stagesData.stages && projectData.tasks) {
+            // Mappa i task completi agli stages
+            const stagesWithCompleteTasks = stagesData.stages.map(stage => ({
+              ...stage,
+              Tasks: stage.Tasks.map(stageTask => {
+                // Trova il task completo dal progetto principale
+                const completeTask = projectData.tasks.find(t => t.TaskID === stageTask.TaskID);
+                return completeTask || stageTask;
+              })
+            }));
+            
+            // Aggiorna gli stages con i task completi
+            setStages(stagesWithCompleteTasks);
+            setUnassignedTasks(stagesData.unassignedTasks || []);
+          }
         }
 
         // Aggiorna il task selezionato se presente
@@ -308,7 +327,7 @@ const ProjectDetailContainer = ({
             (t) => t.TaskID === selectedTask.TaskID
           );
           if (updatedTask) {
-            setSelectedTask(updatedTask);
+            setSelectedTask(updatedTask); // Passa sempre l'oggetto completo!
           }
         }
 
@@ -334,6 +353,13 @@ const ProjectDetailContainer = ({
   // Gestione aggiornamento progetto
   const handleProjectUpdate = async () => {
     try {
+      // Gestione CustSupp: se è un array, prendi il primo valore
+      let custSuppValue = editedProject.CustSupp;
+      if (Array.isArray(custSuppValue)) {
+        custSuppValue = custSuppValue[0];
+      }
+      const custSuppInt = custSuppValue && custSuppValue !== "" ? parseInt(custSuppValue) : 0;
+
       const cleanedProject = {
         ProjectID: editedProject.ProjectID,
         Name: editedProject.Name,
@@ -344,7 +370,7 @@ const ProjectDetailContainer = ({
         ProjectCategoryId: parseInt(editedProject.ProjectCategoryId) || 0,
         ProjectCategoryDetailLine: parseInt(editedProject.ProjectCategoryDetailLine) || 0,
         Disabled: parseInt(editedProject.Disabled) || 0,
-        CustSupp: editedProject.CustSupp || "",
+        CustSupp: custSuppInt,
         TBCreatedId: editedProject.TBCreatedId,
         ProjectErpID: editedProject.ProjectErpID || "",
         UseStages: editedProject.UseStages || false,
@@ -513,7 +539,7 @@ const ProjectDetailContainer = ({
             setIsTaskPanelOpen(false);
             setSelectedTask(null);
           } else if (selectedTask?.TaskID === completeTaskData.TaskID) {
-            setSelectedTask((prev) => ({ ...prev, ...completeTaskData }));
+            setSelectedTask(completeTaskData);
           }
 
           if (shouldCloseModal) {
@@ -554,7 +580,17 @@ const ProjectDetailContainer = ({
       return;
     }
     
-    setSelectedTask(task);
+    // Se il progetto usa stages, assicurati di usare sempre il task completo dal progetto principale
+    let completeTask = task;
+    if (project?.UseStages && project?.tasks) {
+      const fullTask = project.tasks.find(t => t.TaskID === task.TaskID);
+      if (fullTask) {
+        completeTask = fullTask;
+        console.log("Using complete task from project:", completeTask);
+      }
+    }
+    
+    setSelectedTask(completeTask);
     setIsTaskPanelOpen(true);
   };
 
@@ -1167,6 +1203,7 @@ const ProjectDetailContainer = ({
         defaultWidth={600}
         minWidth={500}
         maxWidth={900}
+        key={selectedTask?.TaskID} // Forza il re-render quando cambia il task
       />
 
       {/* New Task Panel - Disponibile sempre, anche con stages */}

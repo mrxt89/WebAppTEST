@@ -89,7 +89,7 @@ const SortableStageRow = ({ stage, onEdit, onDelete, onToggleChecklist }) => {
         </div>
       </TableCell>
       <TableCell className="font-medium">{stage.StageName}</TableCell>
-      <TableCell className="max-w-xs truncate text-sm text-gray-600">
+      <TableCell className="max-w-xs truncate text-sm text-gray-600 whitespace-pre-wrap">
         {stage.StageDescription || "-"}
       </TableCell>
       <TableCell>
@@ -1077,7 +1077,7 @@ const TaskStageAssignment = ({ template, stages, onUpdate }) => {
                     <div>
                       <p className="font-medium">{task.Title}</p>
                       {task.Description && (
-                        <p className="text-xs text-gray-600 mt-1 line-clamp-1">
+                        <p className="text-xs text-gray-600 mt-1 line-clamp-1 whitespace-pre-wrap">
                           {task.Description}
                         </p>
                       )}

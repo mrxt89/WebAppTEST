@@ -122,7 +122,7 @@ const addUpdateTemplate = async (templateData) => {
         let pool = await sql.connect(config.dbConfig);
         const result = await pool.request()
             .input('TemplateID', sql.Int, templateData.TemplateID || null)
-            .input('Description', sql.NVarChar, templateData.Description)
+            .input('Description', sql.NVarChar(sql.MAX), templateData.Description)
             .input('Notes', sql.NVarChar, templateData.Notes || null)
             .input('ProjectCategoryId', sql.Int, templateData.ProjectCategoryId || null)
             .input('ProjectCategoryDetailLine', sql.Int, templateData.ProjectCategoryDetailLine || null)
@@ -147,7 +147,7 @@ const addUpdateTemplateDetail = async (detailData) => {
             .input('TemplateID', sql.Int, detailData.TemplateID)
             .input('TaskSequence', sql.Int, detailData.TaskSequence)
             .input('Title', sql.NVarChar, detailData.Title)
-            .input('Description', sql.NVarChar, detailData.Description || null)
+            .input('Description', sql.NVarChar(sql.MAX), detailData.Description || null)
             .input('DefaultAssignedTo', sql.Int, detailData.DefaultAssignedTo || null)
             .input('DefaultGroupId', sql.Int, detailData.DefaultGroupId || null)
             .input('Priority', sql.VarChar(10), detailData.Priority || 'MEDIA')
