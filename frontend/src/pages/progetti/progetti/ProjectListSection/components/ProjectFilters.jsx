@@ -153,7 +153,7 @@ const ProjectFilters = ({
                 onChange={(value) =>
                   setFilters(prev => ({ ...prev, custSupp: value }))
                 }
-                customers={customers}
+                projectCustomers={customers}
                 loading={loadingCustomers}
               />
             </div>

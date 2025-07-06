@@ -301,8 +301,7 @@ const ProjectDetailContainer = ({
         // Se il progetto usa stages, carica anche gli stages
         if (projectData?.UseStages) {
           const stagesData = await fetchProjectStages(projectData.ProjectID);
-          console.log("Loaded stages data:", stagesData);
-          
+        
           // IMPORTANTE: Assicurati che i task negli stages abbiano tutti i campi completi
           // I task negli stages potrebbero non avere tutti i campi (Description, Participants, etc.)
           // quindi usiamo sempre i task completi dal progetto principale
@@ -372,7 +371,7 @@ const ProjectDetailContainer = ({
         ProjectErpID: editedProject.ProjectErpID || "",
         UseStages: editedProject.UseStages || false,
       };
-      console.log(cleanedProject);
+      
       const result = await addUpdateProject(cleanedProject);
       if (result.success) {
         setProject(editedProject);
@@ -573,7 +572,6 @@ const ProjectDetailContainer = ({
   // Gestione click su task
   const handleTaskClick = (task) => {
     if (preventDialogOpen.current) {
-      console.log("Dialog opening prevented by flag");
       return;
     }
     
@@ -583,7 +581,6 @@ const ProjectDetailContainer = ({
       const fullTask = project.tasks.find(t => t.TaskID === task.TaskID);
       if (fullTask) {
         completeTask = fullTask;
-        console.log("Using complete task from project:", completeTask);
       }
     }
     

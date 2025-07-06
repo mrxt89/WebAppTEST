@@ -181,6 +181,7 @@ export const CustomerSearchSelect = ({
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
 
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
@@ -195,37 +196,49 @@ export const CustomerSearchSelect = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [value]);
 
-  // Modified to use Id as the unique identifier and handle the data structure correctly
+  // Funzione per normalizzare i dati cliente (supporta entrambe le strutture)
+  const normalizeCustomer = (customer) => {
+    if (!customer) return null;
+    
+    return {
+      id: customer.Id || customer.CustSupp || customer.id,
+      name: customer.CompanyName || customer.Name || customer.name,
+      code: customer.CustomerCode || customer.Code || customer.code,
+      disabled: customer.Disabled || customer.disabled || false
+    };
+  };
+
+  // Normalizza e filtra i clienti
   const uniqueCustomers = useMemo(() => {
     if (!Array.isArray(projectCustomers)) {
+      console.warn("projectCustomers non è un array:", projectCustomers);
       return [];
     }
-    // Use Id as the unique identifier instead of CustSupp
+
     const unique = new Map();
     projectCustomers.forEach((customer) => {
-      // Only include non-disabled customers
-      if (customer && customer.Id && !customer.Disabled) {
-        unique.set(customer.Id, customer);
+      const normalized = normalizeCustomer(customer);
+      if (normalized && normalized.id && !normalized.disabled) {
+        unique.set(normalized.id, normalized);
       }
     });
-    return Array.from(unique.values());
+    
+    const result = Array.from(unique.values());
+    return result;
   }, [projectCustomers]);
 
   const filteredCustomers = useMemo(() => {
     if (!searchTerm.trim()) return uniqueCustomers;
     return uniqueCustomers.filter(
       (customer) =>
-        customer.CompanyName?.toLowerCase().includes(
-          searchTerm.toLowerCase(),
-        ) ||
-        customer.CustomerCode?.toLowerCase().includes(searchTerm.toLowerCase()),
+        customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.code?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [uniqueCustomers, searchTerm]);
 
   const handleSelect = (customer) => {
-    // Use Id as the value to pass back to the parent
-    onChange(customer.Id);
-    setSearchTerm(customer.CompanyName);
+    onChange(customer.id);
+    setSearchTerm(customer.name);
     setIsOpen(false);
   };
 
@@ -238,12 +251,18 @@ export const CustomerSearchSelect = ({
     }
   };
 
+  // Clear button
+  const handleClear = () => {
+    setSearchTerm("");
+    onChange(null);
+    setIsOpen(false);
+  };
+
   useEffect(() => {
     if (value) {
-      // Find customer by Id
-      const selectedCustomer = uniqueCustomers.find((c) => c.Id === value);
+      const selectedCustomer = uniqueCustomers.find((c) => c.id == value);
       if (selectedCustomer) {
-        setSearchTerm(selectedCustomer.CompanyName);
+        setSearchTerm(selectedCustomer.name);
       }
     } else {
       setSearchTerm("");
@@ -252,35 +271,69 @@ export const CustomerSearchSelect = ({
 
   return (
     <div className="relative" ref={wrapperRef}>
-      <Input
-        type="text"
-        value={searchTerm}
-        onChange={handleInputChange}
-        onFocus={() => setIsOpen(true)}
-        placeholder="Cerca cliente..."
-        className="w-full"
-      />
+      <div className="relative">
+        <Input
+          type="text"
+          value={searchTerm}
+          onChange={handleInputChange}
+          onFocus={() => setIsOpen(true)}
+          placeholder={loading ? "Caricamento clienti..." : "Cerca cliente..."}
+          className="w-full pr-8"
+          disabled={loading}
+        />
+        {searchTerm && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+            onClick={handleClear}
+          >
+            ×
+          </Button>
+        )}
+      </div>
+      
       {isOpen && (
         <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
           {loading ? (
-            <div className="p-2 text-gray-500">Caricamento...</div>
+            <div className="p-2 text-gray-500 flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Caricamento...
+            </div>
           ) : filteredCustomers.length > 0 ? (
-            filteredCustomers.map((customer) => (
+            <>
+              {/* Opzione "Tutti i clienti" */}
               <div
-                key={`customer-${customer.Id}`}
-                className="p-2 hover:bg-gray-100 cursor-pointer"
-                onClick={() => handleSelect(customer)}
+                className="p-2 hover:bg-gray-100 cursor-pointer border-b"
+                onClick={() => {
+                  onChange(null);
+                  setSearchTerm("");
+                  setIsOpen(false);
+                }}
               >
-                <div className="font-medium">{customer.CompanyName}</div>
-                {customer.CustomerCode && (
-                  <div className="text-sm text-gray-500">
-                    {customer.CustomerCode}
-                  </div>
-                )}
+                <div className="font-medium text-gray-600">Tutti i clienti</div>
               </div>
-            ))
+              {filteredCustomers.map((customer) => (
+                <div
+                  key={`customer-${customer.id}`}
+                  className="p-2 hover:bg-gray-100 cursor-pointer"
+                  onClick={() => handleSelect(customer)}
+                >
+                  <div className="font-medium">{customer.name}</div>
+                  {customer.code && (
+                    <div className="text-sm text-gray-500">{customer.code}</div>
+                  )}
+                </div>
+              ))}
+            </>
           ) : (
-            <div className="p-2 text-gray-500">Nessun cliente trovato</div>
+            <div className="p-2 text-gray-500">
+              {projectCustomers?.length === 0 
+                ? "Nessun cliente disponibile" 
+                : "Nessun cliente trovato"
+              }
+            </div>
           )}
         </div>
       )}

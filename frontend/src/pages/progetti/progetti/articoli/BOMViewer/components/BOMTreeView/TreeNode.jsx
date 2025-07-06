@@ -12,6 +12,7 @@ import {
   Factory,
   AlertTriangle,
   Home,
+  Edit2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBOMViewer } from "../../context/BOMViewerContext";
@@ -180,7 +181,7 @@ const TreeNode = ({
   dropTarget, // Prop per il target di drop attuale
   dropMode, // Prop per la modalità di drop
 }) => {
-  const { expandedNodes, bomRouting, editMode, selectedComponents, canEdit } =
+  const { expandedNodes, bomRouting, editMode, selectedComponents, canEdit, pendingChanges } =
     useBOMViewer();
 
   const [nodeCycles, setNodeCycles] = useState([]);
@@ -210,6 +211,31 @@ const TreeNode = ({
   const hasMagoBOM =
     node.type === "component" &&
     (node.data.bomStato_erp === "1" || node.data.bomStato_erp === 1);
+
+  // NUOVO: Verifica se il componente ha modifiche pendenti
+  const hasComponentChanges = node.type === "component" && pendingChanges[node.data.ComponentId] && (
+    (pendingChanges[node.data.ComponentId].bomComponentChanges && 
+     Object.keys(pendingChanges[node.data.ComponentId].bomComponentChanges).length > 0) ||
+    (pendingChanges[node.data.ComponentId].itemDetailsChanges &&
+     Object.keys(pendingChanges[node.data.ComponentId].itemDetailsChanges).length > 0)
+  );
+
+  // NUOVO: Verifica se i cicli hanno modifiche pendenti
+  const hasCycleChanges = node.type === "component" && 
+    pendingChanges[`cycle-${node.data.ComponentId}`] &&
+    (
+      (pendingChanges[`cycle-${node.data.ComponentId}`].newCycles && 
+       pendingChanges[`cycle-${node.data.ComponentId}`].newCycles.length > 0) ||
+      (pendingChanges[`cycle-${node.data.ComponentId}`].deletedCycles &&
+       pendingChanges[`cycle-${node.data.ComponentId}`].deletedCycles.length > 0) ||
+      (pendingChanges[`cycle-${node.data.ComponentId}`].cycleChanges &&
+       Object.keys(pendingChanges[`cycle-${node.data.ComponentId}`].cycleChanges).length > 0) ||
+      (pendingChanges[`cycle-${node.data.ComponentId}`].newOrder &&
+       pendingChanges[`cycle-${node.data.ComponentId}`].newOrder.length > 0)
+    );
+
+  // NUOVO: Ha qualsiasi modifica pendente
+  const hasPendingChanges = hasComponentChanges || hasCycleChanges;
 
   // Find associated cycles when component mounts or routing changes
   useEffect(() => {
@@ -269,10 +295,24 @@ const TreeNode = ({
   // Get text for the node
   const getNodeText = () => {
     if (node.type === "component") {
-      // For components, show code and description
-      const code = node.data.ComponentItemCode || node.data.ComponentCode || "";
-      const description =
-        node.data.ComponentItemDescription || node.data.Description || "";
+      // NUOVO: Controlla se c'è una modifica pendente per il codice
+      let code = node.data.ComponentItemCode || node.data.ComponentCode || "";
+      let description = node.data.ComponentItemDescription || node.data.Description || "";
+
+      // Se ci sono modifiche pendenti, usa i valori modificati
+      if (pendingChanges[node.data.ComponentId]) {
+        const changes = pendingChanges[node.data.ComponentId];
+        
+        // Controlla le modifiche dei dettagli dell'articolo
+        if (changes.itemDetailsChanges) {
+          if (changes.itemDetailsChanges.Code !== undefined) {
+            code = changes.itemDetailsChanges.Code;
+          }
+          if (changes.itemDetailsChanges.Description !== undefined) {
+            description = changes.itemDetailsChanges.Description;
+          }
+        }
+      }
 
       // If there's a code, show "Code - Description"
       if (code) {
@@ -297,12 +337,26 @@ const TreeNode = ({
   // Get formatted quantity
   const getQuantity = () => {
     if (node.type === "component" && node.data.Quantity && !isRootNode) {
-      const qty = parseFloat(node.data.Quantity);
-      if (isNaN(qty)) return "";
+      let qty = node.data.Quantity;
+      
+      // NUOVO: Se c'è una modifica pendente alla quantità, usala
+      if (pendingChanges[node.data.ComponentId]?.bomComponentChanges?.Quantity !== undefined) {
+        qty = pendingChanges[node.data.ComponentId].bomComponentChanges.Quantity;
+      }
+      
+      const qtyNum = parseFloat(qty);
+      if (isNaN(qtyNum)) return "";
 
       // Format without trailing zeros
-      const formatted = qty.toString();
-      return `${formatted} ${node.data.UoM || ""}`;
+      const formatted = qtyNum.toString();
+      
+      // NUOVO: Recupera anche l'unità di misura modificata se presente
+      let uom = node.data.UoM || "";
+      if (pendingChanges[node.data.ComponentId]?.bomComponentChanges?.UoM !== undefined) {
+        uom = pendingChanges[node.data.ComponentId].bomComponentChanges.UoM;
+      }
+      
+      return `${formatted} ${uom}`;
     }
     return "";
   };
@@ -316,6 +370,7 @@ const TreeNode = ({
       isLocked && !isRootNode && "opacity-75", // Lower opacity for locked components (ma non per il root)
       isRootNode && "bg-gray-50 hover:bg-gray-100", // Sfondo speciale per il root
       isCurrentDragOver && "ring-1 ring-gray-300", // Sottile bordo per indicare che è possibile fare drop
+      hasPendingChanges && editMode && "bg-amber-50 hover:bg-amber-100", // NUOVO: Evidenzia le righe con modifiche
     );
   };
 
@@ -336,6 +391,7 @@ const TreeNode = ({
       attrs["data-has-cycles"] = hasRoutingCycles ? "true" : "false";
       attrs["data-locked"] = isLocked ? "true" : "false";
       attrs["data-mago-bom"] = hasMagoBOM ? "true" : "false";
+      attrs["data-has-changes"] = hasPendingChanges ? "true" : "false"; // NUOVO
 
       if (node.data.Path) {
         const pathParts = node.data.Path.split(".");
@@ -427,6 +483,26 @@ const TreeNode = ({
     );
   };
 
+  // NUOVO: Indicatore di modifiche pendenti
+  const getModifiedIndicator = () => {
+    if (!hasPendingChanges || !editMode) return null;
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Edit2 className="h-3.5 w-3.5 ml-1 text-amber-600" />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Questo componente ha modifiche non salvate</p>
+            {hasComponentChanges && <p className="text-xs mt-1">- Dettagli componente modificati</p>}
+            {hasCycleChanges && <p className="text-xs">- Cicli di produzione modificati</p>}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
   // Render the component
   return (
     <div>
@@ -441,7 +517,9 @@ const TreeNode = ({
             node.type === "component"
               ? isRootNode
                 ? `3px solid #1f2937` // Bordo più spesso e scuro per il root
-                : `2px solid ${getLevelColor(level)}`
+                : hasPendingChanges && editMode
+                  ? `3px solid #f59e0b` // NUOVO: Bordo ambra per componenti modificati
+                  : `2px solid ${getLevelColor(level)}`
               : "none",
         }}
         onClick={handleSelect}
@@ -493,10 +571,12 @@ const TreeNode = ({
                 className={cn(
                   "truncate max-w-[280px]",
                   isRootNode && "font-semibold text-gray-800",
+                  hasPendingChanges && editMode && "text-amber-700 font-medium", // NUOVO: Testo ambra per componenti modificati
                 )}
               >
                 {getNodeText()}
               </span>
+              {getModifiedIndicator()}
               {isLocked && getLockedTooltip()}
               {hasMagoBOM && getMagoBadge()}
               {getRootBadge()}
@@ -506,7 +586,10 @@ const TreeNode = ({
             {node.type === "component" &&
               node.data.Quantity &&
               !isRootNode && (
-                <span className="text-xs text-gray-500 ml-2">
+                <span className={cn(
+                  "text-xs text-gray-500 ml-2",
+                  hasPendingChanges && editMode && "text-amber-600 font-medium" // NUOVO: Evidenzia anche la quantità se modificata
+                )}>
                   {getQuantity()}
                 </span>
               )}
