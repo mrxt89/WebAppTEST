@@ -20,7 +20,15 @@ import {
   Copy,
   AlertCircle,
   Layers,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/use-toast";
 import useProjectArticlesActions from "@/hooks/useProjectArticlesActions";
 
@@ -39,6 +47,12 @@ const BOMImportWizard = ({
   const [createNewBOM, setCreateNewBOM] = useState(true);
 
   const { getBOMData } = useProjectArticlesActions();
+
+  // Funzione per troncare il testo
+  const truncateText = (text, maxLength = 128) => {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
 
   // Carica la struttura completa della distinta
   useEffect(() => {
@@ -160,6 +174,24 @@ const BOMImportWizard = ({
     }));
   };
 
+  // Espandi/comprimi tutti i nodi
+  const toggleAllNodes = (expand) => {
+    const newExpanded = {};
+    
+    const processNode = (node) => {
+      if (node.children && node.children.length > 0) {
+        newExpanded[node.id] = expand;
+        node.children.forEach(processNode);
+      }
+    };
+    
+    if (bomStructure) {
+      bomStructure.forEach(processNode);
+    }
+    
+    setExpandedNodes(newExpanded);
+  };
+
   // Gestione selezione componente con logica padre-figlio
   const handleComponentSelection = (nodeId, checked) => {
     const newSelected = { ...selectedComponents };
@@ -179,7 +211,7 @@ const BOMImportWizard = ({
       }
     } else {
       // Se deseleziono un componente, devo deselezionare tutti i suoi figli
-      deselectWithChildren(nodeId, newSelected);
+      deselectWithChildren(nodeId, newSelected, newOptions);
     }
     
     setSelectedComponents(newSelected);
@@ -195,6 +227,7 @@ const BOMImportWizard = ({
       if (!node) return;
       
       const parentId = findParentIdFromTree(currentId);
+      
       if (parentId && !selectedMap[parentId]) {
         selectedMap[parentId] = true;
         findAndSelectParent(parentId);
@@ -204,14 +237,19 @@ const BOMImportWizard = ({
     findAndSelectParent(nodeId);
   };
 
-  const deselectWithChildren = (nodeId, selectedMap) => {
+  const deselectWithChildren = (nodeId, selectedMap, optionsMap) => {
     selectedMap[nodeId] = false;
+    
+    // Resetta anche le opzioni quando deseleziono
+    if (optionsMap) {
+      optionsMap[nodeId] = { useOriginalCode: false };
+    }
     
     // Trova e deseleziona i figli
     const node = findNodeById(nodeId, bomStructure);
     if (node && node.children) {
       node.children.forEach(child => {
-        deselectWithChildren(child.id, selectedMap);
+        deselectWithChildren(child.id, selectedMap, optionsMap);
       });
     }
   };
@@ -228,9 +266,34 @@ const BOMImportWizard = ({
   };
 
   const findParentIdFromTree = (nodeId) => {
+    // Prima prova a trovare il padre usando i dati originali
+    const node = findNodeById(nodeId, bomStructure);
+    
+    if (node && node.data.ParentBOMId) {
+      // Cerca il nodo padre usando ParentBOMId
+      const findParentByBOMId = (nodes, targetBOMId) => {
+        for (const n of nodes) {
+          if (n.data.BOMId === targetBOMId) {
+            return n.id;
+          }
+          if (n.children) {
+            const found = findParentByBOMId(n.children, targetBOMId);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      
+      const parentId = findParentByBOMId(bomStructure, node.data.ParentBOMId);
+      return parentId;
+    }
+    
+    // Fallback: usa la logica originale dell'albero
     const findParent = (nodes, parentId = null) => {
       for (const node of nodes) {
-        if (node.id === nodeId) return parentId;
+        if (node.id === nodeId) {
+          return parentId;
+        }
         if (node.children) {
           const found = findParent(node.children, node.id);
           if (found !== null) return found;
@@ -305,102 +368,131 @@ const BOMImportWizard = ({
     return (
       <div key={node.id} className="select-none">
         <div 
-          className={`flex items-center gap-2 py-2 px-2 hover:bg-gray-50 rounded`}
-          style={{ marginLeft: `${level * 2}rem` }}
+          className={`py-2 px-3 hover:bg-gray-50 rounded-lg transition-all duration-200 ${
+            level > 0 ? 'border-l-4' : ''
+          }`}
+          style={{ 
+            marginLeft: `${level * 1.5}rem`,
+            borderLeftColor: level > 0 ? `rgb(59, 130, 246, ${Math.min(0.3 + level * 0.15, 1)})` : 'transparent',
+          }}
         >
-          {/* Expand/Collapse button */}
-          {hasChildren && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => toggleNode(node.id)}
-            >
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </Button>
-          )}
-          {!hasChildren && <div className="w-6" />}
+          {/* Prima riga: controlli, codice e pulsante */}
+          <div className="flex items-center gap-2 mb-1">
+            {/* Expand/Collapse button */}
+            {hasChildren && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 hover:bg-white/50"
+                onClick={() => toggleNode(node.id)}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+            {!hasChildren && <div className="w-6" />}
 
-          {/* Checkbox selezione */}
-          <Checkbox
-            className={`h-6 w-6 ${isSelected ? 'bg-primary' : 'bg-gray-200'}`}
-            checked={isSelected}
-            onCheckedChange={(checked) => handleComponentSelection(node.id, checked)}
-            disabled={loading}
-          />
+            {/* Checkbox selezione */}
+            <Checkbox
+              className={`h-5 w-5 ${isSelected ? 'bg-primary' : ''}`}
+              checked={isSelected}
+              onCheckedChange={(checked) => handleComponentSelection(node.id, checked)}
+              disabled={loading}
+            />
 
-          {/* Icona natura */}
-          {isAcquisto ? (
-            <ShoppingCart className="h-4 w-4 text-amber-600" />
-          ) : (
-            <Package className="h-4 w-4 text-blue-600" />
-          )}
+            {/* Icona natura */}
+            {isAcquisto ? (
+              <ShoppingCart className="h-4 w-4 text-amber-600" />
+            ) : (
+              <Package className="h-4 w-4 text-blue-600" />
+            )}
 
-          {/* Info componente */}
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">
-                {node.data.ComponentItemCode || node.data.Item}
-              </span>
-              <span className="text-sm text-gray-500">
-                {node.data.ComponentItemDescription || node.data.Description}
-              </span>
-              {node.data.Level > 0 && (
-                <Badge variant="outline" className="text-xs">
-                  Livello {node.data.Level}
-                </Badge>
-              )}
+            {/* Codice componente */}
+            <span className="font-medium text-sm">
+              {node.data.ComponentItemCode || node.data.Item}
+            </span>
+
+            {/* Badge livello */}
+            {level > 0 && (
+              <Badge 
+                variant="outline" 
+                className="text-xs"
+                style={{
+                  backgroundColor: `rgba(59, 130, 246, ${0.1 + level * 0.05})`,
+                  borderColor: `rgba(59, 130, 246, ${0.3 + level * 0.1})`,
+                }}
+              >
+                L{level}
+              </Badge>
+            )}
+
+            {/* Spazio flessibile per spingere il pulsante a destra */}
+            <div className="flex-1" />
+
+            {/* Toggle codice originale/temporaneo */}
+            {isSelected && (
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const parentId = findParentIdFromTree(node.id);
+                  const parentHasOriginalCode = parentId && componentOptions[parentId]?.useOriginalCode;
+                  const isDisabled = parentHasOriginalCode && !useOriginalCode;
+                  
+                  return (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={`h-7 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      onClick={() => toggleCodeOption(node.id)}
+                      disabled={isDisabled}
+                      title={isDisabled ? "Il padre mantiene il codice originale, non puoi creare un codice temporaneo" : ""}
+                    >
+                      {useOriginalCode ? (
+                        <>
+                          <Copy className="h-3 w-3 mr-1" />
+                          Mantieni codice
+                        </>
+                      ) : (
+                        <>
+                          <Code className="h-3 w-3 mr-1" />
+                          Nuovo temporaneo
+                        </>
+                      )}
+                    </Button>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Quantità */}
+            <div className="text-sm text-gray-500 min-w-[80px] text-right">
+              Qtà: {node.data.Quantity || 1} {node.data.UoM || 'PZ'}
             </div>
           </div>
 
-          {/* Toggle codice originale/temporaneo */}
-          {isSelected && (
-            <div className="flex items-center gap-2">
-              {(() => {
-                const parentId = findParentIdFromTree(node.id);
-                const parentHasOriginalCode = parentId && componentOptions[parentId]?.useOriginalCode;
-                const isDisabled = parentHasOriginalCode && !useOriginalCode;
-                
-                return (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={`h-7 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    onClick={() => toggleCodeOption(node.id)}
-                    disabled={isDisabled}
-                    title={isDisabled ? "Il padre mantiene il codice originale, non puoi creare un codice temporaneo" : ""}
-                  >
-                    {useOriginalCode ? (
-                      <>
-                        <Copy className="h-3 w-3 mr-1" />
-                        Mantieni codice
-                      </>
-                    ) : (
-                      <>
-                        <Code className="h-3 w-3 mr-1" />
-                        Nuovo temporaneo
-                      </>
-                    )}
-                  </Button>
-                );
-              })()}
-            </div>
-          )}
-
-          {/* Quantità */}
-          <div className="text-sm text-gray-500">
-            Qtà: {node.data.Quantity || 1} {node.data.UoM || 'PZ'}
+          {/* Seconda riga: descrizione */}
+          <div className="flex items-start gap-2 ml-12">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-sm text-gray-600 cursor-help">
+                    {truncateText(node.data.ComponentItemDescription || node.data.Description)}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-md">
+                  <p>{node.data.ComponentItemDescription || node.data.Description}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 
         {/* Renderizza i figli se espanso */}
         {isExpanded && hasChildren && (
-          <div>
-            {node.children.map(child => renderNode(child, level + 1))}
+          <div className="mt-1">
+            {node.children.map((child) => renderNode(child, level + 1))}
           </div>
         )}
       </div>
@@ -419,7 +511,8 @@ const BOMImportWizard = ({
     // Raccogli tutti i componenti selezionati
     const collectSelectedComponents = (nodes) => {
       nodes.forEach(node => {
-        if (selectedComponents[node.id]) {
+        // Escludi i componenti di livello 0 dalla raccolta
+        if (selectedComponents[node.id] && node.data.Level > 0) {
           // Assicuriamoci che i dati abbiano tutti i campi necessari
           const componentData = {
             ComponentItemCode: node.data.ComponentItemCode || node.data.Component || node.data.Item,
@@ -446,7 +539,6 @@ const BOMImportWizard = ({
       collectSelectedComponents(bomStructure);
     }
 
-    console.log('Import data being sent:', importData); // Debug
     onConfirm(importData);
   };
 
@@ -458,7 +550,10 @@ const BOMImportWizard = ({
     let count = 0;
     const countNodes = (nodes) => {
       nodes.forEach(node => {
-        count++;
+        // Escludi i componenti di livello 0 dal conteggio
+        if (node.data.Level > 0) {
+          count++;
+        }
         if (node.children) countNodes(node.children);
       });
     };
@@ -468,7 +563,7 @@ const BOMImportWizard = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-5xl h-[95vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Layers className="h-5 w-5" />
@@ -482,20 +577,49 @@ const BOMImportWizard = ({
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-medium">{sourceItem?.Item || sourceItem?.BOM}</h3>
-                <p className="text-sm text-gray-600">
-                  {sourceItem?.Description || sourceItem?.ItemDescription}
-                </p>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="text-sm text-gray-600 cursor-help">
+                        {truncateText(sourceItem?.Description || sourceItem?.ItemDescription)}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-md">
+                      <p>{sourceItem?.Description || sourceItem?.ItemDescription}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="createNewBOM"
-                  className={`${createNewBOM ? 'bg-primary' : 'bg-gray-200'}`}
-                  checked={createNewBOM}
-                  onCheckedChange={setCreateNewBOM}
-                />
-                <Label htmlFor="createNewBOM" className="cursor-pointer">
-                  Crea nuovo codice distinta
-                </Label>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleAllNodes(true)}
+                    title="Espandi tutto"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleAllNodes(false)}
+                    title="Comprimi tutto"
+                  >
+                    <Minimize2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="createNewBOM"
+                    checked={createNewBOM}
+                    onCheckedChange={setCreateNewBOM}
+                    className="h-5 w-5 bg-primary"
+                  />
+                  <Label htmlFor="createNewBOM" className="cursor-pointer">
+                    Crea nuovo codice distinta
+                  </Label>
+                </div>
               </div>
             </div>
           </div>
@@ -506,31 +630,33 @@ const BOMImportWizard = ({
             <div className="text-sm">
               <p>Seleziona i componenti da importare. I cicli verranno sempre importati.</p>
               <p className="mt-1">
-                Quando selezioni un componente, tutti i suoi padri vengono selezionati automaticamente.
-              </p>
-              <p className="mt-1">
                 <strong>Nota:</strong> Se un componente mantiene il codice originale, tutti i suoi figli dovranno mantenerlo.
               </p>
             </div>
           </div>
 
           {/* Albero componenti */}
-          <ScrollArea className="h-[500px] border rounded-lg [&_[data-radix-scroll-area-viewport]]:overflow-y-scroll [&_[data-radix-scroll-area-viewport]]:scrollbar-thin [&_[data-radix-scroll-area-viewport]]:scrollbar-thumb-gray-300 [&_[data-radix-scroll-area-viewport]]:scrollbar-track-gray-100">
-            <div className="p-2">
-              {loading ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : bomStructure && bomStructure.length > 0 ? (
+          <ScrollArea className="flex-1 border rounded-lg p-2">
+            {loading ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+                          ) : bomStructure && bomStructure.length > 0 ? (
                 <div className="space-y-1">
-                  {bomStructure.map(node => renderNode(node))}
+                  {bomStructure.map(node => {
+                    // Nascondi i componenti di livello 0 (vengono creati automaticamente)
+                    if (node.data.Level === 0) {
+                      // Renderizza solo i figli del livello 0
+                      return node.children ? node.children.map(child => renderNode(child)) : null;
+                    }
+                    return renderNode(node);
+                  })}
                 </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  Nessun componente trovato nella distinta
-                </div>
-              )}
-            </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                Nessun componente trovato nella distinta
+              </div>
+            )}
           </ScrollArea>
 
           {/* Contatore selezione */}
@@ -551,7 +677,6 @@ const BOMImportWizard = ({
           <Button 
             onClick={handleConfirm} 
             disabled={loading || getSelectedCount() === 0}
-            className={getSelectedCount() === 0 ? "opacity-50 cursor-not-allowed" : ""}
           >
             Importa Selezione
           </Button>

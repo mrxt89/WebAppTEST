@@ -225,7 +225,7 @@ const ProjectManagementSplitView = () => {
         projects={projects}
         projectStatuses={projectStatuses}
         categories={categories}
-        projectCustomers={projectCustomers}
+        customers={projectCustomers}
         users={users}
         loading={loading}
         loadingCustomers={loadingCustomers}

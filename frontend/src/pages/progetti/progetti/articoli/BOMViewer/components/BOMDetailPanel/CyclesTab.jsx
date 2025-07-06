@@ -113,13 +113,46 @@ const SearchableCombobox = ({
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
+  // Calcola i termini di ricerca una volta sola e normalizza
+  const searchTerms = searchValue
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+    .filter(term => term.length > 0);
+
   // Filtra gli elementi basandosi sulla ricerca
   const filteredItems = items.filter((item) => {
-    const searchLower = searchValue.toLowerCase();
-    const displayValue = item[displayField]?.toLowerCase() || "";
-    const descValue = item[descriptionField]?.toLowerCase() || "";
-    return displayValue.includes(searchLower) || descValue.includes(searchLower);
+    if (!searchValue.trim()) return true;
+    
+    // Normalizza i valori per la ricerca
+    const displayValue = (item[displayField] || "").toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+    const descValue = (item[descriptionField] || "").toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+    
+    // Se non ci sono termini di ricerca, mostra tutto
+    if (searchTerms.length === 0) return true;
+    
+    // Controlla se TUTTI i termini di ricerca sono presenti in almeno uno dei campi
+    const matches = searchTerms.every(term => {
+      // Cerca nel codice operazione (LIKE '%term%')
+      if (displayValue.includes(term)) return true;
+      
+      // Cerca nella descrizione operazione (LIKE '%term%')
+      if (descValue.includes(term)) return true;
+      
+      // Cerca anche in altri campi se presenti (per compatibilità)
+      const allFields = Object.values(item)
+        .filter(val => typeof val === 'string')
+        .map(val => val.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ""))
+        .join(' ');
+      
+      return allFields.includes(term);
+    });
+
+
+    return matches;
   });
+
+
 
   // Trova l'elemento selezionato
   const selectedItem = items.find((item) => item[valueField] === value);
@@ -143,13 +176,15 @@ const SearchableCombobox = ({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[400px] p-0">
-        <Command>
+        <Command shouldFilter={false}>
           <CommandInput 
-            placeholder={`Cerca ${placeholder.toLowerCase()}...`} 
+            placeholder={`Cerca codice o descrizione...`} 
             value={searchValue}
             onValueChange={setSearchValue}
           />
-          <CommandEmpty>Nessun risultato trovato.</CommandEmpty>
+          {filteredItems.length === 0 && searchValue.trim() && (
+            <CommandEmpty>Nessun risultato trovato.</CommandEmpty>
+          )}
           <CommandGroup className="max-h-[300px] overflow-auto">
             {filteredItems.map((item) => (
               <CommandItem
@@ -162,9 +197,17 @@ const SearchableCombobox = ({
                 }}
               >
                 <div className="flex flex-col">
-                  <span className="font-medium">{item[displayField]}</span>
+                  <span className="font-medium">
+                    {item[displayField]}
+                    {searchValue && searchTerms.some(term => item[displayField]?.toLowerCase().includes(term)) && (
+                      <span className="text-blue-600 ml-1">(codice)</span>
+                    )}
+                  </span>
                   <span className="text-sm text-gray-500">
                     {item[descriptionField]}
+                    {searchValue && searchTerms.some(term => item[descriptionField]?.toLowerCase().includes(term)) && (
+                      <span className="text-blue-600 ml-1">(descrizione)</span>
+                    )}
                   </span>
                 </div>
               </CommandItem>

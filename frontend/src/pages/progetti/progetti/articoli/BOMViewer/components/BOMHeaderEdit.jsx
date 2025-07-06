@@ -36,6 +36,7 @@ const BOMHeaderEdit = () => {
     bomComponents,
     updateItemDetails,
     smartRefresh,
+    reorderBOMRoutings,
   } = useBOMViewer();
 
   const [bomData, setBomData] = useState({
@@ -308,7 +309,6 @@ const BOMHeaderEdit = () => {
         }));
 
       if (cyclesToReorder.length > 0) {
-        const { reorderBOMRoutings } = useBOMViewer();
         await reorderBOMRoutings(bomId, cyclesToReorder);
       }
     }
