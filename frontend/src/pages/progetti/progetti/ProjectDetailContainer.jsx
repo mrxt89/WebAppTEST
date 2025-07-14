@@ -32,6 +32,7 @@ import {
   LayoutDashboard,
   List,
   GanttChartSquare,
+  RefreshCw,
 } from "lucide-react";
 import { swal } from "../../../lib/common";
 import ProjectEditModalWithTemplate from "./ProjectEditModalWithTemplate";
@@ -219,6 +220,7 @@ const ProjectDetailContainer = ({
   const [editedProject, setEditedProject] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showDisabledTasks, setShowDisabledTasks] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // State per membri team
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
@@ -234,7 +236,7 @@ const ProjectDetailContainer = ({
   // State per UI
   const [activeTab, setActiveTab] = useState("overview");
   const [tasksViewMode, setTasksViewMode] = useState("kanban");
-  const [stagesViewMode, setStagesViewMode] = useState("phases"); // 'phases', 'kanban', 'table', 'gantt'
+  const [stagesViewMode, setStagesViewMode] = useState("phases");
   
   // Refs
   const isMounted = useRef(true);
@@ -302,21 +304,15 @@ const ProjectDetailContainer = ({
         if (projectData?.UseStages) {
           const stagesData = await fetchProjectStages(projectData.ProjectID);
         
-          // IMPORTANTE: Assicurati che i task negli stages abbiano tutti i campi completi
-          // I task negli stages potrebbero non avere tutti i campi (Description, Participants, etc.)
-          // quindi usiamo sempre i task completi dal progetto principale
           if (stagesData.stages && projectData.tasks) {
-            // Mappa i task completi agli stages
             const stagesWithCompleteTasks = stagesData.stages.map(stage => ({
               ...stage,
               Tasks: stage.Tasks.map(stageTask => {
-                // Trova il task completo dal progetto principale
                 const completeTask = projectData.tasks.find(t => t.TaskID === stageTask.TaskID);
                 return completeTask || stageTask;
               })
             }));
             
-            // Aggiorna gli stages con i task completi
             setStages(stagesWithCompleteTasks);
             setUnassignedTasks(stagesData.unassignedTasks || []);
           }
@@ -328,7 +324,7 @@ const ProjectDetailContainer = ({
             (t) => t.TaskID === selectedTask.TaskID
           );
           if (updatedTask) {
-            setSelectedTask(updatedTask); // Passa sempre l'oggetto completo!
+            setSelectedTask(updatedTask);
           }
         }
 
@@ -350,6 +346,34 @@ const ProjectDetailContainer = ({
     },
     [projectId, showDisabledTasks, selectedTask, isTaskPanelOpen, project, getProjectById, fetchProjectStages]
   );
+
+  // Nuova funzione per il refresh manuale
+  const handleManualRefresh = async () => {
+    if (isRefreshing) return;
+    
+    try {
+      setIsRefreshing(true);
+      await loadProject(true);
+      
+      // Refresh anche i progetti nella lista se disponibile
+      if (refreshAllProjects) {
+        await refreshAllProjects();
+      }
+      
+      swal.fire({
+        title: "Aggiornato",
+        text: "Dati del progetto aggiornati con successo",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Error refreshing project:", error);
+      swal.fire("Errore", "Errore nell'aggiornamento dei dati", "error");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Gestione aggiornamento progetto
   const handleProjectUpdate = async () => {
@@ -575,7 +599,6 @@ const ProjectDetailContainer = ({
       return;
     }
     
-    // Se il progetto usa stages, assicurati di usare sempre il task completo dal progetto principale
     let completeTask = task;
     if (project?.UseStages && project?.tasks) {
       const fullTask = project.tasks.find(t => t.TaskID === task.TaskID);
@@ -795,6 +818,18 @@ const ProjectDetailContainer = ({
         </h1>
 
         <div className="flex items-center gap-2">
+          <Button
+            id="refreshProjectButton"
+            variant="outline"
+            size="sm"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="bg-white text-[var(--primary)] hover:bg-gray-100"
+            title="Aggiorna dati progetto"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+
           <Button
             id="editProjectButton"
             variant=""
@@ -1206,7 +1241,7 @@ const ProjectDetailContainer = ({
         defaultWidth={600}
         minWidth={500}
         maxWidth={900}
-        key={selectedTask?.TaskID} // Forza il re-render quando cambia il task
+        key={selectedTask?.TaskID}
       />
 
       {/* New Task Panel - Disponibile sempre, anche con stages */}

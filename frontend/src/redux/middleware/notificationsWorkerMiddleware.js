@@ -367,7 +367,8 @@ const notificationsWorkerMiddleware = (store) => {
               });
             }
             break;
-      
+
+            
             case "new_message":
               if (event.data.newMessagesInfo) {
                 try {
@@ -375,12 +376,13 @@ const notificationsWorkerMiddleware = (store) => {
                   if (!state?.notifications) {
                     return;
                   }
-            
+
                   const doNotDisturbEnabled = localStorage.getItem("doNotDisturbEnabled") === "true";
                   
                   if (doNotDisturbEnabled) {
+                    console.log("[Middleware] DND abilitato, skip notifica");
                   }
-            
+
                   let currentUserId = null;
                   try {
                     const userStr = localStorage.getItem("user");
@@ -391,7 +393,17 @@ const notificationsWorkerMiddleware = (store) => {
                   } catch (e) {
                     console.error("Errore recupero userId:", e);
                   }
-            
+
+                  // IMPORTANTE: Marca che stiamo processando nuovi messaggi
+                  // Questo previene interferenze con altri aggiornamenti del contatore
+                  store.dispatch({
+                    type: "notifications/setPendingUnreadCount",
+                    payload: {
+                      count: state.notifications.unreadCount,
+                      timestamp: Date.now()
+                    }
+                  });
+
                   event.data.newMessagesInfo.forEach((messageInfo) => {
                     const {
                       notificationId,
@@ -403,18 +415,18 @@ const notificationsWorkerMiddleware = (store) => {
                       isOpenChat,
                       senderId
                     } = messageInfo;
-            
+
                     if (isOwnMessage) {
-                    
+                      console.log(`[Middleware] Skip messaggio proprio per chat ${notificationId}`);
                       return;
                     }
-            
+
                     const isActuallyOpen = state.notifications.openChatIds.has(parseInt(notificationId));
                     
-                   
-            
+                    console.log(`[Middleware] Nuovo messaggio per chat ${notificationId}, aperta: ${isActuallyOpen}`);
+
                     if (isActuallyOpen) {
-                      
+                      console.log(`[Middleware] Chat ${notificationId} è aperta, aggiorno solo i dati`);
                       store.dispatch(fetchNotificationById(parseInt(notificationId), true));
                       
                       document.dispatchEvent(
@@ -441,7 +453,7 @@ const notificationsWorkerMiddleware = (store) => {
                       
                       return;
                     }
-            
+
                     // IMPORTANTE: Cerca la notifica in TUTTI i possibili posti
                     let notification = null;
                     
@@ -460,31 +472,28 @@ const notificationsWorkerMiddleware = (store) => {
                     }
                     
                     if (!notification) {
-                    
+                      console.warn(`[Middleware] Notifica ${notificationId} non trovata nello store`);
                     }
-            
+
                     const notificationCache = (window._notificationCache = window._notificationCache || {});
                     const now = Date.now();
-            
+
                     if (
                       notificationCache[notificationId] &&
                       now - notificationCache[notificationId].timestamp < 30000
                     ) {
-                   
+                      console.log(`[Middleware] Skip notifica duplicata per ${notificationId}`);
                       return;
                     }
-            
+
                     if (!currentUserId) {
                       currentUserId = -1;
                     }
-            
+
                     if (!doNotDisturbEnabled) {
-                      // RIMOSSO: La creazione diretta della notifica web qui!
-                      // Lasciamo che sia SOLO il NotificationService a gestire le notifiche
-                      
                       // Usa SOLO il NotificationService per notifiche
                       if (window.notificationService && typeof window.notificationService.notifyNewMessage === 'function') {
-                     
+                        console.log(`[Middleware] Invio notifica per chat ${notificationId}`);
                         window.notificationService.notifyNewMessage(
                           messagePreview,
                           senderName,
@@ -492,35 +501,48 @@ const notificationsWorkerMiddleware = (store) => {
                           senderId
                         );
                       } else {
-                       
+                        console.error("[Middleware] NotificationService non disponibile");
                       }
                     } else {
-                     
+                      console.log(`[Middleware] DND attivo, notifica salvata per chat ${notificationId}`);
                       
                       if (window.notificationService && window.notificationService.dndNotifiedChatIds) {
                         window.notificationService.dndNotifiedChatIds.add(notificationId);
                       }
                     }
-            
+
                     // Aggiorna cache notifiche
                     notificationCache[notificationId] = {
                       timestamp: now,
                       messageCount: newMessageCount,
                     };
-            
-                    // Emetti evento per aggiornare UI
-                    document.dispatchEvent(
-                      new CustomEvent("unread-count-changed", {
-                        detail: {
-                          notificationId,
-                          timestamp: now,
-                        },
-                      }),
-                    );
-            
+
+                    // NON emettere eventi che possono interferire con il contatore
+                    
                     // Aggiorna la notifica nello store
                     store.dispatch(fetchNotificationById(notificationId, false));
                   });
+                  
+                  // IMPORTANTE: Forza un reload delle notifiche per ottenere il contatore aggiornato
+                  // con un delay leggermente maggiore per evitare race conditions
+                  if (event.data.newMessagesInfo.length > 0) {
+                    console.log("[Middleware] Forzando reload notifiche per aggiornare contatore...");
+                    
+                    // Delay maggiore per dare tempo al backend di aggiornare completamente
+                    setTimeout(() => {
+                      // Clear pending count prima del reload
+                      store.dispatch({
+                        type: "notifications/clearPendingUnreadCount"
+                      });
+                      
+                      // Usa l'azione di reload del worker
+                      store.dispatch({
+                        type: "notifications/reload",
+                        payload: { highPriority: true }
+                      });
+                    }, 1000); // Aumentato a 1 secondo
+                  }
+                  
                 } catch (e) {
                   console.error("Errore elaborazione nuovi messaggi:", e);
                 }
