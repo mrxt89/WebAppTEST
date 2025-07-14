@@ -1595,45 +1595,53 @@ const notificationsSlice = createSlice({
       // Toggle read/unread status
       .addCase(toggleReadUnread.fulfilled, (state, action) => {
         const { notificationId, isReadByUser } = action.payload;
-
+      
         try {
-         // Aggiorna openChatData se esiste
-         if (state.openChatData[notificationId]) {
-           state.openChatData[notificationId].isReadByUser = isReadByUser;
-         }
-
-         // Aggiorna notifications
+          // Aggiorna openChatData se esiste
+          if (state.openChatData[notificationId]) {
+            state.openChatData[notificationId].isReadByUser = isReadByUser;
+          }
+      
+          // Aggiorna notifications
           const notificationsCopy = [...state.notifications];
           const notificationIndex = notificationsCopy.findIndex(
             (n) => n && n.notificationId === notificationId,
           );
-
+      
           if (notificationIndex !== -1) {
             notificationsCopy[notificationIndex] = {
               ...notificationsCopy[notificationIndex],
               isReadByUser,
             };
-
+      
             const newUnreadCount = notificationsCopy.filter(
-             (n) => n && typeof n === "object" && !n.isReadByUser && n.archived !== "1",
+              (n) => n && typeof n === "object" && !n.isReadByUser && n.archived !== "1" && n.archived !== 1
             ).length;
-
+      
             state.notifications = notificationsCopy;
-            state.unreadCount = newUnreadCount;
-
+            
+            // IMPORTANTE: NON aggiornare unreadCount qui se c'è un aggiornamento in corso dal worker
+            // Lascia che sia il worker a gestire il contatore totale
+            if (!state.unreadCountLastModified || Date.now() - state.unreadCountLastModified > 5000) {
+              state.unreadCount = newUnreadCount;
+            }
+      
             if (isReadByUser) {
               state.unreadMessages = state.unreadMessages.filter(
                 (message) => message.notificationId !== notificationId,
               );
             }
-
+      
             const eventDetail = {
               notificationId,
               isReadByUser,
-              unreadCount: newUnreadCount,
+              unreadCount: state.unreadCount, // Usa il contatore corrente dello state
               timestamp: new Date().toISOString(),
             };
-
+      
+            // IMPORTANTE: Rimuovi o commenta l'evento read-status-changed
+            // Questo evento sta causando interferenze con il contatore
+            /*
             requestAnimationFrame(() => {
               try {
                 document.dispatchEvent(
@@ -1642,14 +1650,16 @@ const notificationsSlice = createSlice({
                   }),
                 );
               } catch (eventError) {
-               console.error("Errore nell'emissione dell'evento read-status-changed:", eventError);
+                console.error("Errore nell'emissione dell'evento read-status-changed:", eventError);
               }
             });
+            */
           }
         } catch (error) {
-         console.error("Errore nell'aggiornamento dello stato di lettura:", error);
+          console.error("Errore nell'aggiornamento dello stato di lettura:", error);
         }
       })
+      
 
       // Toggle pin status
       .addCase(togglePin.fulfilled, (state, action) => {

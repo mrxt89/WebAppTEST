@@ -16,25 +16,28 @@ let openChatIds = new Set();
 let recentNotifications = new Set();
 let notificationsWithNewMessages = new Set();
 let lastUnreadCount = null;
-let lastDataHash = null; // NUOVO: Per controllare se i dati sono effettivamente cambiati
+let lastDataHash = null;
+
+// IMPORTANTE: Aggiungi variabile per tracciare l'ultimo unreadCount valido
+let lastValidUnreadCount = 0;
 
 // Constants
-const POLLING_INTERVAL = 15000; // 15 secondi per il polling normale
-const FORCED_REFRESH_INTERVAL = 1000; // 1 secondo per refresh forzati
+const POLLING_INTERVAL = 15000;
+const FORCED_REFRESH_INTERVAL = 1000;
 const REQUEST_TIMEOUT = 30000;
-const MIN_INTERVAL_BETWEEN_REQUESTS = 5000; // Minimo 5 secondi tra richieste
+const MIN_INTERVAL_BETWEEN_REQUESTS = 5000;
 
 let lastRequestTime = 0;
 
 function logError(...args) {
   const timestamp = new Date().toISOString();
- 
+  console.error(`[Worker ${timestamp}]`, ...args);
 }
 
 function logDebug(...args) {
   if (debugEnabled) {
     const timestamp = new Date().toISOString();
-   
+    console.log(`[Worker ${timestamp}]`, ...args);
   }
 }
 
@@ -43,14 +46,12 @@ function createDataHash(data) {
   if (!data) return null;
   
   if (data.notifications && data.unreadCount !== undefined) {
-    // Per dati paginati
     const key = `${data.unreadCount}_${data.notifications.length}`;
     const firstNotifs = data.notifications.slice(0, 5).map(n => 
       `${n.notificationId}_${n.lastMessage}_${n.messageCount}_${n.isReadByUser}`
     ).join('|');
     return `${key}_${firstNotifs}`;
   } else if (Array.isArray(data)) {
-    // Per array di notifiche
     return data.slice(0, 5).map(n => 
       `${n.notificationId}_${n.lastMessage}_${n.messageCount}_${n.isReadByUser}`
     ).join('|');
@@ -61,41 +62,38 @@ function createDataHash(data) {
 
 // MODIFICA: Gestione migliorata per i cambiamenti
 function haveNotificationsChanged(newData) {
-  // Crea hash dei nuovi dati
   const newHash = createDataHash(newData);
   
-  // Se l'hash è uguale, non ci sono cambiamenti
   if (lastDataHash && newHash === lastDataHash) {
     logDebug("Nessun cambiamento rilevato (hash identico)");
     return false;
   }
   
-  // Salva il nuovo hash
   lastDataHash = newHash;
   
-  // Se è una risposta paginata
   if (newData.notifications && newData.unreadCount !== undefined) {
-    // Controlla il contatore unread
+    // IMPORTANTE: Salva sempre l'ultimo unreadCount valido
+    if (typeof newData.unreadCount === 'number' && newData.unreadCount >= 0) {
+      lastValidUnreadCount = newData.unreadCount;
+    }
+    
     if (lastUnreadCount !== null && lastUnreadCount !== newData.unreadCount) {
       logDebug(`UnreadCount cambiato: ${lastUnreadCount} -> ${newData.unreadCount}`);
       lastUnreadCount = newData.unreadCount;
       return true;
     }
     
-    // Prima volta
     if (lastUnreadCount === null) {
       lastUnreadCount = newData.unreadCount;
       return true;
     }
     
-    // Controlla cambiamenti nelle notifiche
     const newNotifications = newData.notifications || [];
     
     if (!notificationCache || notificationCache.length === 0) {
       return true;
     }
     
-    // Controlla solo cambiamenti strutturali importanti
     for (let i = 0; i < Math.min(10, newNotifications.length); i++) {
       const newNotif = newNotifications[i];
       const cachedNotif = notificationCache[i];
@@ -113,8 +111,7 @@ function haveNotificationsChanged(newData) {
     return false;
   }
   
-  // Per array di notifiche (singola notifica)
-  return true; // Sempre aggiorna per singole notifiche
+  return true;
 }
 
 async function fetchNotifications(notificationIdToFetch = null) {
@@ -126,7 +123,6 @@ async function fetchNotifications(notificationIdToFetch = null) {
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
 
-  // Controllo throttling più rigoroso
   if (timeSinceLastRequest < MIN_INTERVAL_BETWEEN_REQUESTS && !notificationIdToFetch && !forcedRefreshRequested) {
     logDebug(`Throttling: solo ${timeSinceLastRequest}ms dall'ultima richiesta`);
     scheduleNextFetch(POLLING_INTERVAL);
@@ -190,7 +186,6 @@ async function fetchNotifications(notificationIdToFetch = null) {
       handlePaginatedUpdate(data);
     }
 
-    // Reset forced refresh flag
     forcedRefreshRequested = false;
     highPriorityUpdate = false;
 
@@ -207,7 +202,6 @@ async function fetchNotifications(notificationIdToFetch = null) {
     });
   } finally {
     isRequestInProgress = false;
-    // Pianifica il prossimo fetch con l'intervallo normale
     scheduleNextFetch(POLLING_INTERVAL);
   }
 }
@@ -217,27 +211,41 @@ function handlePaginatedUpdate(data) {
     throw new Error(data.error || "Failed to fetch notifications");
   }
 
-  // Invia sempre il contatore unread
-  self.postMessage({
-    type: "unread_count_update",
-    unreadCount: data.unreadCount,
-    timestamp: Date.now(),
-  });
+  // IMPORTANTE: Il backend ritorna sempre il contatore totale corretto
+  // Non dobbiamo ricalcolarlo localmente!
+  if (typeof data.unreadCount === 'number' && data.unreadCount >= 0) {
+    lastValidUnreadCount = data.unreadCount;
+    
+    // Invia sempre il contatore unread aggiornato
+    self.postMessage({
+      type: "unread_count_update",
+      unreadCount: data.unreadCount,
+      timestamp: Date.now(),
+    });
+    
+    logDebug(`UnreadCount aggiornato a: ${data.unreadCount}`);
+  } else {
+    logError(`UnreadCount non valido ricevuto: ${data.unreadCount}, usando ultimo valido: ${lastValidUnreadCount}`);
+    
+    // Usa l'ultimo valore valido
+    self.postMessage({
+      type: "unread_count_update",
+      unreadCount: lastValidUnreadCount,
+      timestamp: Date.now(),
+    });
+  }
 
-  // Controlla se ci sono cambiamenti
   const hasChanges = haveNotificationsChanged(data);
   
   if (hasChanges) {
     logDebug("Cambiamenti rilevati, invio aggiornamento");
     
     if (data.notifications && data.notifications.length > 0) {
-      // Controlla per nuovi messaggi
-      checkForNewMessages(data.notifications);
-      
-      // Aggiorna cache
+      // IMPORTANTE: Non ricalcolare il contatore qui!
+      // Il backend già fornisce il contatore totale corretto
+      checkForNewMessages(data.notifications, false); // Passa false per non ricalcolare
       notificationCache = data.notifications.slice(0, 20);
       
-      // Invia aggiornamento
       self.postMessage({
         type: "partial_notifications_update", 
         notifications: data.notifications,
@@ -259,7 +267,6 @@ function handleSingleNotificationUpdate(notification, notificationIdToFetch) {
   
   const notifications = [notification];
   
-  // Sempre invia aggiornamenti per singole notifiche
   self.postMessage({
     type: "notifications",
     notifications: notifications,
@@ -267,10 +274,47 @@ function handleSingleNotificationUpdate(notification, notificationIdToFetch) {
   });
 }
 
-function checkForNewMessages(notifications) {
+function checkForNewMessages(notifications, shouldRecalculateCount = true) {
   notificationsWithNewMessages.clear();
   
+  // NON ricalcolare il contatore se non richiesto
+  // Il backend fornisce già il contatore totale corretto
+  if (!shouldRecalculateCount) {
+    notifications.forEach(notification => {
+      const cachedNotif = notificationCache.find(n => n.notificationId === notification.notificationId);
+      
+      if (cachedNotif) {
+        const newMsgCount = notification.messageCount || 0;
+        const cachedMsgCount = cachedNotif.messageCount || 0;
+        const newLastMessage = new Date(notification.lastMessage);
+        const cachedLastMessage = new Date(cachedNotif.lastMessage);
+        
+        if (newLastMessage > cachedLastMessage || newMsgCount > cachedMsgCount) {
+          notificationsWithNewMessages.add(notification.notificationId);
+        }
+      } else {
+        // Nuova notifica
+        if (!notification.isReadByUser && !openChatIds.has(notification.notificationId)) {
+          notificationsWithNewMessages.add(notification.notificationId);
+        }
+      }
+    });
+    
+    if (notificationsWithNewMessages.size > 0) {
+      handleNewMessages(notifications);
+    }
+    return;
+  }
+  
+  // Codice originale per quando è richiesto il ricalcolo
+  let newUnreadCount = 0;
+  
   notifications.forEach(notification => {
+    // Conta le notifiche non lette e non archiviate
+    if (!notification.isReadByUser && notification.archived !== 1 && notification.archived !== "1") {
+      newUnreadCount++;
+    }
+    
     const cachedNotif = notificationCache.find(n => n.notificationId === notification.notificationId);
     
     if (cachedNotif) {
@@ -281,9 +325,31 @@ function checkForNewMessages(notifications) {
       
       if (newLastMessage > cachedLastMessage || newMsgCount > cachedMsgCount) {
         notificationsWithNewMessages.add(notification.notificationId);
+        
+        // Se la notifica non era letta prima e ha nuovi messaggi, incrementa il contatore
+        if (!notification.isReadByUser && !openChatIds.has(notification.notificationId)) {
+          logDebug(`Nuovi messaggi per notifica non letta ${notification.notificationId}`);
+        }
+      }
+    } else {
+      // Nuova notifica
+      if (!notification.isReadByUser && !openChatIds.has(notification.notificationId)) {
+        notificationsWithNewMessages.add(notification.notificationId);
       }
     }
   });
+  
+  // Aggiorna il contatore unread se necessario
+  if (newUnreadCount !== lastValidUnreadCount) {
+    logDebug(`Aggiornamento unreadCount da checkForNewMessages: ${lastValidUnreadCount} -> ${newUnreadCount}`);
+    lastValidUnreadCount = newUnreadCount;
+    
+    self.postMessage({
+      type: "unread_count_update",
+      unreadCount: newUnreadCount,
+      timestamp: Date.now(),
+    });
+  }
   
   if (notificationsWithNewMessages.size > 0) {
     handleNewMessages(notifications);
@@ -296,7 +362,6 @@ function handleNewMessages(notifications) {
   notifications
     .filter(notification => notificationsWithNewMessages.has(notification.notificationId))
     .forEach(notification => {
-      // Skip se è una chat aperta
       if (openChatIds.has(notification.notificationId)) {
         return;
       }
@@ -320,7 +385,6 @@ function handleNewMessages(notifications) {
         logError(`Error parsing messages:`, e);
       }
 
-      // Skip messaggi propri
       const isOwnMessage = currentUserId && senderId && 
                           (senderId === currentUserId || 
                            senderId.toString() === currentUserId.toString());
@@ -336,10 +400,15 @@ function handleNewMessages(notifications) {
     });
 
   if (closedChatMessages.length > 0) {
+    // IMPORTANTE: Quando ci sono nuovi messaggi, il backend ha già calcolato il nuovo unreadCount
+    // Non dobbiamo incrementarlo noi, ma usare quello fornito dal backend
+    logDebug(`Nuovi messaggi per ${closedChatMessages.length} chat chiuse. UnreadCount corrente: ${lastValidUnreadCount}`);
+    
     self.postMessage({
       type: "new_message",
       newMessagesInfo: closedChatMessages,
       timestamp: Date.now(),
+      // Rimuovi expectedUnreadCount - lascia che sia il backend a gestire il contatore
     });
   }
 }
@@ -350,13 +419,11 @@ function scheduleNextFetch(interval = POLLING_INTERVAL) {
     return;
   }
 
-  // Cancella timeout esistente
   if (pollingTimeout) {
     clearTimeout(pollingTimeout);
     pollingTimeout = null;
   }
 
-  // Usa l'intervallo appropriato
   const actualInterval = forcedRefreshRequested ? FORCED_REFRESH_INTERVAL : interval;
   
   logDebug(`Prossimo fetch tra ${actualInterval}ms`);
@@ -380,10 +447,13 @@ self.onmessage = (event) => {
         currentUserId = data.userId;
         isWorkerActive = true;
         debugEnabled = data.debug || false;
+        
+        // Reset dei contatori all'inizializzazione
+        lastUnreadCount = null;
+        lastValidUnreadCount = 0;
 
         logDebug("Worker inizializzato con userId:", currentUserId);
 
-        // Prima fetch immediata
         fetchNotifications();
         break;
 
@@ -410,7 +480,6 @@ self.onmessage = (event) => {
         forcedRefreshRequested = true;
         highPriorityUpdate = data.highPriority || false;
 
-        // Fetch immediata per reload
         if (pollingTimeout) {
           clearTimeout(pollingTimeout);
         }
@@ -422,7 +491,6 @@ self.onmessage = (event) => {
         apiBaseUrl = data.apiBaseUrl || apiBaseUrl;
         currentUserId = data.userId || currentUserId;
 
-        // Fetch immediata per notifica specifica
         if (pollingTimeout) {
           clearTimeout(pollingTimeout);
         }
@@ -444,7 +512,8 @@ self.onmessage = (event) => {
           timestamp: Date.now(),
           lastUpdateTime,
           isActive: isWorkerActive,
-          currentUserId: currentUserId
+          currentUserId: currentUserId,
+          currentUnreadCount: lastValidUnreadCount
         });
         break;
 
