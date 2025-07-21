@@ -146,6 +146,8 @@ const aiRoutes = require('./routes/aiRoutes');
 const itemAttachmentRoutes = require('./routes/itemAttachmentRoutes');
 const documentLinkRoutes = require('./routes/documentLinkRoutes');
 
+const codingRulesRoutes = require('./routes/codingRulesRoutes');
+
 const app = express();
 
 // Configurazione Multer per upload file
@@ -234,6 +236,7 @@ app.use('/api', projectArticlesRoutes);
 app.use('/api', groupRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api', documentLinkRoutes);
+app.use('/api', codingRulesRoutes);
 
 // Endpoint per servire i file uploadati
 app.get('/api/uploads/*', (req, res) => {

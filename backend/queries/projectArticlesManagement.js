@@ -2804,6 +2804,54 @@ const updateItemDetailsWithValidation = async (itemId, itemData) => {
     }
 };
 
+// Aggiungere alla fine del file projectArticlesManagement.js esistente
+
+/**
+ * Search for similar articles based on root code and description
+ * @param {number} companyId - Company ID
+ * @param {string} rootCode - Root code to search (optional)
+ * @param {string} description - Description to search (optional)
+ * @param {number} excludeId - Article ID to exclude from results (optional)
+ * @param {number} limit - Maximum number of results (default 10)
+ * @param {boolean} erpOnly - Show only ERP articles
+ * @param {boolean} tempOnly - Show only temporary articles
+ * @returns {Promise<Array>} Array of similar articles with similarity scores
+ */
+const searchSimilarArticles = async (companyId, rootCode = '', description = '', excludeId = null, limit = 10, erpOnly = false, tempOnly = false) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+
+        // Set parameters
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('RootCode', sql.VarChar(10), rootCode || '');
+        request.input('Description', sql.NVarChar(128), description || '');
+        request.input('ExcludeId', sql.BigInt, excludeId);
+        request.input('Limit', sql.Int, limit);
+        request.input('ErpOnly', sql.Bit, erpOnly);
+        request.input('TempOnly', sql.Bit, tempOnly);
+
+        // Execute stored procedure
+        const result = await request.execute('MA_ProjectArticles_SearchSimilar');
+        
+        // Process results to add client-side calculations if needed
+        const articles = result.recordset.map(article => ({
+            ...article,
+            // Calculate similarity percentage
+            similarityScore: Math.round((article.TotalScore / 200) * 100), // Max score is 200 (100 code + 100 desc)
+            canModify: article.stato_erp !== 1,
+            isErp: article.stato_erp === 1,
+            // Add formatted date
+            syncDate: article.data_sync_erp ? new Date(article.data_sync_erp).toLocaleDateString('it-IT') : null
+        }));
+        
+        return articles;
+    } catch (err) {
+        console.error('Error searching similar articles:', err);
+        throw err;
+    }
+};
+
 // Esporta tutte le funzioni
 module.exports = {
     addUpdateItem,
@@ -2840,4 +2888,5 @@ module.exports = {
     validateItemCode,
     checkItemCodeExists,
     updateItemDetailsWithValidation,
+    searchSimilarArticles,
 };
