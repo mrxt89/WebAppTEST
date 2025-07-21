@@ -35,7 +35,8 @@ import {
   Hash,
   Building2,
   Layers,
-  HelpCircle, 
+  HelpCircle,
+  AlertTriangle,
 } from "lucide-react";
 import useCategoryActions from "../../../hooks/useCategoryActions";
 import { CustomerSearchSelect } from "./ProjectComponents";
@@ -95,6 +96,7 @@ const ProjectEditModalWithTemplate = ({
   );
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [templateHasStages, setTemplateHasStages] = useState(false);
+  const [showTemplateWarning, setShowTemplateWarning] = useState(false);
 
   // Usa customers o projectCustomers in base a quale è disponibile
   const availableCustomers = customers || projectCustomers || [];
@@ -204,6 +206,7 @@ const ProjectEditModalWithTemplate = ({
     };
     setLocalProject(updatedProject);
     setSelectedTemplateId(null);
+    setShowTemplateWarning(false);
     onChange && onChange(updatedProject);
 
     // Carica i template filtrati per la categoria selezionata
@@ -227,6 +230,7 @@ const ProjectEditModalWithTemplate = ({
     };
     setLocalProject(updatedProject);
     setSelectedTemplateId(null);
+    setShowTemplateWarning(false);
     onChange && onChange(updatedProject);
 
     // Carica i template filtrati per categoria e sottocategoria
@@ -235,10 +239,17 @@ const ProjectEditModalWithTemplate = ({
     }
   };
 
-  // Gestione cambio template - approccio migliorato
+  // Gestione cambio template
   const handleTemplateChange = (value) => {
     const templateId = value === "0" ? null : parseInt(value);
     console.log("Template selezionato:", templateId);
+
+    // Se è un progetto esistente e viene selezionato un template, mostra avviso
+    if (project?.ProjectID && templateId) {
+      setShowTemplateWarning(true);
+    } else {
+      setShowTemplateWarning(false);
+    }
 
     // Aggiorna lo stato
     setSelectedTemplateId(templateId);
@@ -568,12 +579,30 @@ const ProjectEditModalWithTemplate = ({
                     </SelectContent>
                   </Select>
 
-                  {selectedTemplateId && (
+                  {selectedTemplateId && !project?.ProjectID && (
                     <p className="text-xs text-gray-500 mt-1 px-2 py-1 bg-blue-50 rounded border border-blue-100">
                       <Info className="h-3 w-3 inline mr-1" />
                       Le attività verranno create automaticamente dal template.
                       {templateHasStages && " Il template include fasi di lavoro."}
                     </p>
+                  )}
+
+                  {project?.ProjectID && selectedTemplateId && showTemplateWarning && (
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <div className="flex items-start">
+                        <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" />
+                        <div className="text-sm text-yellow-800">
+                          <p className="font-semibold mb-1">Attenzione!</p>
+                          <p>Applicando questo template:</p>
+                          <ul className="list-disc list-inside mt-1 space-y-1">
+                            <li>Verranno eliminate tutte le attività in stato "DA FARE"</li>
+                            <li>Verranno create le nuove attività dal template selezionato</li>
+                            <li>Le attività già avviate o completate non saranno modificate</li>
+                          </ul>
+                          <p className="mt-2 text-xs text-yellow-700">Questa operazione non può essere annullata.</p>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

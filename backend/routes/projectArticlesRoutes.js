@@ -33,7 +33,8 @@ const {
     getERPItemsPaginated,
     validateItemCode,
     checkItemCodeExists,
-    updateItemDetailsWithValidation
+    updateItemDetailsWithValidation,
+    searchSimilarArticles
 } = require('../queries/projectArticlesManagement');
 
 // Ottieni stati degli articoli di progetto
@@ -1001,6 +1002,72 @@ router.get('/projectArticles/items/check-code/:itemCode', authenticateToken, asy
         res.status(500).json({
             success: 0,
             msg: err.message || 'Errore durante la verifica del codice'
+        });
+    }
+});
+
+// Search similar articles by root code and description
+router.get('/projectArticles/searchSimilar', authenticateToken, async (req, res) => {
+    try {
+        const { 
+            rootCode = '', 
+            description = '', 
+            excludeId = null,
+            limit = 10,
+            erpOnly = false,
+            tempOnly = false,
+            searchTerm = ''
+        } = req.query;
+
+        // Get companyId from authenticated user
+        const companyId = req.user.CompanyId;
+
+        // Validation
+        if (!companyId) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'CompanyId obbligatorio'
+            });
+        }
+
+        // If neither rootCode nor description is provided, return empty array
+        if (!rootCode && !description) {
+            return res.json([]);
+        }
+
+        // Convert string boolean parameters to actual booleans
+        const isErpOnly = erpOnly === 'true' || erpOnly === true;
+        const isTempOnly = tempOnly === 'true' || tempOnly === true;
+
+        // Call the stored procedure through the management function
+        const results = await searchSimilarArticles(
+            companyId,
+            rootCode,
+            description,
+            excludeId ? parseInt(excludeId) : null,
+            parseInt(limit) || 10,
+            isErpOnly,
+            isTempOnly
+        );
+
+        // If searchTerm is provided, apply additional filtering
+        let filteredResults = results;
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filteredResults = results.filter(item => 
+                item.Item.toLowerCase().includes(term) ||
+                item.Description.toLowerCase().includes(term)
+            );
+        }
+
+        // Return the results
+        res.json(filteredResults);
+
+    } catch (error) {
+        console.error('Error searching similar articles:', error);
+        res.status(500).json({
+            success: 0,
+            msg: error.message || 'Errore durante la ricerca articoli simili'
         });
     }
 });

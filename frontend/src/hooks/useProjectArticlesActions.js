@@ -1517,6 +1517,44 @@ const checkERPItemHasBOM = useCallback(
     [makeRequest, validateItemCode, clearValidationCache]
   );
 
+  // Cerca articoli simili basandosi su radice codice e descrizione
+const searchSimilarArticles = useCallback(
+  async (rootCode = '', description = '', excludeId = null, options = {}) => {
+    try {
+      // Costruisci i parametri di query
+      const params = new URLSearchParams({
+        rootCode: rootCode || '',
+        description: description || '',
+      });
+      
+      // Aggiungi parametri opzionali
+      if (excludeId) params.append('excludeId', excludeId);
+      if (options.limit) params.append('limit', options.limit);
+      if (options.erpOnly) params.append('erpOnly', options.erpOnly);
+      if (options.tempOnly) params.append('tempOnly', options.tempOnly);
+      if (options.searchTerm) params.append('searchTerm', options.searchTerm);
+      
+      const response = await makeRequest(
+        `${config.API_BASE_URL}/projectArticles/searchSimilar?${params}`,
+        { method: "GET" }
+      );
+      
+      // Se la risposta è un array, ritornalo direttamente
+      if (Array.isArray(response)) {
+        return response;
+      }
+      
+      // Altrimenti ritorna array vuoto
+      return [];
+    } catch (error) {
+      console.error("Error searching similar articles:", error);
+      setError(error.message || "Errore durante la ricerca articoli simili");
+      return [];
+    }
+  },
+  [makeRequest]
+);  
+
   return {
     // Stati
     items,
@@ -1593,6 +1631,7 @@ const checkERPItemHasBOM = useCallback(
     checkERPItemHasBOM,
 
     getERPItemsPaginated,
+    searchSimilarArticles,
   };
 };
 

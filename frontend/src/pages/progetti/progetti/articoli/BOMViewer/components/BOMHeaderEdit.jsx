@@ -1,4 +1,5 @@
-// BOMHeaderEdit.jsx - Componente per gestire la modalità di modifica dell'header BOM
+// src/pages/progetti/progetti/articoli/BOMViewer/components/BOMHeaderEdit.jsx
+
 import React, { useState, useEffect } from "react";
 import { useBOMViewer } from "../context/BOMViewerContext";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Save, X, AlertCircle } from "lucide-react";
+import { Save, X, AlertCircle, Code } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import {
   Dialog,
@@ -22,9 +23,12 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { swal } from "@/lib/common";
+import RecodingWizard from "./codingRules/RecodingWizard";
 
 const BOMHeaderEdit = () => {
   const {
+    item,
     bom,
     editMode,
     setEditMode,
@@ -37,6 +41,8 @@ const BOMHeaderEdit = () => {
     updateItemDetails,
     smartRefresh,
     reorderBOMRoutings,
+    selectedComponents,
+    project,
   } = useBOMViewer();
 
   const [bomData, setBomData] = useState({
@@ -47,6 +53,10 @@ const BOMHeaderEdit = () => {
 
   const [showCancelConfirmDialog, setShowCancelConfirmDialog] = useState(false);
   const [savingProgress, setSavingProgress] = useState(null);
+  
+  // Stati per ricodifica
+  const [recodingWizardOpen, setRecodingWizardOpen] = useState(false);
+  const [recodingItems, setRecodingItems] = useState([]);
 
   // Stati disponibili per la distinta
   const availableStatuses = [
@@ -87,6 +97,107 @@ const BOMHeaderEdit = () => {
   // Funzione per controllare se ci sono modifiche
   const hasChanges = () => {
     return Object.keys(pendingChanges).length > 0;
+  };
+
+  // Handler per ricodifica articolo principale
+  const handleRecodeRoot = () => {
+    // Verifica se l'articolo è bloccato
+    if (item?.stato_erp === 1) {
+      toast({
+        title: "Articolo bloccato",
+        description: "L'articolo principale è presente in ERP e non può essere ricodificato",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Crea oggetto per l'articolo principale
+    const rootComponent = {
+      id: `component-${item.Id}-0`,
+      type: "component",
+      data: {
+        ComponentId: item.Id,
+        ComponentItemCode: item.Item,
+        Item: item.Item,
+        Description: item.Description,
+        Level: 0,
+        IsRoot: true,
+        Nature: item.Nature || 22413312,
+        BaseUoM: item.BaseUoM || "PZ",
+        stato_erp: item.stato_erp || 0
+      }
+    };
+
+    setRecodingItems([rootComponent]);
+    setRecodingWizardOpen(true);
+  };
+
+  // Handler per ricodifica componenti selezionati
+  const handleRecodeSelected = async () => {
+    if (!selectedComponents || selectedComponents.length === 0) {
+      toast({
+        title: "Nessun componente selezionato",
+        description: "Seleziona almeno un componente da ricodificare",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Verifica componenti bloccati
+    const lockedComponents = selectedComponents.filter(c => 
+      c.data && c.data.stato_erp === 1
+    );
+    
+    if (lockedComponents.length > 0) {
+      const result = await swal.fire({
+        title: "Attenzione",
+        html: `
+          <p><strong>${lockedComponents.length} componenti</strong> sono presenti in ERP e non possono essere ricodificati.</p>
+          <p>Vuoi procedere con i rimanenti <strong>${selectedComponents.length - lockedComponents.length} componenti</strong>?</p>
+        `,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Procedi",
+        cancelButtonText: "Annulla",
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+      });
+
+      if (!result.isConfirmed) {
+        return;
+      }
+    }
+
+    // Filtra solo i componenti ricodificabili
+    const recodableComponents = selectedComponents.filter(c => 
+      c.data && c.data.stato_erp !== 1
+    );
+
+    if (recodableComponents.length === 0) {
+      toast({
+        title: "Nessun componente ricodificabile",
+        description: "Tutti i componenti selezionati sono bloccati",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setRecodingItems(recodableComponents);
+    setRecodingWizardOpen(true);
+  };
+
+  // Handler per applicazione ricodifica
+  const handleApplyRecoding = async (result) => {
+    // La ricodifica è già stata applicata nel wizard
+    // Qui possiamo fare azioni aggiuntive se necessario
+    
+    // Chiudi il wizard
+    setRecodingWizardOpen(false);
+    
+    // Reset items
+    setRecodingItems([]);
+    
+    // Il refresh è già stato fatto dal wizard tramite smartRefresh
   };
 
   // Funzione per salvare tutte le modifiche
@@ -388,121 +499,150 @@ const BOMHeaderEdit = () => {
   const totalChanges = changesCount.header + changesCount.components + changesCount.items + changesCount.cycles;
 
   return (
-    <div className="bg-amber-50 p-4 border-b border-amber-200">
-      <div className="space-y-4">
-        {/* Form di modifica header */}
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <Label htmlFor="bomCode">Codice BOM</Label>
-            <Input
-              id="bomCode"
-              value={bomData.code}
-              onChange={(e) => handleHeaderChange("code", e.target.value)}
-              className="bg-white"
-              disabled={loading}
-            />
+    <>
+      <div className="bg-amber-50 p-4 border-b border-amber-200">
+        <div className="space-y-4">
+          {/* Form di modifica header */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="bomCode">Codice BOM</Label>
+              <Input
+                id="bomCode"
+                value={bomData.code}
+                onChange={(e) => handleHeaderChange("code", e.target.value)}
+                className="bg-white"
+                disabled={loading}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="bomDescription">Descrizione</Label>
+              <Input
+                id="bomDescription"
+                value={bomData.description}
+                onChange={(e) => handleHeaderChange("description", e.target.value)}
+                className="bg-white"
+                disabled={loading}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="bomStatus">Stato</Label>
+              <Select 
+                value={bomData.status} 
+                onValueChange={(value) => handleHeaderChange("status", value)}
+                disabled={loading}
+              >
+                <SelectTrigger id="bomStatus" className="bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableStatuses.map((status) => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          
-          <div>
-            <Label htmlFor="bomDescription">Descrizione</Label>
-            <Input
-              id="bomDescription"
-              value={bomData.description}
-              onChange={(e) => handleHeaderChange("description", e.target.value)}
-              className="bg-white"
-              disabled={loading}
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="bomStatus">Stato</Label>
-            <Select 
-              value={bomData.status} 
-              onValueChange={(value) => handleHeaderChange("status", value)}
-              disabled={loading}
-            >
-              <SelectTrigger id="bomStatus" className="bg-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availableStatuses.map((status) => (
-                  <SelectItem key={status.value} value={status.value}>
-                    {status.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
 
-        {/* Riepilogo modifiche e pulsanti azione */}
-        <div className="flex items-center justify-between pt-2 border-t border-amber-200">
-          <div className="flex items-center gap-4">
-            {totalChanges > 0 && (
-              <>
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
-                  <span className="text-sm font-medium text-amber-700">
-                    Modifiche non salvate:
-                  </span>
-                </div>
-                
-                {changesCount.header > 0 && (
-                  <Badge variant="outline" className="bg-white">
-                    Header
-                  </Badge>
-                )}
-                
-                {changesCount.components > 0 && (
-                  <Badge variant="outline" className="bg-white">
-                    {changesCount.components} componenti
-                  </Badge>
-                )}
-                
-                {changesCount.items > 0 && (
-                  <Badge variant="outline" className="bg-white">
-                    {changesCount.items} articoli
-                  </Badge>
-                )}
-                
-                {changesCount.cycles > 0 && (
-                  <Badge variant="outline" className="bg-white">
-                    {changesCount.cycles} cicli
-                  </Badge>
-                )}
-              </>
+          {/* Pulsanti ricodifica */}
+          <div className="flex items-center gap-2 pt-2 border-t border-amber-200">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRecodeRoot}
+              disabled={item?.stato_erp === 1 || loading}
+              className="bg-white"
+            >
+              <Code className="h-4 w-4 mr-1" />
+              Ricodifica principale
+            </Button>
+
+            {selectedComponents && selectedComponents.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRecodeSelected}
+                disabled={loading}
+                className="bg-white"
+              >
+                <Code className="h-4 w-4 mr-1" />
+                Ricodifica selezionati ({selectedComponents.length})
+              </Button>
             )}
           </div>
 
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleCancelEditing}
-              disabled={loading}
-            >
-              <X className="h-4 w-4 mr-1" />
-              Annulla
-            </Button>
-            
-            <Button
-              onClick={handleSaveAllChanges}
-              disabled={loading || totalChanges === 0}
-            >
-              <Save className="h-4 w-4 mr-1" />
-              Salva tutto ({totalChanges})
-            </Button>
-          </div>
-        </div>
+          {/* Riepilogo modifiche e pulsanti azione */}
+          <div className="flex items-center justify-between pt-2 border-t border-amber-200">
+            <div className="flex items-center gap-4">
+              {totalChanges > 0 && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <span className="text-sm font-medium text-amber-700">
+                      Modifiche non salvate:
+                    </span>
+                  </div>
+                  
+                  {changesCount.header > 0 && (
+                    <Badge variant="outline" className="bg-white">
+                      Header
+                    </Badge>
+                  )}
+                  
+                  {changesCount.components > 0 && (
+                    <Badge variant="outline" className="bg-white">
+                      {changesCount.components} componenti
+                    </Badge>
+                  )}
+                  
+                  {changesCount.items > 0 && (
+                    <Badge variant="outline" className="bg-white">
+                      {changesCount.items} articoli
+                    </Badge>
+                  )}
+                  
+                  {changesCount.cycles > 0 && (
+                    <Badge variant="outline" className="bg-white">
+                      {changesCount.cycles} cicli
+                    </Badge>
+                  )}
+                </>
+              )}
+            </div>
 
-        {/* Indicatore di progresso durante il salvataggio */}
-        {savingProgress && (
-          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
-            <div className="flex items-center gap-2 text-sm text-blue-700">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-700"></div>
-              <span>{savingProgress}</span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleCancelEditing}
+                disabled={loading}
+              >
+                <X className="h-4 w-4 mr-1" />
+                Annulla
+              </Button>
+              
+              <Button
+                onClick={handleSaveAllChanges}
+                disabled={loading || totalChanges === 0}
+              >
+                <Save className="h-4 w-4 mr-1" />
+                Salva tutto ({totalChanges})
+              </Button>
             </div>
           </div>
-        )}
+
+          {/* Indicatore di progresso durante il salvataggio */}
+          {savingProgress && (
+            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-center gap-2 text-sm text-blue-700">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-700"></div>
+                <span>{savingProgress}</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Dialog conferma annullamento */}
@@ -524,7 +664,21 @@ const BOMHeaderEdit = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      {/* Wizard ricodifica */}
+      {recodingWizardOpen && (
+        <RecodingWizard
+          items={recodingItems}
+          companyId={project?.CompanyId || 1}
+          userId={1} // TODO: Prendere dall'autenticazione
+          onClose={() => {
+            setRecodingWizardOpen(false);
+            setRecodingItems([]);
+          }}
+          onApply={handleApplyRecoding}
+        />
+      )}
+    </>
   );
 };
 

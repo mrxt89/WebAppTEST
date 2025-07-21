@@ -1,4 +1,5 @@
-// TreeNode.jsx - Versione completa con supporto per livello 0 non eliminabile
+// src/pages/progetti/progetti/articoli/BOMViewer/components/BOMTreeView/TreeNode.jsx
+
 import React, { useEffect, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import {
@@ -199,13 +200,16 @@ const TreeNode = ({
     },
   });
 
-  // Determina se il componente è in uno stato che ne impedisce la modifica
-  // MODIFICA: Il livello 0 è sempre bloccato
+  // MODIFICA: Il livello 0 è bloccato solo se NON siamo in editMode
+  // In editMode può essere selezionato per la ricodifica ma non eliminato
   const isLocked =
-    isRootNode || // Livello 0 sempre bloccato
+    (isRootNode && !editMode) || // Root bloccato solo se non in edit mode
     (node.type === "component" &&
       (node.data.parentBOMStato_erp === "1" ||
         node.data.parentBOMStato_erp === 1));
+
+  // NUOVO: Flag per indicare se il root può essere ricodificato
+  const canRecodeRoot = isRootNode && editMode && node.data.stato_erp !== 1;
 
   // Verifica se il componente ha una distinta in MAGO (ERP)
   const hasMagoBOM =
@@ -255,10 +259,9 @@ const TreeNode = ({
   const indentPerLevel = 24; // Pixel di indentazione per ogni livello
   const indent = level * indentPerLevel + baseIndent;
 
-  // Check if node is selected via checkbox
+  // MODIFICA: Permetti la selezione del root solo in editMode
   const isChecked =
     node.type === "component" &&
-    !isRootNode && // Non permettere la selezione del root
     selectedComponents.some((comp) => {
       const compUniqueId =
         comp._uniqueSelectionId || generateUniqueNodeId(comp);
@@ -286,8 +289,8 @@ const TreeNode = ({
 
   const handleCheckboxChange = (e) => {
     e.stopPropagation(); // Prevent node selection
-    // MODIFICA: Non permettere la selezione del livello 0
-    if (onNodeCheck && !isLocked && !isRootNode) {
+    // MODIFICA: Permetti la selezione del root solo se siamo in editMode e può essere ricodificato
+    if (onNodeCheck && !isLocked) {
       onNodeCheck(node, e.target.checked);
     }
   };
@@ -296,7 +299,7 @@ const TreeNode = ({
   const getNodeText = () => {
     if (node.type === "component") {
       // NUOVO: Controlla se c'è una modifica pendente per il codice
-      let code = node.data.ComponentItemCode || node.data.ComponentCode || "";
+      let code = node.data.ComponentItemCode || node.data.ComponentCode || node.data.Item || "";
       let description = node.data.ComponentItemDescription || node.data.Description || "";
 
       // Se ci sono modifiche pendenti, usa i valori modificati
@@ -367,7 +370,7 @@ const TreeNode = ({
       "flex items-center py-1 rounded cursor-pointer hover:bg-gray-100 transition-colors relative",
       selected && "bg-blue-50 text-blue-700 font-medium",
       node.type === "cycle" && "italic text-green-700", // Special styling for cycles
-      isLocked && !isRootNode && "opacity-75", // Lower opacity for locked components (ma non per il root)
+      isLocked && !canRecodeRoot && "opacity-75", // Lower opacity for locked components (ma non per il root se può essere ricodificato)
       isRootNode && "bg-gray-50 hover:bg-gray-100", // Sfondo speciale per il root
       isCurrentDragOver && "ring-1 ring-gray-300", // Sottile bordo per indicare che è possibile fare drop
       hasPendingChanges && editMode && "bg-amber-50 hover:bg-amber-100", // NUOVO: Evidenzia le righe con modifiche
@@ -392,6 +395,7 @@ const TreeNode = ({
       attrs["data-locked"] = isLocked ? "true" : "false";
       attrs["data-mago-bom"] = hasMagoBOM ? "true" : "false";
       attrs["data-has-changes"] = hasPendingChanges ? "true" : "false"; // NUOVO
+      attrs["data-can-recode"] = canRecodeRoot ? "true" : "false"; // NUOVO
 
       if (node.data.Path) {
         const pathParts = node.data.Path.split(".");
@@ -412,12 +416,16 @@ const TreeNode = ({
 
   // Costruisci un tooltip per componenti bloccati
   const getLockedTooltip = () => {
-    if (!isLocked) return null;
+    if (!isLocked && !isRootNode) return null;
 
     let message = "Componente non modificabile";
 
-    if (isRootNode) {
-      message = "L'articolo principale non può essere eliminato o modificato";
+    if (isRootNode && !editMode) {
+      message = "Entra in modalità modifica per ricodificare l'articolo principale";
+    } else if (isRootNode && node.data.stato_erp === 1) {
+      message = "L'articolo principale è presente in ERP e non può essere ricodificato";
+    } else if (isRootNode && canRecodeRoot) {
+      message = "L'articolo principale può essere ricodificato ma non eliminato";
     } else if (node.data.bomStato_erp === "1" || node.data.bomStato_erp === 1) {
       message =
         "Questo componente è presente in ERP (Mago) e non può essere modificato";
@@ -541,20 +549,21 @@ const TreeNode = ({
           )}
         </div>
 
-        {/* Checkbox for components - NASCOSTO per il livello 0 */}
-        {node.type === "component" && !isRootNode && (
-          <Checkbox
-            className={`mr-1.5 h-3.5 w-3.5 ${isChecked ? "bg-primary" : ""}`}
-            checked={isChecked}
-            disabled={isLocked && editMode}
-            onClick={(e) => e.stopPropagation()}
-            onCheckedChange={(value) => onNodeCheck && onNodeCheck(node, value)}
-          />
-        )}
-
-        {/* Spazio vuoto al posto della checkbox per il root */}
-        {node.type === "component" && isRootNode && (
-          <span className="w-5 h-3.5 mr-1.5" />
+        {/* MODIFICA: Checkbox visibile anche per root se in editMode e non bloccato da ERP */}
+        {node.type === "component" && (
+          <>
+            {(editMode && canRecodeRoot) || !isRootNode ? (
+              <Checkbox
+                className={`mr-1.5 h-3.5 w-3.5 ${isChecked ? "bg-primary" : ""}`}
+                checked={isChecked}
+                disabled={isLocked || (isRootNode && node.data.stato_erp === 1)}
+                onClick={(e) => e.stopPropagation()}
+                onCheckedChange={(value) => onNodeCheck && onNodeCheck(node, value)}
+              />
+            ) : (
+              <span className="w-5 h-3.5 mr-1.5" />
+            )}
+          </>
         )}
 
         {/* Node icon */}
@@ -577,7 +586,7 @@ const TreeNode = ({
                 {getNodeText()}
               </span>
               {getModifiedIndicator()}
-              {isLocked && getLockedTooltip()}
+              {(isLocked || (isRootNode && !canRecodeRoot)) && getLockedTooltip()}
               {hasMagoBOM && getMagoBadge()}
               {getRootBadge()}
             </div>

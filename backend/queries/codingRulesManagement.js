@@ -1,0 +1,827 @@
+const sql = require('mssql');
+const config = require('../config');
+
+/**
+ * Get coding hierarchy based on parent selection
+ * @param {number} companyId - Company ID
+ * @param {number} categoryId - Category ID (optional)
+ * @param {number} macroFamilyId - MacroFamily ID (optional)
+ * @param {number} familyId - Family ID (optional)
+ * @param {number} typeId - Type ID (optional)
+ * @returns {Promise<Array>} Hierarchy items
+ */
+const getCodingHierarchy = async (companyId, categoryId = null, macroFamilyId = null, familyId = null, typeId = null) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('CategoryId', sql.BigInt, categoryId);
+        request.input('MacroFamilyId', sql.BigInt, macroFamilyId);
+        request.input('FamilyId', sql.BigInt, familyId);
+        request.input('TypeId', sql.BigInt, typeId);
+
+        const result = await request.execute('MA_CodingRules_GetHierarchy');
+        
+        return result.recordset;
+    } catch (err) {
+        console.error('Error getting coding hierarchy:', err);
+        throw err;
+    }
+};
+
+/**
+ * Get next sequential number for a specific root code
+ * @param {number} companyId - Company ID
+ * @param {string} macroFamilyCode - MacroFamily code (1 char)
+ * @param {string} familyCode - Family code (3 chars)
+ * @param {string} typeCode - Type code (3 chars)
+ * @param {string} aliasCode - Alias code (3 chars)
+ * @returns {Promise<number>} Next sequential number
+ */
+const getNextSequential = async (companyId, macroFamilyCode, familyCode, typeCode, aliasCode) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('MacroFamilyCode', sql.VarChar(1), macroFamilyCode);
+        request.input('FamilyCode', sql.VarChar(3), familyCode);
+        request.input('TypeCode', sql.VarChar(3), typeCode);
+        request.input('AliasCode', sql.VarChar(3), aliasCode);
+        request.output('NextSequential', sql.Int);
+
+        await request.execute('MA_CodingRules_GetNextSequential');
+        
+        return request.parameters.NextSequential.value;
+    } catch (err) {
+        console.error('Error getting next sequential:', err);
+        throw err;
+    }
+};
+
+/**
+ * Validate a code
+ * @param {number} companyId - Company ID
+ * @param {string} itemCode - Item code to validate
+ * @returns {Promise<{isValid: boolean, errorMessage: string}>} Validation result
+ */
+const validateCode = async (companyId, itemCode) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('ItemCode', sql.VarChar(64), itemCode);
+        request.output('IsValid', sql.Bit);
+        request.output('ErrorMessage', sql.NVarChar(500));
+
+        await request.execute('MA_CodingRules_ValidateCode');
+        
+        return {
+            isValid: request.parameters.IsValid.value,
+            errorMessage: request.parameters.ErrorMessage.value
+        };
+    } catch (err) {
+        console.error('Error validating code:', err);
+        throw err;
+    }
+};
+
+/**
+ * Apply batch recoding
+ * @param {number} companyId - Company ID
+ * @param {number} userId - User ID performing the operation
+ * @param {Array} items - Array of items to recode
+ * @returns {Promise<{success: number, successCount: number, errorCount: number, msg: string}>} Operation result
+ */
+const applyBatchRecoding = async (companyId, userId, items) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        console.log('Items ricevuti:', JSON.stringify(items, null, 2));
+        
+        // Create TVP (Table-Valued Parameter)
+        const tvp = new sql.Table('MA_CodingRules_ItemsToRecode');
+        tvp.columns.add('ItemId', sql.BigInt);
+        tvp.columns.add('OldCode', sql.VarChar(64));
+        tvp.columns.add('NewCode', sql.VarChar(64));
+        tvp.columns.add('NewDescription', sql.NVarChar(128));
+        tvp.columns.add('MacroFamilyId', sql.BigInt);
+        tvp.columns.add('FamilyId', sql.BigInt);
+        tvp.columns.add('TypeId', sql.BigInt);
+        tvp.columns.add('AliasId', sql.BigInt);
+        tvp.columns.add('Measures', sql.VarChar(2));
+        tvp.columns.add('Sequential', sql.Int);
+        tvp.columns.add('UseExistingArticleId', sql.BigInt);
+        tvp.columns.add('ReplaceWithExisting', sql.Bit);
+
+        // Add rows to TVP
+        items.forEach(item => {
+            const useExistingArticleId = item.UseExistingArticleId ? 
+                (typeof item.UseExistingArticleId === 'string' ? 
+                    parseInt(item.UseExistingArticleId) : 
+                    item.UseExistingArticleId) : 
+                null;
+
+            console.log('Aggiungendo riga TVP:', {
+                ItemId: item.ItemId,
+                OldCode: item.OldCode,
+                NewCode: item.NewCode,
+                UseExistingArticleId: useExistingArticleId,
+                ReplaceWithExisting: item.ReplaceWithExisting ? 1 : 0
+            });
+
+            tvp.rows.add(
+                item.ItemId,
+                item.OldCode,
+                item.NewCode || item.OldCode,
+                item.NewDescription || null,
+                item.MacroFamilyId || null,
+                item.FamilyId || null,
+                item.TypeId || null,
+                item.AliasId || null,
+                item.Measures || null,
+                item.Sequential || null,
+                useExistingArticleId,
+                item.ReplaceWithExisting ? 1 : 0
+            );
+        });
+
+        console.log('TVP rows count:', tvp.rows.length);
+
+        const request = pool.request();
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('UserId', sql.Int, userId);
+        request.input('Items', tvp);
+        request.output('SuccessCount', sql.Int);
+        request.output('ErrorCount', sql.Int);
+
+        console.log('Eseguendo stored procedure MA_CodingRules_ApplyBatch...');
+        
+        // Esegui la stored procedure
+        const result = await request.execute('MA_CodingRules_ApplyBatch');
+        
+        // Recupera i parametri di output
+        let successCount = request.parameters.SuccessCount.value || 0;
+        let errorCount = request.parameters.ErrorCount.value || 0;
+        
+        console.log('Risultato SP:', { successCount, errorCount });
+        
+        // Se abbiamo 0 successi e 0 errori ma abbiamo items, verifica manualmente
+        if (successCount === 0 && errorCount === 0 && items.length > 0) {
+            console.log('ATTENZIONE: La stored procedure non ha restituito contatori. Verifico manualmente...');
+            
+            // Conta manualmente i successi verificando le modifiche nel database
+            let manualSuccessCount = 0;
+            
+            for (const item of items) {
+                try {
+                    const checkRequest = pool.request();
+                    checkRequest.input('CompanyId', sql.Int, companyId);
+                    checkRequest.input('ItemId', sql.BigInt, item.ItemId);
+                    
+                    if (item.ReplaceWithExisting && item.UseExistingArticleId) {
+                        // Verifica se ci sono componenti che puntano al nuovo articolo
+                        checkRequest.input('NewComponentId', sql.BigInt, item.UseExistingArticleId);
+                        
+                        const checkResult = await checkRequest.query(`
+                            SELECT COUNT(*) as Count
+                            FROM MA_ProjectArticles_BOMComponents 
+                            WHERE ComponentId = @NewComponentId 
+                            AND CompanyId = @CompanyId
+                        `);
+                        
+                        if (checkResult.recordset[0].Count > 0) {
+                            manualSuccessCount++;
+                            console.log(`Componente ${item.ItemId} sostituito con successo`);
+                        }
+                    } else {
+                        // Verifica se il codice è stato aggiornato
+                        checkRequest.input('NewCode', sql.VarChar(64), item.NewCode);
+                        
+                        const checkResult = await checkRequest.query(`
+                            SELECT COUNT(*) as Count
+                            FROM MA_ProjectArticles_Items 
+                            WHERE Id = @ItemId 
+                            AND Item = @NewCode 
+                            AND CompanyId = @CompanyId
+                        `);
+                        
+                        if (checkResult.recordset[0].Count > 0) {
+                            manualSuccessCount++;
+                            console.log(`Articolo ${item.ItemId} ricodificato con successo`);
+                        }
+                    }
+                } catch (checkError) {
+                    console.error(`Errore nel controllo manuale per item ${item.ItemId}:`, checkError);
+                }
+            }
+            
+            // Se abbiamo trovato successi manualmente, usa questi contatori
+            if (manualSuccessCount > 0) {
+                successCount = manualSuccessCount;
+                errorCount = items.length - manualSuccessCount;
+                console.log(`Contatori manuali: successi=${successCount}, errori=${errorCount}`);
+            }
+        }
+        
+        // Restituisci il risultato anche se ci sono contatori a zero
+        // (potrebbero essere tutte sostituzioni con articoli esistenti)
+        return {
+            success: 1,
+            successCount: successCount,
+            errorCount: errorCount,
+            totalItems: items.length,
+            msg: successCount > 0 
+                ? `Ricodifica completata: ${successCount} articoli aggiornati, ${errorCount} errori`
+                : errorCount > 0 
+                    ? `Ricodifica fallita: ${errorCount} errori`
+                    : items.length > 0 
+                        ? 'Ricodifica completata'
+                        : 'Nessun elemento da processare'
+        };
+        
+    } catch (err) {
+        console.error('Error applying batch recoding:', err);
+        
+        // Se la stored procedure non esiste, proviamo l'approccio alternativo
+        if (err.message.includes('Could not find stored procedure')) {
+            console.log('Stored procedure non trovata, usando approccio alternativo...');
+            return await applyBatchRecodingAlternative(companyId, userId, items);
+        }
+        
+        throw err;
+    }
+};
+
+// Funzione alternativa che non usa stored procedure
+const applyBatchRecodingAlternative = async (companyId, userId, items) => {
+    console.log('Usando approccio alternativo per ricodifica...');
+    
+    let pool = await sql.connect(config.dbConfig);
+    const transaction = new sql.Transaction(pool);
+    
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+    const processedItems = [];
+    
+    try {
+        await transaction.begin();
+        
+        for (const item of items) {
+            try {
+                if (item.ReplaceWithExisting && item.UseExistingArticleId) {
+                    console.log(`Sostituendo componente ${item.ItemId} con articolo esistente ${item.UseExistingArticleId}`);
+                    
+                    // 1. Aggiorna tutti i riferimenti nelle distinte
+                    const updateComponentsRequest = new sql.Request(transaction);
+                    const updateResult = await updateComponentsRequest
+                        .input('CompanyId', sql.Int, companyId)
+                        .input('OldComponentId', sql.BigInt, item.ItemId)
+                        .input('NewComponentId', sql.BigInt, item.UseExistingArticleId)
+                        .query(`
+                            UPDATE MA_ProjectArticles_BOMComponents
+                            SET ComponentId = @NewComponentId,
+                                TBModified = GETDATE(),
+                                TBModifiedId = ${userId}
+                            WHERE ComponentId = @OldComponentId 
+                            AND CompanyId = @CompanyId
+                        `);
+                    
+                    console.log(`Componenti in distinta aggiornati: ${updateResult.rowsAffected[0]}`);
+                    
+                    // 2. Aggiorna le associazioni progetti-articoli
+                    const updateProjectsRequest = new sql.Request(transaction);
+                    const projectsResult = await updateProjectsRequest
+                        .input('CompanyId', sql.Int, companyId)
+                        .input('OldItemId', sql.BigInt, item.ItemId)
+                        .input('NewItemId', sql.BigInt, item.UseExistingArticleId)
+                        .query(`
+                            UPDATE MA_ProjectsItems
+                            SET ItemId = @NewItemId
+                            WHERE ItemId = @OldItemId 
+                            AND CompanyId = @CompanyId
+                        `);
+                    
+                    console.log(`Associazioni progetti aggiornate: ${projectsResult.rowsAffected[0]}`);
+                    
+                    // 3. Disabilita l'articolo vecchio
+                    const disableRequest = new sql.Request(transaction);
+                    await disableRequest
+                        .input('CompanyId', sql.Int, companyId)
+                        .input('ItemId', sql.BigInt, item.ItemId)
+                        .input('UserId', sql.Int, userId)
+                        .query(`
+                            UPDATE MA_ProjectArticles_Items
+                            SET Disabled = 1,
+                                TBModified = GETDATE(),
+                                TBModifiedId = @UserId,
+                                Notes = ISNULL(Notes, '') + 
+                                    CHAR(13) + CHAR(10) + 
+                                    '--- Sostituito con articolo ID ' + CAST(@ItemId AS VARCHAR) + 
+                                    ' il ' + CONVERT(VARCHAR, GETDATE(), 120) + 
+                                    ' da utente ' + CAST(@UserId AS VARCHAR) + ' ---'
+                            WHERE Id = @ItemId 
+                            AND CompanyId = @CompanyId
+                        `);
+                    
+                    successCount++;
+                    processedItems.push({
+                        itemId: item.ItemId,
+                        oldCode: item.OldCode,
+                        newCode: item.NewCode,
+                        status: 'success',
+                        message: `Sostituito con articolo esistente ${item.UseExistingArticleId}`
+                    });
+                    
+                } else {
+                    // Ricodifica normale
+                    console.log(`Ricodificando articolo ${item.ItemId} da ${item.OldCode} a ${item.NewCode}`);
+                    
+                    // Prima verifica se il nuovo codice è già in uso
+                    const checkRequest = new sql.Request(transaction);
+                    const checkResult = await checkRequest
+                        .input('CompanyId', sql.Int, companyId)
+                        .input('NewCode', sql.VarChar(64), item.NewCode)
+                        .input('ItemId', sql.BigInt, item.ItemId)
+                        .query(`
+                            SELECT COUNT(*) as Count
+                            FROM MA_ProjectArticles_Items 
+                            WHERE Item = @NewCode 
+                            AND CompanyId = @CompanyId 
+                            AND Id != @ItemId
+                            AND Disabled = 0
+                        `);
+                    
+                    if (checkResult.recordset[0].Count > 0) {
+                        throw new Error(`Il codice ${item.NewCode} è già in uso`);
+                    }
+                    
+                    // Aggiorna il codice articolo
+                    const updateItemRequest = new sql.Request(transaction);
+                    await updateItemRequest
+                        .input('CompanyId', sql.Int, companyId)
+                        .input('ItemId', sql.BigInt, item.ItemId)
+                        .input('NewCode', sql.VarChar(64), item.NewCode)
+                        .input('NewDescription', sql.NVarChar(128), item.NewDescription || null)
+                        .input('MacroFamilyId', sql.BigInt, item.MacroFamilyId || null)
+                        .input('FamilyId', sql.BigInt, item.FamilyId || null)
+                        .input('TypeId', sql.BigInt, item.TypeId || null)
+                        .input('AliasId', sql.BigInt, item.AliasId || null)
+                        .input('UserId', sql.Int, userId)
+                        .query(`
+                            UPDATE MA_ProjectArticles_Items
+                            SET Item = @NewCode,
+                                Description = ISNULL(@NewDescription, Description),
+                                MacrofamilyId = ISNULL(@MacroFamilyId, MacrofamilyId),
+                                FamilyId = ISNULL(@FamilyId, FamilyId),
+                                ItemTypeId = ISNULL(@TypeId, ItemTypeId),
+                                AliasId = ISNULL(@AliasId, AliasId),
+                                TBModified = GETDATE(),
+                                TBModifiedId = @UserId
+                            WHERE Id = @ItemId 
+                            AND CompanyId = @CompanyId
+                        `);
+                    
+                    // Aggiorna anche il codice BOM se esiste
+                    const updateBomRequest = new sql.Request(transaction);
+                    await updateBomRequest
+                        .input('CompanyId', sql.Int, companyId)
+                        .input('ItemId', sql.BigInt, item.ItemId)
+                        .input('NewCode', sql.VarChar(64), item.NewCode)
+                        .query(`
+                            UPDATE MA_ProjectArticles_BillOfMaterials
+                            SET BOM = @NewCode
+                            WHERE ItemId = @ItemId 
+                            AND CompanyId = @CompanyId
+                        `);
+                    
+                    successCount++;
+                    processedItems.push({
+                        itemId: item.ItemId,
+                        oldCode: item.OldCode,
+                        newCode: item.NewCode,
+                        status: 'success',
+                        message: 'Ricodifica completata'
+                    });
+                }
+                
+                // Log history (se la tabella esiste)
+                try {
+                    const historyRequest = new sql.Request(transaction);
+                    await historyRequest
+                        .input('CompanyId', sql.Int, companyId)
+                        .input('ItemId', sql.BigInt, item.ReplaceWithExisting ? item.UseExistingArticleId : item.ItemId)
+                        .input('OldCode', sql.VarChar(64), item.OldCode)
+                        .input('NewCode', sql.VarChar(64), item.NewCode)
+                        .input('MacroFamilyId', sql.BigInt, item.MacroFamilyId || null)
+                        .input('FamilyId', sql.BigInt, item.FamilyId || null)
+                        .input('TypeId', sql.BigInt, item.TypeId || null)
+                        .input('AliasId', sql.BigInt, item.AliasId || null)
+                        .input('Measures', sql.VarChar(2), item.Measures || null)
+                        .input('Sequential', sql.Int, item.Sequential || null)
+                        .input('UserId', sql.Int, userId)
+                        .input('ChangeReason', sql.NVarChar(500), 
+                            item.ReplaceWithExisting 
+                                ? `Articolo ${item.OldCode} sostituito con articolo esistente ID: ${item.UseExistingArticleId}`
+                                : `Ricodifica batch da ${item.OldCode} a ${item.NewCode}`)
+                        .query(`
+                            IF OBJECT_ID('MA_CodingRules_History', 'U') IS NOT NULL
+                            BEGIN
+                                INSERT INTO MA_CodingRules_History (
+                                    CompanyId, ItemId, OldCode, NewCode, 
+                                    MacroFamilyId, FamilyId, TypeId, AliasId,
+                                    Measures, Sequential,
+                                    UserId, ChangeDate, ChangeReason
+                                ) VALUES (
+                                    @CompanyId, @ItemId, @OldCode, @NewCode,
+                                    @MacroFamilyId, @FamilyId, @TypeId, @AliasId,
+                                    @Measures, @Sequential,
+                                    @UserId, GETDATE(), @ChangeReason
+                                )
+                            END
+                        `);
+                } catch (historyError) {
+                    console.log('Tabella history non trovata o errore nel log:', historyError.message);
+                }
+                
+            } catch (itemError) {
+                console.error(`Errore per item ${item.ItemId}:`, itemError);
+                errorCount++;
+                errors.push({
+                    itemId: item.ItemId,
+                    itemCode: item.OldCode,
+                    message: itemError.message
+                });
+                processedItems.push({
+                    itemId: item.ItemId,
+                    oldCode: item.OldCode,
+                    newCode: item.NewCode,
+                    status: 'error',
+                    message: itemError.message
+                });
+            }
+        }
+        
+        await transaction.commit();
+        
+        console.log(`Ricodifica completata: ${successCount} successi, ${errorCount} errori`);
+        
+        return {
+            success: 1,
+            successCount: successCount,
+            errorCount: errorCount,
+            totalItems: items.length,
+            errors: errors,
+            processedItems: processedItems,
+            msg: successCount > 0
+                ? `Ricodifica completata: ${successCount} articoli aggiornati, ${errorCount} errori`
+                : errorCount > 0
+                    ? `Ricodifica fallita: tutti gli ${errorCount} articoli hanno generato errori`
+                    : 'Nessun articolo processato'
+        };
+        
+    } catch (err) {
+        console.error('Errore globale nella ricodifica alternativa:', err);
+        await transaction.rollback();
+        throw err;
+    }
+};
+
+/**
+ * Get coding configuration for company
+ * @param {number} companyId - Company ID
+ * @returns {Promise<Object>} Configuration
+ */
+const getCodingConfig = async (companyId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        const result = await pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .query(`
+                SELECT 
+                    CodingType,
+                    TotalLength,
+                    SequentialLength,
+                    SequentialPadChar,
+                    IsActive,
+                    Config
+                FROM MA_CodingRules_Config
+                WHERE CompanyId = @CompanyId AND IsActive = 1
+            `);
+            
+        if (result.recordset.length === 0) {
+            throw new Error('Nessuna configurazione di codifica trovata per questa azienda');
+        }
+        
+        const config = result.recordset[0];
+        
+        // Parse JSON config if present
+        if (config.Config) {
+            try {
+                config.ConfigData = JSON.parse(config.Config);
+            } catch (e) {
+                config.ConfigData = {};
+            }
+        }
+        
+        return config;
+    } catch (err) {
+        console.error('Error getting coding config:', err);
+        throw err;
+    }
+};
+
+/**
+ * Build complete code from components
+ * @param {string} macroFamilyCode - MacroFamily code (1 char)
+ * @param {string} familyCode - Family code (3 chars)
+ * @param {string} typeCode - Type code (3 chars)
+ * @param {string} aliasCode - Alias code (3 chars)
+ * @param {string} measures - Measures (2 chars)
+ * @param {number} sequential - Sequential number
+ * @param {number} sequentialLength - Length for sequential (from config)
+ * @param {string} padChar - Padding character (from config)
+ * @returns {string} Complete code
+ */
+const buildCompleteCode = (macroFamilyCode, familyCode, typeCode, aliasCode, measures, sequential, sequentialLength = 3, padChar = '0') => {
+    // Validate inputs
+    if (!macroFamilyCode || macroFamilyCode.length !== 1) {
+        throw new Error('Codice macrofamiglia deve essere 1 carattere');
+    }
+    if (!familyCode || familyCode.length !== 3) {
+        throw new Error('Codice famiglia deve essere 3 caratteri');
+    }
+    if (!typeCode || typeCode.length !== 3) {
+        throw new Error('Codice tipo deve essere 3 caratteri');
+    }
+    if (!aliasCode || aliasCode.length !== 3) {
+        throw new Error('Codice alias deve essere 3 caratteri');
+    }
+    if (!measures || measures.length !== 2) {
+        throw new Error('Misure devono essere 2 caratteri');
+    }
+    
+    // Pad sequential
+    const sequentialStr = String(sequential).padStart(sequentialLength, padChar);
+    
+    // Build code
+    return macroFamilyCode + familyCode + typeCode + aliasCode + measures + sequentialStr;
+};
+
+/**
+ * Get preview of codes for multiple items
+ * @param {number} companyId - Company ID
+ * @param {Array} items - Array of items with coding components
+ * @returns {Promise<Array>} Items with preview codes
+ */
+const getCodesPreview = async (companyId, items) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        // Get configuration
+        const config = await getCodingConfig(companyId);
+        
+        // Process each item
+        const itemsWithPreview = await Promise.all(items.map(async (item) => {
+            try {
+                // Skip if missing required components
+                if (!item.macroFamilyCode || !item.familyCode || !item.typeCode || !item.aliasCode) {
+                    return {
+                        ...item,
+                        previewCode: '',
+                        previewError: 'Componenti mancanti per generare il codice'
+                    };
+                }
+                
+                // Get next sequential
+                const sequential = await getNextSequential(
+                    companyId,
+                    item.macroFamilyCode,
+                    item.familyCode,
+                    item.typeCode,
+                    item.aliasCode
+                );
+                
+                // Build code
+                const previewCode = buildCompleteCode(
+                    item.macroFamilyCode,
+                    item.familyCode,
+                    item.typeCode,
+                    item.aliasCode,
+                    item.measures || '00',
+                    sequential,
+                    config.SequentialLength,
+                    config.SequentialPadChar
+                );
+                
+                // Validate code
+                const validation = await validateCode(companyId, previewCode);
+                
+                return {
+                    ...item,
+                    previewCode: previewCode,
+                    sequential: sequential,
+                    isValid: validation.isValid,
+                    validationMessage: validation.errorMessage
+                };
+            } catch (err) {
+                return {
+                    ...item,
+                    previewCode: '',
+                    previewError: err.message
+                };
+            }
+        }));
+        
+        return itemsWithPreview;
+    } catch (err) {
+        console.error('Error getting codes preview:', err);
+        throw err;
+    }
+};
+
+/**
+ * Log recoding history
+ * @param {number} companyId - Company ID
+ * @param {number} userId - User ID
+ * @param {Array} items - Items that were recoded
+ */
+const logRecodingHistory = async (companyId, userId, items) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        // Prepare bulk insert
+        const table = new sql.Table('MA_CodingRules_History');
+        table.create = false;
+        table.columns.add('CompanyId', sql.Int);
+        table.columns.add('ItemId', sql.BigInt);
+        table.columns.add('OldCode', sql.VarChar(64));
+        table.columns.add('NewCode', sql.VarChar(64));
+        table.columns.add('MacroFamilyId', sql.BigInt);
+        table.columns.add('FamilyId', sql.BigInt);
+        table.columns.add('TypeId', sql.BigInt);
+        table.columns.add('AliasId', sql.BigInt);
+        table.columns.add('Measures', sql.VarChar(2));
+        table.columns.add('Sequential', sql.Int);
+        table.columns.add('UserId', sql.Int);
+        table.columns.add('ChangeDate', sql.DateTime);
+        table.columns.add('ChangeReason', sql.NVarChar(500));
+        
+        const changeDate = new Date();
+        
+        items.forEach(item => {
+            if (item.newCode && item.oldCode !== item.newCode) {
+                table.rows.add(
+                    companyId,
+                    item.itemId,
+                    item.oldCode,
+                    item.newCode,
+                    item.macroFamilyId || null,
+                    item.familyId || null,
+                    item.typeId || null,
+                    item.aliasId || null,
+                    item.measures || null,
+                    item.sequential || null,
+                    userId,
+                    changeDate,
+                    'Ricodifica batch'
+                );
+            }
+        });
+        
+        if (table.rows.length > 0) {
+            const request = pool.request();
+            await request.bulk(table);
+        }
+    } catch (err) {
+        console.error('Error logging history:', err);
+        // Non rilanciamo l'errore per non bloccare l'operazione principale
+    }
+};
+
+/**
+ * Get recoding history
+ * @param {number} companyId - Company ID
+ * @param {Object} filters - Filters (itemId, dateFrom, dateTo, userId)
+ * @returns {Promise<Array>} History records
+ */
+const getRecodingHistory = async (companyId, filters = {}) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        let query = `
+            SELECT 
+                h.Id,
+                h.ItemId,
+                h.OldCode,
+                h.NewCode,
+                h.MacroFamilyId,
+                h.FamilyId,
+                h.TypeId,
+                h.AliasId,
+                h.Measures,
+                h.Sequential,
+                h.UserId,
+                h.ChangeDate,
+                h.ChangeReason,
+                i.Description as ItemDescription,
+                u.Username as UserName
+            FROM MA_CodingRules_History h
+            LEFT JOIN MA_ProjectArticles_Items i ON h.ItemId = i.Id AND h.CompanyId = i.CompanyId
+            LEFT JOIN AR_Users u ON h.UserId = u.UserId
+            WHERE h.CompanyId = @CompanyId
+        `;
+        
+        const request = pool.request()
+            .input('CompanyId', sql.Int, companyId);
+        
+        // Apply filters
+        if (filters.itemId) {
+            query += ` AND h.ItemId = @ItemId`;
+            request.input('ItemId', sql.BigInt, filters.itemId);
+        }
+        
+        if (filters.dateFrom) {
+            query += ` AND h.ChangeDate >= @DateFrom`;
+            request.input('DateFrom', sql.DateTime, filters.dateFrom);
+        }
+        
+        if (filters.dateTo) {
+            query += ` AND h.ChangeDate <= @DateTo`;
+            request.input('DateTo', sql.DateTime, filters.dateTo);
+        }
+        
+        if (filters.userId) {
+            query += ` AND h.UserId = @UserId`;
+            request.input('UserId', sql.Int, filters.userId);
+        }
+        
+        query += ` ORDER BY h.ChangeDate DESC`;
+        
+        const result = await request.query(query);
+        
+        return result.recordset;
+    } catch (err) {
+        console.error('Error getting recoding history:', err);
+        throw err;
+    }
+};
+
+/**
+ * Search for similar articles when recoding
+ * This is a wrapper that calls the projectArticlesManagement function
+ * @param {number} companyId - Company ID
+ * @param {string} rootCode - Root code to search
+ * @param {string} description - Description to search
+ * @param {number} excludeId - Article ID to exclude
+ * @param {object} options - Additional options
+ * @returns {Promise<Array>} Array of similar articles
+ */
+const searchSimilarForRecoding = async (companyId, rootCode, description, excludeId, options = {}) => {
+    // Import della funzione dal modulo projectArticlesManagement
+    const { searchSimilarArticles } = require('./projectArticlesManagement');
+    
+    try {
+        // Chiama la funzione di ricerca con i parametri appropriati
+        const results = await searchSimilarArticles(
+            companyId,
+            rootCode,
+            description,
+            excludeId,
+            options.limit || 10,
+            options.erpOnly || false,
+            options.tempOnly || false
+        );
+        
+        // Filtra solo gli articoli che possono essere utilizzati per la ricodifica
+        const usableResults = results.filter(article => {
+            // Gli articoli ERP possono essere suggeriti ma non modificati
+            // Gli articoli temporanei possono essere sia suggeriti che modificati
+            return true; // Tutti gli articoli possono essere suggeriti
+        });
+        
+        return usableResults;
+    } catch (err) {
+        console.error('Error searching similar articles for recoding:', err);
+        throw err;
+    }
+};
+
+// Export all functions
+module.exports = {
+    getCodingHierarchy,
+    getNextSequential,
+    validateCode,
+    applyBatchRecoding,
+    getCodingConfig,
+    buildCompleteCode,
+    getCodesPreview,
+    getRecodingHistory,
+    searchSimilarForRecoding,
+    applyBatchRecodingAlternative,
+    logRecodingHistory
+};

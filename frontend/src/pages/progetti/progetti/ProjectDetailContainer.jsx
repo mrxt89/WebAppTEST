@@ -375,26 +375,27 @@ const ProjectDetailContainer = ({
     }
   };
 
-  // Gestione aggiornamento progetto
-  const handleProjectUpdate = async () => {
-    try {
-      const cleanedProject = {
-        ProjectID: editedProject.ProjectID,
-        Name: editedProject.Name,
-        Description: editedProject.Description || "",
-        StartDate: editedProject.StartDate?.split("T")[0],
-        EndDate: editedProject.EndDate?.split("T")[0] || null,
-        Status: editedProject.Status,
-        ProjectCategoryId: parseInt(editedProject.ProjectCategoryId) || 0,
-        ProjectCategoryDetailLine: parseInt(editedProject.ProjectCategoryDetailLine) || 0,
-        Disabled: parseInt(editedProject.Disabled) || 0,
-        CustSupp: Array.isArray(editedProject.CustSupp)
-          ? editedProject.CustSupp[0] || 0
-          : parseInt(editedProject.CustSupp) || 0,
-        TBCreatedId: editedProject.TBCreatedId,
-        ProjectErpID: editedProject.ProjectErpID || "",
-        UseStages: editedProject.UseStages || false,
-      };
+// Gestione aggiornamento progetto
+const handleProjectUpdate = async () => {
+  try {
+    const cleanedProject = {
+      ProjectID: editedProject.ProjectID,
+      Name: editedProject.Name,
+      Description: editedProject.Description || "",
+      StartDate: editedProject.StartDate?.split("T")[0],
+      EndDate: editedProject.EndDate?.split("T")[0] || null,
+      Status: editedProject.Status,
+      ProjectCategoryId: parseInt(editedProject.ProjectCategoryId) || 0,
+      ProjectCategoryDetailLine: parseInt(editedProject.ProjectCategoryDetailLine) || 0,
+      Disabled: parseInt(editedProject.Disabled) || 0,
+      CustSupp: Array.isArray(editedProject.CustSupp)
+        ? editedProject.CustSupp[0] || 0
+        : parseInt(editedProject.CustSupp) || 0,
+      TBCreatedId: editedProject.TBCreatedId,
+      ProjectErpID: editedProject.ProjectErpID || "",
+      TemplateID: editedProject.TemplateID ? parseInt(editedProject.TemplateID) : null,
+      UseStages: editedProject.UseStages || false,
+    };
       
       const result = await addUpdateProject(cleanedProject);
       if (result.success) {
@@ -413,40 +414,42 @@ const ProjectDetailContainer = ({
     }
   };
 
-  // Gestione disabilitazione progetto
-  const handleDisableProject = async (projectId) => {
-    const disabledProject = {
-      ...project,
-      Disabled: 1,
-    };
-    
-    try {
-      const result = await addUpdateProject(disabledProject);
-      if (result.success) {
-        setProject(null);
-        setEditedProject(null);
-        setIsEditModalOpen(false);
-        
-        if (resetSelectedProject) {
-          resetSelectedProject();
-        }
-        
-        if (refreshAllProjects) {
-          await refreshAllProjects();
-        }
-        
-        swal.fire({
-          title: "Successo",
-          text: "Progetto disabilitato con successo",
-          icon: "success",
-          timer: 1500,
-        });
-      }
-    } catch (error) {
-      console.error("Error disabling project:", error);
-      swal.fire("Errore", "Errore nella disabilitazione del progetto", "error");
-    }
+// Gestione disabilitazione progetto
+const handleDisableProject = async (projectId) => {
+  const disabledProject = {
+    ...project,
+    Disabled: 1,
+    // Assicurati che CustSupp sia sempre un valore singolo, non un array
+    CustSupp: Array.isArray(project.CustSupp) ? project.CustSupp[0] : (project.CustSupp || 0),
   };
+  
+  try {
+    const result = await addUpdateProject(disabledProject);
+    if (result.success) {
+      setProject(null);
+      setEditedProject(null);
+      setIsEditModalOpen(false);
+      
+      if (resetSelectedProject) {
+        resetSelectedProject();
+      }
+      
+      if (refreshAllProjects) {
+        await refreshAllProjects();
+      }
+      
+      swal.fire({
+        title: "Successo",
+        text: "Progetto disabilitato con successo",
+        icon: "success",
+        timer: 1500,
+      });
+    }
+  } catch (error) {
+    console.error("Error disabling project:", error);
+    swal.fire("Errore", "Errore nella disabilitazione del progetto", "error");
+  }
+};
 
   // Gestione aggiunta task
   const handleAddTask = async (taskData) => {
