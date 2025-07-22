@@ -4,12 +4,15 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, Loader2 } from "lucide-react";
+import { Download, FileText, Loader2, ExternalLink, Info } from "lucide-react";
 import { config } from "../../config";
 import EmailPreview from "./EmailPreview";
 import OfficePreview from "./OfficePreview";
+import axiosInstance from "@/lib/axios";
 
 // Importazione lazy del visualizzatore CAD
 const CADViewer = lazy(() => import("./CADViewer"));
@@ -23,6 +26,14 @@ const FileViewer = ({ file, isOpen, onClose }) => {
   // Ref per evitare chiamate multiple
   const loadingRef = useRef(false);
   const currentFileIdRef = useRef(null);
+  
+  // Stato per development mode
+  const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development';
+  
+  // Stati per i modali
+  const [showDevelopmentModal, setShowDevelopmentModal] = useState(false);
+  const [showInstructionsModal, setShowInstructionsModal] = useState(false);
+  const [developmentAction, setDevelopmentAction] = useState(null);
 
   useEffect(() => {
     // Cleanup quando il componente si chiude o cambia file
@@ -219,10 +230,21 @@ const FileViewer = ({ file, isOpen, onClose }) => {
               {errorMessage}
             </p>
           )}
-          <Button onClick={() => handleDownload(file)}>
-            <Download className="h-4 w-4 mr-2" />
-            Scarica File
-          </Button>
+          <div className="flex gap-3 mt-4">
+            <Button onClick={() => handleDownload(file)}>
+              <Download className="h-4 w-4 mr-2" />
+              Scarica File
+            </Button>
+            {canOpenDirectly() && (
+              <Button 
+                onClick={handleDirectOpen}
+                variant="default"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Apri Direttamente
+              </Button>
+            )}
+          </div>
         </div>
       );
     }
@@ -311,6 +333,27 @@ const FileViewer = ({ file, isOpen, onClose }) => {
       );
     }
 
+    // File di testo
+    if (isTextFile(file)) {
+      return (
+        <div className="w-full h-[75vh] p-4">
+          <div className="h-full bg-gray-50 rounded border">
+            <iframe
+              src={previewUrl}
+              className="w-full h-full border-0 rounded"
+              title={file.FileName}
+              sandbox="allow-same-origin"
+              onError={(e) => {
+                console.error("Text file iframe error:", e);
+                setPreviewError(true);
+                setErrorMessage("Errore nel caricamento del file di testo");
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+
     // Email
     if (isEmailFile(file)) {
       return (
@@ -329,13 +372,30 @@ const FileViewer = ({ file, isOpen, onClose }) => {
     return (
       <div className="flex flex-col items-center justify-center p-8 bg-gray-50">
         <FileText className="w-16 h-16 text-gray-500 mb-4" />
-        <p className="text-gray-600">
+        <p className="text-gray-600 mb-2 text-lg">
+          {file.FileName}
+        </p>
+        <p className="text-gray-500 text-sm mb-6">
           Anteprima non disponibile per questo tipo di file
         </p>
-        <Button onClick={() => handleDownload(file)} className="mt-4">
-          <Download className="h-4 w-4 mr-2" />
-          Scarica File
-        </Button>
+        <div className="flex gap-3">
+          <Button 
+            onClick={() => handleDownload(file)}
+            variant="outline"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Scarica File
+          </Button>
+          {canOpenDirectly() && (
+            <Button 
+              onClick={handleDirectOpen}
+              variant="default"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Apri Direttamente
+            </Button>
+          )}
+        </div>
       </div>
     );
   };
@@ -381,6 +441,27 @@ const FileViewer = ({ file, isOpen, onClose }) => {
     
     return emailTypes.includes(file.FileType) ||
            emailExtensions.some(ext => file.FileName?.toLowerCase().endsWith(ext));
+  };
+
+  const isTextFile = (file) => {
+    const textTypes = [
+      "text/plain", "text/html", "text/css", "text/javascript",
+      "text/xml", "text/csv", "text/tab-separated-values",
+      "application/json", "application/xml", "application/javascript"
+    ];
+    const textExtensions = [
+      ".txt", ".log", ".ini", ".cfg", ".conf", ".config",
+      ".json", ".xml", ".html", ".htm", ".css", ".js", ".ts",
+      ".md", ".markdown", ".csv", ".tsv", ".sql", ".bat", ".sh",
+      ".ps1", ".py", ".java", ".c", ".cpp", ".cs", ".php",
+      ".rb", ".go", ".rs", ".swift", ".kt", ".r", ".m"
+    ];
+    
+    const fileName = file.FileName?.toLowerCase() || "";
+    const fileType = file.FileType?.toLowerCase() || "";
+    
+    return textTypes.includes(fileType) ||
+           textExtensions.some(ext => fileName.endsWith(ext));
   };
 
   const handleDownload = async (attachment) => {
@@ -432,29 +513,315 @@ const FileViewer = ({ file, isOpen, onClose }) => {
     }
   };
 
+  // Nuova funzione per aprire il file direttamente
+  const handleDirectOpen = async () => {
+    try {
+      const response = await axiosInstance.post('/generate-smb-link', {
+        attachmentId: file.AttachmentID,
+        filePath: file.FilePath
+      });
+
+      if (response.data.success) {
+        const { smbPath, fileLink, isDevelopment: isDevResponse, httpFallback, altLinks } = response.data;
+        
+        console.log('SMB Link Response:', response.data);
+        
+        // Salva i dati per uso successivo inclusi i link alternativi
+        setDevelopmentAction({ fileLink, smbPath, httpFallback, altLinks });
+        
+        // In development, mostra modal di scelta
+        if (isDevelopment && isDevResponse) {
+          setShowDevelopmentModal(true);
+        } else {
+          // In produzione, mostra direttamente il modal
+          // perché Chrome blocca i file:// di rete
+          setShowDevelopmentModal(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error opening file directly:', error);
+      alert('Impossibile aprire il file direttamente');
+    }
+  };
+
+  // Handler per le azioni del modal development
+  const handleDevelopmentChoice = (choice) => {
+    setShowDevelopmentModal(false);
+    
+    if (choice === 'open' && developmentAction) {
+      // Prova ad aprire con file://
+      openSMBLink(developmentAction.fileLink);
+    } else if (choice === 'test-formats' && developmentAction) {
+      // Test diversi formati di link
+      if (developmentAction.altLinks) {
+        console.log('Testing different link formats:');
+        Object.entries(developmentAction.altLinks).forEach(([format, link]) => {
+          console.log(`${format}: ${link}`);
+          // Prova ad aprire ogni formato in una nuova tab
+          setTimeout(() => {
+            window.open(link, '_blank');
+          }, 1000);
+        });
+      }
+    } else if (choice === 'download') {
+      handleDownload(file);
+    } else if (choice === 'copy' && developmentAction) {
+      // Copia il percorso negli appunti
+      navigator.clipboard.writeText(developmentAction.smbPath)
+        .then(() => {
+          alert('Percorso copiato negli appunti!\n\nOra:\n1. Apri Esplora Risorse (Windows+E)\n2. Incolla il percorso nella barra degli indirizzi\n3. Premi Invio\n\nNON incollarlo nel browser!');
+        })
+        .catch(err => {
+          console.error('Errore copia percorso:', err);
+          alert(`Copia manualmente questo percorso: ${developmentAction.smbPath}`);
+        });
+    } else if (choice === 'explorer' && developmentAction) {
+      // Prova ad aprire Esplora Risorse con il percorso
+      // Crea un link con protocollo explorer
+      const folderPath = developmentAction.smbPath.substring(0, developmentAction.smbPath.lastIndexOf('\\'));
+      window.location.href = `file:///${folderPath.replace(/\\/g, '/')}`;
+    } else if (choice === 'run-command' && developmentAction) {
+      // Genera comando per aprire il file
+      const command = `start "" "${developmentAction.smbPath}"`;
+      navigator.clipboard.writeText(command)
+        .then(() => {
+          alert('Comando copiato!\n\n1. Premi Windows+R\n2. Digita "cmd" e premi Invio\n3. Incolla il comando e premi Invio');
+        })
+        .catch(err => {
+          console.error('Errore copia comando:', err);
+        });
+    }
+    
+    setDevelopmentAction(null);
+  };
+
+  // Funzione helper per aprire il link SMB
+  const openSMBLink = (fileLink) => {
+    try {
+      // Usa sempre il link file://
+      const link = document.createElement('a');
+      link.href = fileLink;
+      link.target = '_blank';
+      
+      // Aggiungi il link al DOM, clicca e rimuovi
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // In produzione, Chrome potrebbe bloccare il link
+      // Mostra sempre le istruzioni dopo un breve delay
+      setTimeout(() => {
+        // Se siamo ancora sulla stessa pagina, probabilmente il link è stato bloccato
+        if (!isDevelopment) {
+          setShowInstructionsModal(true);
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error opening file link:', error);
+      // Se c'è un errore, mostra il modal con le opzioni
+      if (developmentAction) {
+        setShowDevelopmentModal(true);
+      }
+    }
+  };
+
+  // Verifica se possiamo aprire direttamente questo tipo di file
+  const canOpenDirectly = () => {
+    // Permetti apertura diretta per tutti i file tranne le email
+    // che hanno bisogno di un trattamento speciale
+    return !isEmailFile(file);
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="max-w-7xl w-[95vw] max-h-[90vh] flex flex-col"
-        style={{ zIndex: 99999 }}
-      >
-        <DialogHeader>
-          <DialogTitle>{file?.FileName}</DialogTitle>
-        </DialogHeader>
-        <div className="flex-1 overflow-auto">
-          {getFileContent()}
-        </div>
-        <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" onClick={onClose}>
-            Chiudi
-          </Button>
-          <Button onClick={() => handleDownload(file)}>
-            <Download className="h-4 w-4 mr-2" />
-            Scarica
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <>
+      {/* Modal principale del FileViewer */}
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent
+          className="max-w-7xl w-[95vw] max-h-[90vh] flex flex-col"
+          style={{ zIndex: 50 }}
+        >
+          <DialogHeader>
+            <DialogTitle>{file?.FileName}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {getFileContent()}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={onClose}>
+              Chiudi
+            </Button>
+            
+            {/* Nuovo pulsante per apertura diretta */}
+            {canOpenDirectly() && (
+              <Button 
+                onClick={handleDirectOpen}
+                variant="default"
+                title="Apri il file direttamente nell'applicazione"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Apri
+              </Button>
+            )}
+            
+            <Button 
+              onClick={() => handleDownload(file)}
+              variant={canOpenDirectly() ? "outline" : "default"}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Scarica
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal per scelta in development */}
+      <Dialog open={showDevelopmentModal} onOpenChange={setShowDevelopmentModal}>
+        <DialogContent style={{ zIndex: 60 }}>
+          <DialogHeader>
+            <DialogTitle>
+              {isDevelopment ? 'Modalità Development' : 'Apertura File di Rete'}
+            </DialogTitle>
+            <DialogDescription>
+              {isDevelopment 
+                ? 'Scegli come aprire il file. Local Explorer deve essere installato e configurato per permettere i link file://.'
+                : 'Per aprire file dalla rete, è necessario Local Explorer o copiare il percorso in Esplora Risorse.'
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 my-4">
+            {developmentAction && (
+              <>
+                <p className="text-sm font-medium">Percorso del file:</p>
+                <div className="text-sm bg-gray-100 p-2 rounded font-mono break-all">
+                  {developmentAction.smbPath}
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter className="gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => handleDevelopmentChoice('cancel')}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleDevelopmentChoice('copy')}
+              className="bg-green-50 hover:bg-green-100 text-green-700"
+              title="Metodo più affidabile - copia e incolla in Esplora Risorse"
+            >
+              📋 Copia percorso (consigliato)
+            </Button>
+            {!isDevelopment && (
+              <Button
+                variant="outline"
+                onClick={() => handleDevelopmentChoice('run-command')}
+                title="Copia comando da eseguire nel prompt dei comandi"
+              >
+                💻 Copia comando CMD
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => handleDevelopmentChoice('download')}
+            >
+              ⬇️ Scarica file
+            </Button>
+            {developmentAction?.altLinks && (
+              <Button
+                variant="outline"
+                onClick={() => handleDevelopmentChoice('test-formats')}
+                title="Test diversi formati di link file://"
+              >
+                🧪 Test formati
+              </Button>
+            )}
+            <Button
+              onClick={() => handleDevelopmentChoice('open')}
+              disabled={!localStorage.getItem('local-explorer-confirmed')}
+              title="Richiede Local Explorer installato e configurato"
+            >
+              🔗 Apri con Local Explorer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal per istruzioni prima volta */}
+      <Dialog open={showInstructionsModal} onOpenChange={setShowInstructionsModal}>
+        <DialogContent style={{ zIndex: 60 }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5" />
+              Come aprire file di rete
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 p-3 rounded">
+              <p className="text-sm font-medium text-red-800">
+                Chrome blocca l'accesso diretto ai file di rete per motivi di sicurezza
+              </p>
+            </div>
+            
+            <p className="font-medium">Hai due opzioni:</p>
+            
+            <div className="space-y-3">
+              <div className="border-l-4 border-blue-500 pl-4">
+                <h4 className="font-semibold">Opzione 1: Installa Local Explorer (consigliato)</h4>
+                <ol className="list-decimal list-inside space-y-1 text-sm mt-2">
+                  <li>
+                    <a 
+                      href="https://chrome.google.com/webstore/search/local%20explorer" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-500 hover:underline"
+                    >
+                      Installa l'estensione dal Chrome Web Store →
+                    </a>
+                  </li>
+                  <li>Nelle impostazioni dell'estensione, abilita "Allow access to file URLs"</li>
+                  <li>In Chrome, vai su chrome://extensions/</li>
+                  <li>Trova Local Explorer e abilita "Consenti l'accesso agli URL dei file"</li>
+                  <li>Ricarica questa pagina e riprova</li>
+                </ol>
+              </div>
+              
+              <div className="border-l-4 border-green-500 pl-4">
+                <h4 className="font-semibold">Opzione 2: Usa Esplora Risorse</h4>
+                <ol className="list-decimal list-inside space-y-1 text-sm mt-2">
+                  <li>Copia il percorso del file dal modal precedente</li>
+                  <li>Apri Esplora Risorse (Windows+E)</li>
+                  <li>Incolla il percorso nella barra degli indirizzi</li>
+                  <li>Premi Invio per aprire il file</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => setShowInstructionsModal(false)}
+            >
+              Chiudi
+            </Button>
+            <Button 
+              onClick={() => {
+                localStorage.setItem('local-explorer-confirmed', 'true');
+                setShowInstructionsModal(false);
+                // Riapri il modal delle opzioni
+                if (developmentAction) {
+                  setShowDevelopmentModal(true);
+                }
+              }}
+            >
+              Ho installato Local Explorer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

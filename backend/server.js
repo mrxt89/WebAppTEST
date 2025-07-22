@@ -147,6 +147,7 @@ const itemAttachmentRoutes = require('./routes/itemAttachmentRoutes');
 const documentLinkRoutes = require('./routes/documentLinkRoutes');
 
 const codingRulesRoutes = require('./routes/codingRulesRoutes');
+const smbLinkRoutes = require('./routes/smbLinkRoutes');
 
 const app = express();
 
@@ -237,6 +238,7 @@ app.use('/api', groupRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api', documentLinkRoutes);
 app.use('/api', codingRulesRoutes);
+app.use('/api', smbLinkRoutes);
 
 // Endpoint per servire i file uploadati
 app.get('/api/uploads/*', (req, res) => {
@@ -544,6 +546,17 @@ app.post('/api/refresh-token', authenticateToken, async (req, res) => {
 const FileService = require('./services/fileService');
 const fileService = new FileService();
 
+// middleware per pulire i lock all'avvio
+async function cleanupOldLocks() {
+  try {
+      let pool = await sql.connect(config.database);
+      await pool.request().execute('SP_CleanupOldLocks');
+      console.log('Old locks cleaned up');
+  } catch (err) {
+      console.error('Error cleaning up locks:', err);
+  }
+}
+
 // Inizializzazione del server
 async function initializeServer() {
     try {
@@ -555,7 +568,9 @@ async function initializeServer() {
         console.log('Upload directories created successfully');
 
         await testDatabaseConnection();
-
+        await cleanupOldLocks();
+        // Pulizia periodica ogni ora
+        setInterval(cleanupOldLocks, 60 * 60 * 1000); // ogni ora
         // Leggi i certificati SSL
         let httpsOptions;
         try {

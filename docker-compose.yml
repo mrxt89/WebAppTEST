@@ -30,7 +30,7 @@ services:
       - LOCAL_STORAGE_PATH=/usr/src/app/uploads
       # - REMOTE_STORAGE_PATH=//192.168.1.100/share
       # - REMOTE_STORAGE_TYPE=mounted         # 'mounted', 'smb', o 'nfs'
-      # - SMB_PATH=//192.168.1.100/share/folder
+      - SMB_PATH=\\\\host.docker.internal\\TestShare # in locale!
       # - STORAGE_DOMAIN=DOMAIN
       # - STORAGE_USERNAME=username
       # - STORAGE_PASSWORD=password
@@ -39,9 +39,15 @@ services:
     volumes:
       - ./backend:/usr/src/app
       - /usr/src/app/node_modules
+
+      # Mount diretto della share Windows
+      - type: bind
+        source: C:/TestShare/GestDoc2/WebApp
+        target: /usr/src/app/uploads
+    
       
       # Volume per storage locale (commenta per storage remoto)
-      - ./backend/uploads:/usr/src/app/uploads
+      #- ./backend/uploads:/usr/src/app/uploads
       - ./backend/temp:/usr/src/app/temp
       - ./backend/ssl:/usr/src/app/ssl  # Volume per i certificati SSL
       
