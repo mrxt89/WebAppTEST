@@ -52,6 +52,7 @@ const ChatWindow = ({
   windowManager,
   isStandalone = false,
   standaloneData = null,
+  navigate,
 }) => {
   const dispatch = useDispatch();
   
@@ -751,6 +752,7 @@ const ChatWindow = ({
           closingDate={chatData?.closingDate}
           hasNewMessages={hasNewMessages}
           onMarkAsInteracted={handleMarkAsInteracted}
+          navigate={navigate}
           reopenChat={async () => {
             const res = await reopen();
             if (res) {

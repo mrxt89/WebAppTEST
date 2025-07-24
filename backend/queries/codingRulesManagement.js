@@ -76,11 +76,50 @@ const validateCode = async (companyId, itemCode) => {
         request.output('IsValid', sql.Bit);
         request.output('ErrorMessage', sql.NVarChar(500));
 
-        await request.execute('MA_CodingRules_ValidateCode');
+        const result = await request.execute('MA_CodingRules_ValidateCode');
+        console.log('Risultato validateCode:', result);
+        
+        // Accedi ai parametri di output dal risultato
+        const outputParams = result.output;
+        const isValid = outputParams.IsValid;
+        const errorMessage = outputParams.ErrorMessage;
+        
+        console.log('Valori output:', { isValid, errorMessage });
+        
+        // Se ancora null, prova con un approccio alternativo
+        if (isValid === null || isValid === undefined) {
+            // Prova a fare una query diretta
+            const queryRequest = pool.request();
+            queryRequest.input('CompanyId', sql.Int, companyId);
+            queryRequest.input('ItemCode', sql.VarChar(64), itemCode);
+            
+            const queryResult = await queryRequest.query(`
+                DECLARE @IsValid BIT;
+                DECLARE @ErrorMessage NVARCHAR(500);
+                
+                EXEC dbo.MA_CodingRules_ValidateCode
+                    @CompanyId = @CompanyId,
+                    @ItemCode = @ItemCode,
+                    @IsValid = @IsValid OUTPUT,
+                    @ErrorMessage = @ErrorMessage OUTPUT;
+                    
+                SELECT @IsValid AS IsValid, @ErrorMessage AS ErrorMessage;
+            `);
+            
+            console.log('Risultato query alternativa:', queryResult.recordset);
+            
+            if (queryResult.recordset && queryResult.recordset.length > 0) {
+                const row = queryResult.recordset[0];
+                return {
+                    isValid: row.IsValid === true || row.IsValid === 1,
+                    errorMessage: row.ErrorMessage || ""
+                };
+            }
+        }
         
         return {
-            isValid: request.parameters.IsValid.value,
-            errorMessage: request.parameters.ErrorMessage.value
+            isValid: isValid === true || isValid === 1,
+            errorMessage: errorMessage || ""
         };
     } catch (err) {
         console.error('Error validating code:', err);
@@ -811,6 +850,191 @@ const searchSimilarForRecoding = async (companyId, rootCode, description, exclud
     }
 };
 
+/**
+ * Create a new category
+ */
+const createCategory = async (companyId, categoryData) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+        
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('Code', sql.VarChar(3), categoryData.code);
+        request.input('Description', sql.NVarChar(512), categoryData.description);
+        request.input('Color', sql.VarChar(25), categoryData.color || null);
+        request.input('NatureCode', sql.VarChar(8), categoryData.natureCode || null);
+        request.input('CreateUser', sql.VarChar(64), categoryData.createUser);
+        
+        const result = await request.query(`
+            INSERT INTO MA_CodingRules_Categories 
+            (CompanyId, Code, Description, Color, NatureCode, IsActive, CreateUser, CreateDate, EditUser, EditDate)
+            OUTPUT INSERTED.*
+            VALUES 
+            (@CompanyId, @Code, @Description, @Color, @NatureCode, 1, @CreateUser, GETDATE(), @CreateUser, GETDATE())
+        `);
+        
+        return {
+            success: 1,
+            data: result.recordset[0],
+            msg: 'Categoria creata con successo'
+        };
+    } catch (err) {
+        console.error('Error creating category:', err);
+        if (err.message.includes('UQ_CodingCategories')) {
+            throw new Error('Codice categoria già esistente');
+        }
+        throw err;
+    }
+};
+
+/**
+ * Create a new macrofamily
+ */
+const createMacroFamily = async (companyId, macroFamilyData) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+        
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('CategoryId', sql.BigInt, macroFamilyData.categoryId);
+        request.input('Code', sql.VarChar(3), macroFamilyData.code);
+        request.input('Description', sql.NVarChar(512), macroFamilyData.description);
+        request.input('IsUniversal', sql.Bit, macroFamilyData.isUniversal || 0);
+        request.input('CreateUser', sql.VarChar(64), macroFamilyData.createUser);
+        
+        const result = await request.query(`
+            INSERT INTO MA_CodingRules_MacroFamilies 
+            (CompanyId, CategoryId, Code, Description, IsUniversal, IsActive, CreateUser, CreateDate, EditUser, EditDate)
+            OUTPUT INSERTED.*
+            VALUES 
+            (@CompanyId, @CategoryId, @Code, @Description, @IsUniversal, 1, @CreateUser, GETDATE(), @CreateUser, GETDATE())
+        `);
+        
+        return {
+            success: 1,
+            data: result.recordset[0],
+            msg: 'Macrofamiglia creata con successo'
+        };
+    } catch (err) {
+        console.error('Error creating macrofamily:', err);
+        if (err.message.includes('UQ_MacroFamilies')) {
+            throw new Error('Codice macrofamiglia già esistente per questa categoria');
+        }
+        throw err;
+    }
+};
+
+/**
+ * Create a new family
+ */
+const createFamily = async (companyId, familyData) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+        
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('MacroFamilyId', sql.BigInt, familyData.macroFamilyId);
+        request.input('Code', sql.VarChar(5), familyData.code);
+        request.input('Description', sql.NVarChar(512), familyData.description);
+        request.input('IsUniversal', sql.Bit, familyData.isUniversal || 0);
+        request.input('CreateUser', sql.VarChar(64), familyData.createUser);
+        
+        const result = await request.query(`
+            INSERT INTO MA_CodingRules_Families 
+            (CompanyId, MacroFamilyId, Code, Description, IsUniversal, IsActive, CreateUser, CreateDate, EditUser, EditDate)
+            OUTPUT INSERTED.*
+            VALUES 
+            (@CompanyId, @MacroFamilyId, @Code, @Description, @IsUniversal, 1, @CreateUser, GETDATE(), @CreateUser, GETDATE())
+        `);
+        
+        return {
+            success: 1,
+            data: result.recordset[0],
+            msg: 'Famiglia creata con successo'
+        };
+    } catch (err) {
+        console.error('Error creating family:', err);
+        if (err.message.includes('UQ_Families')) {
+            throw new Error('Codice famiglia già esistente per questa macrofamiglia');
+        }
+        throw err;
+    }
+};
+
+/**
+ * Create a new type
+ */
+const createType = async (companyId, typeData) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+        
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('FamilyId', sql.BigInt, typeData.familyId);
+        request.input('Code', sql.VarChar(5), typeData.code);
+        request.input('Description', sql.NVarChar(512), typeData.description);
+        request.input('IsUniversal', sql.Bit, typeData.isUniversal || 0);
+        request.input('CreateUser', sql.VarChar(64), typeData.createUser);
+        
+        const result = await request.query(`
+            INSERT INTO MA_CodingRules_Types 
+            (CompanyId, FamilyId, Code, Description, IsUniversal, IsActive, CreateUser, CreateDate, EditUser, EditDate)
+            OUTPUT INSERTED.*
+            VALUES 
+            (@CompanyId, @FamilyId, @Code, @Description, @IsUniversal, 1, @CreateUser, GETDATE(), @CreateUser, GETDATE())
+        `);
+        
+        return {
+            success: 1,
+            data: result.recordset[0],
+            msg: 'Tipo creato con successo'
+        };
+    } catch (err) {
+        console.error('Error creating type:', err);
+        if (err.message.includes('UQ_Types')) {
+            throw new Error('Codice tipo già esistente per questa famiglia');
+        }
+        throw err;
+    }
+};
+
+/**
+ * Create a new alias
+ */
+const createAlias = async (companyId, aliasData) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+        
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('TypeId', sql.BigInt, aliasData.typeId);
+        request.input('Code', sql.VarChar(5), aliasData.code);
+        request.input('Description', sql.NVarChar(512), aliasData.description);
+        request.input('IsUniversal', sql.Bit, aliasData.isUniversal || 0);
+        request.input('CreateUser', sql.VarChar(64), aliasData.createUser);
+        
+        const result = await request.query(`
+            INSERT INTO MA_CodingRules_Aliases 
+            (CompanyId, TypeId, Code, Description, IsUniversal, IsActive, CreateUser, CreateDate, EditUser, EditDate)
+            OUTPUT INSERTED.*
+            VALUES 
+            (@CompanyId, @TypeId, @Code, @Description, @IsUniversal, 1, @CreateUser, GETDATE(), @CreateUser, GETDATE())
+        `);
+        
+        return {
+            success: 1,
+            data: result.recordset[0],
+            msg: 'Alias creato con successo'
+        };
+    } catch (err) {
+        console.error('Error creating alias:', err);
+        if (err.message.includes('UQ_Aliases')) {
+            throw new Error('Codice alias già esistente per questo tipo');
+        }
+        throw err;
+    }
+};
+
 // Export all functions
 module.exports = {
     getCodingHierarchy,
@@ -823,5 +1047,10 @@ module.exports = {
     getRecodingHistory,
     searchSimilarForRecoding,
     applyBatchRecodingAlternative,
-    logRecodingHistory
+    logRecodingHistory,
+    createCategory,
+    createMacroFamily,
+    createFamily,
+    createType,
+    createAlias
 };

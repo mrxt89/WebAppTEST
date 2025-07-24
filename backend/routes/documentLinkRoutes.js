@@ -80,6 +80,7 @@ router.post('/notifications/:notificationId/documents', authenticateToken, async
                       || itemCode 
                       || (custSuppCode && custSuppType) 
                       || taskId
+                      || projectId
                           
     if (!hasDocumentId) {
       return res.status(400).json({ 

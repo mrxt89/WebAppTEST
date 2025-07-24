@@ -1750,4 +1750,71 @@ router.get('/notifications/:notificationId/participants', authenticateToken, asy
   }
 });
 
+// Aggiungi versione per notification attachments
+router.post('/notifications/:notificationId/attachments/:attachmentId/version', authenticateToken, upload.single('file'), async (req, res) => {
+  try {
+      const attachmentId = parseInt(req.params.attachmentId);
+      const notificationId = parseInt(req.params.notificationId);
+      const userId = req.user.UserId;
+      const { changeNotes } = req.body;
+      
+      if (!req.file) {
+          return res.status(400).json({ success: 0, message: 'Nessun file caricato' });
+      }
+      
+      // Verifica che l'attachment appartenga alla notifica
+      const attachment = await getAttachmentById(attachmentId);
+      if (!attachment) {
+          return res.status(404).json({ success: 0, message: 'Allegato non trovato' });
+      }
+      
+      if (attachment.NotificationID !== notificationId) {
+          return res.status(403).json({ success: 0, message: 'Allegato non appartiene a questa notifica' });
+      }
+      
+      const fileInfo = await fileService.saveFile(
+          req.file,
+          null, // projectId
+          null, // taskId
+          notificationId,
+          null, // itemCode
+          null  // companyId
+      );
+      
+      // Aggiorna database
+      let pool = await sql.connect(config.database);
+      await pool.request()
+          .input('AttachmentID', sql.Int, attachmentId)
+          .input('FilePath', sql.VarChar, fileInfo.filePath)
+          .input('FileSizeKB', sql.Int, fileInfo.fileSizeKB)
+          .input('ModifiedBy', sql.Int, userId)
+          .query(`
+              UPDATE AR_Attachments 
+              SET FilePath = @FilePath,
+                  FileSizeKB = @FileSizeKB,
+                  ModifiedDate = GETDATE(),
+                  ModifiedBy = @ModifiedBy
+              WHERE AttachmentID = @AttachmentID
+          `);
+      
+      res.json({ 
+          success: 1, 
+          message: 'File aggiornato con successo',
+          data: {
+              attachmentId,
+              notificationId,
+              newFilePath: fileInfo.filePath,
+              fileSizeKB: fileInfo.fileSizeKB
+          }
+      });
+      
+  } catch (error) {
+      console.error('Error updating notification attachment version:', error);
+      res.status(500).json({ 
+          success: 0, 
+          message: 'Errore nell\'aggiornamento del file' 
+      });
+  }
+});
+
 module.exports = router;

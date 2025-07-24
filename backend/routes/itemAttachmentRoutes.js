@@ -313,12 +313,18 @@ router.post('/item-attachments/project-item/:projectItemId/upload', authenticate
 router.get('/item-attachments/:attachmentId/download', authenticateToken, async (req, res) => {
     try {
         const attachmentId = parseInt(req.params.attachmentId);
+        console.log('Download requested for attachment:', attachmentId);
+        
         const attachment = await getItemAttachmentById(attachmentId);
+        console.log('Attachment found:', attachment);
         
         if (!attachment) {
             return res.status(404).json({ success: 0, message: 'Allegato non trovato' });
         }
 
+        console.log('File path:', attachment.FilePath);
+        console.log('File type:', attachment.FileType);
+        
         const fileStream = await fileService.getFileStream(attachment.FilePath);
         res.setHeader('Content-Type', attachment.FileType);
         res.setHeader('Content-Disposition', `attachment; filename="${attachment.FileName}"`);

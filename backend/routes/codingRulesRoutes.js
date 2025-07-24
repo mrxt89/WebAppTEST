@@ -9,7 +9,11 @@ const {
     getCodingConfig,
     getCodesPreview,
     getRecodingHistory,
-    searchSimilarForRecoding
+    createCategory,
+    createMacroFamily,
+    createFamily,
+    createType,
+    createAlias
 } = require('../queries/codingRulesManagement');
 
 // Get coding configuration for company
@@ -128,7 +132,7 @@ router.post('/codingRules/validate', authenticateToken, async (req, res) => {
         
         res.json({
             success: 1,
-            isValid: result.isValid,
+            isValid: result.isValid == '1'? true : false,
             message: result.errorMessage
         });
     } catch (err) {
@@ -424,6 +428,161 @@ router.get('/codingRules/searchSimilar', authenticateToken, async (req, res) => 
         res.status(500).json({
             success: 0,
             msg: err.message || 'Errore durante la ricerca articoli simili'
+        });
+    }
+});
+
+// Crea una nuova categoria
+router.post('/codingRules/categories', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { code, description, color, natureCode } = req.body;
+        
+        if (!code || code.length !== 3) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Il codice categoria deve essere di 3 caratteri'
+            });
+        }
+        
+        const result = await createCategory(companyId, {
+            code,
+            description,
+            color,
+            natureCode,
+            createUser: req.user.Username || 'SYSTEM'
+        });
+        
+        res.json(result);
+    } catch (err) {
+        console.error('Error creating category:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nella creazione della categoria'
+        });
+    }
+});
+
+// Crea una nuova macrofamiglia
+router.post('/codingRules/macrofamilies', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { categoryId, code, description, isUniversal } = req.body;
+        
+        if (!categoryId || !code || !description) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Dati non validi'
+            });
+        }
+        
+        const result = await createMacroFamily(companyId, {
+            categoryId,
+            code,
+            description,
+            isUniversal: isUniversal || false,
+            createUser: req.user.Username || 'SYSTEM'
+        });
+        
+        res.json(result);
+    } catch (err) {
+        console.error('Error creating macrofamily:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nella creazione della macrofamiglia'
+        });
+    }
+});
+
+// Crea una nuova famiglia
+router.post('/codingRules/families', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { macroFamilyId, code, description, isUniversal } = req.body;
+        
+        if (!macroFamilyId || !code || !description) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Dati non validi'
+            });
+        }
+        
+        const result = await createFamily(companyId, {
+            macroFamilyId,
+            code,
+            description,
+            isUniversal: isUniversal || false,
+            createUser: req.user.Username || 'SYSTEM'
+        });
+        
+        res.json(result);
+    } catch (err) {
+        console.error('Error creating family:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nella creazione della famiglia'
+        });
+    }
+});
+
+// Crea un nuovo tipo
+router.post('/codingRules/types', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { familyId, code, description, isUniversal } = req.body;
+        
+        if (!familyId || !code || !description) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Dati non validi'
+            });
+        }
+        
+        const result = await createType(companyId, {
+            familyId,
+            code,
+            description,
+            isUniversal: isUniversal || false,
+            createUser: req.user.Username || 'SYSTEM'
+        });
+        
+        res.json(result);
+    } catch (err) {
+        console.error('Error creating type:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nella creazione del tipo'
+        });
+    }
+});
+
+// Crea un nuovo alias
+router.post('/codingRules/aliases', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { typeId, code, description, isUniversal } = req.body;
+        
+        if (!typeId || !code || !description) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Dati non validi'
+            });
+        }
+        
+        const result = await createAlias(companyId, {
+            typeId,
+            code,
+            description,
+            isUniversal: isUniversal || false,
+            createUser: req.user.Username || 'SYSTEM'
+        });
+        
+        res.json(result);
+    } catch (err) {
+        console.error('Error creating alias:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nella creazione dell\'alias'
         });
     }
 });

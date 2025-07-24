@@ -148,6 +148,10 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
 
   // Document types
   const documentTypes = [
+    { id: "Project", label: "Progetti", icon: <Clipboard size={16} /> },
+    { id: "Task", label: "Attività", icon: <Clipboard size={16} /> },
+    { id: "Item", label: "Articoli", icon: <Tag size={16} /> },
+    { id: "BOM", label: "Distinte Base", icon: <Link size={16} /> },
     { id: "customers", label: "Clienti", icon: <User size={16} /> },
     { id: "suppliers", label: "Fornitori", icon: <Truck size={16} /> },
     { id: "SaleOrd", label: "Ordini Cliente", icon: <ShoppingCart size={16} /> },
@@ -155,9 +159,6 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     { id: "PurchaseOrd", label: "Ordini Fornitore", icon: <FileBox size={16} /> },
     { id: "PurchaseDoc", label: "Documenti Acquisto", icon: <FileText size={16} /> },
     { id: "MO", label: "Ordini Produzione", icon: <Clipboard size={16} /> },
-    { id: "BOM", label: "Distinte Base", icon: <Link size={16} /> },
-    { id: "Item", label: "Articoli", icon: <Tag size={16} /> },
-    { id: "Task", label: "Attività", icon: <Clipboard size={16} /> },
   ];
 
   // Helper functions
@@ -1044,6 +1045,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
   };
 
   const searchChatsByDocument = async (document) => {
+    console.log("searchChatsByDocument", document);
     setSelectedDocument(document);
     setDocumentChatsLoading(true);
     setDocumentChats([]);
@@ -1056,16 +1058,20 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
           : documentTab === "suppliers"
             ? "Supplier"
             : documentTab;
-
+      console.log("documentTab", documentTab);
       let searchValue = "";
       if (documentTab === "customers" || documentTab === "suppliers") {
         searchValue = document.DocumentNumber;
+      } else if (documentTab === "Project") {
+        searchValue = document.DocumentId
       } else if (["SaleOrd", "PurchaseOrd", "SaleDoc", "PurchaseDoc", "MO"].includes(documentTab)) {
         searchValue = document.DocumentId.toString();
       } else if (documentTab === "BOM") {
         searchValue = document.DocumentNumber;
       } else if (documentTab === "Item") {
         searchValue = document.DocumentNumber;
+      } else if (documentTab === "Task") {
+        searchValue = document.DocumentId
       }
 
       const response = await axios.get(

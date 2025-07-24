@@ -194,6 +194,62 @@ const ProjectManagementSplitView = () => {
     setSelectedProjectId(null);
   }, []);
 
+// Evento per gestire apertura task dalle chat
+useEffect(() => {
+const loadInitialData = async () => {
+  try {
+    setLoading(true);
+    const [
+      usersResponse,
+      customersResponse,
+      categoriesResponse,
+      statusesResponse,
+    ] = await Promise.all([
+      fetchUsers(),
+      fetchProjectCustomers(),
+      fetchCategories(),
+      fetchProjectStatuses(),
+    ]);
+
+    // Carica anche gli utenti con l'hook useUsers
+    await fetchAllUsers();
+
+    await getUserProjectStatistics().then(setStatistics);
+
+    const projectsData = await fetchProjects(0, 100, {});
+    
+    if (projectsData && projectsData.items) {
+      const pinned = new Set(
+        projectsData.items.filter(p => p.IsPinned).map(p => p.ProjectID)
+      );
+      setPinnedProjects(pinned);
+    }
+
+    if (urlProjectId && !isNaN(parseInt(urlProjectId))) {
+      selectProject(parseInt(urlProjectId));
+      
+      // NUOVA PARTE: Gestisci openTaskId se presente
+      const openTaskId = searchParams.get('openTaskId');
+      if (openTaskId && !isNaN(parseInt(openTaskId))) {
+        // Salva l'ID della task da aprire
+        sessionStorage.setItem('pendingTaskToOpen', openTaskId);
+      }
+      
+      if (autoSelect) {
+        navigate(`/progetti/dashboard?projectId=${urlProjectId}`, { replace: true });
+      }
+    }
+  } catch (error) {
+    console.error("Error loading initial data:", error);
+    swal.fire("Errore", "Errore nel caricamento dei dati", "error");
+  } finally {
+    setLoading(false);
+  }
+};
+
+loadInitialData();
+}, [urlProjectId, autoSelect]);
+
   // Rendering
   return (
     <div className="flex relative" style={{ height: "calc(100vh - 105px)" }} ref={containerRef}>

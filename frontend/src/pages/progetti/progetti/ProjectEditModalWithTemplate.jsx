@@ -347,8 +347,10 @@ const ProjectEditModalWithTemplate = ({
                       id="projectErpId"
                       value={localProject.ProjectErpID}
                       onChange={(e) => handleChange("ProjectErpID", e.target.value)}
-                      placeholder="Inserisci ID ERP"
+                      placeholder="Automatico"
                       className="mt-1"
+                      readOnly
+                      disabled
                     />
                   </div>
                   

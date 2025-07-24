@@ -5,6 +5,7 @@ import { useSelector } from "react-redux";
 import { selectUnreadCount } from "@/redux/features/notifications/notificationsSlice";
 import CompanyLogo from "./CompanyLogo";
 import { WikiButton } from "@/components/wiki";
+import { AgentStatusBadge, openAgentWindow } from "@/components/LocalAgentMonitor";
 
 // Componente memoizzato per il pulsante notifiche
 const NotificationButton = memo(({ unreadCount, toggleSidebar }) => {
@@ -134,6 +135,10 @@ const Header = ({
 
           {/* Right Section */}
           <div className="flex items-center space-x-4">
+
+            {/* Agent Status Badge */}
+            <AgentStatusBadge />
+            
             {/* Wiki Button */}
             <WikiButton />
 

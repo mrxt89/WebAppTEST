@@ -803,6 +803,29 @@ const handleDisableProject = async (projectId) => {
     fetchUsers();
   }, [fetchUsers]);
 
+  //logica per aprire automaticamente la task
+  useEffect(() => {
+    // Dopo che il progetto è caricato, controlla se c'è una task da aprire
+    if (project && project.tasks && project.tasks.length > 0) {
+      const pendingTaskId = sessionStorage.getItem('pendingTaskToOpen');
+      
+      if (pendingTaskId) {
+        const taskToOpen = project.tasks.find(
+          t => t.TaskID === parseInt(pendingTaskId)
+        );
+        
+        if (taskToOpen) {
+          // Apri il TaskDetailsPanel con la task
+          setTimeout(() => {
+            handleTaskClick(taskToOpen);
+            // Rimuovi il flag dopo l'apertura
+            sessionStorage.removeItem('pendingTaskToOpen');
+          }, 500); // Piccolo delay per assicurarsi che tutto sia renderizzato
+        }
+      }
+    }
+  }, [project, handleTaskClick]);
+
   // Rendering
   if (loading || !project) {
     return (

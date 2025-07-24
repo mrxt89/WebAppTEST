@@ -1,6 +1,6 @@
 // src/pages/StandaloneChat.jsx
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom"; 
 import { useNotifications } from "../redux/features/notifications/notificationsHooks";
 import ChatWindow from "../components/chat/ChatWindow";
 import useWindowManager from "../hooks/useWindowManager";
@@ -64,6 +64,7 @@ const ErrorScreen = ({ error, onClose, onRetry }) => (
 
 const StandaloneChat = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const notificationId = parseInt(id);
   const dispatch = useDispatch();
   const windowManager = useWindowManager("standalone-");
@@ -348,6 +349,66 @@ const StandaloneChat = () => {
     }, 500);
   }, [notificationId, unregisterStandaloneChat, dispatch]);
 
+  // useEffect unificato per gestire navigazione progetti e task
+useEffect(() => {
+  // Handler per navigazione progetto
+  const handleNavigateToProject = (event) => {
+    const { projectId } = event.detail;
+    
+    // Navigare nella finestra principale (se esiste)
+    if (window.opener && !window.opener.closed) {
+      // Invia messaggio alla finestra principale
+      window.opener.postMessage({
+        type: 'navigate-to-project',
+        projectId: projectId,
+        route: `/progetti/dashboard?projectId=${projectId}&autoSelect=true`
+      }, window.location.origin);
+      
+      // Focus sulla finestra principale
+      window.opener.focus();
+    } else {
+      // Aprire in una nuova scheda se la finestra principale è chiusa
+      window.open(
+        `/progetti/dashboard?projectId=${projectId}&autoSelect=true`,
+        '_blank'
+      );
+    }
+  };
+  
+  // Handler per navigazione task
+  const handleNavigateToTask = (event) => {
+    const { projectId, taskId } = event.detail;
+    
+    if (window.opener && !window.opener.closed) {
+      // Invia messaggio alla finestra principale con info sulla task
+      window.opener.postMessage({
+        type: 'navigate-to-task',
+        projectId: projectId,
+        taskId: taskId,
+        route: `/progetti/dashboard?projectId=${projectId}&openTaskId=${taskId}&autoSelect=true`
+      }, window.location.origin);
+      
+      window.opener.focus();
+    } else {
+      // Apri in nuova scheda con parametri per la task
+      window.open(
+        `/progetti/dashboard?projectId=${projectId}&openTaskId=${taskId}&autoSelect=true`,
+        '_blank'
+      );
+    }
+  };
+  
+  // Aggiungi entrambi i listener
+  document.addEventListener('navigate-to-project', handleNavigateToProject);
+  document.addEventListener('navigate-to-task', handleNavigateToTask);
+  
+  // Cleanup
+  return () => {
+    document.removeEventListener('navigate-to-project', handleNavigateToProject);
+    document.removeEventListener('navigate-to-task', handleNavigateToTask);
+  };
+}, []);
+
   // Se OpenChatData è disponibile, usalo invece di notification
   const currentNotification = openChatData || notification;
 
@@ -372,6 +433,7 @@ const StandaloneChat = () => {
         onMinimize={() => window.blur()}
         windowManager={windowManager}
         isStandalone={true}
+        navigate={navigate}
         // Pass users and response options directly as props
         standaloneData={{
           users: users,

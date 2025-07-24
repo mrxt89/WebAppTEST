@@ -1,0 +1,12 @@
+Prova 123
+
+Non è possibile inserire cicli su codici PF e SML che di partenza non hanno cicli!!
+
+
+Da operazione selezione cdl default da Mago .. Scelta a cascata--> input testo . anche su cdl.
+
+Prima operazione e poi cdl
+
+Valorizzazione tempo FASE da Mago --> Sistemato il connettore
+
+ATTENZIONE: I connettori posgres vanno sistemati per clienti e articoli in base ai database che mi darà Michele. Da lì dovrò creare degli script appositi per mograre i file come fatto per Ricos

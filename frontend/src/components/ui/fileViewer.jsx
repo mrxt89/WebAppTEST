@@ -13,6 +13,7 @@ import { config } from "../../config";
 import EmailPreview from "./EmailPreview";
 import OfficePreview from "./OfficePreview";
 import axiosInstance from "@/lib/axios";
+import localAgentService from "@/services/localAgentService";
 
 // Importazione lazy del visualizzatore CAD
 const CADViewer = lazy(() => import("./CADViewer"));
@@ -35,6 +36,11 @@ const FileViewer = ({ file, isOpen, onClose }) => {
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
   const [developmentAction, setDevelopmentAction] = useState(null);
 
+  // Stati per Local Agent
+  const [agentAvailable, setAgentAvailable] = useState(false);
+  const [agentChecked, setAgentChecked] = useState(false);
+  const [showAgentModal, setShowAgentModal] = useState(false);
+
   useEffect(() => {
     // Cleanup quando il componente si chiude o cambia file
     return () => {
@@ -45,6 +51,17 @@ const FileViewer = ({ file, isOpen, onClose }) => {
       }
     };
   }, [previewUrl]);
+
+  // Check agent availability
+  useEffect(() => {
+    checkAgentAvailability();
+  }, []);
+
+  const checkAgentAvailability = async () => {
+    const available = await localAgentService.checkAvailability();
+    setAgentAvailable(available);
+    setAgentChecked(true);
+  };
 
   useEffect(() => {
     console.log("=== FileViewer useEffect triggered ===");
@@ -400,8 +417,10 @@ const FileViewer = ({ file, isOpen, onClose }) => {
     );
   };
 
-  // Helper functions
+  // Helper functions con controlli null-safe
   const isImageFile = (file) => {
+    if (!file || !file.FileType || !file.FileName) return false;
+    
     const imageTypes = [
       "image/jpeg", "image/png", "image/gif", "image/bmp", 
       "image/svg+xml", "image/tiff", "image/webp"
@@ -411,11 +430,13 @@ const FileViewer = ({ file, isOpen, onClose }) => {
       ".svg", ".tiff", ".tif", ".webp"
     ];
     
-    return imageTypes.includes(file.FileType?.toLowerCase()) ||
-           imageExtensions.some(ext => file.FileName?.toLowerCase().endsWith(ext));
+    return imageTypes.includes(file.FileType.toLowerCase()) ||
+           imageExtensions.some(ext => file.FileName.toLowerCase().endsWith(ext));
   };
 
   const isOfficeFile = (file) => {
+    if (!file || !file.FileType || !file.FileName) return false;
+    
     const officeTypes = [
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "application/msword",
@@ -429,10 +450,12 @@ const FileViewer = ({ file, isOpen, onClose }) => {
     ];
     
     return officeTypes.includes(file.FileType) ||
-           officeExtensions.some(ext => file.FileName?.toLowerCase().endsWith(ext));
+           officeExtensions.some(ext => file.FileName.toLowerCase().endsWith(ext));
   };
 
   const isEmailFile = (file) => {
+    if (!file || !file.FileType || !file.FileName) return false;
+    
     const emailTypes = [
       "message/rfc822", "application/vnd.ms-outlook", 
       "text/x-eml", "application/x-emlx"
@@ -440,10 +463,12 @@ const FileViewer = ({ file, isOpen, onClose }) => {
     const emailExtensions = [".eml", ".msg", ".emlx"];
     
     return emailTypes.includes(file.FileType) ||
-           emailExtensions.some(ext => file.FileName?.toLowerCase().endsWith(ext));
+           emailExtensions.some(ext => file.FileName.toLowerCase().endsWith(ext));
   };
 
   const isTextFile = (file) => {
+    if (!file || !file.FileName) return false;
+    
     const textTypes = [
       "text/plain", "text/html", "text/css", "text/javascript",
       "text/xml", "text/csv", "text/tab-separated-values",
@@ -457,7 +482,7 @@ const FileViewer = ({ file, isOpen, onClose }) => {
       ".rb", ".go", ".rs", ".swift", ".kt", ".r", ".m"
     ];
     
-    const fileName = file.FileName?.toLowerCase() || "";
+    const fileName = file.FileName.toLowerCase();
     const fileType = file.FileType?.toLowerCase() || "";
     
     return textTypes.includes(fileType) ||
@@ -465,6 +490,8 @@ const FileViewer = ({ file, isOpen, onClose }) => {
   };
 
   const handleDownload = async (attachment) => {
+    if (!attachment) return;
+    
     try {
       let url;
 
@@ -513,8 +540,13 @@ const FileViewer = ({ file, isOpen, onClose }) => {
     }
   };
 
-  // Nuova funzione per aprire il file direttamente
-  const handleDirectOpen = async () => {
+// Nuova funzione per aprire il file direttamente
+const handleDirectOpen = async () => {
+  if (!file) return;
+  
+  // Prima controlla se l'agent è disponibile
+  if (!agentAvailable) {
+    // Usa il metodo esistente SMB se agent non disponibile
     try {
       const response = await axiosInstance.post('/generate-smb-link', {
         attachmentId: file.AttachmentID,
@@ -542,7 +574,75 @@ const FileViewer = ({ file, isOpen, onClose }) => {
       console.error('Error opening file directly:', error);
       alert('Impossibile aprire il file direttamente');
     }
-  };
+    return;
+  }
+  
+  // Se l'agent è disponibile, usalo
+  try {
+    console.log('Opening file with Local Agent...');
+    console.log('Agent available:', agentAvailable);
+    console.log('file data:', file);
+    // Prepara dati per agent
+    // Costruisci sempre l'URL completo del server
+    const serverUrl = config.API_BASE_URL.startsWith('http') 
+    ? config.API_BASE_URL.replace('/api', '')  // Se è completo, rimuovi /api
+    : window.location.origin;                   // Se è relativo, usa l'origin
+
+console.log('Config API_BASE_URL:', config.API_BASE_URL);
+console.log('Resulting serverUrl:', serverUrl);
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    const fileData = {
+      attachmentId: file.AttachmentID,
+      fileName: file.FileName,
+      filePath: file.FilePath,
+      serverUrl: serverUrl,
+      token: `Bearer ${token}`,
+      companyId: user.CompanyId,
+      userId: user.userId,
+      projectId: file.ProjectID,
+      taskId: file.TaskID,
+      notificationId: file.NotificationID,
+      itemCode: file.ItemCode,
+      projectItemId: file.ProjectItemId,
+      lockFile: true,
+    };
+
+    console.log('File data for agent:', fileData);
+    
+    // Apri con agent
+    const result = await localAgentService.openFile(fileData);
+    
+    if (result.success) {
+      console.log('File opened successfully with agent');
+      
+      // Chiudi il modal del viewer
+      onClose();
+      
+      // Mostra notifica di successo
+      if (window.toastr) {
+        window.toastr.success(`File aperto: ${file.FileName}`);
+      } else {
+        console.log(`File aperto: ${file.FileName}`);
+      }
+    }
+    
+  } catch (error) {
+    console.error('Error opening with agent:', error);
+    
+    const errorInfo = localAgentService.handleError(error);
+    
+    if (error.code === 'AGENT_NOT_AVAILABLE') {
+      setShowAgentModal(true);
+    } else if (error.code === 'FILE_LOCKED') {
+      // File già bloccato
+      alert(`File bloccato da: ${error.lockedByName}`);
+    } else {
+      alert(errorInfo.message || 'Errore apertura file con agent');
+    }
+  }
+};
 
   // Handler per le azioni del modal development
   const handleDevelopmentChoice = (choice) => {
@@ -628,6 +728,9 @@ const FileViewer = ({ file, isOpen, onClose }) => {
 
   // Verifica se possiamo aprire direttamente questo tipo di file
   const canOpenDirectly = () => {
+    // Se non c'è file, non mostrare il pulsante
+    if (!file) return false;
+    
     // Permetti apertura diretta per tutti i file tranne le email
     // che hanno bisogno di un trattamento speciale
     return !isEmailFile(file);
@@ -642,7 +745,7 @@ const FileViewer = ({ file, isOpen, onClose }) => {
           style={{ zIndex: 50 }}
         >
           <DialogHeader>
-            <DialogTitle>{file?.FileName}</DialogTitle>
+            <DialogTitle>{file?.FileName || "File"}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-auto">
             {getFileContent()}
@@ -653,7 +756,7 @@ const FileViewer = ({ file, isOpen, onClose }) => {
             </Button>
             
             {/* Nuovo pulsante per apertura diretta */}
-            {canOpenDirectly() && (
+            {file && canOpenDirectly() && (
               <Button 
                 onClick={handleDirectOpen}
                 variant="default"
@@ -664,16 +767,76 @@ const FileViewer = ({ file, isOpen, onClose }) => {
               </Button>
             )}
             
-            <Button 
-              onClick={() => handleDownload(file)}
-              variant={canOpenDirectly() ? "outline" : "default"}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Scarica
-            </Button>
+            {file && (
+              <Button 
+                onClick={() => handleDownload(file)}
+                variant={canOpenDirectly() ? "outline" : "default"}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Scarica
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal per Agent non disponibile */}
+<Dialog open={showAgentModal} onOpenChange={setShowAgentModal}>
+  <DialogContent style={{ zIndex: 60 }}>
+    <DialogHeader>
+      <DialogTitle>Local Agent richiesto</DialogTitle>
+      <DialogDescription>
+        Per modificare i file direttamente è necessario Local Agent.
+      </DialogDescription>
+    </DialogHeader>
+    
+    <div className="space-y-4 my-4">
+      <div className="bg-blue-50 p-4 rounded-lg">
+        <h4 className="font-semibold mb-2">Cos'è Local Agent?</h4>
+        <p className="text-sm">
+          Un'applicazione leggera che permette di aprire e modificare 
+          i file con le tue applicazioni preferite, mantenendo la 
+          sincronizzazione automatica con il server.
+        </p>
+      </div>
+      
+      <div className="space-y-2">
+        <h4 className="font-semibold">Vantaggi:</h4>
+        <ul className="list-disc list-inside text-sm space-y-1">
+          <li>Apertura diretta con app native (AutoCAD, Office, ecc.)</li>
+          <li>Sincronizzazione automatica delle modifiche</li>
+          <li>Gestione versioni integrata</li>
+          <li>Lock file per evitare conflitti</li>
+        </ul>
+      </div>
+    </div>
+    
+    <DialogFooter className="gap-2">
+      <Button variant="outline" onClick={() => setShowAgentModal(false)}>
+        Annulla
+      </Button>
+      <Button
+        variant="outline"
+        onClick={() => {
+          setShowAgentModal(false);
+          // Usa il metodo SMB esistente
+          handleDirectOpen();
+          setAgentAvailable(false); // Forza uso metodo SMB
+        }}
+      >
+        Usa metodo alternativo
+      </Button>
+      <Button
+        onClick={() => {
+          window.open('/api/download/agent/windows', '_blank');
+        }}
+      >
+        <Download className="h-4 w-4 mr-2" />
+        Scarica Local Agent
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
       {/* Modal per scelta in development */}
       <Dialog open={showDevelopmentModal} onOpenChange={setShowDevelopmentModal}>

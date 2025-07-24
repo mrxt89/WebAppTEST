@@ -22,6 +22,7 @@ const ChatSidebar = forwardRef((props, ref) => {
     currentUserId,
     selectedMessageId,
     selectedMessageText,
+    navigate,
   } = props;
 
   const [activeTab, setActiveTab] = useState("attachments");
@@ -244,6 +245,7 @@ const ChatSidebar = forwardRef((props, ref) => {
             setDocuments={setDocuments}
             loading={loading}
             onOpenDocumentLinker={() => setDocumentLinkerOpen(true)}
+            navigate={navigate}
           />
         );
       case "highlights":

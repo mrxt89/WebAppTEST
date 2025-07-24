@@ -12,6 +12,7 @@ import MainPage from "./components/main/MainPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import StandaloneChat from "./pages/StandaloneChat";
 import ReduxProvider from "./redux/ReduxProvider";
+import LocalAgentMonitor from '@/components/LocalAgentMonitor';
 
 const App = () => {
   return (
@@ -53,6 +54,7 @@ const App = () => {
                 </Routes>
               </UserSettingsProvider>
             </ReduxProvider>
+            <LocalAgentMonitor />
           </Provider>
         </AuthProvider>
       </Router>
