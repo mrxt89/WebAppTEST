@@ -76,6 +76,7 @@ const MyTasksFilters = ({
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                   {/* Priorità */}
                   <div>
+                    <div className="text-xs font-semibold text-gray-500 mb-1">Priorità</div>
                     <Select
                       value={filters.priority}
                       onValueChange={(value) => onFilterChange({ priority: value })}
@@ -94,6 +95,7 @@ const MyTasksFilters = ({
 
                   {/* Stato */}
                   <div>
+                    <div className="text-xs font-semibold text-gray-500 mb-1">Stato</div>
                     <Select
                       value={filters.status}
                       onValueChange={(value) => onFilterChange({ status: value })}
@@ -114,6 +116,7 @@ const MyTasksFilters = ({
 
                   {/* Scadenza */}
                   <div>
+                    <div className="text-xs font-semibold text-gray-500 mb-1">Scadenza</div>
                     <Select
                       value={filters.dueDate}
                       onValueChange={(value) => onFilterChange({ dueDate: value })}
@@ -134,6 +137,7 @@ const MyTasksFilters = ({
 
                   {/* Progetto */}
                   <div>
+                    <div className="text-xs font-semibold text-gray-500 mb-1">Progetto</div>
                     <Select
                       value={filters.projectId}
                       onValueChange={(value) => onFilterChange({ projectId: value })}
@@ -155,6 +159,7 @@ const MyTasksFilters = ({
                   {/* Utente Coinvolto */}
                   {allUsers.length > 0 && (
                     <div>
+                      <div className="text-xs font-semibold text-gray-500 mb-1">Utente</div>
                       <Select
                         value={filters.involvedUser || "all"}
                         onValueChange={(value) =>
@@ -182,34 +187,36 @@ const MyTasksFilters = ({
                   )}
 
                   {/* Ordinamento */}
-                  <div className="flex gap-1">
-                    <Select
-                      value={filters.sortBy}
-                      onValueChange={(value) => onFilterChange({ sortBy: value })}
-                    >
-                      <SelectTrigger className="h-8 text-xs flex-1">
-                        <SelectValue placeholder="Ordina" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="dueDate">Scadenza</SelectItem>
-                        <SelectItem value="priority">Priorità</SelectItem>
-                        <SelectItem value="project">Progetto</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        onFilterChange({
-                          sortDirection:
-                            filters.sortDirection === "asc" ? "desc" : "asc",
-                        })
-                      }
-                      className="h-8 w-8 p-0"
-                    >
-                      <ArrowUpDown className="h-3 w-3" />
-                    </Button>
+                  <div className="flex gap-1 flex-col">
+                    <div className="text-xs font-semibold text-gray-500 mb-1">Ordinamento</div>
+                    <div className="flex gap-1">
+                      <Select
+                        value={filters.sortBy}
+                        onValueChange={(value) => onFilterChange({ sortBy: value })}
+                      >
+                        <SelectTrigger className="h-8 text-xs flex-1">
+                          <SelectValue placeholder="Ordina" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="dueDate">Scadenza</SelectItem>
+                          <SelectItem value="priority">Priorità</SelectItem>
+                          <SelectItem value="project">Progetto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          onFilterChange({
+                            sortDirection:
+                              filters.sortDirection === "asc" ? "desc" : "asc",
+                          })
+                        }
+                        className="h-8 w-8 p-0"
+                      >
+                        <ArrowUpDown className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
 

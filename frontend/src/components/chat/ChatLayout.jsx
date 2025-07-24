@@ -48,6 +48,7 @@ const ChatLayout = ({
   onMessageDeleted,
   onMessageColorChanged,
   onMarkAsInteracted,
+  navigate,
 }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(initialSidebarOpen);
@@ -191,6 +192,7 @@ const ChatLayout = ({
           messages={messages}
           users={users}
           currentUserId={messages[0]?.selectedUser || 0}
+          navigate={navigate}
         />
       )}
 

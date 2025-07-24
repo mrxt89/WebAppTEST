@@ -33,18 +33,15 @@ const useRecodingRules = () => {
   /**
    * Carica le categorie (MP, PF, SL)
    */
-  const loadCategories = useCallback(async (companyId) => {
+  const loadCategories = useCallback(async (companyId, forceReload = false) => {
     try {
       setLoading(true);
-      
       // Controlla cache
-      if (hierarchyCache.categories.length > 0) {
+      if (!forceReload && hierarchyCache.categories.length > 0) {
         return hierarchyCache.categories;
       }
-      
       const url = `${config.API_BASE_URL}/codingRules/hierarchy?companyId=${companyId}`;
       const data = await makeRequest(url);
-      
       if (Array.isArray(data)) {
         setHierarchyCache(prev => ({
           ...prev,
@@ -52,7 +49,6 @@ const useRecodingRules = () => {
         }));
         return data;
       }
-      
       return [];
     } catch (err) {
       setError(err.message);
@@ -66,19 +62,15 @@ const useRecodingRules = () => {
   /**
    * Carica le macrofamiglie per una categoria
    */
-  const loadMacroFamilies = useCallback(async (companyId, categoryId) => {
+  const loadMacroFamilies = useCallback(async (companyId, categoryId, forceReload = false) => {
     try {
       setLoading(true);
-      
-      // Controlla cache
       const cacheKey = `${companyId}_${categoryId}`;
-      if (hierarchyCache.macroFamilies[cacheKey]) {
+      if (!forceReload && hierarchyCache.macroFamilies[cacheKey]) {
         return hierarchyCache.macroFamilies[cacheKey];
       }
-      
       const url = `${config.API_BASE_URL}/codingRules/hierarchy?companyId=${companyId}&categoryId=${categoryId}`;
       const data = await makeRequest(url);
-      
       if (Array.isArray(data)) {
         setHierarchyCache(prev => ({
           ...prev,
@@ -89,7 +81,6 @@ const useRecodingRules = () => {
         }));
         return data;
       }
-      
       return [];
     } catch (err) {
       setError(err.message);
@@ -103,19 +94,15 @@ const useRecodingRules = () => {
   /**
    * Carica le famiglie per una macrofamiglia
    */
-  const loadFamilies = useCallback(async (companyId, macroFamilyId) => {
+  const loadFamilies = useCallback(async (companyId, macroFamilyId, forceReload = false) => {
     try {
       setLoading(true);
-      
-      // Controlla cache
       const cacheKey = `${companyId}_${macroFamilyId}`;
-      if (hierarchyCache.families[cacheKey]) {
+      if (!forceReload && hierarchyCache.families[cacheKey]) {
         return hierarchyCache.families[cacheKey];
       }
-      
       const url = `${config.API_BASE_URL}/codingRules/hierarchy?companyId=${companyId}&macroFamilyId=${macroFamilyId}`;
       const data = await makeRequest(url);
-      
       if (Array.isArray(data)) {
         setHierarchyCache(prev => ({
           ...prev,
@@ -126,7 +113,6 @@ const useRecodingRules = () => {
         }));
         return data;
       }
-      
       return [];
     } catch (err) {
       setError(err.message);
@@ -140,19 +126,15 @@ const useRecodingRules = () => {
   /**
    * Carica i tipi per una famiglia
    */
-  const loadTypes = useCallback(async (companyId, familyId) => {
+  const loadTypes = useCallback(async (companyId, familyId, forceReload = false) => {
     try {
       setLoading(true);
-      
-      // Controlla cache
       const cacheKey = `${companyId}_${familyId}`;
-      if (hierarchyCache.types[cacheKey]) {
+      if (!forceReload && hierarchyCache.types[cacheKey]) {
         return hierarchyCache.types[cacheKey];
       }
-      
       const url = `${config.API_BASE_URL}/codingRules/hierarchy?companyId=${companyId}&familyId=${familyId}`;
       const data = await makeRequest(url);
-      
       if (Array.isArray(data)) {
         setHierarchyCache(prev => ({
           ...prev,
@@ -163,7 +145,6 @@ const useRecodingRules = () => {
         }));
         return data;
       }
-      
       return [];
     } catch (err) {
       setError(err.message);
@@ -177,19 +158,15 @@ const useRecodingRules = () => {
   /**
    * Carica gli alias per un tipo
    */
-  const loadAliases = useCallback(async (companyId, typeId) => {
+  const loadAliases = useCallback(async (companyId, typeId, forceReload = false) => {
     try {
       setLoading(true);
-      
-      // Controlla cache
       const cacheKey = `${companyId}_${typeId}`;
-      if (hierarchyCache.aliases[cacheKey]) {
+      if (!forceReload && hierarchyCache.aliases[cacheKey]) {
         return hierarchyCache.aliases[cacheKey];
       }
-      
       const url = `${config.API_BASE_URL}/codingRules/hierarchy?companyId=${companyId}&typeId=${typeId}`;
       const data = await makeRequest(url);
-      
       if (Array.isArray(data)) {
         setHierarchyCache(prev => ({
           ...prev,
@@ -200,7 +177,6 @@ const useRecodingRules = () => {
         }));
         return data;
       }
-      
       return [];
     } catch (err) {
       setError(err.message);
@@ -267,9 +243,9 @@ const useRecodingRules = () => {
           })
         }
       );
-      
+      console.log('Risposta validateCode:', response);
       return {
-        isValid: response?.isValid || false,
+        isValid: response?.isValid == '1',
         message: response?.message || ""
       };
     } catch (err) {
@@ -447,6 +423,42 @@ const useRecodingRules = () => {
     }
   }, [loadCategories, loadMacroFamilies, loadFamilies, loadTypes, loadAliases]);
 
+    /**
+   * Crea un nuovo elemento nella gerarchia
+   */
+    const createElement = useCallback(async (type, data) => {
+      try {
+        const endpoints = {
+          macroFamily: '/codingRules/macrofamilies',
+          family: '/codingRules/families',
+          type: '/codingRules/types',
+          alias: '/codingRules/aliases'
+        };
+        
+        const endpoint = endpoints[type];
+        if (!endpoint) {
+          throw new Error('Tipo elemento non valido');
+        }
+        
+        const response = await makeRequest(
+          `${config.API_BASE_URL}${endpoint}`,
+          {
+            method: "POST",
+            body: JSON.stringify(data)
+          }
+        );
+        
+        if (response && response.success) {
+          return response.data;
+        } else {
+          throw new Error(response?.msg || 'Errore nella creazione');
+        }
+      } catch (err) {
+        console.error(`Error creating ${type}:`, err);
+        throw err;
+      }
+    }, [makeRequest]);
+
   return {
     // Stati
     loading,
@@ -467,7 +479,10 @@ const useRecodingRules = () => {
     generateCodePreview,
     getPreviewBatch,
     applyBatchRecoding,
-    resetHierarchyCache
+    resetHierarchyCache,
+    
+    // Funzione di creazione
+    createElement,
   };
 };
 

@@ -25,7 +25,7 @@ async function linkDocumentToNotification(params) {
       notificationId, companyId, documentType, 
       bom, projectId, taskId, moId, saleOrdId, serialNo,
       purchaseOrdId, saleDocId, purchaseDocId, 
-      itemCode, custSuppType, custSuppCode 
+      itemCode, custSuppType, custSuppCode
     } = params;
     
     const pool = await sql.connect(config.database);

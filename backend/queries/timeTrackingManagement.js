@@ -289,7 +289,7 @@ const getUserAvailableTasks = async (userId) => {
               t.Status = 'COMPLETATA' 
               AND EXISTS (
                 SELECT 1 
-                FROM AR_UserTaskTimeEntries e 
+                FROM MA_UserTaskTimeEntries e 
                 WHERE e.TaskID = t.TaskID 
                 AND e.UserID = @UserID 
                 AND e.WorkDate BETWEEN @WeekStartDate AND @WeekEndDate

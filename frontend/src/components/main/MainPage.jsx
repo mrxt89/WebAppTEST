@@ -248,6 +248,8 @@ useEffect(() => {
   };
 }, [openChats, fetchNotificationById, dispatch]);
 
+
+
 // Enhanced open chat modal function
 const openChatModal = async (notificationId) => {
   if (!notificationId) {
@@ -854,19 +856,37 @@ const openChatModal = async (notificationId) => {
     fetchMenuItems();
   }, []);
 
+
   const handleNavigate = (item, state = {}) => {
     const newBreadcrumb = [...breadcrumb, item];
     setBreadcrumb(newBreadcrumb);
     setPageTitle(item.pageName);
     setIsPageComponent(!!item.pageComponent);
-
+  
     const filteredItems = menuItems.filter(
       (menuItem) => menuItem.pageParent === item.pageId,
     );
     setCurrentLevelItems(filteredItems);
-
+  
     if (item.pageComponent) {
-      navigate(item.pageRoute, {
+      // Costruisci l'URL con i parametri se presenti nello state
+      let route = item.pageRoute;
+      const params = new URLSearchParams();
+      
+      if (state.projectId) {
+        params.append('projectId', state.projectId);
+        params.append('autoSelect', 'true');
+      }
+      
+      if (state.openTaskId) {
+        params.append('openTaskId', state.openTaskId);
+      }
+      
+      if (params.toString()) {
+        route = `${route}?${params.toString()}`;
+      }
+      
+      navigate(route, {
         state: {
           ...state,
           pageComponent: true,
@@ -875,6 +895,116 @@ const openChatModal = async (notificationId) => {
       });
     }
   };
+
+
+useEffect(() => {
+  // Handler per messaggi da finestre standalone
+  const handleMessageFromStandalone = (event) => {
+    // Verifica sicurezza: stesso dominio
+    if (event.origin !== window.location.origin) return;
+    
+    if (event.data) {
+      // Gestione navigazione progetto
+      if (event.data.type === 'navigate-to-project') {
+        const { projectId } = event.data;
+        
+        const progettiItem = menuItems.find(
+          item => item.pageRoute === '/progetti/dashboard'
+        );
+        
+        if (progettiItem) {
+          handleNavigate(progettiItem, { 
+            projectId: projectId
+          });
+        }
+      }
+      // Gestione navigazione task
+      else if (event.data.type === 'navigate-to-task') {
+        const { projectId, taskId } = event.data;
+        
+        const progettiItem = menuItems.find(
+          item => item.pageRoute === '/progetti/dashboard'
+        );
+        
+        if (progettiItem) {
+          handleNavigate(progettiItem, { 
+            projectId: projectId,
+            openTaskId: taskId,
+            autoSelect: true
+          });
+        }
+      }
+    }
+  };
+  
+  // Handler per navigazione progetto
+  const handleNavigateToProject = (event) => {
+    const { projectId } = event.detail;
+    
+    const progettiItem = menuItems.find(
+      item => item.pageRoute === '/progetti/dashboard'
+    );
+    
+    if (progettiItem) {
+      handleNavigate(progettiItem, { 
+        projectId: projectId
+      });
+    }
+  };
+  
+  // Handler per navigazione task
+  const handleNavigateToTask = (event) => {
+    const { projectId, taskId } = event.detail;
+    
+    const progettiItem = menuItems.find(
+      item => item.pageRoute === '/progetti/dashboard'
+    );
+    
+    if (progettiItem) {
+      handleNavigate(progettiItem, { 
+        projectId: projectId,
+        openTaskId: taskId,
+        autoSelect: true
+      });
+    }
+  };
+  
+  // Aggiungi tutti i listener
+  window.addEventListener('message', handleMessageFromStandalone);
+  document.addEventListener('navigate-to-project', handleNavigateToProject);
+  document.addEventListener('navigate-to-task', handleNavigateToTask);
+  
+  // Cleanup
+  return () => {
+    window.removeEventListener('message', handleMessageFromStandalone);
+    document.removeEventListener('navigate-to-project', handleNavigateToProject);
+    document.removeEventListener('navigate-to-task', handleNavigateToTask);
+  };
+}, [menuItems, handleNavigate]);
+
+  // Gestione navigazione da componenti figli
+  useEffect(() => {
+    const handleNavigateToProject = (event) => {
+      const { projectId } = event.detail;
+      
+      const progettiItem = menuItems.find(
+        item => item.pageRoute === '/progetti/dashboard'
+      );
+      
+      if (progettiItem) {
+        // Passa projectId nello state
+        handleNavigate(progettiItem, { 
+          projectId: projectId
+        });
+      }
+    };
+    
+    document.addEventListener('navigate-to-project', handleNavigateToProject);
+    
+    return () => {
+      document.removeEventListener('navigate-to-project', handleNavigateToProject);
+    };
+  }, [menuItems, handleNavigate]);
 
   const handleBreadcrumbClick = (index) => {
     const newBreadcrumb = breadcrumb.slice(0, index + 1);
@@ -1021,6 +1151,7 @@ const openChatModal = async (notificationId) => {
                   onClose={closeChatModal}
                   onMinimize={minimizeChat}
                   windowManager={windowManager}
+                  navigate={navigate}
                 />
               );
             })

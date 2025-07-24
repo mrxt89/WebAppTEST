@@ -399,6 +399,17 @@ app.post('/api/logout', authenticateToken, async (req, res) => {
   }
 });
 
+// Route per download Local Agent
+app.get('/api/download/agent/windows', authenticateToken, (req, res) => {
+  const file = path.join(__dirname, 'downloads', 'webapp-agent-setup.exe');
+  
+  if (!fs.existsSync(file)) {
+    return res.status(404).json({ error: 'Agent installer not found' });
+  }
+  
+  res.download(file, 'webapp-agent-setup.exe');
+});
+
 // Route per informazioni sul database
 app.get('/api/dbinfo', async (req, res) => {
   try {

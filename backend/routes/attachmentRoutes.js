@@ -13,7 +13,16 @@ const {
     getAttachments,
     addAttachment,
     deleteAttachment,
-    getAttachmentById
+    getAttachmentById,
+    updateAttachmentVersion,
+    addAttachmentVersion,
+    verifyAttachmentBelongsToTask,
+    verifyAttachmentBelongsToProject,
+    createAttachmentLock,
+    releaseAttachmentLock,
+    forceReleaseAttachmentLock,
+    getAttachmentLockInfo,
+    cleanupExpiredLocks
 } = require('../queries/attachmentQueries');
 
 const fileService = new FileService();
@@ -575,4 +584,306 @@ router.get('/email-preview/:attachmentId', authenticateToken, async (req, res) =
     }
 });
 
+/* Routes per la gestione dei file generica, dall'agent per la modifica e salvataggio */
+
+// Aggiungi una nuova versione di un allegato generico
+router.post('/attachments/:attachmentId/version', authenticateToken, upload.single('file'), async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        const userId = req.user.UserId;
+        const { changeNotes } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ success: 0, message: 'Nessun file caricato' });
+        }
+        
+        // Ottieni l'allegato originale
+        const attachment = await getAttachmentById(attachmentId);
+        if (!attachment) {
+            return res.status(404).json({ success: 0, message: 'Allegato non trovato' });
+        }
+        
+        // Salva il nuovo file mantenendo la struttura delle cartelle
+        const fileInfo = await fileService.saveFile(
+            req.file,
+            attachment.ProjectID,
+            attachment.TaskID,
+            attachment.NotificationID,
+            attachment.ItemCode,
+            attachment.CompanyId
+        );
+        
+        // Backup del file vecchio (opzionale)
+        try {
+            const oldFilePath = path.join(fileService.baseUploadPath, attachment.FilePath);
+            const backupDir = path.join(fileService.baseUploadPath, 'versions', attachmentId.toString());
+            await fs.ensureDir(backupDir);
+            const backupPath = path.join(backupDir, `${Date.now()}_${attachment.FileName}`);
+            await fs.copy(oldFilePath, backupPath);
+        } catch (backupError) {
+            console.error('Error creating backup:', backupError);
+            // Non bloccare l'operazione se il backup fallisce
+        }
+        
+        // Aggiorna il database
+        await updateAttachmentVersion(attachmentId, fileInfo.filePath, fileInfo.fileSizeKB, userId);
+        
+        // Se esiste una tabella di versioning, logga la modifica
+        try {
+            await addAttachmentVersion(
+                attachmentId, 
+                1, // VersionNumber - potresti voler incrementare questo
+                fileInfo.filePath, 
+                fileInfo.fileSizeKB, 
+                changeNotes || 'Aggiornamento da Local Agent', 
+                userId
+            );
+        } catch (versionError) {
+            console.log('Version table not found or error:', versionError.message);
+        }
+        
+        // Elimina il vecchio file
+        try {
+            const oldFilePath = path.join(fileService.baseUploadPath, attachment.FilePath);
+            await fs.remove(oldFilePath);
+        } catch (removeError) {
+            console.error('Error removing old file:', removeError);
+        }
+        
+        res.json({ 
+            success: 1, 
+            message: 'File aggiornato con successo',
+            data: {
+                attachmentId,
+                newFilePath: fileInfo.filePath,
+                fileSizeKB: fileInfo.fileSizeKB
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error updating attachment version:', error);
+        res.status(500).json({ 
+            success: 0, 
+            message: 'Errore nell\'aggiornamento del file',
+            error: error.toString() 
+        });
+    }
+});
+
+// Aggiungi versione per task attachments
+router.post('/tasks/:taskId/attachments/:attachmentId/version', authenticateToken, upload.single('file'), async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        const taskId = parseInt(req.params.taskId);
+        const userId = req.user.UserId;
+        const { changeNotes } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ success: 0, message: 'Nessun file caricato' });
+        }
+        
+        // Verifica che l'attachment appartenga al task
+        const attachment = await getAttachmentById(attachmentId);
+        if (!attachment) {
+            return res.status(404).json({ success: 0, message: 'Allegato non trovato' });
+        }
+        
+        const belongsToTask = await verifyAttachmentBelongsToTask(attachmentId, taskId);
+        if (!belongsToTask) {
+            return res.status(403).json({ success: 0, message: 'Allegato non appartiene a questo task' });
+        }
+        
+        // Usa la stessa logica della route generica
+        const projectId = await getProjectIdByTaskId(taskId);
+        const fileInfo = await fileService.saveFile(
+            req.file,
+            projectId,
+            taskId,
+            null, // notificationId
+            null, // itemCode
+            null  // companyId
+        );
+        
+        // Aggiorna database
+        await updateAttachmentVersion(attachmentId, fileInfo.filePath, fileInfo.fileSizeKB, userId);
+        
+        res.json({ 
+            success: 1, 
+            message: 'File aggiornato con successo',
+            data: {
+                attachmentId,
+                taskId,
+                newFilePath: fileInfo.filePath,
+                fileSizeKB: fileInfo.fileSizeKB
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error updating task attachment version:', error);
+        res.status(500).json({ 
+            success: 0, 
+            message: 'Errore nell\'aggiornamento del file' 
+        });
+    }
+});
+
+// Aggiungi versione per project attachments
+router.post('/projects/:projectId/attachments/:attachmentId/version', authenticateToken, upload.single('file'), async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        const projectId = parseInt(req.params.projectId);
+        const userId = req.user.UserId;
+        const { changeNotes } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ success: 0, message: 'Nessun file caricato' });
+        }
+        
+        // Verifica che l'attachment appartenga al progetto
+        const attachment = await getAttachmentById(attachmentId);
+        if (!attachment) {
+            return res.status(404).json({ success: 0, message: 'Allegato non trovato' });
+        }
+        
+        const belongsToProject = await verifyAttachmentBelongsToProject(attachmentId, projectId);
+        if (!belongsToProject) {
+            return res.status(403).json({ success: 0, message: 'Allegato non appartiene a questo progetto' });
+        }
+        
+        const fileInfo = await fileService.saveFile(
+            req.file,
+            projectId,
+            null, // taskId
+            null, // notificationId
+            null, // itemCode
+            null  // companyId
+        );
+        
+        // Aggiorna database
+        await updateAttachmentVersion(attachmentId, fileInfo.filePath, fileInfo.fileSizeKB, userId);
+        
+        res.json({ 
+            success: 1, 
+            message: 'File aggiornato con successo',
+            data: {
+                attachmentId,
+                projectId,
+                newFilePath: fileInfo.filePath,
+                fileSizeKB: fileInfo.fileSizeKB
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error updating project attachment version:', error);
+        res.status(500).json({ 
+            success: 0, 
+            message: 'Errore nell\'aggiornamento del file' 
+        });
+    }
+});
+
+
+
+
 module.exports = router;
+
+// ============================================
+// ROUTES PER GESTIONE LOCK ALLEGATI
+// ============================================
+
+// Crea un lock su un allegato (quando si apre in editor)
+router.post('/attachment-locks/:attachmentId', authenticateToken, async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        const userId = req.user.UserId;
+        console.log('userId', userId, 'attachmentId', attachmentId);
+        
+        // Verifica che l'allegato esista
+        const attachment = await getAttachmentById(attachmentId);
+        if (!attachment) {
+            return res.status(404).json({ success: 0, message: 'Allegato non trovato' });
+        }
+        
+        const result = await createAttachmentLock(attachmentId, userId);
+        res.json(result);
+        
+    } catch (error) {
+        if (error.code === 'FILE_LOCKED') {
+            return res.status(409).json({
+                success: 0,
+                message: error.message,
+                lockedBy: error.lockedBy,
+                lockedByName: error.lockedByName,
+                lockedAt: error.lockedAt
+            });
+        }
+        
+        console.error('Error creating attachment lock:', error);
+        res.status(500).json({ success: 0, message: 'Errore nella creazione del lock' });
+    }
+});
+
+// Rilascia un lock su un allegato (quando si chiude l'editor)
+router.delete('/attachment-locks/:attachmentId', authenticateToken, async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        const userId = req.user.UserId;
+        
+        const result = await releaseAttachmentLock(attachmentId, userId);
+        res.json(result);
+        
+    } catch (error) {
+        console.error('Error releasing attachment lock:', error);
+        res.status(500).json({ success: 0, message: 'Errore nel rilascio del lock' });
+    }
+});
+
+// Ottieni informazioni sul lock di un allegato
+router.get('/attachment-locks/:attachmentId', authenticateToken, async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        
+        const lockInfo = await getAttachmentLockInfo(attachmentId);
+        res.json({ 
+            success: 1, 
+            hasLock: !!lockInfo,
+            lockInfo: lockInfo
+        });
+        
+    } catch (error) {
+        console.error('Error getting attachment lock info:', error);
+        res.status(500).json({ success: 0, message: 'Errore nel recupero delle informazioni del lock' });
+    }
+});
+
+// Force release di un lock (solo per admin)
+router.delete('/attachment-locks/:attachmentId/force', authenticateToken, async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        const userId = req.user.UserId;
+        
+        // Verifica che l'utente sia admin (implementa la tua logica di autorizzazione)
+        // if (!req.user.isAdmin) {
+        //     return res.status(403).json({ success: 0, message: 'Accesso negato' });
+        // }
+        
+        const result = await forceReleaseAttachmentLock(attachmentId);
+        res.json(result);
+        
+    } catch (error) {
+        console.error('Error force releasing attachment lock:', error);
+        res.status(500).json({ success: 0, message: 'Errore nel force release del lock' });
+    }
+});
+
+// Pulisci lock scaduti (job periodico)
+router.post('/attachment-locks/cleanup', authenticateToken, async (req, res) => {
+    try {
+        const result = await cleanupExpiredLocks();
+        res.json(result);
+        
+    } catch (error) {
+        console.error('Error cleaning up expired locks:', error);
+        res.status(500).json({ success: 0, message: 'Errore nella pulizia dei lock scaduti' });
+    }
+});
