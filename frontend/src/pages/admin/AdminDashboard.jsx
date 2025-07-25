@@ -11,12 +11,12 @@ import GroupsTab from "./tabs/GroupsTab";
 import PagesTab from "./tabs/PagesTab";
 import NotificationsTab from "./tabs/NotificationsTab";
 
-// Handlers for adding new items
+// Dialog components
 import {
-  handleAddUser,
-  handleAddGroup,
-  handleAddNotificationChannel,
-} from "./handlers/addHandlers";
+  AddUserDialog,
+  AddGroupDialog,
+  AddNotificationChannelDialog,
+} from "./components/AddDialogs";
 
 const AdminDashboard = () => {
   /* General state */
@@ -24,7 +24,14 @@ const AdminDashboard = () => {
   const [modalProps, setModalProps] = useState({});
   const [activeTab, setActiveTab] = useState("users");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Dialog states
+  const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
+  const [addGroupDialogOpen, setAddGroupDialogOpen] = useState(false);
+  const [addNotificationDialogOpen, setAddNotificationDialogOpen] = useState(false);
+  
   const { user } = useAuth();
+  
   const handleOpenChat = (notificationCategoryId) => {
     setModalProps({
       reply: true,
@@ -76,15 +83,13 @@ const AdminDashboard = () => {
 
   const handleAdd = () => {
     if (activeTab === "users") {
-      handleAddUser(addUser, () => refreshData("users"), companies);
+      setAddUserDialogOpen(true);
     } else if (activeTab === "groups") {
-      handleAddGroup(addGroup, () => refreshData("groups"));
+      setAddGroupDialogOpen(true);
     } else if (activeTab === "pages") {
       console.log("Inserimento pagina");
     } else if (activeTab === "notificationsChannel") {
-      handleAddNotificationChannel(addNotificationChannel, () =>
-        refreshData("notificationsChannel"),
-      );
+      setAddNotificationDialogOpen(true);
     }
   };
 
@@ -238,7 +243,27 @@ const AdminDashboard = () => {
         </Tabs>
       </main>
 
+      {/* Add User Dialog */}
+      <AddUserDialog
+        open={addUserDialogOpen}
+        onOpenChange={setAddUserDialogOpen}
+        onConfirm={(formData) => addUser(formData)}
+        companies={companies}
+      />
 
+      {/* Add Group Dialog */}
+      <AddGroupDialog
+        open={addGroupDialogOpen}
+        onOpenChange={setAddGroupDialogOpen}
+        onConfirm={(formData) => addGroup(formData)}
+      />
+
+      {/* Add Notification Channel Dialog */}
+      <AddNotificationChannelDialog
+        open={addNotificationDialogOpen}
+        onOpenChange={setAddNotificationDialogOpen}
+        onConfirm={(formData) => addNotificationChannel(formData)}
+      />
     </div>
   );
 };

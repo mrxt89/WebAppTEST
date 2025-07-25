@@ -80,6 +80,7 @@ class LocalAgentService {
       
       // Poi invia la richiesta all'agent
       console.log('Sending file open request to agent...');
+      console.log('File data:', fileData);
       
       const response = await axios.post(`${this.baseURL}/open-file`, {
         attachmentId: fileData.attachmentId,
@@ -163,11 +164,11 @@ class LocalAgentService {
     }
   }
   
-  async closeSession(sessionId, forceClose = false) {
+  async closeSession(sessionId, forceClose = false, saveChanges = true) {
     try {
       const response = await axios.post(
         `${this.baseURL}/close-session/${sessionId}`,
-        { forceClose }
+        { forceClose, saveChanges }
       );
       
       if (response.data.success) {

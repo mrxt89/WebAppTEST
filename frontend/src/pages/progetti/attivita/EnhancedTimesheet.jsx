@@ -71,11 +71,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { swal } from "../../../lib/common";
 import TimeEntryDialog from "./TimeEntryDialog";
-import TimesheetTaskPanel from "../attivita/TimesheetTaskPanel";
+import TaskDetailsPanel from "../progetti/TaskDetailsPanel";
 import useTimeTracking from "../../../hooks/useTimeTracking";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
 import useUsers from "../../../hooks/useUsersActions";
 import { config } from "../../../config";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
   const {
@@ -85,6 +86,7 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
     addTimeEntry,
     updateTimeEntry,
     deleteTimeEntry,
+    getTaskParticipants,
     canViewUserData,
   } = useTimeTracking();
 
@@ -116,6 +118,7 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
   const [groups, setGroups] = useState([]);
   const [expandedGroups, setExpandedGroups] = useState([]);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
 
   // Nuovi stati per il filtro migliorato
   const [userSearchText, setUserSearchText] = useState("");
@@ -123,6 +126,12 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
 
   // Stati per la modifica dello stato delle attività
   const [editingTaskStatus, setEditingTaskStatus] = useState({});
+  
+  // Stato per nascondere le attività completate
+  const [hideCompletedTasks, setHideCompletedTasks] = useState(true);
+  
+  // Stato per memorizzare i partecipanti delle attività
+  const [taskParticipants, setTaskParticipants] = useState({});
 
   // Configurazione stati attività
   const statusConfig = {
@@ -607,6 +616,14 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
     }
   };
 
+  // Filtra le attività completate se richiesto
+  const filteredWeeklyTotals = useMemo(() => {
+    if (!hideCompletedTasks) {
+      return weekData.weeklyTotals;
+    }
+    return weekData.weeklyTotals.filter(task => task.Status !== 'COMPLETATA');
+  }, [weekData.weeklyTotals, hideCompletedTasks]);
+
   // Riepilogo settimanale
   const weekSummary = useMemo(() => {
     const totalHours = weekData.dailyTotals.reduce(
@@ -630,6 +647,44 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
       progress: Math.min(100, (totalHours / 40) * 100),
     };
   }, [weekData.dailyTotals]);
+
+  // Funzione per ottenere le iniziali del nome
+  const getInitials = (name) => {
+    if (!name) return "?";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Funzione per aprire il pannello laterale dell'attività
+  const openTaskPanel = (task) => {
+    // Mappa i dati dell'attività al formato richiesto da TaskDetailsPanel
+    const mappedTask = {
+      TaskID: task.TaskID,
+      Title: task.TaskTitle, // Mappa TaskTitle a Title
+      Description: task.Description || task.TaskTitle, // Usa Description se disponibile, altrimenti TaskTitle
+      Status: task.Status || "DA FARE",
+      Priority: task.Priority || "MEDIA",
+      AssignedTo: task.AssignedTo,
+      AssignedToName: task.AssignedToName,
+      StartDate: task.StartDate,
+      DueDate: task.DueDate,
+      ProjectID: task.ProjectID,
+      ProjectName: task.ProjectName,
+      Participants: task.Participants,
+      PredecessorTaskID: task.PredecessorTaskID,
+      AdditionalAssignees: task.AdditionalAssignees,
+      PredecessorTasks: task.PredecessorTasks,
+      // Aggiungi altri campi se disponibili
+      ...task
+    };
+    
+    setSelectedTask(mappedTask);
+    setIsTaskPanelOpen(true);
+  };
 
   // Debug per monitorare il caricamento degli utenti
   useEffect(() => {
@@ -840,6 +895,16 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
           <div className="flex justify-between items-center">
             <CardTitle className="text-lg">
               Vista settimanale
+              {!loading && (
+                <span className="ml-2 text-gray-500 text-sm font-normal">
+                  {filteredWeeklyTotals.length} attività
+                  {hideCompletedTasks && weekData.weeklyTotals.length > filteredWeeklyTotals.length && (
+                    <span className="text-blue-600">
+                      {" "}({weekData.weeklyTotals.length - filteredWeeklyTotals.length} completate nascoste)
+                    </span>
+                  )}
+                </span>
+              )}
               {loading && (
                 <span className="ml-2 text-gray-500 text-sm font-normal">
                   <Clock className="inline h-4 w-4 animate-spin mr-1" />
@@ -849,6 +914,19 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
             </CardTitle>
 
             <div className="flex items-center gap-4">
+              {/* Toggle per nascondere attività completate */}
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="hideCompleted"
+                  checked={hideCompletedTasks}
+                  onCheckedChange={setHideCompletedTasks}
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="hideCompleted" className="text-sm text-gray-600 cursor-pointer">
+                  Nascondi completate
+                </Label>
+              </div>
+
               {/* Indicatore per attività completate */}
               <TooltipProvider>
                 <Tooltip>
@@ -930,7 +1008,7 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
               </TableHeader>
 
               <TableBody>
-                {weekData.weeklyTotals.length === 0 ? (
+                {filteredWeeklyTotals.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={9}
@@ -938,16 +1016,24 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
                     >
                       <div className="flex flex-col items-center justify-center">
                         <Clock className="h-12 w-12 mb-2 text-gray-300" />
-                        <p>Nessuna attività registrata in questa settimana</p>
+                        <p>
+                          {hideCompletedTasks 
+                            ? "Nessuna attività attiva in questa settimana" 
+                            : "Nessuna attività registrata in questa settimana"
+                          }
+                        </p>
                         <p className="text-sm mt-1">
-                          Clicca su un giorno per registrare ore
+                          {hideCompletedTasks 
+                            ? "Tutte le attività sono completate o non ci sono attività attive"
+                            : "Clicca su un giorno per registrare ore"
+                          }
                         </p>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   <>
-                    {weekData.weeklyTotals.map((taskTotal, index) => (
+                    {filteredWeeklyTotals.map((taskTotal, index) => (
                       <TableRow
                         key={`${taskTotal.ProjectID}-${taskTotal.TaskID}`}
                       >
@@ -956,14 +1042,32 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
                             <div className="text-xs text-gray-500 truncate">
                               {taskTotal.ProjectName}
                             </div>
+                            
+                            {/* Nome attività cliccabile */}
                             <div 
-                              className={`font-medium truncate mt-1 ${
+                              className={`font-medium truncate mt-1 cursor-pointer hover:text-blue-600 transition-colors ${
                                 taskTotal.Status === 'COMPLETATA' ? 'line-through opacity-75' : ''
                               }`} 
                               title={taskTotal.TaskTitle}
+                              onClick={() => openTaskPanel(taskTotal)}
                             >
                               {taskTotal.TaskTitle}
                             </div>
+                            
+                            {/* Owner dell'attività */}
+                            {taskTotal.AssignedToName && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-xs">
+                                    {getInitials(taskTotal.AssignedToName)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-xs text-gray-600 truncate">
+                                  {taskTotal.AssignedToName}
+                                </span>
+                              </div>
+                            )}
+                            
                             
                             {/* Select per lo stato dell'attività */}
                             <div className="mt-1">
@@ -1211,12 +1315,14 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
         dialogConfig={dialogConfig}
       />
 
-      {/* Panel per creare nuova attività */}
-      <TimesheetTaskPanel
+      {/* Panel per visualizzare i dettagli dell'attività */}
+      <TaskDetailsPanel
         isOpen={isTaskPanelOpen}
         onClose={() => setIsTaskPanelOpen(false)}
-        onTaskCreated={loadWeekData}
-        position={window.innerWidth < 768 ? "bottom" : "right"}
+        task={selectedTask}
+        project={selectedTask ? { ProjectID: selectedTask.ProjectID, ProjectName: selectedTask.ProjectName } : null}
+        onUpdate={loadWeekData}
+        position="right"
         defaultWidth={600}
       />
 

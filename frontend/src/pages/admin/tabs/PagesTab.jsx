@@ -20,6 +20,14 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { swal } from "../../../lib/common";
 
 const PagesTab = ({
@@ -37,6 +45,12 @@ const PagesTab = ({
   const [applyToChildren, setApplyToChildren] = useState(false);
   const [pageDisabled, setPageDisabled] = useState(false);
   const [pageInheritPermissions, setPageInheritPermissions] = useState(false);
+
+  // Stati per i dialoghi di conferma
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmTitle, setConfirmTitle] = useState("");
 
   const handleSelectPage = (page) => {
     setSelectedPage(page);
@@ -74,20 +88,10 @@ const PagesTab = ({
       if (newDisabledState) {
         // Disabilitazione: controlla se ha figli
         if (selectedPage.childCount > 0) {
-          swal
-            .fire({
-              title: "Attenzione",
-              text: "Disabilitando questa pagina verranno disabilitate anche tutte le pagine figlie. Vuoi continuare?",
-              icon: "warning",
-              showCancelButton: true,
-              confirmButtonText: "Sì, disabilita",
-              cancelButtonText: "Annulla",
-            })
-            .then((result) => {
-              if (result.isConfirmed) {
-                updatePageStatus(newDisabledState);
-              }
-            });
+          setConfirmTitle("Attenzione");
+          setConfirmMessage("Disabilitando questa pagina verranno disabilitate anche tutte le pagine figlie. Vuoi continuare?");
+          setConfirmAction(() => () => updatePageStatus(newDisabledState));
+          setConfirmDialogOpen(true);
         } else {
           // Nessun figlio, procedi direttamente
           updatePageStatus(newDisabledState);
@@ -101,20 +105,10 @@ const PagesTab = ({
           );
 
         if (hasDisabledParent) {
-          swal
-            .fire({
-              title: "Informazione",
-              text: "Abilitando questa pagina verranno abilitate anche tutte le pagine genitore nella gerarchia. Vuoi continuare?",
-              icon: "info",
-              showCancelButton: true,
-              confirmButtonText: "Sì, abilita",
-              cancelButtonText: "Annulla",
-            })
-            .then((result) => {
-              if (result.isConfirmed) {
-                updatePageStatus(newDisabledState);
-              }
-            });
+          setConfirmTitle("Informazione");
+          setConfirmMessage("Abilitando questa pagina verranno abilitate anche tutte le pagine genitore nella gerarchia. Vuoi continuare?");
+          setConfirmAction(() => () => updatePageStatus(newDisabledState));
+          setConfirmDialogOpen(true);
         } else {
           // Nessun genitore disabilitato, procedi direttamente
           updatePageStatus(newDisabledState);
@@ -498,42 +492,69 @@ const PagesTab = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Left column - Pages list */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pagine</CardTitle>
-          <CardDescription>
-            Gestisci le autorizzazioni delle pagine e l'ereditarietà dei
-            permessi.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[calc(100vh-230px)] overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>{renderPageHierarchy(pages)}</TableBody>
-            </Table>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Left column - Pages list */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Pagine</CardTitle>
+            <CardDescription>
+              Gestisci le autorizzazioni delle pagine e l'ereditarietà dei
+              permessi.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[calc(100vh-230px)] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>{renderPageHierarchy(pages)}</TableBody>
+              </Table>
+            </ScrollArea>
+          </CardContent>
+        </Card>
 
-      {/* Right column - Page details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Dettagli pagina</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[calc(100vh-230px)]">
-            {renderPageDetails()}
-          </ScrollArea>
-        </CardContent>
-      </Card>
-    </div>
+        {/* Right column - Page details */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Dettagli pagina</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[calc(100vh-230px)]">
+              {renderPageDetails()}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Dialog di conferma */}
+      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{confirmTitle}</DialogTitle>
+            <DialogDescription>
+              {confirmMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>
+              Annulla
+            </Button>
+            <Button onClick={() => {
+              if (confirmAction) {
+                confirmAction();
+              }
+              setConfirmDialogOpen(false);
+            }}>
+              Conferma
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

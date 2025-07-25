@@ -31,7 +31,7 @@ import {
   hasAdminOrManagerPermission,
   canEditTask,
 } from "@/lib/taskPermissionsUtils";
-import { MoreVertical, Eye, Ban, CheckCircle2, Pin, PinOff } from "lucide-react";
+import { MoreVertical, Eye, Ban, CheckCircle2, Pin, PinOff, Users } from "lucide-react";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
 import { toast } from "@/components/ui/use-toast";
 
@@ -51,6 +51,7 @@ const ProjectTasksTableImproved = ({
   });
   const [filter, setFilter] = useState("");
   const [showDelayedOnly, setShowDelayedOnly] = useState(false);
+  const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { users } = useNotifications();
   const { manageTaskPin } = useProjectActions();
@@ -63,6 +64,7 @@ const ProjectTasksTableImproved = ({
   const [columnWidths, setColumnWidths] = useState([
     250, // title
     200, // responsible
+    150, // participants
     150, // status
     120, // dueDate
     100, // priority
@@ -224,6 +226,11 @@ const ProjectTasksTableImproved = ({
   const sortedAndFilteredTasks = useMemo(() => {
     let result = [...localTasks];
 
+    // Filtro per stati selezionati
+    if (selectedStatuses.length > 0) {
+      result = result.filter((task) => selectedStatuses.includes(task.Status));
+    }
+
     if (showDelayedOnly) {
       result = result.filter((task) => isTaskDelayed(task));
     }
@@ -271,7 +278,7 @@ const ProjectTasksTableImproved = ({
 
     // Combina prima i pinnati, poi i non pinnati
     return [...pinnedTasksList, ...unpinnedTasksList];
-  }, [localTasks, sortConfig, filter, showDelayedOnly, pinnedTasks]);
+  }, [localTasks, sortConfig, filter, showDelayedOnly, selectedStatuses, pinnedTasks]);
 
   const requestSort = (key) => {
     let direction = "asc";
@@ -338,6 +345,8 @@ const ProjectTasksTableImproved = ({
           tasks={localTasks}
           searchValue={filter}
           onSearchChange={setFilter}
+          selectedStatuses={selectedStatuses}
+          onStatusFilterChange={setSelectedStatuses}
         />
       </div>
 
@@ -410,12 +419,9 @@ const ProjectTasksTableImproved = ({
                 </TableHead>
                 <TableHead
                   style={{ width: `${columnWidths[2]}px`, position: 'relative' }}
-                  className="cursor-pointer hover:bg-gray-100"
-                  onClick={() => requestSort("Status")}
+                  className="hover:bg-gray-100"
                 >
-                  Stato{" "}
-                  {sortConfig.key === "Status" &&
-                    (sortConfig.direction === "asc" ? "↑" : "↓")}
+                  Partecipanti
                   <div
                     className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
                     onMouseDown={(e) => handleMouseDown(e, 2)}
@@ -424,10 +430,10 @@ const ProjectTasksTableImproved = ({
                 <TableHead
                   style={{ width: `${columnWidths[3]}px`, position: 'relative' }}
                   className="cursor-pointer hover:bg-gray-100"
-                  onClick={() => requestSort("DueDate")}
+                  onClick={() => requestSort("Status")}
                 >
-                  Scadenza{" "}
-                  {sortConfig.key === "DueDate" &&
+                  Stato{" "}
+                  {sortConfig.key === "Status" &&
                     (sortConfig.direction === "asc" ? "↑" : "↓")}
                   <div
                     className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
@@ -437,21 +443,24 @@ const ProjectTasksTableImproved = ({
                 <TableHead
                   style={{ width: `${columnWidths[4]}px`, position: 'relative' }}
                   className="cursor-pointer hover:bg-gray-100"
-                  onClick={() => requestSort("Priority")}
+                  onClick={() => requestSort("DueDate")}
                 >
-                  Priorità{" "}
-                  {sortConfig.key === "Priority" &&
+                  Scadenza{" "}
+                  {sortConfig.key === "DueDate" &&
                     (sortConfig.direction === "asc" ? "↑" : "↓")}
                   <div
                     className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
                     onMouseDown={(e) => handleMouseDown(e, 4)}
                   />
                 </TableHead>
-                <TableHead 
+                <TableHead
                   style={{ width: `${columnWidths[5]}px`, position: 'relative' }}
-                  className="text-center"
+                  className="cursor-pointer hover:bg-gray-100"
+                  onClick={() => requestSort("Priority")}
                 >
-                  Commenti
+                  Priorità{" "}
+                  {sortConfig.key === "Priority" &&
+                    (sortConfig.direction === "asc" ? "↑" : "↓")}
                   <div
                     className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
                     onMouseDown={(e) => handleMouseDown(e, 5)}
@@ -461,13 +470,23 @@ const ProjectTasksTableImproved = ({
                   style={{ width: `${columnWidths[6]}px`, position: 'relative' }}
                   className="text-center"
                 >
-                  Allegati
+                  Commenti
                   <div
                     className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
                     onMouseDown={(e) => handleMouseDown(e, 6)}
                   />
                 </TableHead>
-                <TableHead style={{ width: `${columnWidths[7]}px` }} className="text-center">
+                <TableHead 
+                  style={{ width: `${columnWidths[7]}px`, position: 'relative' }}
+                  className="text-center"
+                >
+                  Allegati
+                  <div
+                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                    onMouseDown={(e) => handleMouseDown(e, 7)}
+                  />
+                </TableHead>
+                <TableHead style={{ width: `${columnWidths[8]}px` }} className="text-center">
                   Azioni
                 </TableHead>
               </TableRow>
@@ -605,7 +624,7 @@ const ProjectTasksTableImproved = ({
               {sortedAndFilteredTasks.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={9}
                     className="text-center py-10 text-gray-500"
                   >
                     {filter

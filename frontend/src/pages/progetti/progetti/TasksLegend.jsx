@@ -13,7 +13,13 @@ import {
   Search,
 } from "lucide-react";
 
-const TasksLegend = ({ tasks = [], searchValue = "", onSearchChange }) => {
+const TasksLegend = ({ 
+  tasks = [], 
+  searchValue = "", 
+  onSearchChange,
+  selectedStatuses = [],
+  onStatusFilterChange
+}) => {
   // Calcola le statistiche delle task per stato
   const taskStats = {
     "DA FARE": tasks.filter((t) => t.Status === "DA FARE").length,
@@ -59,6 +65,32 @@ const TasksLegend = ({ tasks = [], searchValue = "", onSearchChange }) => {
     },
   };
 
+  const handleStatusClick = (status, event) => {
+    event.preventDefault();
+    
+    let newSelectedStatuses;
+    
+    if (event.ctrlKey || event.metaKey) {
+      // Selezione multipla con Ctrl/Cmd
+      if (selectedStatuses.includes(status)) {
+        newSelectedStatuses = selectedStatuses.filter(s => s !== status);
+      } else {
+        newSelectedStatuses = [...selectedStatuses, status];
+      }
+    } else {
+      // Click singolo - toggle dello stato
+      if (selectedStatuses.includes(status)) {
+        newSelectedStatuses = selectedStatuses.filter(s => s !== status);
+      } else {
+        newSelectedStatuses = [status];
+      }
+    }
+    
+    onStatusFilterChange(newSelectedStatuses);
+  };
+
+  const isStatusSelected = (status) => selectedStatuses.includes(status);
+
   return (
     <div className="bg-gray-50 p-3 rounded-md border">
       <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-3">
@@ -70,10 +102,17 @@ const TasksLegend = ({ tasks = [], searchValue = "", onSearchChange }) => {
             <Badge
               key={status}
               variant="outline"
-              className={`flex items-center ${config.color}`}
+              className={`
+                flex items-center ${config.color} cursor-pointer hover:opacity-80 transition-opacity
+                ${isStatusSelected(status) ? 'font-bold ring-2 ring-blue-500' : ''}
+              `}
+              onClick={(e) => handleStatusClick(status, e)}
+              title={`${isStatusSelected(status) ? 'Rimuovi' : 'Aggiungi'} filtro per ${config.label} (Ctrl+click per selezione multipla)`}
             >
               {config.icon}
-              {config.label}: {taskStats[status]}
+              <span className={isStatusSelected(status) ? 'font-bold' : ''}>
+                {config.label}: {taskStats[status]}
+              </span>
             </Badge>
           ))}
 
@@ -118,6 +157,30 @@ const TasksLegend = ({ tasks = [], searchValue = "", onSearchChange }) => {
           </div>
         </div>
       </div>
+      
+      {/* Indicatore filtri attivi */}
+      {selectedStatuses.length > 0 && (
+        <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+          <span>Filtri attivi:</span>
+          <div className="flex flex-wrap gap-1">
+            {selectedStatuses.map(status => (
+              <Badge
+                key={status}
+                variant="outline"
+                className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+              >
+                {statusConfig[status]?.label || status}
+              </Badge>
+            ))}
+          </div>
+          <button
+            onClick={() => onStatusFilterChange([])}
+            className="text-blue-600 hover:text-blue-800 underline text-xs"
+          >
+            Rimuovi tutti
+          </button>
+        </div>
+      )}
     </div>
   );
 };

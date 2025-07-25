@@ -158,10 +158,12 @@ const deleteAttachment = async (attachmentId) => {
 
 const getAttachmentById = async (attachmentId) => {
     try {
+        console.log('Getting Attachment "getAttachmentById" with ID:', attachmentId);
         let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('AttachmentID', sql.Int, attachmentId)
             .execute('MA_GetAttachmentById');
+            console.log('Result:', result.recordset[0]);
         return result.recordset[0];
     } catch (err) {
         console.error('Error in getAttachmentById:', err);

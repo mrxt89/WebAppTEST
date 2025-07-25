@@ -12,6 +12,22 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { swal } from "../../../lib/common";
 import { CircleHelp } from "lucide-react";
 import {
@@ -34,6 +50,12 @@ const NotificationsTab = ({
 }) => {
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [selectedUsers, setSelectedUsers] = useState([]);
+
+  // Stati per i dialoghi
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingChannel, setEditingChannel] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [loading, setLoading] = useState(false);
 
   // Hook per il contesto Wiki
   const { openWiki } = useWikiContext();
@@ -63,91 +85,60 @@ const NotificationsTab = ({
   };
 
   const handleEditNotificationChannel = (channel) => {
-    swal
-      .fire({
-        title: "Modifica Canale di Notifica",
-        html: `
-        <input type="text" id="channelName" class="archa-input" placeholder="Nome Canale" value="${channel.name}">
-        <input type="text" id="description" class="archa-input" placeholder="Descrizione" value="${channel.description}">
-        <input type="color" id="color" class="archa-input" placeholder="Colore" value="${channel.hexColor}">
-        <select id="responseType" class="archa-input">
-          <option value="1" ${channel.defaultResponseOptionId === 1 ? "selected" : ""}>Nessuna Risposta</option>
-          <option value="2" ${channel.defaultResponseOptionId === 2 ? "selected" : ""}>Risposta SI/NO</option>
-          <option value="3" ${channel.defaultResponseOptionId === 3 ? "selected" : ""}>Testo libero</option>
-        </select>
-        <input type="text" id="defaultTitle" class="archa-input" placeholder="Titolo di Default" value="${channel.defaultTitle}">
-        <div class="mt-3">
-          <label for="intercompany">Canale Intercompany</label>
-          <input type="checkbox" id="intercompany" class="archa-input" ${channel.intercompany ? "checked" : ""}>
-        </div>
-      `,
-        focusConfirm: false,
-        showCancelButton: true,
-        cancelButtonText: "Annulla",
-        preConfirm: () => {
-          const channelName = swal
-            .getPopup()
-            .querySelector("#channelName").value;
-          const description = swal
-            .getPopup()
-            .querySelector("#description").value;
-          const hexColor = swal.getPopup().querySelector("#color").value;
-          const defaultResponseOptionId = swal
-            .getPopup()
-            .querySelector("#responseType").value;
-          const defaultTitle = swal
-            .getPopup()
-            .querySelector("#defaultTitle").value;
-          const intercompany = swal
-            .getPopup()
-            .querySelector("#intercompany").checked;
+    setEditingChannel(channel);
+    setEditFormData({
+      name: channel.name,
+      description: channel.description,
+      hexColor: channel.hexColor,
+      defaultResponseOptionId: channel.defaultResponseOptionId,
+      defaultTitle: channel.defaultTitle,
+      intercompany: channel.intercompany,
+    });
+    setEditDialogOpen(true);
+  };
 
-          if (
-            !channelName ||
-            !description ||
-            !hexColor ||
-            !defaultResponseOptionId
-          ) {
-            swal.showValidationMessage(
-              `Campi obbligatori: nome canale, descrizione, colore, risposta di default`,
-            );
-            return null;
-          }
-          return {
-            notificationCategoryId: channel.notificationCategoryId,
-            name: channelName,
-            description,
-            hexColor,
-            defaultResponseOptionId,
-            defaultTitle,
-            intercompany,
-          };
-        },
+  const handleEditDialogClose = () => {
+    setEditDialogOpen(false);
+    setEditingChannel(null);
+    setEditFormData({});
+  };
+
+  const handleEditFormSubmit = () => {
+    if (!editFormData.name || !editFormData.description || !editFormData.hexColor || !editFormData.defaultResponseOptionId) {
+      swal.fire("Errore", "Campi obbligatori: nome canale, descrizione, colore, risposta di default", "error");
+      return;
+    }
+
+    setLoading(true);
+    const formDataWithId = {
+      ...editFormData,
+      notificationCategoryId: editingChannel.notificationCategoryId,
+    };
+    
+    updateNotificationChannel(formDataWithId)
+      .then(() => {
+        swal.fire(
+          "Successo",
+          "Canale di notifica aggiornato con successo.",
+          "success",
+        );
+        refreshData(); // Aggiorna i dati mantenendo i filtri
+        handleEditDialogClose();
       })
-      .then((result) => {
-        if (result.isConfirmed) {
-          updateNotificationChannel(result.value)
-            .then(() => {
-              swal.fire(
-                "Successo",
-                "Canale di notifica aggiornato con successo.",
-                "success",
-              );
-              refreshData(); // Aggiorna i dati mantenendo i filtri
-            })
-            .catch((error) => {
-              console.error(
-                "Errore durante l'aggiornamento del canale di notifica:",
-                error,
-              );
-              swal.fire(
-                "Errore",
-                error.response?.data ||
-                  "Errore durante l'aggiornamento del canale di notifica.",
-                "error",
-              );
-            });
-        }
+      .catch((error) => {
+        console.error(
+          "Errore durante l'aggiornamento del canale di notifica:",
+          error,
+        );
+        swal.fire(
+          "Errore",
+          error.response?.data ||
+            "Errore durante l'aggiornamento del canale di notifica.",
+          "error",
+        );
+      })
+      .finally(() => {
+        setLoading(false);
       });
   };
 
@@ -657,6 +648,118 @@ const NotificationsTab = ({
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* Dialog per la modifica del canale */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifica Canale di Notifica</DialogTitle>
+            <DialogDescription>
+              Modifica le proprietà del canale di notifica.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Nome Canale
+              </Label>
+              <Input
+                id="name"
+                value={editFormData.name}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, name: e.target.value })
+                }
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="description" className="text-right">
+                Descrizione
+              </Label>
+              <Input
+                id="description"
+                value={editFormData.description}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, description: e.target.value })
+                }
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="color" className="text-right">
+                Colore
+              </Label>
+              <Input
+                type="color"
+                id="color"
+                value={editFormData.hexColor}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, hexColor: e.target.value })
+                }
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="responseType" className="text-right">
+                Tipo di Risposta
+              </Label>
+              <Select
+                value={editFormData.defaultResponseOptionId}
+                onValueChange={(value) =>
+                  setEditFormData({ ...editFormData, defaultResponseOptionId: parseInt(value) })
+                }
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Seleziona un tipo di risposta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Nessuna Risposta</SelectItem>
+                  <SelectItem value="2">Risposta SI/NO</SelectItem>
+                  <SelectItem value="3">Testo libero</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="defaultTitle" className="text-right">
+                Titolo di Default
+              </Label>
+              <Input
+                id="defaultTitle"
+                value={editFormData.defaultTitle}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, defaultTitle: e.target.value })
+                }
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="intercompany" className="text-right">
+                Canale Intercompany
+              </Label>
+              <div className="col-span-3 flex items-center space-x-2">
+                <Checkbox
+                  id="intercompany"
+                  checked={editFormData.intercompany}
+                  onCheckedChange={(checked) =>
+                    setEditFormData({ ...editFormData, intercompany: checked })
+                  }
+                />
+                <Label htmlFor="intercompany" className="text-sm">
+                  Abilita canale intercompany
+                </Label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleEditDialogClose} disabled={loading}>
+              Annulla
+            </Button>
+            <Button onClick={handleEditFormSubmit} disabled={loading}>
+              {loading ? "Salvataggio..." : "Salva Modifiche"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
