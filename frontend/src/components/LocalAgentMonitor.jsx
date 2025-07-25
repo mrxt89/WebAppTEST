@@ -1,6 +1,6 @@
 // frontend/src/components/LocalAgentMonitor.jsx
 import React, { useState, useEffect } from 'react';
-import { X, FileText, AlertCircle, Check, Clock } from 'lucide-react';
+import { X, FileText, AlertCircle, Check, Clock, ChevronDown } from 'lucide-react';
 import localAgentService from '@/services/localAgentService';
 import { toast } from 'react-toastify';
 
@@ -19,6 +19,8 @@ const LocalAgentMonitor = () => {
   const [sessions, setSessions] = useState([]);
   const [isVisible, setIsVisible] = useState(false);
   const [agentStatus, setAgentStatus] = useState('checking');
+  const [openMenus, setOpenMenus] = useState({}); // Per gestire i menu a tendina
+  const [menuPositions, setMenuPositions] = useState({}); // Per gestire il posizionamento dei menu
   
   // Aggiorna il riferimento globale
   globalSetWindowVisible = setIsVisible;
@@ -28,6 +30,16 @@ const LocalAgentMonitor = () => {
     const interval = setInterval(checkAgentAndSessions, 5000);
     
     return () => clearInterval(interval);
+  }, []);
+
+  // Chiudi menu quando si clicca fuori
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setOpenMenus({});
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   }, []);
   
   const checkAgentAndSessions = async () => {
@@ -77,6 +89,27 @@ const LocalAgentMonitor = () => {
       toast.error(`Errore chiusura file: ${error.message}`);
     }
   };
+
+  const handleCloseWithoutSaving = async (sessionId, fileName) => {
+    if (!window.confirm(`Chiudere ${fileName} SENZA salvare le modifiche? Questa azione non può essere annullata.`)) {
+      return;
+    }
+    
+    try {
+      const result = await localAgentService.closeSession(sessionId, false, false); // saveChanges = false
+      
+      if (result.success) {
+        toast.success(`File chiuso senza salvare: ${fileName}`, {
+          position: 'bottom-right'
+        });
+        
+        // Aggiorna lista sessioni
+        checkAgentAndSessions();
+      }
+    } catch (error) {
+      toast.error(`Errore chiusura file: ${error.message}`);
+    }
+  };
   
   const handleCloseWindow = () => {
     setIsVisible(false);
@@ -98,7 +131,7 @@ const LocalAgentMonitor = () => {
   
   return (
     <div className="fixed bottom-20 right-4 z-40">
-      <div className="bg-white rounded-lg shadow-lg border border-gray-200 w-80">
+      <div className="bg-white rounded-lg shadow-lg border border-gray-200 w-[400px]">
         {/* Header */}
         <div className="flex items-center justify-between p-3 border-b">
           <div className="flex items-center gap-2">
@@ -145,12 +178,20 @@ const LocalAgentMonitor = () => {
                   </div>
                 </div>
                 
-                <button
-                  onClick={() => handleCloseSession(session.sessionId, session.fileName)}
-                  className="ml-2 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
-                >
-                  Chiudi
-                </button>
+                <div className="flex items-center gap-1 ml-2">
+                  <button
+                    onClick={() => handleCloseSession(session.sessionId, session.fileName)}
+                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                  >
+                    Chiudi
+                  </button>
+                  <button
+                    onClick={() => handleCloseWithoutSaving(session.sessionId, session.fileName)}
+                    className="px-2 py-1 text-xs bg-red-100 hover:bg-red-200 rounded text-red-700"
+                  >
+                    Chiudi senza salvare
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -158,12 +199,7 @@ const LocalAgentMonitor = () => {
         
         {/* Footer */}
         <div className="p-2 border-t bg-gray-50">
-          <button
-            onClick={() => window.open('http://localhost:7865/sessions', '_blank')}
-            className="w-full text-xs text-blue-600 hover:text-blue-800"
-          >
-            Gestisci tutte le sessioni →
-          </button>
+          <p className="w-full text-xs text-blue-600 hover:text-blue-800">Utilizza l'app agent per gestire le sessioni</p>
         </div>
       </div>
     </div>

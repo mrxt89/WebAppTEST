@@ -20,6 +20,7 @@ import {
   ListTodo,
   AlertCircle,
   LockIcon,
+  Users,
 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -497,6 +498,65 @@ const TaskRow = ({
               <span className="text-sm">{task.AssignedToName}</span>
             </div>,
           )
+        )}
+      </TableCell>
+
+      {/* Partecipanti */}
+      <TableCell>
+        {task.Participants && task.Participants !== "[]" ? (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1">
+                  <Users className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-600">
+                    {(() => {
+                      try {
+                        const participants = typeof task.Participants === 'string' 
+                          ? JSON.parse(task.Participants) 
+                          : task.Participants;
+                        return participants.length;
+                      } catch (e) {
+                        return 0;
+                      }
+                    })()}
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <div className="space-y-1">
+                  <p className="font-medium text-xs">Partecipanti:</p>
+                  <div className="text-xs">
+                    {(() => {
+                      try {
+                        const participants = typeof task.Participants === 'string' 
+                          ? JSON.parse(task.Participants) 
+                          : task.Participants;
+                        return participants.map((participant, index) => (
+                          <div key={index} className="flex items-center gap-2 py-1">
+                            <Avatar className="h-4 w-4">
+                              <AvatarFallback className="text-xs">
+                                {getInitials(`${participant.firstName} ${participant.lastName}`)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {participant.firstName} {participant.lastName}
+                              </span>
+                            </div>
+                          </div>
+                        ));
+                      } catch (e) {
+                        return <span className="text-gray-500">Errore nel caricamento</span>;
+                      }
+                    })()}
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          <span className="text-gray-400">-</span>
         )}
       </TableCell>
 

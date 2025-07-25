@@ -12,6 +12,15 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { swal } from "../../../lib/common";
 
 const GroupsTab = ({
@@ -26,6 +35,12 @@ const GroupsTab = ({
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [showDisabled, setShowDisabled] = useState(true);
+
+  // Stati per i dialoghi
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [loading, setLoading] = useState(false);
 
   // Funzione di ordinamento
   const sortGroups = (groups) => {
@@ -75,55 +90,46 @@ const GroupsTab = ({
   };
 
   const handleEditGroup = (group) => {
-    swal
-      .fire({
-        title: "Modifica Gruppo",
-        html: `
-        <label for="groupName" class="">Nome Gruppo</label>
-        <input type="text" id="groupName" class="archa-input" placeholder="Nome Gruppo" value="${group.groupName}">
-        <label for="description" class="">Descrizione</label>
-        <input type="text" id="description" class="archa-input" placeholder="Descrizione" value="${group.description}">
-      `,
-        focusConfirm: false,
-        showCancelButton: true,
-        cancelButtonText: "Annulla",
-        preConfirm: () => {
-          const groupName = swal.getPopup().querySelector("#groupName").value;
-          const description = swal
-            .getPopup()
-            .querySelector("#description").value;
+    setEditingGroup(group);
+    setEditFormData({
+      groupName: group.groupName,
+      description: group.description,
+    });
+    setEditDialogOpen(true);
+  };
 
-          if (!groupName) {
-            swal.showValidationMessage(`Please enter the group name`);
-            return null;
-          }
-          return { groupId: group.groupId, groupName, description };
-        },
+  const handleEditDialogClose = () => {
+    setEditDialogOpen(false);
+    setEditingGroup(null);
+    setEditFormData({});
+  };
+
+  const handleEditFormSubmit = () => {
+    setLoading(true);
+    updateGroup(editingGroup.groupId, editFormData)
+      .then(() => {
+        swal.fire(
+          "Successo",
+          "Gruppo aggiornato con successo.",
+          "success",
+        );
+        refreshData("groups");
+        handleEditDialogClose();
       })
-      .then((result) => {
-        if (result.isConfirmed) {
-          updateGroup(result.value.groupId, result.value)
-            .then(() => {
-              swal.fire(
-                "Successo",
-                "Gruppo aggiornato con successo.",
-                "success",
-              );
-              refreshData("groups");
-            })
-            .catch((error) => {
-              console.error(
-                "Errore durante l'aggiornamento del gruppo:",
-                error,
-              );
-              swal.fire(
-                "Errore",
-                error.response.data ||
-                  "Errore durante l'aggiornamento del gruppo.",
-                "error",
-              );
-            });
-        }
+      .catch((error) => {
+        console.error(
+          "Errore durante l'aggiornamento del gruppo:",
+          error,
+        );
+        swal.fire(
+          "Errore",
+          error.response.data ||
+            "Errore durante l'aggiornamento del gruppo.",
+          "error",
+        );
+      })
+      .finally(() => {
+        setLoading(false);
       });
   };
 
@@ -187,6 +193,63 @@ const GroupsTab = ({
     }
   };
 
+  // Funzioni per selezionare/deselezionare tutti gli utenti
+  const handleSelectAllGroupUsers = () => {
+    const groupUsers = selectedGroup?.users || [];
+    const groupUserIds = groupUsers.map(user => user.userId);
+    setSelectedUsers(prev => {
+      const newSelection = [...prev];
+      groupUserIds.forEach(userId => {
+        if (!newSelection.includes(userId)) {
+          newSelection.push(userId);
+        }
+      });
+      return newSelection;
+    });
+  };
+
+  const handleDeselectAllGroupUsers = () => {
+    const groupUsers = selectedGroup?.users || [];
+    const groupUserIds = groupUsers.map(user => user.userId);
+    setSelectedUsers(prev => prev.filter(userId => !groupUserIds.includes(userId)));
+  };
+
+  const handleSelectAllAvailableUsers = () => {
+    const groupUsers = selectedGroup?.users || [];
+    // Filtra gli utenti disponibili considerando anche il filtro disabilitati
+    const availableUsers = users.filter((user) => {
+      const isInGroup = groupUsers.some((groupUser) => groupUser.userId === user.userId);
+      if (isInGroup) return false;
+      // Se showDisabled è false, nascondi gli utenti disabilitati
+      if (!showDisabled && user.disabled) return false;
+      return true;
+    });
+    const availableUserIds = availableUsers.map(user => user.userId);
+    setSelectedUsers(prev => {
+      const newSelection = [...prev];
+      availableUserIds.forEach(userId => {
+        if (!newSelection.includes(userId)) {
+          newSelection.push(userId);
+        }
+      });
+      return newSelection;
+    });
+  };
+
+  const handleDeselectAllAvailableUsers = () => {
+    const groupUsers = selectedGroup?.users || [];
+    // Filtra gli utenti disponibili considerando anche il filtro disabilitati
+    const availableUsers = users.filter((user) => {
+      const isInGroup = groupUsers.some((groupUser) => groupUser.userId === user.userId);
+      if (isInGroup) return false;
+      // Se showDisabled è false, nascondi gli utenti disabilitati
+      if (!showDisabled && user.disabled) return false;
+      return true;
+    });
+    const availableUserIds = availableUsers.map(user => user.userId);
+    setSelectedUsers(prev => prev.filter(userId => !availableUserIds.includes(userId)));
+  };
+
   const renderGroupDetails = () => {
     if (!selectedGroup) {
       return (
@@ -200,10 +263,18 @@ const GroupsTab = ({
 
     // Filter for users already in the group and available users
     const groupUsers = selectedGroup.users || [];
-    const availableUsers = users.filter(
-      (user) =>
-        !groupUsers.some((groupUser) => groupUser.userId === user.userId),
-    );
+    
+    // Filtra gli utenti disponibili, escludendo quelli già nel gruppo e quelli disabilitati se necessario
+    const availableUsers = users.filter((user) => {
+      // Esclude utenti già nel gruppo
+      const isInGroup = groupUsers.some((groupUser) => groupUser.userId === user.userId);
+      if (isInGroup) return false;
+      
+      // Se showDisabled è false, nascondi gli utenti disabilitati
+      if (!showDisabled && user.disabled) return false;
+      
+      return true;
+    });
 
     return (
       <div className="space-y-4">
@@ -223,18 +294,38 @@ const GroupsTab = ({
         </div>
 
         <div>
-          <div className="flex justify-content-around items-center mb-2 h-11">
+          <div className="flex justify-between items-center mb-2 h-11">
             <h4 className="text-md font-medium">Membri del gruppo</h4>
-            {selectedUsers.length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleRemoveUsersFromGroup}
-              >
-                <i className="fa-solid fa-user-minus mr-2"></i>
-                Rimuovi selezionati
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {groupUsers.length > 0 && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSelectAllGroupUsers}
+                  >
+                    Seleziona tutti
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDeselectAllGroupUsers}
+                  >
+                    Deseleziona tutti
+                  </Button>
+                </>
+              )}
+              {selectedUsers.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleRemoveUsersFromGroup}
+                >
+                  <i className="fa-solid fa-user-minus mr-2"></i>
+                  Rimuovi selezionati
+                </Button>
+              )}
+            </div>
           </div>
 
           <ScrollArea className="h-60 border rounded-md p-2">
@@ -271,18 +362,38 @@ const GroupsTab = ({
         </div>
 
         <div>
-          <div className="flex justify-content-around items-center mb-2 h-11">
+          <div className="flex justify-between items-center mb-2 h-11">
             <h4 className="text-md font-medium">Utenti disponibili</h4>
-            {selectedUsers.length > 0 && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleAssignUsersToGroup}
-              >
-                <i className="fa-solid fa-user-plus mr-2"></i>
-                Aggiungi selezionati
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {availableUsers.length > 0 && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSelectAllAvailableUsers}
+                  >
+                    Seleziona tutti
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDeselectAllAvailableUsers}
+                  >
+                    Deseleziona tutti
+                  </Button>
+                </>
+              )}
+              {selectedUsers.length > 0 && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleAssignUsersToGroup}
+                >
+                  <i className="fa-solid fa-user-plus mr-2"></i>
+                  Aggiungi selezionati
+                </Button>
+              )}
+            </div>
           </div>
 
           <ScrollArea className="h-60 border rounded-md p-2">
@@ -394,6 +505,50 @@ const GroupsTab = ({
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* Dialog per la modifica del gruppo */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifica Gruppo</DialogTitle>
+            <DialogDescription>
+              Modifica le informazioni del gruppo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="groupName" className="text-right">
+                Nome Gruppo
+              </Label>
+              <Input
+                id="groupName"
+                value={editFormData.groupName}
+                onChange={(e) => setEditFormData({ ...editFormData, groupName: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="description" className="text-right">
+                Descrizione
+              </Label>
+              <Input
+                id="description"
+                value={editFormData.description}
+                onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleEditDialogClose} disabled={loading}>
+              Annulla
+            </Button>
+            <Button onClick={handleEditFormSubmit} disabled={loading}>
+              {loading ? "Salvataggio..." : "Salva Modifiche"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

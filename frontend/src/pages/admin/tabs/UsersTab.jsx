@@ -13,6 +13,15 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { swal } from "../../../lib/common";
 
 const UsersTab = ({
@@ -33,6 +42,14 @@ const UsersTab = ({
   const [selectedCompanies, setSelectedCompanies] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [showDisabled, setShowDisabled] = useState(false);
+
+  // Stati per i dialoghi
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [newPassword, setNewPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // Funzione di ordinamento
   const sortUsers = (users) => {
@@ -90,145 +107,86 @@ const UsersTab = ({
   };
 
   const handleEditUser = (user) => {
-    swal
-      .fire({
-        title: "Modifica Utente",
-        html: `
-          <div class="form-group row">
-            <label for="firstName" class="col-sm-3 col-form-label">Nome</label>
-            <div class="col-sm-8">
-              <input type="text" id="firstName" class="form-control" placeholder="Nome" value="${user.firstName}">
-            </div>
-          </div>
-          <div class="form-group row">
-            <label for="lastName" class="col-sm-3 col-form-label">Cognome</label>
-            <div class="col-sm-8">
-              <input type="text" id="lastName" class="form-control" placeholder="Cognome" value="${user.lastName}">
-            </div>
-          </div>
-          <div class="form-group row">
-            <label for="email" class="col-sm-3 col-form-label">Email</label>
-            <div class="col-sm-8">
-              <input type="email" id="email" class="form-control" placeholder="Email" value="${user.email}">
-            </div>
-          </div>
-          <div class="form-group row">
-            <label for="phoneNumber" class="col-sm-3 col-form-label">Telefono</label>
-            <div class="col-sm-8">
-              <input type="text" id="phoneNumber" class="form-control" placeholder="Telefono" value="${user.phoneNumber || ""}">
-            </div>
-          </div>
-          <div class="form-group row">
-            <label for="role" class="col-sm-3 col-form-label">Ruolo</label>
-            <div class="col-sm-8">
-              <input type="text" id="role" class="form-control" placeholder="Ruolo" value="${user.role || ""}">
-            </div>
-          </div>
-      `,
-        focusConfirm: false,
-        showCancelButton: true,
-        cancelButtonText: "Annulla",
-        preConfirm: () => {
-          const firstName = swal.getPopup().querySelector("#firstName").value;
-          const lastName = swal.getPopup().querySelector("#lastName").value;
-          const email = swal.getPopup().querySelector("#email").value;
-          const phoneNumber = swal
-            .getPopup()
-            .querySelector("#phoneNumber").value;
-          const role = swal.getPopup().querySelector("#role").value;
-
-          if (!firstName) {
-            swal.showValidationMessage(`Please enter the first name`);
-            return null;
-          }
-          return {
-            userId: user.userId,
-            firstName,
-            lastName,
-            email,
-            phoneNumber,
-            role,
-          };
-        },
-      })
-      .then((result) => {
-        if (result.isConfirmed) {
-          updateUser(result.value.userId, result.value)
-            .then(() => {
-              swal.fire(
-                "Successo",
-                "Utente aggiornato con successo.",
-                "success",
-              );
-              refreshData("users");
-              // Update the selected user in state to reflect changes
-              setSelectedUser({
-                ...selectedUser,
-                ...result.value,
-              });
-            })
-            .catch((error) => {
-              console.error(
-                "Errore durante l'aggiornamento dell'utente:",
-                error,
-              );
-              swal.fire(
-                "Errore",
-                error.response?.data ||
-                  "Errore durante l'aggiornamento dell'utente.",
-                "error",
-              );
-            });
-        }
-      });
+    setEditingUser(user);
+    setEditFormData({
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      email: user.email || "",
+      phoneNumber: user.phoneNumber || "",
+      role: user.role || "",
+    });
+    setEditDialogOpen(true);
   };
 
-  const handleResetPassword = (userId) => {
-    swal
-      .fire({
-        title: "Reset Password",
-        html: `
-        <input type="password" id="newPassword" class="archa-input" placeholder="Nuova Password">
-      `,
-        focusConfirm: false,
-        showCancelButton: true,
-        cancelButtonText: "Annulla",
-        didOpen: () => {
-          document.getElementById("newPassword").value = "";
-        },
-        preConfirm: () => {
-          const newPassword = swal
-            .getPopup()
-            .querySelector("#newPassword").value;
-          if (!newPassword) {
-            swal.showValidationMessage(`Inserisci la nuova password`);
-            return null;
-          }
-          return { userId, newPassword };
-        },
-      })
-      .then((result) => {
-        if (result.isConfirmed) {
-          resetPassword(result.value.userId, result.value.newPassword)
-            .then(() => {
-              swal.fire(
-                "Successo",
-                "Password resettata con successo.",
-                "success",
-              );
-              refreshData("users");
-            })
-            .catch((error) => {
-              console.error("Errore durante il reset della password:", error);
-              swal.fire(
-                "Errore",
-                error.response?.data ||
-                  "Errore durante il reset della password.",
-                "error",
-              );
-            });
-        }
+  const handleSaveEdit = async () => {
+    if (!editFormData.firstName.trim()) {
+      swal.fire("Errore", "Il nome è obbligatorio", "error");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await updateUser(editingUser.userId, {
+        userId: editingUser.userId,
+        ...editFormData,
       });
+      
+      swal.fire("Successo", "Utente aggiornato con successo.", "success");
+      refreshData("users");
+      
+      // Aggiorna l'utente selezionato nello stato
+      if (selectedUser && selectedUser.userId === editingUser.userId) {
+        setSelectedUser({
+          ...selectedUser,
+          ...editFormData,
+        });
+      }
+      
+      setEditDialogOpen(false);
+      setEditingUser(null);
+      setEditFormData({});
+    } catch (error) {
+      console.error("Errore durante l'aggiornamento dell'utente:", error);
+      swal.fire(
+        "Errore",
+        error.response?.data || "Errore durante l'aggiornamento dell'utente.",
+        "error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = (user) => {
+    setEditingUser(user);
+    setNewPassword("");
+    setResetPasswordDialogOpen(true);
+  };
+
+  const handleSavePassword = async () => {
+    if (!newPassword.trim()) {
+      swal.fire("Errore", "Inserisci la nuova password", "error");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await resetPassword(editingUser.userId, newPassword);
+      swal.fire("Successo", "Password resettata con successo.", "success");
+      refreshData("users");
+      setResetPasswordDialogOpen(false);
+      setEditingUser(null);
+      setNewPassword("");
+    } catch (error) {
+      console.error("Errore durante il reset della password:", error);
+      swal.fire(
+        "Errore",
+        error.response?.data || "Errore durante il reset della password.",
+        "error"
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleToggleUserStatus = (userId, currentStatus) => {
@@ -424,7 +382,7 @@ const UsersTab = ({
           </Button>
           <Button
             variant="outline"
-            onClick={() => handleResetPassword(selectedUser.userId)}
+            onClick={() => handleResetPassword(selectedUser)}
           >
             <i className="fa-solid fa-key mr-2"></i>
             Reset password
@@ -601,108 +559,228 @@ const UsersTab = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Left column - User list */}
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Utenti</CardTitle>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="showDisabled"
-                checked={!showDisabled}
-                onCheckedChange={(checked) => setShowDisabled(!checked)}
-                variant="transparent"
-                className="h-4 w-4"
-              />
-              <Label htmlFor="showDisabled" className="text-sm">
-                Nascondi disabilitati
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Left column - User list */}
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>Utenti</CardTitle>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="showDisabled"
+                  checked={!showDisabled}
+                  onCheckedChange={(checked) => setShowDisabled(!checked)}
+                  variant="transparent"
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="showDisabled" className="text-sm">
+                  Nascondi disabilitati
+                </Label>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[calc(100vh-230px)] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('username')}
+                    >
+                      Username {sortConfig.key === 'username' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </TableHead>
+                    <TableHead 
+                      className="hidden md:table-cell cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('firstName')}
+                    >
+                      Nome {sortConfig.key === 'firstName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </TableHead>
+                    <TableHead 
+                      className="hidden md:table-cell cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('lastName')}
+                    >
+                      Cognome {sortConfig.key === 'lastName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </TableHead>
+                    <TableHead 
+                      className="hidden md:table-cell cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('role')}
+                    >
+                      Ruolo {sortConfig.key === 'role' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </TableHead>
+                    <TableHead className="hidden md:table-cell">
+                      Azienda
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.isArray(filteredAndSortedUsers) &&
+                    filteredAndSortedUsers.map((user) => {
+                      const company = companies.find(
+                        (c) => c.CompanyId === user.CompanyId,
+                      );
+                      return (
+                        <TableRow
+                          key={user.userId}
+                          className={`${user.userDisabled ? "bg-red-100" : ""} ${selectedUser && selectedUser.userId === user.userId ? "bg-blue-100" : ""} cursor-pointer`}
+                          onClick={() => handleSelectUser(user)}
+                        >
+                          <TableCell className="font-medium">
+                            {user.username}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            {user.firstName}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            {user.lastName}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            {user.role || "-"}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            {company?.Description || "-"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Right column - User details */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Dettagli utente</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[calc(100vh-230px)]">
+              {renderUserDetails()}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Dialog per modifica utente */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Modifica Utente</DialogTitle>
+            <DialogDescription>
+              Modifica i dati dell'utente selezionato. Clicca su Salva quando hai finito.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="firstName" className="text-right">
+                Nome
               </Label>
+              <Input
+                id="firstName"
+                value={editFormData.firstName || ""}
+                onChange={(e) => setEditFormData({...editFormData, firstName: e.target.value})}
+                className="col-span-3"
+                placeholder="Nome"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="lastName" className="text-right">
+                Cognome
+              </Label>
+              <Input
+                id="lastName"
+                value={editFormData.lastName || ""}
+                onChange={(e) => setEditFormData({...editFormData, lastName: e.target.value})}
+                className="col-span-3"
+                placeholder="Cognome"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="email" className="text-right">
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={editFormData.email || ""}
+                onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
+                className="col-span-3"
+                placeholder="Email"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="phoneNumber" className="text-right">
+                Telefono
+              </Label>
+              <Input
+                id="phoneNumber"
+                value={editFormData.phoneNumber || ""}
+                onChange={(e) => setEditFormData({...editFormData, phoneNumber: e.target.value})}
+                className="col-span-3"
+                placeholder="Telefono"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="role" className="text-right">
+                Ruolo
+              </Label>
+              <Input
+                id="role"
+                value={editFormData.role || ""}
+                onChange={(e) => setEditFormData({...editFormData, role: e.target.value})}
+                className="col-span-3"
+                placeholder="Ruolo"
+              />
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[calc(100vh-230px)] overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('username')}
-                  >
-                    Username {sortConfig.key === 'username' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </TableHead>
-                  <TableHead 
-                    className="hidden md:table-cell cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('firstName')}
-                  >
-                    Nome {sortConfig.key === 'firstName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </TableHead>
-                  <TableHead 
-                    className="hidden md:table-cell cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('lastName')}
-                  >
-                    Cognome {sortConfig.key === 'lastName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </TableHead>
-                  <TableHead 
-                    className="hidden md:table-cell cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('role')}
-                  >
-                    Ruolo {sortConfig.key === 'role' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Azienda
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array.isArray(filteredAndSortedUsers) &&
-                  filteredAndSortedUsers.map((user) => {
-                    const company = companies.find(
-                      (c) => c.CompanyId === user.CompanyId,
-                    );
-                    return (
-                      <TableRow
-                        key={user.userId}
-                        className={`${user.userDisabled ? "bg-red-100" : ""} ${selectedUser && selectedUser.userId === user.userId ? "bg-blue-100" : ""} cursor-pointer`}
-                        onClick={() => handleSelectUser(user)}
-                      >
-                        <TableCell className="font-medium">
-                          {user.username}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {user.firstName}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {user.lastName}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {user.role || "-"}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {company?.Description || "-"}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Annulla
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={loading}>
+              {loading ? "Salvando..." : "Salva"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Right column - User details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Dettagli utente</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[calc(100vh-230px)]">
-            {renderUserDetails()}
-          </ScrollArea>
-        </CardContent>
-      </Card>
-    </div>
+      {/* Dialog per reset password */}
+      <Dialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Inserisci la nuova password per l'utente {editingUser?.username}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="newPassword" className="text-right">
+                Nuova Password
+              </Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="col-span-3"
+                placeholder="Nuova password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetPasswordDialogOpen(false)}>
+              Annulla
+            </Button>
+            <Button onClick={handleSavePassword} disabled={loading}>
+              {loading ? "Salvando..." : "Salva"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

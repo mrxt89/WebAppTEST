@@ -742,7 +742,7 @@ console.log('Resulting serverUrl:', serverUrl);
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent
           className="max-w-7xl w-[95vw] max-h-[90vh] flex flex-col"
-          style={{ zIndex: 50 }}
+          style={{ zIndex: 99999 }}
         >
           <DialogHeader>
             <DialogTitle>{file?.FileName || "File"}</DialogTitle>
