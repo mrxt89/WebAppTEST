@@ -27,7 +27,8 @@ const {
     updateItemAttachmentCodeMap,
     getItemAttachmentVersions,
     addItemAttachmentVersion,
-    getItemAttachmentByIdWithDetails
+    getItemAttachmentByIdWithDetails,
+    getItemAttachmentsWithHierarchy
 } = require('../queries/itemAttachmentQueries');
 
 const fileService = new FileService();
@@ -753,6 +754,31 @@ router.get('/item-attachments/:attachmentId', authenticateToken, async (req, res
         res.status(500).json({ 
             success: 0, 
             message: 'Errore nel recupero dell\'allegato' 
+        });
+    }
+});
+
+router.get('/item-attachments/bom/:bomId/hierarchy', authenticateToken, async (req, res) => {
+    try {
+        const bomId = parseInt(req.params.bomId);
+        const companyId = req.user.CompanyId;
+        const includeShared = req.query.includeShared !== 'false';
+        const isErpAttachment = req.query.isErpAttachment === 'true' ? true : 
+                              req.query.isErpAttachment === 'false' ? false : null;
+
+        const attachments = await getItemAttachmentsWithHierarchy(
+            bomId, 
+            companyId, 
+            includeShared, 
+            isErpAttachment
+        );
+
+        res.json(attachments || []);
+    } catch (error) {
+        console.error('Error fetching hierarchical attachments:', error);
+        res.status(500).json({ 
+            success: 0, 
+            message: 'Errore nel recupero degli allegati gerarchici' 
         });
     }
 });

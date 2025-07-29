@@ -25,9 +25,12 @@ import {
   Unlink,
   Eye,
   ListFilter,
+  Upload,
+  Database,
 } from "lucide-react";
 import { swal } from "@/lib/common";
 import useProjectArticlesActions from "@/hooks/useProjectArticlesActions";
+import useErpExport from "@/hooks/useErpExport";
 
 /**
  * ArticleActionsDropdown - Componente per le azioni sugli articoli
@@ -56,6 +59,141 @@ const ArticleActionsDropdown = ({
   // Hook per le azioni API
   const { unlinkItemFromProject, disableTemporaryItem, canDisableItem } =
     useProjectArticlesActions();
+  
+  // Hook per export ERP
+  const { 
+    exportItem, 
+    checkItemExportability,
+    syncItemsFromERP 
+  } = useErpExport();
+
+  // Handler per export ERP
+  const handleExportToERP = async () => {
+    try {
+      setLoading(true);
+
+      // Prima verifica se può essere esportato
+      const checkResult = await checkItemExportability(item.Id);
+      
+      if (!checkResult.canExport) {
+        await swal.fire({
+          title: "Articolo non esportabile",
+          text: checkResult.reason,
+          icon: checkResult.alreadyExported ? "info" : "warning",
+          confirmButtonColor: "#3085d6",
+        });
+        return;
+      }
+
+      // Conferma export
+      const result = await swal.fire({
+        title: "Esportare articolo in ERP?",
+        html: `
+          <div class="text-left">
+            <p>Stai per esportare l'articolo:</p>
+            <div class="mt-2 p-3 bg-gray-100 rounded">
+              <p class="font-semibold">${item.Item}</p>
+              <p class="text-sm text-gray-600">${item.Description}</p>
+            </div>
+            <p class="mt-3 text-sm text-gray-700">
+              L'articolo verrà esportato nel gestionale e sincronizzato automaticamente.
+            </p>
+          </div>
+        `,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Esporta",
+        cancelButtonText: "Annulla",
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+      });
+
+      if (!result.isConfirmed) return;
+
+      // Esporta articolo
+      const exportResult = await exportItem(item.Id);
+      
+      if (exportResult.success) {
+        await swal.fire({
+          title: "Esportazione completata!",
+          text: exportResult.message || "Articolo esportato e sincronizzato con successo",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+
+        // Refresh della lista
+        if (onRefresh) {
+          await onRefresh();
+        }
+      } else {
+        throw new Error(exportResult.message || "Errore durante l'esportazione");
+      }
+    } catch (error) {
+      console.error("Error exporting to ERP:", error);
+      await swal.fire({
+        title: "Errore",
+        text: error.message || "Si è verificato un errore durante l'esportazione",
+        icon: "error",
+        confirmButtonColor: "#d33",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handler per sync da ERP
+  const handleSyncFromERP = async () => {
+    try {
+      setLoading(true);
+
+      const result = await swal.fire({
+        title: "Sincronizzare da ERP?",
+        html: `
+          <div class="text-left">
+            <p>Vuoi sincronizzare i dati dell'articolo <strong>${item.Item}</strong> dal gestionale?</p>
+            <p class="mt-2 text-sm text-gray-600">
+              Questa operazione aggiornerà i dati dell'articolo con quelli presenti nel gestionale.
+            </p>
+          </div>
+        `,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Sincronizza",
+        cancelButtonText: "Annulla",
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+      });
+
+      if (!result.isConfirmed) return;
+
+      // Sincronizza articolo
+      const syncResult = await syncItemsFromERP(item.Item);
+      
+      if (syncResult.success) {
+        await swal.fire({
+          title: "Sincronizzazione completata!",
+          text: "Dati aggiornati dal gestionale",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+
+        if (onRefresh) {
+          await onRefresh();
+        }
+      }
+    } catch (error) {
+      console.error("Error syncing from ERP:", error);
+      await swal.fire({
+        title: "Errore",
+        text: error.message || "Errore durante la sincronizzazione",
+        icon: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Gestione rimozione articolo dal progetto
   const handleUnlinkItem = async () => {
@@ -156,10 +294,12 @@ const ArticleActionsDropdown = ({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>Azioni Articolo</DropdownMenuLabel>
+          
           <DropdownMenuItem onClick={onViewDetails}>
             <Eye className="h-4 w-4 mr-2" />
             Visualizza Dettagli
           </DropdownMenuItem>
+          
           <DropdownMenuItem onClick={onViewBOM}>
             <ListFilter className="h-4 w-4 mr-2" />
             Visualizza Distinta Base
@@ -168,10 +308,41 @@ const ArticleActionsDropdown = ({
           {canEdit && (
             <>
               <DropdownMenuSeparator />
+              
               <DropdownMenuItem onClick={onEdit}>
                 <Pencil className="h-4 w-4 mr-2" />
                 Modifica Articolo
               </DropdownMenuItem>
+
+              {/* Sezione Export/Sync ERP */}
+              <DropdownMenuSeparator />
+              
+              {/* Export in ERP - solo se non è già esportato */}
+              {!isFromERP && (
+                <DropdownMenuItem 
+                  onClick={handleExportToERP}
+                  className="text-blue-600 hover:text-blue-700"
+                  disabled={loading}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Esporta in ERP
+                </DropdownMenuItem>
+              )}
+              
+              {/* Sync da ERP - solo se è già esportato */}
+              {isFromERP && (
+                <DropdownMenuItem 
+                  onClick={handleSyncFromERP}
+                  className="text-green-600 hover:text-green-700"
+                  disabled={loading}
+                >
+                  <Database className="h-4 w-4 mr-2" />
+                  Sincronizza da ERP
+                </DropdownMenuItem>
+              )}
+
+              <DropdownMenuSeparator />
+              
               <DropdownMenuItem
                 onClick={() => setShowUnlinkDialog(true)}
                 className="text-amber-600"
