@@ -75,6 +75,12 @@ export const getFilteredAndSortedProjects = (
       p.ProjectErpID?.toLowerCase().includes(columnFilters.erpId.toLowerCase())
     );
   }
+
+  if (columnFilters.description) {
+    filteredProjects = filteredProjects.filter(p =>
+      p.Description?.toLowerCase().includes(columnFilters.description.toLowerCase())
+    );
+  }
   
   // Separa progetti fissati e non fissati
   const pinnedProjectsList = filteredProjects.filter(p => pinnedProjects.has(p.ProjectID));

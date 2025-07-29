@@ -148,6 +148,7 @@ const documentLinkRoutes = require('./routes/documentLinkRoutes');
 
 const codingRulesRoutes = require('./routes/codingRulesRoutes');
 const smbLinkRoutes = require('./routes/smbLinkRoutes');
+const erpExport = require('./routes/erpExportRoutes');
 
 const app = express();
 
@@ -239,6 +240,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api', documentLinkRoutes);
 app.use('/api', codingRulesRoutes);
 app.use('/api', smbLinkRoutes);
+app.use('/api', erpExport);
 
 // Endpoint per servire i file uploadati
 app.get('/api/uploads/*', (req, res) => {

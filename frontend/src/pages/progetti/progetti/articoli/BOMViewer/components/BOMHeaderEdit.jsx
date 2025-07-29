@@ -13,7 +13,15 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Save, X, AlertCircle, Code } from "lucide-react";
+import { 
+  Save, 
+  X, 
+  AlertCircle, 
+  Code,
+  Upload,
+  Database,
+  CheckCircle2
+} from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import {
   Dialog,
@@ -25,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { swal } from "@/lib/common";
 import RecodingWizard from "./codingRules/RecodingWizard";
+import useErpExport from "@/hooks/useErpExport";
 
 const BOMHeaderEdit = () => {
   const {
@@ -45,6 +54,14 @@ const BOMHeaderEdit = () => {
     project,
   } = useBOMViewer();
 
+  // Hook per export ERP
+  const {
+    exportBOM,
+    checkBOMExportability,
+    syncBOMsFromERP,
+    loading: exportLoading
+  } = useErpExport();
+
   const [bomData, setBomData] = useState({
     code: "",
     description: "",
@@ -57,6 +74,9 @@ const BOMHeaderEdit = () => {
   // Stati per ricodifica
   const [recodingWizardOpen, setRecodingWizardOpen] = useState(false);
   const [recodingItems, setRecodingItems] = useState([]);
+  
+  // Stato per tracciare export in corso
+  const [isExporting, setIsExporting] = useState(false);
 
   // Stati disponibili per la distinta
   const availableStatuses = [
@@ -198,6 +218,189 @@ const BOMHeaderEdit = () => {
     setRecodingItems([]);
     
     // Il refresh è già stato fatto dal wizard tramite smartRefresh
+  };
+
+  // Handler per export BOM
+  const handleExportBOM = async () => {
+    if (!bom?.Id || !bom?.Version) {
+      toast({
+        title: "Errore",
+        description: "Nessuna distinta selezionata",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+
+      // Verifica esportabilità
+      const checkResult = await checkBOMExportability(bom.Id, bom.Version);
+      
+      if (!checkResult.canExport) {
+        // Se ci sono componenti mancanti, mostra dettagli
+        if (checkResult.missingComponents?.length > 0) {
+          const missingList = checkResult.missingComponents
+            .map(c => `• ${c.code || 'N/A'}: ${c.description} (${c.issue})`)
+            .join('\n');
+
+          await swal.fire({
+            title: "Distinta non esportabile",
+            html: `
+              <div class="text-left">
+                <p class="mb-3">${checkResult.reason}</p>
+                <div class="bg-red-50 border border-red-200 rounded p-3">
+                  <p class="font-semibold text-red-800 mb-2">Componenti con problemi:</p>
+                  <pre class="text-sm text-red-700 whitespace-pre-wrap">${missingList}</pre>
+                </div>
+                <p class="mt-3 text-sm text-gray-600">
+                  Risolvi questi problemi prima di esportare la distinta.
+                </p>
+              </div>
+            `,
+            icon: "warning",
+            confirmButtonText: "OK",
+            confirmButtonColor: "#3085d6",
+          });
+          return;
+        }
+
+        // Altri motivi
+        await swal.fire({
+          title: "Distinta non esportabile",
+          text: checkResult.reason,
+          icon: checkResult.alreadyExported ? "info" : "warning",
+          confirmButtonColor: "#3085d6",
+        });
+        return;
+      }
+
+      // Conferma export
+      const confirmResult = await swal.fire({
+        title: "Esportare distinta in ERP?",
+        html: `
+          <div class="text-left">
+            <p>Stai per esportare la distinta:</p>
+            <div class="mt-2 p-3 bg-gray-100 rounded">
+              <p class="font-semibold">${bom.BOM}</p>
+              <p class="text-sm text-gray-600">${bom.Description}</p>
+              <p class="text-xs text-gray-500 mt-1">Versione ${bom.Version}</p>
+            </div>
+            <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+              <p class="text-sm text-blue-800">
+                <strong>Nota:</strong> Verranno esportati anche tutti i componenti 
+                e i cicli di lavorazione associati.
+              </p>
+            </div>
+          </div>
+        `,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Esporta",
+        cancelButtonText: "Annulla",
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+        showLoaderOnConfirm: true,
+        allowOutsideClick: () => !swal.isLoading(),
+        preConfirm: async () => {
+          try {
+            const result = await exportBOM(bom.Id, bom.Version);
+            return result;
+          } catch (error) {
+            swal.showValidationMessage(`Errore: ${error.message}`);
+            return false;
+          }
+        },
+      });
+
+      if (confirmResult.isConfirmed && confirmResult.value?.success) {
+        await swal.fire({
+          title: "Esportazione completata!",
+          html: `
+            <div class="text-center">
+              <div class="mb-4">
+                <CheckCircle2 class="h-16 w-16 text-green-500 mx-auto" />
+              </div>
+              <p>Distinta base esportata e sincronizzata con successo</p>
+            </div>
+          `,
+          icon: "success",
+          timer: 2500,
+          showConfirmButton: false,
+        });
+
+        // Disattiva modalità modifica dopo export riuscito
+        setEditMode(false);
+        
+        // Refresh completo
+        await smartRefresh();
+      }
+    } catch (error) {
+      console.error("Errore export BOM:", error);
+      await swal.fire({
+        title: "Errore",
+        text: error.message || "Si è verificato un errore durante l'esportazione",
+        icon: "error",
+        confirmButtonColor: "#d33",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Handler per sync da ERP
+  const handleSyncFromERP = async () => {
+    try {
+      setIsExporting(true);
+
+      const result = await swal.fire({
+        title: "Sincronizzare da ERP?",
+        html: `
+          <div class="text-left">
+            <p>Vuoi sincronizzare la distinta <strong>${bom.BOM}</strong> dal gestionale?</p>
+            <p class="mt-2 text-sm text-gray-600">
+              Questa operazione aggiornerà i dati della distinta con quelli presenti nel gestionale.
+            </p>
+          </div>
+        `,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Sincronizza",
+        cancelButtonText: "Annulla",
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+      });
+
+      if (!result.isConfirmed) return;
+
+      // Sincronizza distinta
+      const syncResult = await syncBOMsFromERP(bom.BOM, bom.Version);
+      
+      if (syncResult.success) {
+        await swal.fire({
+          title: "Sincronizzazione completata!",
+          text: "Dati aggiornati dal gestionale",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+
+        // Disattiva modalità modifica
+        setEditMode(false);
+        
+        // Refresh
+        await smartRefresh();
+      }
+    } catch (error) {
+      console.error("Error syncing from ERP:", error);
+      await swal.fire({
+        title: "Errore",
+        text: error.message || "Errore durante la sincronizzazione",
+        icon: "error",
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Funzione per salvare tutte le modifiche
@@ -571,6 +774,68 @@ const BOMHeaderEdit = () => {
                 <Code className="h-4 w-4 mr-1" />
                 Ricodifica selezionati ({selectedComponents.length})
               </Button>
+            )}
+          </div>
+
+          {/* Pulsanti Export/Sync ERP */}
+          <div className="flex items-center gap-2 pt-2 border-t border-amber-200">
+            {/* Export in ERP - solo se non già esportato */}
+            {bom?.stato_erp !== 1 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportBOM}
+                disabled={loading || isExporting || exportLoading}
+                className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300"
+              >
+                {isExporting ? (
+                  <>
+                    <span className="animate-spin h-4 w-4 mr-1">⏳</span>
+                    Esportazione...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-1" />
+                    Esporta in ERP
+                  </>
+                )}
+              </Button>
+            )}
+
+            {/* Sync da ERP - solo se già esportato */}
+            {bom?.stato_erp === 1 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSyncFromERP}
+                disabled={loading || isExporting || exportLoading}
+                className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
+              >
+                {isExporting ? (
+                  <>
+                    <span className="animate-spin h-4 w-4 mr-1">⏳</span>
+                    Sincronizzazione...
+                  </>
+                ) : (
+                  <>
+                    <Database className="h-4 w-4 mr-1" />
+                    Sincronizza da ERP
+                  </>
+                )}
+              </Button>
+            )}
+
+            {/* Indicatore stato ERP */}
+            {bom?.stato_erp === 1 && (
+              <div className="ml-auto flex items-center gap-2 text-sm text-green-700">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Presente in ERP</span>
+                {bom?.data_sync_erp && (
+                  <span className="text-xs text-gray-500">
+                    (sync: {new Date(bom.data_sync_erp).toLocaleDateString('it-IT')})
+                  </span>
+                )}
+              </div>
             )}
           </div>
 

@@ -24,7 +24,7 @@ const ProjectTable = ({
   fetchProjects,
   filters
 }) => {
-  const [columnWidths, setColumnWidths] = useState(DEFAULT_COLUMN_WIDTHS);
+  const [columnWidths, setColumnWidths] = useState([90, ...DEFAULT_COLUMN_WIDTHS]);
   const [isResizingColumn, setIsResizingColumn] = useState(null);
 
   const handleColumnMouseDown = (e, index) => {
@@ -106,6 +106,23 @@ const ProjectTable = ({
             <TableRow>
               <TableHead
                 style={{ width: `${columnWidths[0]}px`, position: 'relative' }}
+                className="whitespace-nowrap text-center font-bold"
+              >
+                <div className="flex flex-col items-center">
+                  <span>ID</span>
+                  <ColumnFilter
+                    column="text"
+                    value={columnFilters.erpId}
+                    onChange={(value) => handleColumnFilter("erpId", value)}
+                  />
+                </div>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                  onMouseDown={(e) => handleColumnMouseDown(e, 0)}
+                />
+              </TableHead>
+              <TableHead
+                style={{ width: `${columnWidths[1]}px`, position: 'relative' }}
                 className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
                 onClick={() => handleSort("Name")}
               >
@@ -124,11 +141,11 @@ const ProjectTable = ({
                 </div>
                 <div
                   className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
-                  onMouseDown={(e) => handleColumnMouseDown(e, 0)}
+                  onMouseDown={(e) => handleColumnMouseDown(e, 1)}
                 />
               </TableHead>
               <TableHead
-                style={{ width: `${columnWidths[1]}px`, position: 'relative' }}
+                style={{ width: `${columnWidths[2]}px`, position: 'relative' }}
                 className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
                 onClick={() => handleSort("Description")}
               >
@@ -139,14 +156,19 @@ const ProjectTable = ({
                       {sortConfig.direction === "ascending" ? "↑" : "↓"}
                     </span>
                   )}
+                  <ColumnFilter
+                    column="text"
+                    value={columnFilters.description}
+                    onChange={(value) => handleColumnFilter("description", value)}
+                  />
                 </div>
                 <div
                   className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
-                  onMouseDown={(e) => handleColumnMouseDown(e, 1)}
+                  onMouseDown={(e) => handleColumnMouseDown(e, 2)}
                 />
               </TableHead>
               <TableHead
-                style={{ width: `${columnWidths[2]}px`, position: 'relative' }}
+                style={{ width: `${columnWidths[3]}px`, position: 'relative' }}
                 className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
                 onClick={() => handleSort("CompanyName")}
               >
@@ -165,10 +187,10 @@ const ProjectTable = ({
                 </div>
                 <div
                   className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
-                  onMouseDown={(e) => handleColumnMouseDown(e, 2)}
+                  onMouseDown={(e) => handleColumnMouseDown(e, 3)}
                 />
               </TableHead>
-              <TableHead style={{ width: `${columnWidths[3]}px`, position: 'relative' }} className="whitespace-nowrap">
+              <TableHead style={{ width: `${columnWidths[4]}px`, position: 'relative' }} className="whitespace-nowrap">
                 <div className="flex items-center">
                   Stato
                   <ColumnFilter
@@ -180,11 +202,11 @@ const ProjectTable = ({
                 </div>
                 <div
                   className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
-                  onMouseDown={(e) => handleColumnMouseDown(e, 3)}
+                  onMouseDown={(e) => handleColumnMouseDown(e, 4)}
                 />
               </TableHead>
               <TableHead
-                style={{ width: `${columnWidths[4]}px`, position: 'relative' }}
+                style={{ width: `${columnWidths[5]}px`, position: 'relative' }}
                 className="cursor-pointer hover:bg-gray-200 whitespace-nowrap"
                 onClick={() => handleSort("EndDate")}
               >
@@ -203,17 +225,13 @@ const ProjectTable = ({
                 </div>
                 <div
                   className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
-                  onMouseDown={(e) => handleColumnMouseDown(e, 4)}
-                />
-              </TableHead>
-              <TableHead style={{ width: `${columnWidths[5]}px`, position: 'relative' }} className="text-right whitespace-nowrap">
-                Attività
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
                   onMouseDown={(e) => handleColumnMouseDown(e, 5)}
                 />
               </TableHead>
               <TableHead style={{ width: `${columnWidths[6]}px` }} className="text-center">
+                Attività
+              </TableHead>
+              <TableHead style={{ width: `${columnWidths[7]}px` }} className="text-center">
                 Azioni
               </TableHead>
             </TableRow>
@@ -235,6 +253,9 @@ const ProjectTable = ({
                   `}
                   onClick={() => onSelectProject(project.ProjectID)}
                 >
+                  <TableCell className="py-1 text-xs text-center font-mono whitespace-nowrap font-bold">
+                    {project.ProjectErpID || "-"}
+                  </TableCell>
                   <TableCell className="font-medium py-1 whitespace-nowrap">
                     <div className="flex items-start gap-1">
                       {isPinned && (
@@ -249,7 +270,7 @@ const ProjectTable = ({
                           </Tooltip>
                         </TooltipProvider>
                       )}
-                      <span className="truncate" style={{ maxWidth: `${columnWidths[0] - 40}px` }}>
+                      <span className="truncate" style={{ maxWidth: `${columnWidths[1] - 40}px` }}>
                         {project.Name}
                       </span>
                     </div>

@@ -54,6 +54,78 @@ class FileService {
     }
 
     /**
+     * Trova un file gestendo problemi di encoding SMB
+     * @private
+     */
+    async _findFileWithEncodingIssues(directory, targetFileName) {
+        try {
+            const files = await fs.readdir(directory);
+            
+            // Prima prova match esatto
+            if (files.includes(targetFileName)) {
+                return targetFileName;
+            }
+            
+            // Se il nome contiene caratteri non-ASCII, prova match approssimativo
+            if (/[^\x00-\x7F]/.test(targetFileName)) {
+                console.log(`Target file contains non-ASCII chars: ${targetFileName}`);
+                
+                // Rimuovi l'estensione per il confronto
+                const targetExt = path.extname(targetFileName).toLowerCase();
+                const targetBase = path.basename(targetFileName, targetExt);
+                
+                // Crea pattern per match approssimativo
+                // Sostituisci caratteri non-ASCII con .? per regex
+                const pattern = targetBase
+                    .split('')
+                    .map(char => {
+                        if (/[^\x00-\x7F]/.test(char)) {
+                            return '.?'; // Match qualsiasi carattere singolo o doppio
+                        }
+                        return char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape caratteri speciali regex
+                    })
+                    .join('');
+                
+                const regex = new RegExp(`^${pattern}${targetExt.replace('.', '\\.')}$`, 'i');
+                console.log(`Using pattern: ${regex}`);
+                
+                // Cerca file che matcha il pattern
+                for (const file of files) {
+                    if (regex.test(file)) {
+                        console.log(`Found matching file: ${file}`);
+                        // Verifica ulteriore: lunghezza simile (tolleranza di 2 caratteri)
+                        if (Math.abs(file.length - targetFileName.length) <= 2) {
+                            return file;
+                        }
+                    }
+                }
+                
+                // Se non trovato con regex, prova con confronto più loose
+                // Cerca file che contiene le parti ASCII del nome
+                const asciiParts = targetBase.match(/[\x00-\x7F]+/g) || [];
+                console.log('ASCII parts:', asciiParts);
+                
+                if (asciiParts.length > 0) {
+                    for (const file of files) {
+                        const fileBase = path.basename(file, path.extname(file));
+                        // Verifica che tutte le parti ASCII siano presenti
+                        if (asciiParts.every(part => fileBase.includes(part)) && 
+                            file.toLowerCase().endsWith(targetExt)) {
+                            console.log(`Found file by ASCII parts: ${file}`);
+                            return file;
+                        }
+                    }
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('Error in _findFileWithEncodingIssues:', error);
+            return null;
+        }
+    }
+
+    /**
      * Salva un file caricato
      * @param {Object} file - File caricato da multer
      * @param {number} projectId - ID del progetto (opzionale)
@@ -304,25 +376,60 @@ class FileService {
                 throw new Error('Invalid file path');
             }
             
-            // Se è storage locale, verifica prima che il file esista
+            // Se è storage locale o montato
             if (this.storage.getStorageType() === 'local' || config.storage.remoteType === 'mounted') {
                 const fullPath = path.join(this.baseUploadPath, filePath);
-                const exists = await fs.pathExists(fullPath);
+                let exists = false;
+                let actualFilePath = fullPath;
                 
                 console.log('Checking file at path:', fullPath);
-                console.log('File exists:', exists);
+                
+                // Prima prova il percorso normale
+                try {
+                    exists = await fs.pathExists(fullPath);
+                    console.log('File exists:', exists);
+                } catch (e) {
+                    console.log('Error checking path:', e.message);
+                }
+                
+                // Se non esiste e potrebbe avere problemi di encoding
+                if (!exists) {
+                    const directory = path.dirname(fullPath);
+                    const fileName = path.basename(fullPath);
+                    
+                    // Controlla se la directory esiste
+                    const dirExists = await fs.pathExists(directory);
+                    console.log('Directory exists:', dirExists);
+                    
+                    if (dirExists && /[^\x00-\x7F]/.test(fileName)) {
+                        // Prova a trovare il file con encoding issues
+                        const actualFileName = await this._findFileWithEncodingIssues(directory, fileName);
+                        
+                        if (actualFileName) {
+                            actualFilePath = path.join(directory, actualFileName);
+                            exists = true;
+                            console.log('File found with different encoding:', actualFileName);
+                        }
+                    }
+                }
                 
                 if (!exists) {
                     throw new Error(`File not found at path: ${fullPath}`);
                 }
                 
-                const stats = await fs.stat(fullPath);
+                const stats = await fs.stat(actualFilePath);
                 console.log('File size for streaming:', stats.size, 'bytes');
+                
+                const stream = fs.createReadStream(actualFilePath);
+                console.log('Read stream created successfully');
+                return stream;
             }
             
+            // Per storage remoto non-mounted
             const stream = this.storage.createReadStream(filePath);
             console.log('Read stream created successfully');
             return stream;
+            
         } catch (error) {
             console.error('Error creating read stream:', error);
             throw new Error(`Error reading file: ${error.message}`);

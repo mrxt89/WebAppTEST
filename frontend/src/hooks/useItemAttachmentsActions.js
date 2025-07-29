@@ -903,6 +903,52 @@ const useItemAttachmentsActions = () => {
     [makeRequest],
   );
 
+  const getAttachmentsByBOMHierarchy = useCallback(
+    async (bomId, includeShared = true, isErpAttachment = null) => {
+      try {
+        setLoading(true);
+        const query = new URLSearchParams();
+        if (includeShared !== undefined)
+          query.append("includeShared", includeShared);
+        if (isErpAttachment !== null)
+          query.append("isErpAttachment", isErpAttachment);
+
+        const data = await makeRequest(
+          `${config.API_BASE_URL}/item-attachments/bom/${bomId}/hierarchy?${query.toString()}`
+        );
+
+        if (data) {
+          // Raggruppa per livello o componente se necessario
+          const grouped = data.reduce((acc, attachment) => {
+            const key = attachment.ItemCode;
+            if (!acc[key]) {
+              acc[key] = {
+                itemCode: key,
+                itemDescription: attachment.ComponentDescription,
+                level: attachment.ComponentLevel,
+                hierarchyPath: attachment.HierarchyPath,
+                attachments: []
+              };
+            }
+            acc[key].attachments.push(attachment);
+            return acc;
+          }, {});
+          
+          setAttachments(data);
+          return { raw: data, grouped: Object.values(grouped) };
+        }
+        return { raw: [], grouped: [] };
+      } catch (err) {
+        setError(err.message);
+        console.error("Error fetching BOM hierarchy attachments:", err);
+        return { raw: [], grouped: [] };
+      } finally {
+        setLoading(false);
+      }
+    },
+    [makeRequest]
+  );
+
   return {
     loading,
     error,
@@ -939,6 +985,7 @@ const useItemAttachmentsActions = () => {
     downloadAllAttachmentsByProjectItemId,
     // Helper per verificare permessi
     canModifyAttachment,
+    getAttachmentsByBOMHierarchy
   };
 };
 

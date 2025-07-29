@@ -488,6 +488,23 @@ const getItemAttachmentByIdWithDetails = async (attachmentId, companyId) => {
     }
 };
 
+const getItemAttachmentsWithHierarchy = async (bomId, companyId, includeShared = true, isErpAttachment = null) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const result = await pool.request()
+            .input('BOMId', sql.Int, bomId)
+            .input('CompanyId', sql.Int, companyId)
+            .input('IncludeShared', sql.Bit, includeShared ? 1 : 0)
+            .input('IsErpAttachment', sql.Bit, isErpAttachment)
+            .execute('MA_GetItemAttachmentsWithHierarchy');
+        
+        return result.recordset;
+    } catch (err) {
+        console.error('Error in getItemAttachmentsWithHierarchy:', err);
+        throw err;
+    }
+};
+
 module.exports = {
     getItemAttachments,
     addItemAttachment,
@@ -505,5 +522,6 @@ module.exports = {
     updateItemAttachmentCodeMap,
     getItemAttachmentVersions,
     addItemAttachmentVersion,
-    getItemAttachmentByIdWithDetails
+    getItemAttachmentByIdWithDetails,
+    getItemAttachmentsWithHierarchy
 };
