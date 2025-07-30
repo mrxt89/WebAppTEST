@@ -198,6 +198,7 @@ const ProjectTable = ({
                     value={columnFilters.status}
                     onChange={(value) => handleColumnFilter("status", value)}
                     options={statusOptions}
+                    className="bg-primary"
                   />
                 </div>
                 <div

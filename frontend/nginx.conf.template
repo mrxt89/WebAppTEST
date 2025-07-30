@@ -24,12 +24,24 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # Aumenta i buffer per gestire file grandi
+    client_max_body_size 100M;
+    client_body_buffer_size 50M;
+    proxy_buffers 16 16k;
+    proxy_buffer_size 32k;
+    
+    # Timeout generali
+    proxy_connect_timeout 120s;
+    proxy_send_timeout 120s;
+    proxy_read_timeout 120s;
+    send_timeout 120s;
+
     # Gzip compression
     gzip on;
     gzip_vary on;
     gzip_min_length 10240;
     gzip_proxied expired no-cache no-store private auth;
-    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml;
+    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml application/json;
     gzip_disable "MSIE [1-6]\.";
 
     location / {
@@ -42,7 +54,86 @@ server {
         add_header Cache-Control "public, no-transform";
     }
 
-    # API Proxy
+    # Route specifica per email preview con timeout estesi
+    location ~ ^/api/email-preview/ {
+        proxy_pass https://${HOST_IP}:${API_HTTPS_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # Timeout estesi per email preview (5 minuti)
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        send_timeout 300s;
+        
+        # Disabilita buffering per streaming
+        proxy_buffering off;
+        proxy_request_buffering off;
+        
+        # Buffer più grandi per response
+        proxy_busy_buffers_size 32k;
+        proxy_temp_file_write_size 64k;
+    }
+    
+    # Route per email info (veloce, timeout standard)
+    location ~ ^/api/email-info/ {
+        proxy_pass https://${HOST_IP}:${API_HTTPS_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Timeout standard per info rapide
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+    }
+
+    # Route per download allegati con timeout estesi
+    location ~ ^/api/attachments/[0-9]+/download$ {
+        proxy_pass https://${HOST_IP}:${API_HTTPS_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Timeout estesi per download file grandi
+        proxy_connect_timeout 180s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        
+        # Streaming senza buffer
+        proxy_buffering off;
+    }
+
+    # Route per upload allegati con timeout estesi
+    location ~ ^/api/attachments/.*/upload$ {
+        proxy_pass https://${HOST_IP}:${API_HTTPS_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Timeout estesi per upload
+        proxy_connect_timeout 180s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        client_body_timeout 300s;
+        
+        # Buffer per upload grandi
+        client_body_buffer_size 50M;
+        proxy_request_buffering off;
+    }
+
+    # API Proxy generale (tutte le altre route)
     location /api/ {
         proxy_pass https://${HOST_IP}:${API_HTTPS_PORT}/api/;
         proxy_set_header Host $host;
@@ -52,6 +143,11 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+        
+        # Timeout standard per API generali
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
     }
 
     # Security headers

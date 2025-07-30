@@ -2221,12 +2221,7 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         const sourceItemCode = importData.sourceItem.Item || importData.sourceItem.BOM || '';
         const sourceItemDescription = importData.sourceItem.Description || '';
         
-        console.log('Import data received:', {
-            sourceItemCode,
-            sourceItemDescription,
-            createNewBOM: importData.createNewBOM,
-            componentsCount: importData.components.length
-        });
+
         
         // IMPORTANTE: Definisci il tipo di tabella TVP
         const tvp = new sql.Table('SelectedComponentsTableType');
@@ -2255,7 +2250,7 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
             );
         });
 
-        console.log('Components table rows:', tvp.rows.length);
+
         
         // Parametri di input
         request.input('CompanyId', sql.Int, companyId);
@@ -2283,13 +2278,7 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         const errorCode = request.parameters.ErrorCode.value || 0;
         const errorMessage = request.parameters.ErrorMessage.value || '';
         
-        console.log('SP Output values:', {
-            returnItemId,
-            returnBOMId,
-            importedComponents,
-            errorCode,
-            errorMessage
-        });
+
         
         // Controllo errori
         if (errorCode !== 0) {
@@ -2306,7 +2295,6 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         
         // Se non abbiamo un ID articolo valido, c'è stato un problema
         if (!returnItemId) {
-            console.log('No ReturnItemId returned from SP');
             
             // Prima di fallire, proviamo a recuperare l'articolo appena creato
             try {
@@ -2325,7 +2313,6 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
                 
                 if (checkResult.recordset && checkResult.recordset.length > 0) {
                     const recoveredItemId = checkResult.recordset[0].Id;
-                    console.log('Recovered ItemId from database:', recoveredItemId);
                     
                     // Continua con l'ID recuperato
                     return await completeImportResult(
@@ -2374,7 +2361,7 @@ async function completeImportResult(pool, companyId, itemId, bomId, importedComp
     let itemDetails = null;
     try {
         itemDetails = await getItemById(companyId, itemId);
-        console.log('Item details retrieved:', itemDetails ? 'Success' : 'Failed');
+
     } catch (err) {
         console.error('Error getting item details:', err);
     }
@@ -2403,7 +2390,7 @@ async function completeImportResult(pool, companyId, itemId, bomId, importedComp
                 `);
             
             componentsDetails = componentsQuery.recordset;
-            console.log(`Retrieved ${componentsDetails.length} component details`);
+
         } catch (err) {
             console.error('Error getting components details:', err);
         }

@@ -4,18 +4,27 @@ const config = require('../config');
 
 async function getUserById(userId) {
   try {
+    console.log(`[USER_MANAGEMENT] Getting user by ID: ${userId}`);
     let pool = await sql.connect(config.dbConfig);
     let result = await pool.request()
       .input('userId', sql.Int, userId)
       .query('SELECT * FROM AR_Users WHERE userId = @userId');
+    
+    if (!result.recordset[0]) {
+      console.log(`[USER_MANAGEMENT] User not found: ${userId}`);
+    } else {
+      console.log(`[USER_MANAGEMENT] User found: ${result.recordset[0].username}`);
+    }
+    
     return result.recordset[0];
   } catch (err) {
-    console.error('Error fetching user:', err);
+    console.error('[USER_MANAGEMENT] Error fetching user:', err);
     throw err;
   }
 }
 
 async function getAllUsers(userId) {
+  console.log(`[USER_MANAGEMENT] Getting all users for admin: ${userId}`);
   const query = `
 SELECT	
     T0.userId
@@ -47,30 +56,36 @@ FOR JSON PATH
       .input('userId', sql.Int, userId)
       .query(query);
 
-    return JSON.parse(result.recordset[0]['JSON_F52E2B61-18A1-11d1-B105-00805F49916B']); // Parse JSON
+    const users = JSON.parse(result.recordset[0]['JSON_F52E2B61-18A1-11d1-B105-00805F49916B']); // Parse JSON
+    console.log(`[USER_MANAGEMENT] Retrieved ${users.length} users`);
+    return users;
   } catch (err) {
-    console.error('Error fetching users:', err);
+    console.error('[USER_MANAGEMENT] Error fetching users:', err);
     throw err;
   }
 }
 
 async function toggleUserStatus(userId, userDisabled) {
+  console.log(`[USER_MANAGEMENT] Toggling user status: ${userId} -> ${userDisabled ? 'disabled' : 'enabled'}`);
   const query = 'UPDATE AR_Users SET userDisabled = @userDisabled WHERE userId = @userId';
   try {
     let pool = await sql.connect(config.dbConfig);
-    await pool.request()
+    const result = await pool.request()
       .input('userId', sql.Int, userId)
       .input('userDisabled', sql.Bit, userDisabled)
       .query(query);
+    
+    console.log(`[USER_MANAGEMENT] User status updated. Rows affected: ${result.rowsAffected[0]}`);
     return true;
   } catch (err) {
-    console.error('Error updating user status:', err);
+    console.error('[USER_MANAGEMENT] Error updating user status:', err);
     throw err;
   }
 }
 
 
 async function changePassword(userId, currentPassword, newPassword) {
+  console.log(`[USER_MANAGEMENT] Changing password for user: ${userId}`);
   const query = 'SELECT * FROM AR_Users WHERE userId = @userId';
   try {
     let pool = await sql.connect(config.dbConfig);
@@ -85,33 +100,39 @@ async function changePassword(userId, currentPassword, newPassword) {
         .input('password', sql.VarChar, hashedPassword)
         .input('userId', sql.Int, userId)
         .query(updateQuery);
+      console.log(`[USER_MANAGEMENT] Password changed successfully for user: ${userId}`);
       return true;
     } else {
+      console.log(`[USER_MANAGEMENT] Password change failed - invalid current password for user: ${userId}`);
       return false;
     }
   } catch (err) {
-    console.error('Error changing password:', err);
+    console.error('[USER_MANAGEMENT] Error changing password:', err);
     throw err;
   }
 }
 
 async function resetPassword(userId, newPassword) {
+  console.log(`[USER_MANAGEMENT] Resetting password for user: ${userId}`);
   try {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     const query = 'UPDATE AR_Users SET password = @password, salt = \'10\' WHERE userId = @userId';
     let pool = await sql.connect(config.dbConfig);
-    await pool.request()
+    const result = await pool.request()
       .input('password', sql.NVarChar, hashedPassword)
       .input('userId', sql.Int, userId)
       .query(query);
+    
+    console.log(`[USER_MANAGEMENT] Password reset successfully. Rows affected: ${result.rowsAffected[0]}`);
     return true;
   } catch (err) {
-    console.error('Error resetting password:', err);
+    console.error('[USER_MANAGEMENT] Error resetting password:', err);
     throw err;
   }
 }
 
 async function updateUser(data) {
+  console.log(`[USER_MANAGEMENT] Updating user: ${data.userId}`, { email: data.email, firstName: data.firstName, lastName: data.lastName });
   const { userId, username, email, firstName, lastName, phoneNumber, address, role } = data;
   const query = `
     UPDATE AR_Users 
@@ -120,7 +141,7 @@ async function updateUser(data) {
   `;
   try {
     let pool = await sql.connect(config.dbConfig);
-    await pool.request()
+    const result = await pool.request()
       .input('email', sql.VarChar, email)
       .input('firstName', sql.VarChar, firstName)
       .input('lastName', sql.VarChar, lastName)
@@ -129,13 +150,16 @@ async function updateUser(data) {
       .input('address', sql.VarChar, address ? address : '')
       .input('role', sql.VarChar, role)
       .query(query);
+    
+    console.log(`[USER_MANAGEMENT] User updated successfully. Rows affected: ${result.rowsAffected[0]}`);
   } catch (err) {
-    console.error('Error updating user:', err);
+    console.error('[USER_MANAGEMENT] Error updating user:', err);
     throw err;
   }
 }
 
 async function addUser(data) {
+  console.log(`[USER_MANAGEMENT] Adding new user: ${data.username}`, { email: data.email, firstName: data.firstName, lastName: data.lastName });
   const { username, password, email, firstName, lastName, userBadge, role, phoneNumber, userId, companies } = data;
   const hashedPassword = await bcrypt.hash(password, 10);
   const sanitizedUserBadge = userBadge || 0;
@@ -155,13 +179,15 @@ async function addUser(data) {
     
     if (companyResult.recordset.length > 0) {
       defaultCompanyId = companyResult.recordset[0].CompanyId;
+      console.log(`[USER_MANAGEMENT] Default company ID: ${defaultCompanyId}`);
     }
   } catch (error) {
-    console.error('Error getting default CompanyId:', error);
+    console.error('[USER_MANAGEMENT] Error getting default CompanyId:', error);
   }
   
   // Utilizza la prima azienda selezionata o quella di default
   const primaryCompanyId = companies && companies.length > 0 ? companies[0] : defaultCompanyId;
+  console.log(`[USER_MANAGEMENT] Primary company ID: ${primaryCompanyId}`);
   
   const queryCheckUsername = 'SELECT COUNT(*) AS count FROM AR_Users WHERE username = @username';
   const queryInsertUser = `
@@ -189,9 +215,11 @@ async function addUser(data) {
       .query(queryCheckUsername);
       
     if (result.recordset[0].count > 0) {
+      console.log(`[USER_MANAGEMENT] Username already exists: ${username}`);
       return { success: false, message: 'Username già in uso' };
     }
     
+    console.log(`[USER_MANAGEMENT] Creating new user with company ID: ${primaryCompanyId}`);
     const insertResult = await pool.request()
       .input('username', sql.VarChar, username)
       .input('password', sql.NVarChar, hashedPassword)
@@ -206,20 +234,24 @@ async function addUser(data) {
     
     // Ottieni l'ID dell'utente appena creato
     const newUserId = insertResult.recordset[0].NewUserId;
+    console.log(`[USER_MANAGEMENT] New user created with ID: ${newUserId}`);
     
     // Associa l'utente alle aziende selezionate
     if (companies && companies.length > 0) {
+      console.log(`[USER_MANAGEMENT] Associating user with ${companies.length} companies`);
       for (const companyId of companies) {
         await assignUserToCompany(newUserId, companyId);
       }
     } else if (defaultCompanyId > 0) {
       // Se non sono state selezionate aziende, associa l'utente all'azienda di default
+      console.log(`[USER_MANAGEMENT] Associating user with default company: ${defaultCompanyId}`);
       await assignUserToCompany(newUserId, defaultCompanyId);
     }
     
+    console.log(`[USER_MANAGEMENT] User creation completed successfully`);
     return { success: true };
   } catch (err) {
-    console.error('Error adding user:', err);
+    console.error('[USER_MANAGEMENT] Error adding user:', err);
     throw err;
   }
 }
@@ -228,6 +260,7 @@ async function addUser(data) {
 
 // Funzione per ottenere le aziende associate a un utente
 async function getUserCompanies(userId) {
+  console.log(`[USER_MANAGEMENT] Getting companies for user: ${userId}`);
   try {
     let pool = await sql.connect(config.dbConfig);
     let result = await pool.request()
@@ -239,15 +272,17 @@ async function getUserCompanies(userId) {
         WHERE cu.UserId = @userId AND c.IsActive = 1
         ORDER BY c.Description
       `);
+    console.log(`[USER_MANAGEMENT] Found ${result.recordset.length} companies for user ${userId}`);
     return result.recordset;
   } catch (err) {
-    console.error('Error fetching user companies:', err);
+    console.error('[USER_MANAGEMENT] Error fetching user companies:', err);
     throw err;
   }
 }
 
 // Funzione per ottenere tutte le aziende disponibili
 async function getAllCompanies() {
+  console.log(`[USER_MANAGEMENT] Getting all active companies`);
   try {
     let pool = await sql.connect(config.dbConfig);
     let result = await pool.request()
@@ -257,15 +292,17 @@ async function getAllCompanies() {
         WHERE IsActive = 1
         ORDER BY Description
       `);
+    console.log(`[USER_MANAGEMENT] Found ${result.recordset.length} active companies`);
     return result.recordset;
   } catch (err) {
-    console.error('Error fetching companies:', err);
+    console.error('[USER_MANAGEMENT] Error fetching companies:', err);
     throw err;
   }
 }
 
 // Funzione per associare un utente a un'azienda
 async function assignUserToCompany(userId, companyId) {
+  console.log(`[USER_MANAGEMENT] Assigning user ${userId} to company ${companyId}`);
   try {
     let pool = await sql.connect(config.dbConfig);
     
@@ -281,24 +318,28 @@ async function assignUserToCompany(userId, companyId) {
     
     // Se l'associazione non esiste, la crea
     if (checkResult.recordset[0].count === 0) {
-      await pool.request()
+      const result = await pool.request()
         .input('userId', sql.Int, userId)
         .input('companyId', sql.Int, companyId)
         .query(`
           INSERT INTO AR_CompaniesUsers (UserId, CompanyId)
           VALUES (@userId, @companyId)
         `);
+      console.log(`[USER_MANAGEMENT] User-company association created. Rows affected: ${result.rowsAffected[0]}`);
+    } else {
+      console.log(`[USER_MANAGEMENT] User-company association already exists`);
     }
     
     return true;
   } catch (err) {
-    console.error('Error assigning user to company:', err);
+    console.error('[USER_MANAGEMENT] Error assigning user to company:', err);
     throw err;
   }
 }
 
 // Funzione per rimuovere l'associazione di un utente da un'azienda
 async function removeUserFromCompany(userId, companyId) {
+  console.log(`[USER_MANAGEMENT] Removing user ${userId} from company ${companyId}`);
   try {
     let pool = await sql.connect(config.dbConfig);
     
@@ -313,11 +354,12 @@ async function removeUserFromCompany(userId, companyId) {
     
     // Se l'utente ha solo un'azienda, non permettere la rimozione
     if (countResult.recordset[0].count <= 1) {
+      console.log(`[USER_MANAGEMENT] Cannot remove user from company - user must be associated with at least one company`);
       return { success: false, message: 'L\'utente deve essere associato ad almeno un\'azienda' };
     }
     
     // Rimuovi l'associazione
-    await pool.request()
+    const result = await pool.request()
       .input('userId', sql.Int, userId)
       .input('companyId', sql.Int, companyId)
       .query(`
@@ -325,15 +367,17 @@ async function removeUserFromCompany(userId, companyId) {
         WHERE UserId = @userId AND CompanyId = @companyId
       `);
     
+    console.log(`[USER_MANAGEMENT] User-company association removed. Rows affected: ${result.rowsAffected[0]}`);
     return { success: true };
   } catch (err) {
-    console.error('Error removing user from company:', err);
+    console.error('[USER_MANAGEMENT] Error removing user from company:', err);
     throw err;
   }
 }
 
 // Funzione per aggiornare l'azienda principale di un utente (CompanyId in AR_Users)
 async function updateUserPrimaryCompany(userId, companyId) {
+  console.log(`[USER_MANAGEMENT] Updating primary company for user ${userId} to ${companyId}`);
   try {
     let pool = await sql.connect(config.dbConfig);
     
@@ -349,11 +393,12 @@ async function updateUserPrimaryCompany(userId, companyId) {
     
     // Se l'associazione non esiste, restituisci un errore
     if (checkResult.recordset[0].count === 0) {
+      console.log(`[USER_MANAGEMENT] User is not associated with company ${companyId}`);
       return { success: false, message: 'L\'utente non è associato a questa azienda' };
     }
     
     // Aggiorna l'azienda principale dell'utente
-    await pool.request()
+    const result = await pool.request()
       .input('userId', sql.Int, userId)
       .input('companyId', sql.Int, companyId)
       .query(`
@@ -362,15 +407,17 @@ async function updateUserPrimaryCompany(userId, companyId) {
         WHERE userId = @userId
       `);
     
+    console.log(`[USER_MANAGEMENT] Primary company updated. Rows affected: ${result.rowsAffected[0]}`);
     return { success: true };
   } catch (err) {
-    console.error('Error updating user primary company:', err);
+    console.error('[USER_MANAGEMENT] Error updating user primary company:', err);
     throw err;
   }
 }
 
 // Funzione per ottenere le aziende associate a un utente tramite username
 async function getUserCompaniesByUsername(username) {
+  console.log(`[USER_MANAGEMENT] Getting companies for username: ${username}`);
   try {
     let pool = await sql.connect(config.dbConfig);
     let result = await pool.request()
@@ -385,9 +432,10 @@ async function getUserCompaniesByUsername(username) {
         AND c.IsActive = 1
         ORDER BY c.Description
       `);
+    console.log(`[USER_MANAGEMENT] Found ${result.recordset.length} companies for username ${username}`);
     return result.recordset;
   } catch (err) {
-    console.error('Error fetching user companies by username:', err);
+    console.error('[USER_MANAGEMENT] Error fetching user companies by username:', err);
     throw err;
   }
 }

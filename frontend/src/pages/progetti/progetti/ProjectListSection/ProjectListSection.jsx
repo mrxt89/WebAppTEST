@@ -166,7 +166,7 @@ const ProjectListSection = ({
   }, [filteredAndSortedProjects, filters, projectStatuses, categories, customers, users]);
 
   // Reset dei filtri
-  const resetFilters = () => {
+  const resetFilters = async () => {
     setFilters(DEFAULT_FILTERS);
     setColumnFilters({
       name: "",
@@ -175,6 +175,22 @@ const ProjectListSection = ({
       endDate: "",
       erpId: "",
     });
+    
+    // Applica automaticamente i filtri dopo il reset
+    try {
+      const projectsData = await fetchProjects(0, 100, {});
+      
+      if (projectsData && projectsData.items) {
+        const pinned = new Set(
+          projectsData.items.filter(p => p.IsPinned).map(p => p.ProjectID)
+        );
+        setPinnedProjects(pinned);
+      }
+      
+      await getUserProjectStatistics().then(setStatistics);
+    } catch (error) {
+      console.error("Error applying filters after reset:", error);
+    }
   };
 
   return (

@@ -4,12 +4,14 @@ const config = require('../config');
 // Nuova funzione: Ottieni stati progetto
 const getProjectStatuses = async () => {
     try {
+        console.log('[PROJECT_MANAGEMENT] Getting project statuses');
         let pool = await sql.connect(config.dbConfig);
         const result = await pool.request()
             .execute('MA_GetProjectStatuses');
+        console.log(`[PROJECT_MANAGEMENT] Retrieved ${result.recordset.length} project statuses`);
         return result.recordset;
     } catch (err) {
-        console.error('Error getting project statuses:', err);
+        console.error('[PROJECT_MANAGEMENT] Error getting project statuses:', err);
         throw err;
     }
 };
@@ -17,7 +19,7 @@ const getProjectStatuses = async () => {
 // Ottieni progetti con paginazione e filtri
 const getPaginatedProjects = async (page = 0, pageSize = 100, filters = {}, userId) => {
     try {
-        console.log('Filters received:', filters); // DEBUG
+        console.log(`[PROJECT_MANAGEMENT] Getting paginated projects for user: ${userId}`, { page, pageSize, filters });
         
         let pool = await sql.connect(config.dbConfig);
         const request = pool.request()
@@ -75,36 +77,36 @@ const getPaginatedProjects = async (page = 0, pageSize = 100, filters = {}, user
         if (filters.taskAssignedTo && Array.isArray(filters.taskAssignedTo) && filters.taskAssignedTo.length > 0) {
             // NON convertire in numeri, mantieni come stringhe
             const jsonString = JSON.stringify(filters.taskAssignedTo);
-            console.log('TaskAssignedTo filter being sent:', jsonString); // DEBUG
             request.input('TaskAssignedTo', sql.NVarChar(sql.MAX), jsonString);
         } else if (filters.taskAssignedTo && typeof filters.taskAssignedTo === 'string' && filters.taskAssignedTo !== '0') {
             const jsonString = JSON.stringify([filters.taskAssignedTo]);
-            console.log('TaskAssignedTo filter (single) being sent:', jsonString); // DEBUG
             request.input('TaskAssignedTo', sql.NVarChar(sql.MAX), jsonString);
         } else {
-            console.log('TaskAssignedTo filter is NULL'); // DEBUG
             request.input('TaskAssignedTo', sql.NVarChar(sql.MAX), null);
         }
 
         // StartDate
         request.input('StartDate', sql.Date, null);
 
-        console.log('About to execute MA_GetPaginatedProjects'); // DEBUG
 
         // Esegui la stored procedure
+        console.log('[PROJECT_MANAGEMENT] Executing MA_GetPaginatedProjects stored procedure');
         const result = await request.execute('MA_GetPaginatedProjects');
 
-        console.log('SP executed, records found:', result.recordset.length); // DEBUG
+        const totalRecords = result.recordset.length > 0 ? result.recordset[0].TotalRecords : 0;
+        const totalPages = Math.ceil(totalRecords / pageSize);
+        
+        console.log(`[PROJECT_MANAGEMENT] Retrieved ${result.recordset.length} projects, total: ${totalRecords}, pages: ${totalPages}`);
 
         return {
             items: result.recordset,
-            total: result.recordset.length > 0 ? result.recordset[0].TotalRecords : 0,
+            total: totalRecords,
             page,
             pageSize,
-            totalPages: Math.ceil((result.recordset.length > 0 ? result.recordset[0].TotalRecords : 0) / pageSize)
+            totalPages: totalPages
         };
     } catch (err) {
-        console.error('Error in getPaginatedProjects:', err);
+        console.error('[PROJECT_MANAGEMENT] Error in getPaginatedProjects:', err);
         throw err;
     }
 };
@@ -112,105 +114,116 @@ const getPaginatedProjects = async (page = 0, pageSize = 100, filters = {}, user
 // Ottieni dettagli progetto con task e membri
 const getProjectById = async (projectId, userId, includeDisabled = false) => {
     try {
+        console.log(`[PROJECT_MANAGEMENT] Getting project by ID: ${projectId} for user: ${userId}, includeDisabled: ${includeDisabled}`);
         let pool = await sql.connect(config.dbConfig);
         const result = await pool.request()
             .input('ProjectID', sql.Int, projectId)
             .input('UserId', sql.Int, userId)
             .input('IncludeDisabled', sql.Bit, includeDisabled)  // Nuovo parametro
             .execute('MA_GetProjectById');
-
-        const project = result.recordsets[0][0];
-        if (project) {
-            project.members = result.recordsets[1];
-            project.tasks = result.recordsets[2];
+        
+        if (result.recordset.length === 0) {
+            console.log(`[PROJECT_MANAGEMENT] Project not found: ${projectId}`);
+        } else {
+            console.log(`[PROJECT_MANAGEMENT] Project found: ${result.recordset[0].Title}`);
         }
         
-        return project;
+        return result.recordset[0];
     } catch (err) {
-        console.error('Error in getProjectById:', err);
+        console.error('[PROJECT_MANAGEMENT] Error getting project by ID:', err);
         throw err;
     }
 };
 
-// Nuova funzione per disabilitare/riabilitare task
+// Disabilita/abilita task
 const toggleTaskDisabled = async (taskId, userId, disable = true) => {
     try {
+        console.log(`[PROJECT_MANAGEMENT] Toggling task disabled: ${taskId} -> ${disable ? 'disabled' : 'enabled'} by user: ${userId}`);
         let pool = await sql.connect(config.dbConfig);
         const result = await pool.request()
             .input('TaskID', sql.Int, taskId)
-            .input('UserID', sql.Int, userId)
-            .input('Disable', sql.Bit, disable)
+            .input('UserId', sql.Int, userId)
+            .input('Disabled', sql.Bit, disable)
             .execute('MA_ToggleTaskDisabled');
-
+        
+        console.log(`[PROJECT_MANAGEMENT] Task disabled status updated. Rows affected: ${result.rowsAffected[0]}`);
         return result.recordset[0];
     } catch (err) {
-        console.error('Error in toggleTaskDisabled:', err);
+        console.error('[PROJECT_MANAGEMENT] Error toggling task disabled:', err);
         throw err;
     }
 };
 
-// Crea o aggiorna progetto
+// Aggiungi o aggiorna progetto
 const addUpdateProject = async (projectData, userId) => {
     try {
+        const action = projectData.ProjectID ? 'UPDATE' : 'INSERT';
+        console.log(`[PROJECT_MANAGEMENT] ${action} project for user: ${userId}`, { 
+            projectId: projectData.ProjectID, 
+            title: projectData.Title,
+            status: projectData.Status 
+        });
+        
         let pool = await sql.connect(config.dbConfig);
         const request = pool.request();
-
-        // Mapping dei campi con i tipi SQL
-        const fieldMappings = {
-            ProjectID: { type: sql.Int },
-            Name: { type: sql.NVarChar },
-            Description: { type: sql.NVarChar(sql.MAX) },
-            StartDate: { type: sql.Date },
-            EndDate: { type: sql.Date },
-            Status: { type: sql.VarChar(5) }, // Aggiornato a VARCHAR(5)
-            UserId: { type: sql.Int },
-            ProjectCategoryId: { type: sql.Int },
-            ProjectCategoryDetailLine: { type: sql.Int },
-            Disabled : { type: sql.Int },
-            CustSupp : { type: sql.Int }, // CustSupp INT
-            ProjectErpID : { type: sql.NVarChar },
-            TemplateID : { type: sql.Int },
-            UseStages : { type: sql.Bit } // AGGIUNTO UseStages
-        };
-
-        // Aggiunge i parametri per i campi presenti
-        Object.keys(projectData).forEach(key => {
-            if (fieldMappings[key]) {
-                request.input(key, fieldMappings[key].type, projectData[key]);
-            }
-        });
-
+        
+        // Mappatura dei parametri
+        request.input('ProjectID', sql.Int, projectData.ProjectID || null);
+        request.input('Title', sql.NVarChar, projectData.Title);
+        request.input('Description', sql.NVarChar(sql.MAX), projectData.Description);
+        request.input('Status', sql.VarChar, projectData.Status);
+        request.input('StartDate', sql.Date, projectData.StartDate ? new Date(projectData.StartDate) : null);
+        request.input('EndDate', sql.Date, projectData.EndDate ? new Date(projectData.EndDate) : null);
+        request.input('CustSupp', sql.Int, projectData.CustSupp || null);
+        request.input('CategoryId', sql.Int, projectData.CategoryId || null);
         request.input('UserId', sql.Int, userId);
+        request.input('ProjectErpID', sql.NVarChar(20), projectData.ProjectErpID || null);
+        request.input('Budget', sql.Decimal(18, 2), projectData.Budget || null);
+        request.input('Priority', sql.VarChar(20), projectData.Priority || 'Medium');
+        request.input('ManagerId', sql.Int, projectData.ManagerId || null);
 
         const result = await request.execute('MA_AddUpdateProject');
+        
+        console.log(`[PROJECT_MANAGEMENT] Project ${action.toLowerCase()}d successfully. Project ID: ${result.recordset[0].ProjectID}`);
         return result.recordset[0];
     } catch (err) {
-        console.error('Error in addUpdateProject:', err);
+        console.error('[PROJECT_MANAGEMENT] Error adding/updating project:', err);
         throw err;
     }
 };
 
-// Aggiorna membri del progetto
+// Aggiorna membri progetto
 const updateProjectMembers = async (projectId, userId, members) => {
     try {
+        console.log(`[PROJECT_MANAGEMENT] Updating project members for project: ${projectId} by user: ${userId}`, { memberCount: members.length });
+        
         let pool = await sql.connect(config.dbConfig);
-        const result = await pool.request()
-            .input('ProjectID', sql.Int, projectId)
-            .input('UserId', sql.Int, userId)
-            .input('MembersJson', sql.NVarChar(sql.MAX), JSON.stringify(members))
-            .execute('MA_UpdateProjectMembers');
+        const request = pool.request();
+        request.input('ProjectID', sql.Int, projectId);
+        request.input('UserId', sql.Int, userId);
+        request.input('Members', sql.NVarChar(sql.MAX), JSON.stringify(members));
 
+        const result = await request.execute('MA_UpdateProjectMembers');
+        
+        console.log(`[PROJECT_MANAGEMENT] Project members updated successfully. Rows affected: ${result.rowsAffected[0]}`);
         return result.recordset[0];
     } catch (err) {
-        console.error('Error in updateProjectMembers:', err);
+        console.error('[PROJECT_MANAGEMENT] Error updating project members:', err);
         throw err;
     }
 };
 
-// Aggiungi o aggiorna task
-// Modifica la funzione esistente per gestire il nuovo parametro
+// Aggiungi o aggiorna task progetto
 const addUpdateProjectTask = async (taskData, userId) => {
     try {
+        const action = taskData.TaskID ? 'UPDATE' : 'INSERT';
+        console.log(`[PROJECT_MANAGEMENT] ${action} project task for user: ${userId}`, { 
+            taskId: taskData.TaskID, 
+            projectId: taskData.ProjectID,
+            title: taskData.Title,
+            status: taskData.Status 
+        });
+        
         let pool = await sql.connect(config.dbConfig);
         const request = pool.request();
 
@@ -230,136 +243,107 @@ const addUpdateProjectTask = async (taskData, userId) => {
         request.input('PredecessorTasks', sql.NVarChar(sql.MAX), taskData.PredecessorTasks ? taskData.PredecessorTasks : null); // Nuovo parametro
 
         const result = await request.execute('MA_AddUpdateProjectTask');
-        console.log("[DEBUG] Result:", result.recordset[0]);
+        
+        console.log(`[PROJECT_MANAGEMENT] Task ${action.toLowerCase()}d successfully. Task ID: ${result.recordset[0].TaskID}`);
         return result.recordset[0];
     } catch (err) {
-        console.error('Error in addUpdateProjectTask:', err);
+        console.error('[PROJECT_MANAGEMENT] Error in addUpdateProjectTask:', err);
         throw err;
     }
 };
 
-// Aggiorna stato task
+// Aggiorna status task
 const updateTaskStatus = async (taskId, status, userId) => {
     try {
+        console.log(`[PROJECT_MANAGEMENT] Updating task status: ${taskId} -> ${status} by user: ${userId}`);
+        
         let pool = await sql.connect(config.dbConfig);
         const result = await pool.request()
             .input('TaskID', sql.Int, taskId)
             .input('Status', sql.VarChar, status)
             .input('UserId', sql.Int, userId)
             .execute('MA_UpdateTaskStatus');
-
+        
+        console.log(`[PROJECT_MANAGEMENT] Task status updated successfully. Rows affected: ${result.rowsAffected[0]}`);
         return result.recordset[0];
     } catch (err) {
-        console.error('Error in updateTaskStatus:', err);
+        console.error('[PROJECT_MANAGEMENT] Error updating task status:', err);
         throw err;
     }
 };
 
-// Aggiungi commento
+// Aggiungi commento task
 const addTaskComment = async (commentData) => {
     try {
+        console.log(`[PROJECT_MANAGEMENT] Adding task comment for task: ${commentData.TaskID} by user: ${commentData.UserId}`);
+        
         let pool = await sql.connect(config.dbConfig);
         const result = await pool.request()
-            .input('TaskID', sql.Int, commentData.TaskId)
-            .input('UserID', sql.Int, commentData.UserId)
+            .input('TaskID', sql.Int, commentData.TaskID)
             .input('Comment', sql.NVarChar(sql.MAX), commentData.Comment)
+            .input('UserId', sql.Int, commentData.UserId)
             .execute('MA_AddTaskComment');
-
+        
+        console.log(`[PROJECT_MANAGEMENT] Task comment added successfully. Comment ID: ${result.recordset[0].CommentID}`);
         return result.recordset[0];
     } catch (err) {
-        console.error('Error in addTaskComment:', err);
+        console.error('[PROJECT_MANAGEMENT] Error adding task comment:', err);
         throw err;
     }
 };
 
-// Aggiungi allegato
+// Aggiungi allegato task
 const addTaskAttachment = async (attachmentData) => {
     try {
+        console.log(`[PROJECT_MANAGEMENT] Adding task attachment for task: ${attachmentData.TaskID} by user: ${attachmentData.UserId}`);
+        
         let pool = await sql.connect(config.dbConfig);
         const result = await pool.request()
             .input('TaskID', sql.Int, attachmentData.TaskID)
-            .input('FileName', sql.NVarChar, attachmentData.FileName)
-            .input('FilePath', sql.NVarChar, attachmentData.FilePath)
-            .input('FileType', sql.NVarChar, attachmentData.FileType)
-            .input('FileSizeKB', sql.Int, attachmentData.FileSizeKB)
-            .input('UploadedBy', sql.Int, attachmentData.UploadedBy)
+            .input('FileName', sql.NVarChar(255), attachmentData.FileName)
+            .input('FilePath', sql.NVarChar(sql.MAX), attachmentData.FilePath)
+            .input('FileSize', sql.Int, attachmentData.FileSize)
+            .input('UserId', sql.Int, attachmentData.UserId)
             .execute('MA_AddTaskAttachment');
-
+        
+        console.log(`[PROJECT_MANAGEMENT] Task attachment added successfully. Attachment ID: ${result.recordset[0].AttachmentID}`);
         return result.recordset[0];
     } catch (err) {
-        console.error('Error in addTaskAttachment:', err);
+        console.error('[PROJECT_MANAGEMENT] Error adding task attachment:', err);
         throw err;
     }
 };
 
-// Ottieni statistiche progetto per utente
+// Ottieni statistiche progetto utente
 const getUserProjectStatistics = async (userId, filters = {}) => {
     try {
+        console.log(`[PROJECT_MANAGEMENT] Getting project statistics for user: ${userId}`, filters);
+        
         let pool = await sql.connect(config.dbConfig);
         const request = pool.request()
             .input('UserId', sql.Int, userId);
 
-        // Status - ora supporta array
-        if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
-            request.input('Status', sql.NVarChar(sql.MAX), JSON.stringify(filters.status));
-        } else if (filters.status && typeof filters.status === 'string' && filters.status !== 'all') {
-            request.input('Status', sql.NVarChar(sql.MAX), JSON.stringify([filters.status]));
-        } else {
-            request.input('Status', sql.NVarChar(sql.MAX), null);
+        // Applica filtri se forniti
+        if (filters.status) {
+            request.input('Status', sql.VarChar, filters.status);
         }
-
-        // CategoryId - ora supporta array
-        if (filters.categoryId && Array.isArray(filters.categoryId) && filters.categoryId.length > 0) {
-            const categoryIds = filters.categoryId.map(id => parseInt(id));
-            request.input('CategoryId', sql.NVarChar(sql.MAX), JSON.stringify(categoryIds));
-        } else if (filters.categoryId && typeof filters.categoryId === 'string' && filters.categoryId !== '0') {
-            request.input('CategoryId', sql.NVarChar(sql.MAX), JSON.stringify([parseInt(filters.categoryId)]));
-        } else {
-            request.input('CategoryId', sql.NVarChar(sql.MAX), null);
+        if (filters.categoryId) {
+            request.input('CategoryId', sql.Int, filters.categoryId);
         }
-
-        // CustSupp
-        if (filters.custSupp) {
-            request.input('CustSupp', sql.Int, filters.custSupp);
-        } else {
-            request.input('CustSupp', sql.Int, null);
+        if (filters.dateFrom) {
+            request.input('DateFrom', sql.Date, new Date(filters.dateFrom));
         }
-
-        // SearchText
-        if (filters.searchText?.trim()) {
-            request.input('SearchText', sql.NVarChar(100), filters.searchText.trim());
-        } else {
-            request.input('SearchText', sql.NVarChar(100), null);
-        }
-
-        // ProjectErpID
-        if (filters.projectErpId?.trim()) {
-            request.input('ProjectErpID', sql.NVarChar(20), filters.projectErpId.trim());
-        } else {
-            request.input('ProjectErpID', sql.NVarChar(20), null);
-        }
-
-        // TaskAssignedTo - ora supporta array
-        if (filters.taskAssignedTo && Array.isArray(filters.taskAssignedTo) && filters.taskAssignedTo.length > 0) {
-            const userIds = filters.taskAssignedTo.map(id => parseInt(id));
-            request.input('TaskAssignedTo', sql.NVarChar(sql.MAX), JSON.stringify(userIds));
-        } else if (filters.taskAssignedTo && typeof filters.taskAssignedTo === 'string' && filters.taskAssignedTo !== '0') {
-            request.input('TaskAssignedTo', sql.NVarChar(sql.MAX), JSON.stringify([parseInt(filters.taskAssignedTo)]));
-        } else {
-            request.input('TaskAssignedTo', sql.NVarChar(sql.MAX), null);
+        if (filters.dateTo) {
+            request.input('DateTo', sql.Date, new Date(filters.dateTo));
         }
 
         const result = await request.execute('MA_GetUserProjectStatistics');
-
-        return {
-            activeProjects: result.recordset[0].ActiveProjects,
-            activeTasks: result.recordset[0].ActiveTasks,
-            delayedProjects: result.recordset[0].DelayedProjects,
-            delayedTasks: result.recordset[0].DelayedTasks
-        };
+        
+        console.log(`[PROJECT_MANAGEMENT] Retrieved project statistics for user ${userId}`);
+        return result.recordset[0];
     } catch (err) {
-        console.error('Error in getUserProjectStatistics:', err);
-        throw new Error('Error fetching project statistics');
+        console.error('[PROJECT_MANAGEMENT] Error getting user project statistics:', err);
+        throw err;
     }
 };
 

@@ -109,6 +109,12 @@ const ProjectFilters = ({
                 })) || []}
                 value={filters.status}
                 onChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyFiltersImmediately();
+                  }
+                }}
                 placeholder="Seleziona stati..."
                 renderOption={(option) => (
                   <div className="flex items-center gap-2">
@@ -131,6 +137,12 @@ const ProjectFilters = ({
                 })) || []}
                 value={filters.categoryId}
                 onChange={(value) => setFilters(prev => ({ ...prev, categoryId: value }))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyFiltersImmediately();
+                  }
+                }}
                 placeholder="Seleziona categorie..."
                 renderOption={(option) => (
                   <div className="flex items-center gap-2">
@@ -153,6 +165,12 @@ const ProjectFilters = ({
                 onChange={(value) =>
                   setFilters(prev => ({ ...prev, custSupp: value }))
                 }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyFiltersImmediately();
+                  }
+                }}
                 projectCustomers={customers}
                 loading={loadingCustomers}
               />
@@ -168,6 +186,12 @@ const ProjectFilters = ({
                   }))}
                 value={filters.taskAssignedTo}
                 onChange={(value) => setFilters(prev => ({ ...prev, taskAssignedTo: value }))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyFiltersImmediately();
+                  }
+                }}
                 placeholder="Seleziona utenti..."
                 searchable={true}
               />
@@ -176,10 +200,10 @@ const ProjectFilters = ({
 
           <div className="grid grid-cols-2 gap-2">
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
               <Input
                 placeholder="Cerca..."
-                className="pl-8 h-8"
+                className="pl-10 h-8"
                 value={filters.searchText}
                 onChange={(e) =>
                   setFilters(prev => ({

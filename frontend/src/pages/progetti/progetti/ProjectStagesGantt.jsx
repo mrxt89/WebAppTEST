@@ -1055,7 +1055,7 @@ const ProjectStagesGantt = ({
                   className="h-8 w-[150px] pl-8 pr-2"
                   disabled={isLoading}
                 />
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               </div>
 
               <Button

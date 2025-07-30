@@ -77,14 +77,11 @@ const validateCode = async (companyId, itemCode) => {
         request.output('ErrorMessage', sql.NVarChar(500));
 
         const result = await request.execute('MA_CodingRules_ValidateCode');
-        console.log('Risultato validateCode:', result);
         
         // Accedi ai parametri di output dal risultato
         const outputParams = result.output;
         const isValid = outputParams.IsValid;
         const errorMessage = outputParams.ErrorMessage;
-        
-        console.log('Valori output:', { isValid, errorMessage });
         
         // Se ancora null, prova con un approccio alternativo
         if (isValid === null || isValid === undefined) {
@@ -106,7 +103,7 @@ const validateCode = async (companyId, itemCode) => {
                 SELECT @IsValid AS IsValid, @ErrorMessage AS ErrorMessage;
             `);
             
-            console.log('Risultato query alternativa:', queryResult.recordset);
+
             
             if (queryResult.recordset && queryResult.recordset.length > 0) {
                 const row = queryResult.recordset[0];
@@ -138,7 +135,7 @@ const applyBatchRecoding = async (companyId, userId, items) => {
     try {
         let pool = await sql.connect(config.dbConfig);
         
-        console.log('Items ricevuti:', JSON.stringify(items, null, 2));
+
         
         // Create TVP (Table-Valued Parameter)
         const tvp = new sql.Table('MA_CodingRules_ItemsToRecode');
@@ -163,13 +160,7 @@ const applyBatchRecoding = async (companyId, userId, items) => {
                     item.UseExistingArticleId) : 
                 null;
 
-            console.log('Aggiungendo riga TVP:', {
-                ItemId: item.ItemId,
-                OldCode: item.OldCode,
-                NewCode: item.NewCode,
-                UseExistingArticleId: useExistingArticleId,
-                ReplaceWithExisting: item.ReplaceWithExisting ? 1 : 0
-            });
+
 
             tvp.rows.add(
                 item.ItemId,
@@ -187,7 +178,7 @@ const applyBatchRecoding = async (companyId, userId, items) => {
             );
         });
 
-        console.log('TVP rows count:', tvp.rows.length);
+
 
         const request = pool.request();
         request.input('CompanyId', sql.Int, companyId);
@@ -196,8 +187,6 @@ const applyBatchRecoding = async (companyId, userId, items) => {
         request.output('SuccessCount', sql.Int);
         request.output('ErrorCount', sql.Int);
 
-        console.log('Eseguendo stored procedure MA_CodingRules_ApplyBatch...');
-        
         // Esegui la stored procedure
         const result = await request.execute('MA_CodingRules_ApplyBatch');
         
@@ -205,11 +194,8 @@ const applyBatchRecoding = async (companyId, userId, items) => {
         let successCount = request.parameters.SuccessCount.value || 0;
         let errorCount = request.parameters.ErrorCount.value || 0;
         
-        console.log('Risultato SP:', { successCount, errorCount });
-        
         // Se abbiamo 0 successi e 0 errori ma abbiamo items, verifica manualmente
         if (successCount === 0 && errorCount === 0 && items.length > 0) {
-            console.log('ATTENZIONE: La stored procedure non ha restituito contatori. Verifico manualmente...');
             
             // Conta manualmente i successi verificando le modifiche nel database
             let manualSuccessCount = 0;
@@ -233,7 +219,6 @@ const applyBatchRecoding = async (companyId, userId, items) => {
                         
                         if (checkResult.recordset[0].Count > 0) {
                             manualSuccessCount++;
-                            console.log(`Componente ${item.ItemId} sostituito con successo`);
                         }
                     } else {
                         // Verifica se il codice è stato aggiornato
@@ -249,7 +234,6 @@ const applyBatchRecoding = async (companyId, userId, items) => {
                         
                         if (checkResult.recordset[0].Count > 0) {
                             manualSuccessCount++;
-                            console.log(`Articolo ${item.ItemId} ricodificato con successo`);
                         }
                     }
                 } catch (checkError) {
@@ -261,7 +245,6 @@ const applyBatchRecoding = async (companyId, userId, items) => {
             if (manualSuccessCount > 0) {
                 successCount = manualSuccessCount;
                 errorCount = items.length - manualSuccessCount;
-                console.log(`Contatori manuali: successi=${successCount}, errori=${errorCount}`);
             }
         }
         
@@ -286,7 +269,6 @@ const applyBatchRecoding = async (companyId, userId, items) => {
         
         // Se la stored procedure non esiste, proviamo l'approccio alternativo
         if (err.message.includes('Could not find stored procedure')) {
-            console.log('Stored procedure non trovata, usando approccio alternativo...');
             return await applyBatchRecodingAlternative(companyId, userId, items);
         }
         
@@ -296,7 +278,6 @@ const applyBatchRecoding = async (companyId, userId, items) => {
 
 // Funzione alternativa che non usa stored procedure
 const applyBatchRecodingAlternative = async (companyId, userId, items) => {
-    console.log('Usando approccio alternativo per ricodifica...');
     
     let pool = await sql.connect(config.dbConfig);
     const transaction = new sql.Transaction(pool);
@@ -312,8 +293,6 @@ const applyBatchRecodingAlternative = async (companyId, userId, items) => {
         for (const item of items) {
             try {
                 if (item.ReplaceWithExisting && item.UseExistingArticleId) {
-                    console.log(`Sostituendo componente ${item.ItemId} con articolo esistente ${item.UseExistingArticleId}`);
-                    
                     // 1. Aggiorna tutti i riferimenti nelle distinte
                     const updateComponentsRequest = new sql.Request(transaction);
                     const updateResult = await updateComponentsRequest
@@ -329,8 +308,6 @@ const applyBatchRecodingAlternative = async (companyId, userId, items) => {
                             AND CompanyId = @CompanyId
                         `);
                     
-                    console.log(`Componenti in distinta aggiornati: ${updateResult.rowsAffected[0]}`);
-                    
                     // 2. Aggiorna le associazioni progetti-articoli
                     const updateProjectsRequest = new sql.Request(transaction);
                     const projectsResult = await updateProjectsRequest
@@ -343,8 +320,6 @@ const applyBatchRecodingAlternative = async (companyId, userId, items) => {
                             WHERE ItemId = @OldItemId 
                             AND CompanyId = @CompanyId
                         `);
-                    
-                    console.log(`Associazioni progetti aggiornate: ${projectsResult.rowsAffected[0]}`);
                     
                     // 3. Disabilita l'articolo vecchio
                     const disableRequest = new sql.Request(transaction);
@@ -377,7 +352,6 @@ const applyBatchRecodingAlternative = async (companyId, userId, items) => {
                     
                 } else {
                     // Ricodifica normale
-                    console.log(`Ricodificando articolo ${item.ItemId} da ${item.OldCode} a ${item.NewCode}`);
                     
                     // Prima verifica se il nuovo codice è già in uso
                     const checkRequest = new sql.Request(transaction);
@@ -483,7 +457,7 @@ const applyBatchRecodingAlternative = async (companyId, userId, items) => {
                             END
                         `);
                 } catch (historyError) {
-                    console.log('Tabella history non trovata o errore nel log:', historyError.message);
+                    // Tabella history non trovata o errore nel log
                 }
                 
             } catch (itemError) {
@@ -505,8 +479,6 @@ const applyBatchRecodingAlternative = async (companyId, userId, items) => {
         }
         
         await transaction.commit();
-        
-        console.log(`Ricodifica completata: ${successCount} successi, ${errorCount} errori`);
         
         return {
             success: 1,
