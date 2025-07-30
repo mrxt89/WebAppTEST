@@ -117,12 +117,13 @@ router.get('/projects/:id', authenticateToken, async (req, res) => {
 router.post('/projects', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.UserId;
+        const companyId = req.user.CompanyId;
         const projectData = {
             ...req.body,
             TBCreatedId: userId
         };
         
-        const result = await addUpdateProject(projectData, userId);
+        const result = await addUpdateProject(projectData, userId, companyId);
         res.json(result);
     } catch (err) {
         console.error('Error in project creation/update:', err);
