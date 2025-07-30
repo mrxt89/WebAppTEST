@@ -1,7 +1,8 @@
-// BOMViewer/components/BOMHeader.jsx - Versione modificata con supporto per BOMHeaderEdit
+// BOMViewer/components/BOMHeader.jsx - Versione con ricodifica diretta
 import React, { useEffect, useState, useRef } from "react";
 import { useBOMViewer } from "../context/BOMViewerContext";
 import BOMHeaderEdit from "./BOMHeaderEdit";
+import RecodingWizard from "./codingRules/RecodingWizard";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -19,6 +20,9 @@ import {
   AlertCircle,
   Code,
   Replace,
+  Package,
+  Layers,
+  CheckCircle,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { swal } from "@/lib/common";
@@ -63,6 +67,8 @@ const BOMHeader = () => {
     addComponent,
     getERPItems,
     getAvailableItems,
+    selectedComponents,
+    project,
   } = useBOMViewer();
 
   const [isCreating, setIsCreating] = useState(false);
@@ -82,6 +88,11 @@ const BOMHeader = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [erpItems, setErpItems] = useState([]);
   const [projectItems, setProjectItems] = useState([]);
+  
+  // NUOVO: Stati per ricodifica diretta
+  const [showRecodeOptionsDialog, setShowRecodeOptionsDialog] = useState(false);
+  const [recodingWizardOpen, setRecodingWizardOpen] = useState(false);
+  const [recodingItems, setRecodingItems] = useState([]);
 
   // Stato per l'inserimento manuale
   const [manualData, setManualData] = useState({
@@ -110,6 +121,150 @@ const BOMHeader = () => {
   const findParentComponent = () => {
     // Implementazione come nell'originale
     // ...
+  };
+  
+  // NUOVO: Handler per ricodifica diretta articolo principale
+  const handleDirectRecodeRoot = () => {
+    // Verifica se l'articolo è bloccato
+    if (item?.stato_erp === 1) {
+      toast({
+        title: "Articolo bloccato",
+        description: "L'articolo principale è presente in ERP e non può essere ricodificato",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Crea oggetto per l'articolo principale
+    const rootComponent = {
+      id: `component-${item.Id}-0`,
+      type: "component",
+      data: {
+        ComponentId: item.Id,
+        ComponentItemCode: item.Item,
+        Item: item.Item,
+        Description: item.Description,
+        Level: 0,
+        IsRoot: true,
+        Nature: item.Nature || 22413312,
+        BaseUoM: item.BaseUoM || "PZ",
+        stato_erp: item.stato_erp || 0
+      }
+    };
+
+    setRecodingItems([rootComponent]);
+    setRecodingWizardOpen(true);
+    setShowRecodeOptionsDialog(false);
+  };
+  
+  // NUOVO: Handler per ricodifica tutti i componenti
+  const handleRecodeAll = async () => {
+    // Prendi tutti i componenti ricodificabili
+    const recodableComponents = bomComponents
+      .filter(c => c.stato_erp !== 1)
+      .map(c => ({
+        id: `component-${c.ComponentId}-${c.Line}`,
+        type: "component",
+        data: c
+      }));
+    
+    if (recodableComponents.length === 0) {
+      toast({
+        title: "Nessun componente ricodificabile",
+        description: "Tutti i componenti sono bloccati o presenti in ERP",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Se l'articolo principale è ricodificabile, aggiungilo
+    if (item?.stato_erp !== 1) {
+      const rootComponent = {
+        id: `component-${item.Id}-0`,
+        type: "component",
+        data: {
+          ComponentId: item.Id,
+          ComponentItemCode: item.Item,
+          Item: item.Item,
+          Description: item.Description,
+          Level: 0,
+          IsRoot: true,
+          Nature: item.Nature || 22413312,
+          BaseUoM: item.BaseUoM || "PZ",
+          stato_erp: item.stato_erp || 0
+        }
+      };
+      recodableComponents.unshift(rootComponent);
+    }
+    
+    setRecodingItems(recodableComponents);
+    setRecodingWizardOpen(true);
+    setShowRecodeOptionsDialog(false);
+  };
+  
+  // Handler per ricodifica componenti selezionati (già esistente, lo spostiamo qui)
+  const handleRecodeSelected = async () => {
+    if (!selectedComponents || selectedComponents.length === 0) {
+      toast({
+        title: "Nessun componente selezionato",
+        description: "Seleziona almeno un componente da ricodificare",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Verifica componenti bloccati
+    const lockedComponents = selectedComponents.filter(c => 
+      c.data && c.data.stato_erp === 1
+    );
+    
+    if (lockedComponents.length > 0) {
+      const result = await swal.fire({
+        title: "Attenzione",
+        html: `
+          <p><strong>${lockedComponents.length} componenti</strong> sono presenti in ERP e non possono essere ricodificati.</p>
+          <p>Vuoi procedere con i rimanenti <strong>${selectedComponents.length - lockedComponents.length} componenti</strong>?</p>
+        `,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Procedi",
+        cancelButtonText: "Annulla",
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+      });
+
+      if (!result.isConfirmed) {
+        return;
+      }
+    }
+
+    // Filtra solo i componenti ricodificabili
+    const recodableComponents = selectedComponents.filter(c => 
+      c.data && c.data.stato_erp !== 1
+    );
+
+    if (recodableComponents.length === 0) {
+      toast({
+        title: "Nessun componente ricodificabile",
+        description: "Tutti i componenti selezionati sono bloccati",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setRecodingItems(recodableComponents);
+    setRecodingWizardOpen(true);
+  };
+  
+  // NUOVO: Handler per applicazione ricodifica
+  const handleApplyRecoding = async (result) => {
+    // Chiudi il wizard
+    setRecodingWizardOpen(false);
+    
+    // Reset items
+    setRecodingItems([]);
+    
+    // Il refresh è già stato fatto dal wizard tramite smartRefresh
   };
 
   // Reset completo quando cambia item
@@ -880,6 +1035,34 @@ const BOMHeader = () => {
                Aggiungi
              </Button>
 
+             {/* NUOVO: Pulsante Ricodifica diretto */}
+             <Button
+               size="sm"
+               variant="outline"
+               onClick={() => {
+                 // Se ci sono componenti selezionati, ricodifica quelli
+                 if (selectedComponents && selectedComponents.length > 0) {
+                   handleRecodeSelected();
+                 } else {
+                   // Altrimenti mostra opzioni
+                   setShowRecodeOptionsDialog(true);
+                 }
+               }}
+               disabled={loading || item?.stato_erp === 1}
+               className="h-8 bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-300"
+               title={selectedComponents && selectedComponents.length > 0 
+                 ? `Ricodifica ${selectedComponents.length} componenti selezionati`
+                 : "Ricodifica articolo"}
+             >
+               <Code className="h-4 w-4 mr-1" />
+               Ricodifica
+               {selectedComponents && selectedComponents.length > 0 && (
+                 <Badge variant="secondary" className="ml-1 h-5 px-1 text-xs">
+                   {selectedComponents.length}
+                 </Badge>
+               )}
+             </Button>
+
              <Button
                size="sm"
                variant="outline"
@@ -1173,6 +1356,81 @@ const BOMHeader = () => {
          </DialogFooter>
        </DialogContent>
      </Dialog>
+     
+     {/* NUOVO: Dialog per opzioni di ricodifica */}
+     <Dialog open={showRecodeOptionsDialog} onOpenChange={setShowRecodeOptionsDialog}>
+       <DialogContent className="sm:max-w-[400px]">
+         <DialogHeader>
+           <DialogTitle>Scegli cosa ricodificare</DialogTitle>
+         </DialogHeader>
+
+         <div className="py-4 space-y-4">
+           <div
+             className="p-3 border rounded-md cursor-pointer hover:bg-gray-50"
+             onClick={handleDirectRecodeRoot}
+           >
+             <div className="flex items-center gap-2 font-medium text-purple-600">
+               <Package className="h-4 w-4" />
+               Solo articolo principale
+             </div>
+             <p className="text-sm text-gray-500 mt-1">
+               Ricodifica solo {item?.Item}
+             </p>
+           </div>
+
+           <div
+             className="p-3 border rounded-md cursor-pointer hover:bg-gray-50"
+             onClick={handleRecodeAll}
+           >
+             <div className="flex items-center gap-2 font-medium text-blue-600">
+               <Layers className="h-4 w-4" />
+               Tutti i componenti
+             </div>
+             <p className="text-sm text-gray-500 mt-1">
+               Ricodifica articolo principale e tutti i componenti modificabili
+             </p>
+           </div>
+
+           {selectedComponents && selectedComponents.length > 0 && (
+             <div
+               className="p-3 border rounded-md cursor-pointer hover:bg-gray-50"
+               onClick={() => {
+                 handleRecodeSelected();
+                 setShowRecodeOptionsDialog(false);
+               }}
+             >
+               <div className="flex items-center gap-2 font-medium text-green-600">
+                 <CheckCircle className="h-4 w-4" />
+                 Componenti selezionati ({selectedComponents.length})
+               </div>
+               <p className="text-sm text-gray-500 mt-1">
+                 Ricodifica solo i componenti attualmente selezionati
+               </p>
+             </div>
+           )}
+         </div>
+
+         <DialogFooter>
+           <Button variant="outline" onClick={() => setShowRecodeOptionsDialog(false)}>
+             Annulla
+           </Button>
+         </DialogFooter>
+       </DialogContent>
+     </Dialog>
+
+     {/* Wizard ricodifica */}
+     {recodingWizardOpen && (
+       <RecodingWizard
+         items={recodingItems}
+         companyId={project?.CompanyId || 1}
+         userId={1} // TODO: Prendere dall'autenticazione
+         onClose={() => {
+           setRecodingWizardOpen(false);
+           setRecodingItems([]);
+         }}
+         onApply={handleApplyRecoding}
+       />
+     )}
    </>
  );
 };
