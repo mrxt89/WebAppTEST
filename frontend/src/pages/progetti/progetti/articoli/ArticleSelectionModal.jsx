@@ -88,7 +88,7 @@ const ArticleSelectionModal = ({
   const [selectedItemForWizard, setSelectedItemForWizard] = useState(null);
   const [wizardSource, setWizardSource] = useState(null); // 'temporary' o 'defined'
 
-  // Hook per le azioni API - CORREZIONE: rimuovere projectArticlesActions
+  // Hook per le azioni API
   const { 
     getAvailableItems, 
     getERPItemsPaginated, 
@@ -236,14 +236,14 @@ const ArticleSelectionModal = ({
     setShowBOMWizard(true);
   };
 
-  // Gestione conferma dal wizard - CORREZIONE
+  // Gestione conferma dal wizard
   const handleWizardConfirm = async (importData) => {
     try {
       setShowBOMWizard(false);
       
       console.log('Wizard confirm - Import data:', importData);
       
-      // CORREZIONE: Usa importERPItemWithSelection direttamente, non projectArticlesActions
+      // Usa importERPItemWithSelection direttamente
       const result = await importERPItemWithSelection(
         project.ProjectID,
         importData
@@ -278,6 +278,17 @@ const ArticleSelectionModal = ({
         variant: "destructive",
       });
     }
+  };
+
+  // Gestione chiusura del wizard
+  const handleWizardClose = () => {
+    // Reset stati del wizard
+    setShowBOMWizard(false);
+    setSelectedItemForWizard(null);
+    setWizardSource(null);
+    
+    // IMPORTANTE: NON chiudere il modal principale
+    // L'utente può continuare a selezionare altri articoli
   };
 
   // Gestione del cambio tab
@@ -616,11 +627,7 @@ const ArticleSelectionModal = ({
       {/* Wizard per l'importazione della distinta */}
       <BOMImportWizard
         isOpen={showBOMWizard}
-        onClose={() => {
-          setShowBOMWizard(false);
-          setSelectedItemForWizard(null);
-          setWizardSource(null);
-        }}
+        onClose={handleWizardClose}
         sourceItem={selectedItemForWizard}
         onConfirm={handleWizardConfirm}
         project={project}

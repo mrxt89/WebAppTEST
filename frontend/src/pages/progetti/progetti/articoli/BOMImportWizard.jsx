@@ -78,9 +78,12 @@ const BOMImportWizard = ({
         }
       );
 
+      console.log('BOM data loaded:', data);
+
       if (data) {
         // Costruisci la struttura ad albero
         const tree = buildTreeStructure(data.components || data);
+        console.log('Tree structure built:', tree);
         setBomStructure(tree);
         
         // Espandi automaticamente il primo livello
@@ -123,26 +126,29 @@ const BOMImportWizard = ({
 
     // Prima passa: crea tutti i nodi
     components.forEach(comp => {
+      // Usa il Path come ID univoco quando disponibile
+      // Il Path dalla stored procedure è nel formato: "rootId.childId1.childId2"
+      const uniqueId = comp.Path || `${comp.ComponentId}-${comp.Line}`;
       const node = {
-        id: `${comp.ComponentId}-${comp.Line}`,
+        id: uniqueId,
         data: comp,
         children: [],
       };
-      nodeMap[node.id] = node;
+      nodeMap[uniqueId] = node;
     });
 
     // Seconda passa: costruisci la gerarchia
     components.forEach(comp => {
-      const nodeId = `${comp.ComponentId}-${comp.Line}`;
+      const nodeId = comp.Path || `${comp.ComponentId}-${comp.Line}`;
       const node = nodeMap[nodeId];
       
       if (comp.Level === 0 || comp.Level === 1) {
         rootNodes.push(node);
       } else {
         // Trova il padre basandosi sul Path
-        const parentId = findParentId(comp, components);
-        if (parentId && nodeMap[parentId]) {
-          nodeMap[parentId].children.push(node);
+        const parentNode = findParentNode(comp, components, nodeMap);
+        if (parentNode) {
+          parentNode.children.push(node);
         }
       }
     });
@@ -150,20 +156,29 @@ const BOMImportWizard = ({
     return rootNodes;
   };
 
-  const findParentId = (component, allComponents) => {
+  // Trova il nodo padre basandosi sul Path
+  const findParentNode = (component, allComponents, nodeMap) => {
     if (!component.Path) return null;
     
+    // Il Path è nel formato "rootId.childId1.childId2"
     const pathParts = component.Path.split('.');
     if (pathParts.length < 2) return null;
     
+    // Rimuovi l'ultimo elemento per ottenere il path del padre
     pathParts.pop();
     const parentPath = pathParts.join('.');
     
-    const parent = allComponents.find(
+    // Cerca il componente padre con questo path
+    const parentComponent = allComponents.find(
       comp => comp.Path === parentPath && comp.Level === component.Level - 1
     );
     
-    return parent ? `${parent.ComponentId}-${parent.Line}` : null;
+    if (parentComponent) {
+      const parentId = parentComponent.Path || `${parentComponent.ComponentId}-${parentComponent.Line}`;
+      return nodeMap[parentId];
+    }
+    
+    return null;
   };
 
   // Toggle espansione nodo
@@ -221,11 +236,8 @@ const BOMImportWizard = ({
   const selectWithParents = (nodeId, selectedMap) => {
     selectedMap[nodeId] = true;
     
-    // Trova e seleziona i padri
+    // Trova e seleziona solo i padri diretti nella gerarchia
     const findAndSelectParent = (currentId) => {
-      const node = findNodeById(currentId, bomStructure);
-      if (!node) return;
-      
       const parentId = findParentIdFromTree(currentId);
       
       if (parentId && !selectedMap[parentId]) {
@@ -245,7 +257,7 @@ const BOMImportWizard = ({
       optionsMap[nodeId] = { useOriginalCode: false };
     }
     
-    // Trova e deseleziona i figli
+    // Trova e deseleziona solo i figli diretti
     const node = findNodeById(nodeId, bomStructure);
     if (node && node.children) {
       node.children.forEach(child => {
@@ -266,43 +278,33 @@ const BOMImportWizard = ({
   };
 
   const findParentIdFromTree = (nodeId) => {
-    // Prima prova a trovare il padre usando i dati originali
+    // Trova il nodo corrente
     const node = findNodeById(nodeId, bomStructure);
+    if (!node || !node.data.Path) return null;
     
-    if (node && node.data.ParentBOMId) {
-      // Cerca il nodo padre usando ParentBOMId
-      const findParentByBOMId = (nodes, targetBOMId) => {
-        for (const n of nodes) {
-          if (n.data.BOMId === targetBOMId) {
-            return n.id;
-          }
-          if (n.children) {
-            const found = findParentByBOMId(n.children, targetBOMId);
-            if (found) return found;
-          }
-        }
-        return null;
-      };
-      
-      const parentId = findParentByBOMId(bomStructure, node.data.ParentBOMId);
-      return parentId;
-    }
+    // Il Path è nel formato "rootId.childId1.childId2"
+    const pathParts = node.data.Path.split('.');
+    if (pathParts.length < 2) return null;
     
-    // Fallback: usa la logica originale dell'albero
-    const findParent = (nodes, parentId = null) => {
-      for (const node of nodes) {
-        if (node.id === nodeId) {
-          return parentId;
+    // Rimuovi l'ultimo elemento per ottenere il path del padre
+    pathParts.pop();
+    const parentPath = pathParts.join('.');
+    
+    // Trova il nodo padre che ha questo path
+    const findNodeByPath = (nodes, targetPath) => {
+      for (const n of nodes) {
+        if (n.data.Path === targetPath) {
+          return n.id;
         }
-        if (node.children) {
-          const found = findParent(node.children, node.id);
-          if (found !== null) return found;
+        if (n.children) {
+          const found = findNodeByPath(n.children, targetPath);
+          if (found) return found;
         }
       }
       return null;
     };
     
-    return findParent(bomStructure);
+    return findNodeByPath(bomStructure, parentPath);
   };
 
   // Toggle opzione codice originale/temporaneo
@@ -365,6 +367,11 @@ const BOMImportWizard = ({
     const nature = node.data.ComponentNature || node.data.Nature;
     const isAcquisto = nature === 22413314;
 
+    // Non renderizzare componenti di livello 0 (root)
+    if (node.data.Level === 0) {
+      return null;
+    }
+
     return (
       <div key={node.id} className="select-none">
         <div 
@@ -416,16 +423,16 @@ const BOMImportWizard = ({
             </span>
 
             {/* Badge livello */}
-            {level > 0 && (
+            {node.data.Level > 0 && (
               <Badge 
                 variant="outline" 
                 className="text-xs"
                 style={{
-                  backgroundColor: `rgba(59, 130, 246, ${0.1 + level * 0.05})`,
-                  borderColor: `rgba(59, 130, 246, ${0.3 + level * 0.1})`,
+                  backgroundColor: `rgba(59, 130, 246, ${0.1 + node.data.Level * 0.05})`,
+                  borderColor: `rgba(59, 130, 246, ${0.3 + node.data.Level * 0.1})`,
                 }}
               >
-                L{level}
+                L{node.data.Level}
               </Badge>
             )}
 
@@ -641,17 +648,17 @@ const BOMImportWizard = ({
               <div className="flex items-center justify-center h-32">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-                          ) : bomStructure && bomStructure.length > 0 ? (
-                <div className="space-y-1">
-                  {bomStructure.map(node => {
-                    // Nascondi i componenti di livello 0 (vengono creati automaticamente)
-                    if (node.data.Level === 0) {
-                      // Renderizza solo i figli del livello 0
-                      return node.children ? node.children.map(child => renderNode(child)) : null;
-                    }
-                    return renderNode(node);
-                  })}
-                </div>
+            ) : bomStructure && bomStructure.length > 0 ? (
+              <div className="space-y-1">
+                {bomStructure.map(node => {
+                  // Se il nodo è di livello 0, renderizza solo i suoi figli
+                  if (node.data.Level === 0) {
+                    return node.children ? node.children.map(child => renderNode(child, 1)) : null;
+                  }
+                  // Altrimenti renderizza normalmente
+                  return renderNode(node, 0);
+                })}
+              </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
                 Nessun componente trovato nella distinta
