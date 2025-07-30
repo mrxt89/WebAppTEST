@@ -7,6 +7,7 @@ const FileService = require('../services/fileService');
 const authenticateToken = require('../authenticateToken');
 const fs = require('fs').promises;
 const { simpleParser } = require('mailparser');
+const { getEmailWorkerPool } = require('../workers/emailWorker');
 
 const {
     getProjectIdByTaskId,
@@ -534,55 +535,388 @@ router.get('/attachments/itemCode/:itemCode/download-all', authenticateToken, as
     }
 });
 
-// Anteprima di un'email
+// Route ottimizzata che usa worker threads
 router.get('/email-preview/:attachmentId', authenticateToken, async (req, res) => {
+    let timeoutHandle;
+    
     try {
-      const attachmentId = parseInt(req.params.attachmentId);
-      
-      const attachment = await getAttachmentById(attachmentId);
-      if (!attachment) {
-        return res.status(404).json({ error: 'Attachment not found' });
-      }
-  
-  
-      // Verifica che sia un file email
-      if (!attachment.FileType.includes('message/') && 
-          !attachment.FileName.toLowerCase().endsWith('.eml') && 
-          !attachment.FileName.toLowerCase().endsWith('.msg')) {
-        return res.status(400).json({ error: 'Not an email file' });
-      }
-  
-      // Leggi il file
-      const filePath = path.join(fileService.baseUploadPath, attachment.FilePath);
-      
-      const emailFile = await fs.readFile(filePath);
-      
-      // Parsa l'email
-      const parsed = await simpleParser(emailFile);
-      
-      // Prepara la risposta
-      const response = {
-        from: parsed.from?.text || '',
-        to: parsed.to?.text || '',
-        cc: parsed.cc?.text || '',
-        subject: parsed.subject || '',
-        date: parsed.date || new Date(),
-        textBody: parsed.text || '',
-        htmlBody: parsed.html || '',
-        attachments: (parsed.attachments || []).map(att => ({
-          filename: att.filename,
-          contentType: att.contentType,
-          size: att.size
-        }))
-      };
-      
-      res.json(response);
+        const attachmentId = parseInt(req.params.attachmentId);
+        
+        const attachment = await getAttachmentById(attachmentId);
+        if (!attachment) {
+            return res.status(404).json({ error: 'Attachment not found' });
+        }
+    
+        // Verifica che sia un file email
+        if (!attachment.FileType.includes('message/') && 
+            !attachment.FileName.toLowerCase().endsWith('.eml') && 
+            !attachment.FileName.toLowerCase().endsWith('.msg')) {
+            return res.status(400).json({ error: 'Not an email file' });
+        }
+    
+        const filePath = path.join(fileService.baseUploadPath, attachment.FilePath);
+        
+        // Verifica esistenza file usando fs nativo
+        try {
+            await fs.access(filePath);
+        } catch (err) {
+            return res.status(404).json({ error: 'Email file not found' });
+        }
+        
+        // Ottieni dimensione file
+        const stats = await fs.stat(filePath);
+        const fileSizeMB = stats.size / (1024 * 1024);
+        
+        console.log(`Email preview requested: ${attachment.FileName} (${fileSizeMB.toFixed(2)}MB)`);
+        
+        // Limite massimo assoluto
+        const MAX_FILE_SIZE_MB = 100;
+        
+        if (fileSizeMB > MAX_FILE_SIZE_MB) {
+            return res.status(413).json({ 
+                error: 'Email too large',
+                message: `Il file email supera il limite massimo di ${MAX_FILE_SIZE_MB}MB`,
+                fileSizeMB: fileSizeMB,
+                maxSizeMB: MAX_FILE_SIZE_MB
+            });
+        }
+        
+        // Set response timeout basato sulla dimensione del file
+        const timeoutMs = Math.min(30000 + (fileSizeMB * 2000), 120000); // Max 2 minuti
+        const startTime = Date.now();
+        
+        timeoutHandle = setTimeout(() => {
+            if (!res.headersSent) {
+                res.status(504).json({
+                    error: 'Processing timeout',
+                    message: 'L\'elaborazione dell\'email ha richiesto troppo tempo',
+                    fileSizeMB: fileSizeMB
+                });
+            }
+        }, timeoutMs);
+        
+        // Usa worker pool per file > 1MB
+        if (fileSizeMB > 1) {
+            console.log('Using worker thread for large email');
+            
+            try {
+                const workerPool = getEmailWorkerPool();
+                const result = await workerPool.parseEmail(filePath, {
+                    maxSizeMB: 50,
+                    timeoutMs: timeoutMs - 5000 // 5 secondi meno del timeout HTTP
+                });
+                
+                clearTimeout(timeoutHandle);
+                
+                // Aggiungi metadati
+                result.processingMethod = 'worker';
+                result.processingTimeMs = Date.now() - startTime;
+                
+                return res.json(result);
+                
+            } catch (workerError) {
+                console.error('Worker processing failed:', workerError);
+                clearTimeout(timeoutHandle);
+                
+                // Fallback a metodo base con limitazioni
+                return res.json({
+                    from: '',
+                    to: '',
+                    cc: '',
+                    subject: 'Email non processabile',
+                    date: new Date(),
+                    textBody: `Il file email (${fileSizeMB.toFixed(2)}MB) non può essere processato. Scarica il file per visualizzarlo.`,
+                    htmlBody: '',
+                    attachments: [],
+                    error: 'Processing failed',
+                    fileSizeMB: fileSizeMB
+                });
+            }
+        }
+        
+        // Per file piccoli usa il metodo standard nel thread principale
+        console.log('Using main thread for small email');
+        
+        const emailFile = await fs.readFile(filePath);
+        
+        // Parsing con opzioni ottimizzate
+        const parsed = await simpleParser(emailFile, {
+            skipHtmlToText: false,
+            skipTextContent: false,
+            skipImageLinks: true,
+            streamAttachments: true,
+            // Limiti per evitare memory issues
+            maxHeaderLength: 1000000, // 1MB per headers
+            strictlyMime: false
+        });
+        
+        clearTimeout(timeoutHandle);
+        
+        // Costruisci risposta
+        const response = {
+            from: parsed.from?.text || '',
+            to: parsed.to?.text || '',
+            cc: parsed.cc?.text || '',
+            subject: parsed.subject || '',
+            date: parsed.date || new Date(),
+            textBody: parsed.text || '',
+            htmlBody: parsed.html || '',
+            attachments: (parsed.attachments || []).map(att => ({
+                filename: att.filename,
+                contentType: att.contentType,
+                size: att.size
+            })),
+            fileSizeMB: fileSizeMB,
+            processingMethod: 'main',
+            processingTimeMs: Date.now() - startTime
+        };
+        
+        res.json(response);
+        
     } catch (error) {
-      console.error('Error parsing email:', error);
-      console.error('Stack trace:', error.stack);
-      res.status(500).json({ error: 'Failed to parse email', details: error.message });
+        clearTimeout(timeoutHandle);
+        console.error('Error parsing email:', error);
+        
+        // Errori specifici
+        if (error.code === 'ENOENT') {
+            return res.status(404).json({ 
+                error: 'File not found',
+                message: 'Il file email non è stato trovato sul server'
+            });
+        }
+        
+        if (error.message.includes('ENOMEM') || error.message.includes('heap')) {
+            return res.status(507).json({ 
+                error: 'Insufficient memory',
+                message: 'Memoria insufficiente per processare l\'email. Il file è troppo grande o complesso.'
+            });
+        }
+        
+        res.status(500).json({ 
+            error: 'Failed to parse email', 
+            details: process.env.NODE_ENV === 'development' ? error.message : 'Internal error'
+        });
     }
 });
+
+// Route alternativa per info base senza parsing completo
+router.get('/email-info/:attachmentId', authenticateToken, async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        
+        const attachment = await getAttachmentById(attachmentId);
+        if (!attachment) {
+            return res.status(404).json({ error: 'Attachment not found' });
+        }
+        
+        // Verifica che sia un file email
+        if (!attachment.FileType.includes('message/') && 
+            !attachment.FileName.toLowerCase().endsWith('.eml') && 
+            !attachment.FileName.toLowerCase().endsWith('.msg')) {
+            return res.status(400).json({ error: 'Not an email file' });
+        }
+        
+        const filePath = path.join(fileService.baseUploadPath, attachment.FilePath);
+        const stats = await fs.stat(filePath);
+        
+        // Leggi solo i primi 100KB per estrarre headers base
+        const HEADER_READ_SIZE = 100 * 1024; // 100KB
+        const buffer = Buffer.alloc(HEADER_READ_SIZE);
+        const fileHandle = await fs.open(filePath, 'r');
+        
+        try {
+            await fileHandle.read(buffer, 0, HEADER_READ_SIZE, 0);
+            const headerText = buffer.toString('utf8');
+            
+            // Estrai headers base con regex
+            const extractHeader = (name) => {
+                const regex = new RegExp(`^${name}:\\s*(.+)$`, 'mi');
+                const match = headerText.match(regex);
+                return match ? match[1].trim() : '';
+            };
+            
+            res.json({
+                fileName: attachment.FileName,
+                fileSizeMB: stats.size / (1024 * 1024),
+                from: extractHeader('From'),
+                to: extractHeader('To'),
+                subject: extractHeader('Subject'),
+                date: extractHeader('Date'),
+                messageId: extractHeader('Message-ID'),
+                canPreview: stats.size < 50 * 1024 * 1024, // Can preview if < 50MB
+                uploadedAt: attachment.UploadedAt
+            });
+            
+        } finally {
+            await fileHandle.close();
+        }
+        
+    } catch (error) {
+        console.error('Error getting email info:', error);
+        res.status(500).json({ error: 'Failed to get email info' });
+    }
+});
+
+// Route alternativa per info base senza parsing completo
+router.get('/email-info/:attachmentId', authenticateToken, async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        
+        const attachment = await getAttachmentById(attachmentId);
+        if (!attachment) {
+            return res.status(404).json({ error: 'Attachment not found' });
+        }
+        
+        // Verifica che sia un file email
+        if (!attachment.FileType.includes('message/') && 
+            !attachment.FileName.toLowerCase().endsWith('.eml') && 
+            !attachment.FileName.toLowerCase().endsWith('.msg')) {
+            return res.status(400).json({ error: 'Not an email file' });
+        }
+        
+        const filePath = path.join(fileService.baseUploadPath, attachment.FilePath);
+        const stats = await fs.stat(filePath);
+        
+        // Leggi solo i primi 100KB per estrarre headers base
+        const HEADER_READ_SIZE = 100 * 1024; // 100KB
+        const buffer = Buffer.alloc(HEADER_READ_SIZE);
+        const fileHandle = await fs.open(filePath, 'r');
+        
+        try {
+            await fileHandle.read(buffer, 0, HEADER_READ_SIZE, 0);
+            const headerText = buffer.toString('utf8');
+            
+            // Estrai headers base con regex
+            const extractHeader = (name) => {
+                const regex = new RegExp(`^${name}:\\s*(.+)$`, 'mi');
+                const match = headerText.match(regex);
+                return match ? match[1].trim() : '';
+            };
+            
+            res.json({
+                fileName: attachment.FileName,
+                fileSizeMB: stats.size / (1024 * 1024),
+                from: extractHeader('From'),
+                to: extractHeader('To'),
+                subject: extractHeader('Subject'),
+                date: extractHeader('Date'),
+                messageId: extractHeader('Message-ID'),
+                canPreview: stats.size < 50 * 1024 * 1024, // Can preview if < 50MB
+                uploadedAt: attachment.UploadedAt
+            });
+            
+        } finally {
+            await fileHandle.close();
+        }
+        
+    } catch (error) {
+        console.error('Error getting email info:', error);
+        res.status(500).json({ error: 'Failed to get email info' });
+    }
+});
+
+// Funzione helper per parsing streaming di email grandi
+async function parseEmailStreaming(filePath, fileName) {
+    return new Promise((resolve, reject) => {
+        const stream = fs.createReadStream(filePath, { 
+            highWaterMark: 64 * 1024 // 64KB chunks
+        });
+        
+        let headers = {};
+        let bodyText = '';
+        let bodyHtml = '';
+        let attachments = [];
+        let headersParsed = false;
+        let buffer = '';
+        let linesProcessed = 0;
+        const MAX_LINES = 10000; // Limita il numero di righe processate
+        const MAX_BODY_LENGTH = 500000; // 500KB max per corpo del messaggio
+        
+        stream.on('data', (chunk) => {
+            buffer += chunk.toString('utf8');
+            const lines = buffer.split('\n');
+            
+            // Mantieni l'ultima riga incompleta nel buffer
+            buffer = lines.pop() || '';
+            
+            for (const line of lines) {
+                linesProcessed++;
+                
+                // Interrompi se abbiamo processato troppe righe
+                if (linesProcessed > MAX_LINES) {
+                    stream.destroy();
+                    break;
+                }
+                
+                // Parsing degli headers
+                if (!headersParsed) {
+                    if (line.trim() === '') {
+                        headersParsed = true;
+                        continue;
+                    }
+                    
+                    const headerMatch = line.match(/^(From|To|Cc|Subject|Date):\s*(.+)$/i);
+                    if (headerMatch) {
+                        headers[headerMatch[1].toLowerCase()] = headerMatch[2];
+                    }
+                } else {
+                    // Parsing del body (limitato)
+                    if (bodyText.length < MAX_BODY_LENGTH) {
+                        // Semplice estrazione del testo (rimuovi HTML tags basilari)
+                        const textLine = line.replace(/<[^>]*>/g, '').trim();
+                        if (textLine) {
+                            bodyText += textLine + '\n';
+                        }
+                    }
+                    
+                    // Cerca allegati nel contenuto
+                    if (line.includes('Content-Disposition: attachment')) {
+                        attachments.push({
+                            filename: 'Allegato',
+                            contentType: 'application/octet-stream',
+                            size: 0
+                        });
+                    }
+                }
+            }
+        });
+        
+        stream.on('end', () => {
+            resolve({
+                from: headers.from || '',
+                to: headers.to || '',
+                cc: headers.cc || '',
+                subject: headers.subject || '',
+                date: headers.date ? new Date(headers.date) : new Date(),
+                textBody: bodyText.substring(0, MAX_BODY_LENGTH) + (bodyText.length > MAX_BODY_LENGTH ? '\n\n[... contenuto troncato ...]' : ''),
+                htmlBody: '', // Non processare HTML per file grandi
+                attachments: attachments,
+                metadata: {
+                    linesProcessed: linesProcessed,
+                    truncated: linesProcessed >= MAX_LINES || bodyText.length >= MAX_BODY_LENGTH
+                }
+            });
+        });
+        
+        stream.on('error', reject);
+        
+        // Timeout di sicurezza
+        setTimeout(() => {
+            stream.destroy();
+            resolve({
+                from: headers.from || '',
+                to: headers.to || '',
+                cc: headers.cc || '',
+                subject: headers.subject || '',
+                date: new Date(),
+                textBody: 'Email troppo grande: anteprima limitata disponibile',
+                htmlBody: '',
+                attachments: [],
+                error: 'Timeout durante il parsing'
+            });
+        }, 15000); // 15 secondi timeout per lo streaming
+    });
+}
 
 /* Routes per la gestione dei file generica, dall'agent per la modifica e salvataggio */
 
@@ -796,7 +1130,6 @@ router.post('/attachment-locks/:attachmentId', authenticateToken, async (req, re
     try {
         const attachmentId = parseInt(req.params.attachmentId);
         const userId = req.user.UserId;
-        console.log('userId', userId, 'attachmentId', attachmentId);
         
         // Verifica che l'allegato esista
         const attachment = await getAttachmentById(attachmentId);

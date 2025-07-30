@@ -338,7 +338,6 @@ router.post('/send-notification', authenticateToken, async (req, res) => {
   const userId = req.user.UserId;
   try {
     const result = await sendNotification({ notificationId, message, responseOptionId, eventId, title, notificationCategoryId, receiversList, userId, replyToMessageId });
-    console.log("sendNotification - result:", result);
     res.status(200).json(result);
   } catch (err) {
     console.error('Error sending notification:', err);

@@ -401,7 +401,7 @@ const ArticleSuggestions = ({
                       {filteredSuggestions.length > 5 && (
                         <div className="mb-3">
                           <div className="relative">
-                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+                            <Search className="absolute right-2 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
                             <Input
                               value={searchTerm}
                               onChange={(e) => setSearchTerm(e.target.value)}

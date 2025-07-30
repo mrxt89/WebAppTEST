@@ -323,8 +323,6 @@ router.get('/item-attachments/:attachmentId/download', authenticateToken, async 
             return res.status(404).json({ success: 0, message: 'Allegato non trovato' });
         }
 
-        console.log('File path:', attachment.FilePath);
-        console.log('File type:', attachment.FileType);
         
         const fileStream = await fileService.getFileStream(attachment.FilePath);
         res.setHeader('Content-Type', attachment.FileType);

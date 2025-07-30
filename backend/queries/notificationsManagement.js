@@ -1015,7 +1015,7 @@ async function getMessageReactions(messageId) {
 
 async function addMessageReaction(messageId, userId, reactionType) {
   try {
-    console.log('addMessageReaction', messageId, userId, reactionType);
+   
     if (!messageId || !reactionType) {
       throw new Error('MessageId, userId e reactionType sono campi obbligatori');
     }

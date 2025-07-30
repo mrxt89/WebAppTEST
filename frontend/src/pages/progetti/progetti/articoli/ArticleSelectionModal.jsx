@@ -369,7 +369,7 @@ const ArticleSelectionModal = ({
                 }
               }}
             />
-            <Search className="h-4 w-4 absolute top-3 left-2 text-gray-400" />
+            <Search className="h-4 w-4 absolute top-3 right-2 text-gray-400" />
             {searchText && (
               <X
                 className="h-4 w-4 absolute top-3 right-2 text-gray-400 cursor-pointer"

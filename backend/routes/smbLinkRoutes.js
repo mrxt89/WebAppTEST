@@ -136,8 +136,6 @@ router.post('/generate-smb-link', authenticateToken, async (req, res) => {
             // Genera il link file:// corretto per UNC
             fileLink = `file://${cleanUncPath}`;
             
-            console.log('Production mode - SMB path:', smbLink);
-            console.log('Production mode - File link:', fileLink);
         }
 
         // Risposta con tutti i dati necessari

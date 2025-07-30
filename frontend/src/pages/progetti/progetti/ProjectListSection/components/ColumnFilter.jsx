@@ -84,6 +84,7 @@ const ColumnFilter = ({ column, value, onChange, options = [] }) => {
                   <Checkbox
                     checked={Array.isArray(localValue) && localValue.includes(option.value)}
                     onCheckedChange={(checked) => handleMultiSelectChange(option.value, checked)}
+                    className="bg-primary"  
                   />
                   <span className="text-sm">{option.label}</span>
                 </label>

@@ -35,7 +35,11 @@ services:
       # - STORAGE_USERNAME=username
       # - STORAGE_PASSWORD=password
       
-      # ... altre variabili di ambiente ...
+      # Ottimizzazioni Node.js per file grandi e worker threads
+      - NODE_OPTIONS=--max-old-space-size=2048
+      - UV_THREADPOOL_SIZE=8
+      - WORKER_POOL_SIZE=2
+      
     volumes:
       - ./backend:/usr/src/app
       - /usr/src/app/node_modules
@@ -45,19 +49,31 @@ services:
         source: C:/TestShare/GestDoc2/WebApp
         target: /usr/src/app/uploads
     
-      
       # Volume per storage locale (commenta per storage remoto)
       #- ./backend/uploads:/usr/src/app/uploads
       - ./backend/temp:/usr/src/app/temp
       - ./backend/ssl:/usr/src/app/ssl  # Volume per i certificati SSL
       
-      # Volume per storage remoto (decommentare e modificare per storage remoto)
-      # Esempio per NFS:
-      # - type: volume
-      #   source: remote_uploads
-      #   target: /usr/src/app/uploads
-      #   volume:
-      #     nocopy: true
+    # Limiti di risorse per prevenire blocchi totali
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    
+    # Health check per riavvio automatico
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Restart automatico
+    restart: unless-stopped
     
     networks:
       - app-network-dev
@@ -90,6 +106,27 @@ services:
       - backend
     networks:
       - app-network-dev
+    restart: unless-stopped
+
+  # Nginx come reverse proxy (opzionale ma consigliato per produzione)
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    environment:
+      - HOST_IP=${SELF_IP}
+      - HOST_DOMAIN=localhost
+      - API_HTTPS_PORT=3443
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - app-network-dev
+    restart: unless-stopped
 
 networks:
   app-network-dev:
