@@ -19,10 +19,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import useCategoryActions from "../../../hooks/useCategoryActions";
-import { swal } from "../../../lib/common";
+import { swal } from "@/lib/common";
 import { toast } from "@/components/ui/use-toast";
 
 const CategoriesPage = () => {
@@ -137,6 +137,7 @@ const CategoriesPage = () => {
         toast({
           title: "Categoria Aggiornata",
           variant: "success",
+          position: "bottom-right",
           duration: 3000,
           style: { backgroundColor: "#2c7a7b", color: "#fff" },
         });

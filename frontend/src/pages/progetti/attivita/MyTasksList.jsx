@@ -197,6 +197,7 @@ const MyTasksList = ({
         toast({
           title: isPinned ? "Pin rimosso" : "Attività fissata",
           description: result.msg,
+          position: "bottom-right",
           variant: "success",
           duration: 2000,
         });
@@ -206,7 +207,8 @@ const MyTasksList = ({
       toast({
         title: "Errore",
         description: "Errore nella gestione del pin",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
     } finally {
       setPinLoading(null);

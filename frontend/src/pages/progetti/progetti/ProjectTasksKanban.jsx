@@ -558,8 +558,10 @@ const TasksKanban = ({
 
       if (result && result.success) {
         toast({
-          title: "✨ Task aggiornato",
+          title: "Task aggiornato",
           description: `Stato cambiato in "${statusConfig[newStatus].label}"`,
+          position: "bottom-right",
+          variant: "success",
         });
       } else {
         setLocalTasks((prevTasks) =>
@@ -571,7 +573,8 @@ const TasksKanban = ({
         toast({
           title: "Errore",
           description: "Non è stato possibile aggiornare lo stato del task",
-          variant: "destructive",
+          variant: "danger",
+          position: "bottom-right",
         });
       }
     } catch (error) {
@@ -585,7 +588,8 @@ const TasksKanban = ({
       toast({
         title: "Errore",
         description: error.message || "Si è verificato un errore durante l'aggiornamento",
-        variant: "destructive",
+        variant: "danger",
+        position: "bottom-right",
       });
     } finally {
       setUpdatingTasks((prev) => ({ ...prev, [task.TaskID]: false }));

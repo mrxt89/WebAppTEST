@@ -2,8 +2,8 @@
 // Inspired by react-hot-toast library
 import * as React from "react";
 
-const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 3000; // 3 secondi
+const TOAST_LIMIT = 3; // Aumentato per permettere più notifiche
+const TOAST_REMOVE_DELAY = 5000; // 5 secondi per default
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -101,8 +101,29 @@ function dispatch(action) {
   });
 }
 
-function toast({ ...props }) {
+// Configurazione globale per la posizione dei toast
+let globalPosition = "bottom-right";
+
+// Funzione per impostare la posizione globale
+toast.setPosition = (position) => {
+  globalPosition = position;
+  // Notifica tutti i listener del cambio di posizione
+  listeners.forEach((listener) => {
+    listener({ ...memoryState, position: globalPosition });
+  });
+};
+
+// Funzione toast principale con supporto per varianti
+function toast(props) {
+  // Se viene passata una stringa, la convertiamo in oggetto
+  if (typeof props === "string") {
+    props = { description: props };
+  }
+
   const id = genId();
+
+  // Determina la durata in base alla variante
+  const duration = props.duration || (props.variant === "destructive" ? 7000 : TOAST_REMOVE_DELAY);
 
   const update = (props) =>
     dispatch({
@@ -114,6 +135,8 @@ function toast({ ...props }) {
   dispatch({
     type: "ADD_TOAST",
     toast: {
+      variant: "default", // variante di default
+      position: props.position || globalPosition, // usa posizione specifica o globale
       ...props,
       id,
       open: true,
@@ -123,29 +146,69 @@ function toast({ ...props }) {
     },
   });
 
-  setTimeout(() => {
+  // Auto-dismiss dopo il timeout
+  const dismissTimeout = setTimeout(() => {
     dismiss();
-  }, TOAST_REMOVE_DELAY);
+  }, duration);
+
+  // Cancella il timeout se il toast viene chiuso manualmente
+  const originalDismiss = dismiss;
+  const dismissWithClearTimeout = () => {
+    clearTimeout(dismissTimeout);
+    originalDismiss();
+  };
 
   return {
     id: id,
-    dismiss,
+    dismiss: dismissWithClearTimeout,
     update,
   };
 }
 
+// Helper functions per le varianti comuni
+toast.success = (props) => {
+  if (typeof props === "string") {
+    return toast({ description: props, variant: "success" });
+  }
+  return toast({ ...props, variant: "success" });
+};
+
+toast.error = (props) => {
+  if (typeof props === "string") {
+    return toast({ description: props, variant: "destructive" });
+  }
+  return toast({ ...props, variant: "destructive" });
+};
+
+toast.warning = (props) => {
+  if (typeof props === "string") {
+    return toast({ description: props, variant: "warning" });
+  }
+  return toast({ ...props, variant: "warning" });
+};
+
+toast.info = (props) => {
+  if (typeof props === "string") {
+    return toast({ description: props, variant: "primary" });
+  }
+  return toast({ ...props, variant: "primary" });
+};
+
 function useToast() {
-  const [state, setState] = React.useState(memoryState);
+  const [state, setState] = React.useState({ ...memoryState, position: globalPosition });
 
   React.useEffect(() => {
-    listeners.push(setState);
+    const updateState = (newState) => {
+      setState({ ...newState, position: globalPosition });
+    };
+    listeners.push(updateState);
     return () => {
-      const index = listeners.indexOf(setState);
+      const index = listeners.indexOf(updateState);
       if (index > -1) {
         listeners.splice(index, 1);
       }
     };
-  }, [state]);
+  }, []);
 
   return {
     ...state,
