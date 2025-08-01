@@ -62,7 +62,8 @@ const fetchProjectStages = useCallback(async (projectId) => {
       toast({
         title: "Errore",
         description: "Errore nel caricamento degli stage",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
       return { stages: [], unassignedTasks: [] };
     } finally {
@@ -94,7 +95,8 @@ const fetchProjectStages = useCallback(async (projectId) => {
       toast({
         title: "Errore",
         description: error.message || "Errore nel salvataggio dello stage",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
       return { success: false };
     } finally {
@@ -125,7 +127,8 @@ const fetchProjectStages = useCallback(async (projectId) => {
       toast({
         title: "Errore",
         description: error.message || "Errore nell'eliminazione dello stage",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
       return { success: false };
     } finally {
@@ -151,7 +154,8 @@ const fetchProjectStages = useCallback(async (projectId) => {
       toast({
         title: "Errore",
         description: "Errore nel riordinamento degli stage",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
       return { success: false };
     }
@@ -175,7 +179,8 @@ const fetchProjectStages = useCallback(async (projectId) => {
       toast({
         title: "Errore",
         description: "Errore nell'assegnazione del task allo stage",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
       return { success: false };
     }
@@ -200,7 +205,8 @@ const fetchProjectStages = useCallback(async (projectId) => {
       toast({
         title: "Errore",
         description: "Errore nel salvataggio dell'elemento checklist",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
       return { success: false };
     } finally {
@@ -226,7 +232,8 @@ const fetchProjectStages = useCallback(async (projectId) => {
       toast({
         title: "Errore",
         description: "Errore nell'aggiornamento dell'elemento",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
       return { success: false };
     }
@@ -256,7 +263,8 @@ const fetchProjectStages = useCallback(async (projectId) => {
       toast({
         title: "Errore",
         description: error.message || "Errore nella gestione del gate",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
       return { success: false };
     } finally {
@@ -288,6 +296,7 @@ const fetchProjectStages = useCallback(async (projectId) => {
         toast({
           title: "Successo",
           description: "Stage template salvato con successo",
+          position: "bottom-right",
           variant: "success",
         });
         return result;
@@ -298,7 +307,8 @@ const fetchProjectStages = useCallback(async (projectId) => {
       toast({
         title: "Errore",
         description: "Errore nel salvataggio dello stage template",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
       return { success: false };
     }

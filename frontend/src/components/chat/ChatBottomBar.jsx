@@ -776,15 +776,31 @@ const ChatBottomBar = ({
 
   // Formattazione data
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const options = {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    };
-    return new Intl.DateTimeFormat("it-IT", options).format(date);
+    // Controlla se la data è valida
+    if (!dateString) {
+      return "Data non disponibile";
+    }
+    
+    try {
+      const date = new Date(dateString);
+      
+      // Verifica se la data è valida
+      if (isNaN(date.getTime())) {
+        return "Data non valida";
+      }
+      
+      const options = {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      };
+      return new Intl.DateTimeFormat("it-IT", options).format(date);
+    } catch (error) {
+      console.error("Errore nella formattazione della data:", error);
+      return "Data non valida";
+    }
   };
 
   // Rendering stati speciali

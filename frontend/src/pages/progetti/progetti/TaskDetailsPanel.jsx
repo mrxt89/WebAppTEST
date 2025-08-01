@@ -654,10 +654,9 @@ const TaskDetailsPanel = ({
 
             {/* Alert disabilitazione */}
             {!isMinimized && showContent && editedTask?.TaskDisabled && (
-              <Alert className="m-4 mb-0 border-red-200 bg-red-50">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <AlertTitle className="text-red-800">Attività Disabilitata</AlertTitle>
-                <AlertDescription className="text-red-700">
+              <Alert className="" variant="warning">
+                <AlertTitle className="">Attività Disabilitata</AlertTitle>
+                <AlertDescription className ="">
                   Questa attività è stata disabilitata da {editedTask.DisabledByName} 
                   il {new Date(editedTask.TaskDisabledAt).toLocaleString()}.
                   Le attività disabilitate non sono visibili nelle viste di default.

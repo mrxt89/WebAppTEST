@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  ChevronRight,
+  Menu,
+} from "lucide-react";
 import { Helmet } from "react-helmet";
-import { Routes, Route, useNavigate } from "react-router-dom";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import ProtectedRoute from "../ProtectedRoute";
 import AdminDashboard from "../../pages/admin/AdminDashboard";
 import ProjectManagementSplitView from "../../pages/progetti/progetti/ProjectManagementSplitView";
@@ -11,6 +15,8 @@ import MyTasksPage from "../../pages/progetti/attivita/MyTasksPage";
 import ChangePassword from "../../pages/user/ChangePassword";
 import UserProfile from "../../pages/user/UserProfile";
 import MainMenu from "../MainMenu";
+import NavigationDrawer from "../navigation/NavigationDrawer";
+import "../../styles/navigation-drawer.css";
 
 // Import the NotificationProvider (which is now a placeholder function)
 import { NotificationProvider } from "@/redux/features/notifications/NotificationProvider";
@@ -28,7 +34,10 @@ const MainContainer = ({
   children, // Aggiungo il supporto per i children
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const drawerTriggerRef = useRef(null);
   
   // Monitora l'apertura dei dialog per gestire correttamente l'accessibilità
   useEffect(() => {
@@ -61,6 +70,19 @@ const MainContainer = ({
     return () => observer.disconnect();
   }, []);
 
+  const toggleDrawer = () => {
+    setIsDrawerOpen(!isDrawerOpen);
+  };
+
+  const handleDrawerNavigate = (item) => {
+    if (item.pageRoute === '/') {
+      handleHomeClick();
+    } else {
+      handleNavigate(item);
+    }
+    setIsDrawerOpen(false);
+  };
+
   return (
     <NotificationProvider>
       <Helmet>
@@ -90,25 +112,63 @@ const MainContainer = ({
               <h6 className="colorSecondary m-auto mx-2 fs-5">Menu</h6>
             </button>
             <div className="text-center font-medium fs-5 mx-4">{pageTitle}</div>
+            {/* Icona per aprire il navigation drawer */}
+              <Menu 
+                className="w-5 h-5 relative z-10 text-black mr-5" 
+                ref={drawerTriggerRef}
+                onClick={toggleDrawer}
+                title="Apri menu di navigazione"
+                aria-label="Apri menu di navigazione"
+              />
+              
+             
           </div>
         ) : (
           <div className="breadcrumb-container">
             <ol className="breadcrumb">
               <li className="breadcrumb-item ml-3">
-                <button onClick={handleHomeClick}>
-                  <i className="fas fa-home p-1 colorSecondary "></i>
-                  <h6 className="m-auto colorSecondary fs-5"> Home</h6>
+                <button 
+                  onClick={handleHomeClick}
+                  className="breadcrumb-button home-button"
+                >
+                  <i className="fas fa-home p-1 colorSecondary"></i>
+                  <h6 className="m-auto colorSecondary fs-5">Home</h6>
                 </button>
               </li>
               {breadcrumb.map((item, index) => (
-                <div key={item.pageId} className="breadcrumb-item">
-                  <button onClick={() => handleBreadcrumbClick(index)}>
-                    <h6 className="m-auto colorSecondary fs-5">
-                      {item.pageName}
-                    </h6>
-                  </button>
-                </div>
+                <React.Fragment key={item.pageId}>
+                  <li className="breadcrumb-separator">
+                    <ChevronRight className="text-gray-400 mx-2 h-4 w-4" />
+                  </li>
+                  <li className="breadcrumb-item">
+                    <button 
+                      onClick={() => handleBreadcrumbClick(index)}
+                      className="breadcrumb-button"
+                    >
+                      <h6 className="m-auto colorSecondary fs-5">
+                        {item.pageName}
+                      </h6>
+                    </button>
+                  </li>
+                </React.Fragment>
               ))}
+              {/* Icona menu anche nel breadcrumb normale, all'estrema destra */}
+              {breadcrumb.length > 0 && (
+                <li className="ml-auto mr-3">
+                 
+                  
+                    <Menu 
+                     ref={drawerTriggerRef}
+                     onClick={toggleDrawer}
+                     title="Apri menu di navigazione"
+                     aria-label="Apri menu di navigazione"
+                      className="w-4 h-4 relative z-10 text-black mr-5" 
+                    
+                    />
+                    
+                
+                </li>
+              )}
             </ol>
           </div>
         )}
@@ -196,6 +256,16 @@ const MainContainer = ({
 
         {/* Renderizza i children */}
         {children}
+
+        {/* Navigation Drawer */}
+        <NavigationDrawer
+          isOpen={isDrawerOpen}
+          onClose={() => setIsDrawerOpen(false)}
+          menuItems={menuItems}
+          currentPath={location.pathname}
+          onNavigate={handleDrawerNavigate}
+          triggerRef={drawerTriggerRef}
+        />
       </div>
     </NotificationProvider>
   );

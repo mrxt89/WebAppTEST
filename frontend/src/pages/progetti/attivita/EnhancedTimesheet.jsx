@@ -341,7 +341,8 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
         toast({
           title: "Errore di permessi",
           description: "Non hai i permessi per visualizzare i dati di questo utente",
-          variant: "destructive",
+          position: "bottom-right",
+          variant: "danger",
         });
         return;
       }
@@ -360,7 +361,8 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
       toast({
         title: "Errore",
         description: error.message || "Impossibile caricare i dati delle ore",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
     } finally {
       setLoading(false);
@@ -412,7 +414,8 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
       toast({
         title: "Errore",
         description: error.message || "Errore nell'aggiornamento dello stato",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
     } finally {
       setEditingTaskStatus(prev => ({ ...prev, [taskId]: false }));
@@ -535,7 +538,8 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
       toast({
         title: "Errore",
         description: "Impossibile caricare le attività disponibili",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
     }
   };
@@ -579,7 +583,8 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
       toast({
         title: "Errore",
         description: error.message || "Si è verificato un errore durante il salvataggio",
-        variant: "destructive",
+        position: "bottom-right",
+        variant: "danger",
       });
       throw error;
     }
@@ -610,7 +615,8 @@ const EnhancedTimesheet = ({ currentUserId, isAdmin = false }) => {
         toast({
           title: "Errore",
           description: error.message || "Si è verificato un errore durante l'eliminazione",
-          variant: "destructive",
+          position: "bottom-right",
+          variant: "danger",
         });
       }
     }
