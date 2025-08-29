@@ -1,0 +1,173 @@
+/* Stili per le reazioni rapide */
+
+.quick-reactions-button {
+    transition: all 0.2s ease;
+  }
+  
+  .quick-reactions-button:hover {
+    transform: scale(1.1);
+  }
+  
+  .quick-reactions-popup {
+    backdrop-filter: blur(8px);
+    background-color: rgba(255, 255, 255, 0.425);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  }
+  
+  .reaction-emoji {
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  
+  .reaction-emoji:hover {
+    transform: scale(1.2);
+  }
+  
+  .reaction-emoji:active {
+    transform: scale(0.9);
+  }
+  
+  /* Animazione per il popup */
+  @keyframes popupFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.8) translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+  
+  .quick-reactions-popup-enter {
+    animation: popupFadeIn 0.2s ease-out;
+  }
+  
+  /* Effetto hover per le emoji */
+  .reaction-emoji-container {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .reaction-emoji-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+  
+  .reaction-emoji-container:hover::before {
+    opacity: 1;
+  }
+  
+  /* Stili per il loading state */
+  .reaction-loading {
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  /* Responsive design per mobile */
+  @media (max-width: 768px) {
+    .quick-reactions-popup {
+      padding: 0.5rem;
+    }
+    
+    .reaction-emoji {
+      font-size: 1.5rem;
+    }
+    
+    .quick-reactions-button {
+      padding: 0.75rem;
+    }
+  }
+  
+  /* Stili per messaggi con reazioni esistenti */
+  .message-with-reactions .quick-reactions-button {
+    opacity: 0.7;
+  }
+  
+  .message-with-reactions:hover .quick-reactions-button {
+    opacity: 1;
+  }
+  
+  /* Effetto di feedback quando si aggiunge una reazione */
+  .reaction-feedback {
+    animation: reactionPulse 0.6s ease-out;
+  }
+  
+  @keyframes reactionPulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.3);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  
+  /* Gestione overflow del popup */
+  .quick-reactions-popup {
+    max-width: calc(100vw - 40px);
+    overflow: hidden;
+  }
+  
+  /* Assicura che il popup sia sempre visibile */
+  .quick-reactions-popup-container {
+    position: relative;
+    z-index: 9999;
+  }
+  
+  /* Responsive per schermi piccoli */
+  @media (max-width: 640px) {
+    .quick-reactions-popup {
+      max-width: calc(100vw - 20px);
+      padding: 0.5rem;
+    }
+    
+    .reaction-emoji {
+      font-size: 1.25rem;
+    }
+  }
+  
+  /* Stili per il tasto "+" */
+  .reaction-emoji-container.custom-reaction {
+    background-color: rgba(107, 114, 128, 0.1);
+    border: 1px solid rgba(107, 114, 128, 0.2);
+  }
+  
+  .reaction-emoji-container.custom-reaction:hover {
+    background-color: rgba(107, 114, 128, 0.2);
+    border-color: rgba(107, 114, 128, 0.3);
+  }
+  
+  /* Scrollbar personalizzata per il picker emoji */
+  .quick-reactions-popup ::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .quick-reactions-popup ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+  
+  .quick-reactions-popup ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+  
+  .quick-reactions-popup ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }

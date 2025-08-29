@@ -23,7 +23,8 @@ import {
   RotateCcw,
   Paperclip,
   Loader2,
-  Info
+  Info,
+  Smile
 } from 'lucide-react';
 import FileViewer from '@/components/ui/fileViewer';
 import { swal } from '@/lib/common';
@@ -33,6 +34,7 @@ import PollModal from './PollModal';
 import MessageColorPicker from './MessageColorPicker';
 import MessageActionsMenu from './MessageActionsMenu';
 import MessageReactions from './MessageReactions';
+import QuickReactionsPopup from './QuickReactionsPopup';
 import { FaFlag } from 'react-icons/fa';
 import axios from 'axios';
 import { config } from '@/config';
@@ -71,6 +73,7 @@ const ChatMessage = memo(({
   const [showReadInfo, setShowReadInfo] = useState(false);
   const [readInfo, setReadInfo] = useState(null);
   const [loadingReadInfo, setLoadingReadInfo] = useState(false);
+  const [showQuickReactions, setShowQuickReactions] = useState(false);
   
   const messageRef = useRef(null);
   const actionsRef = useRef(null);
@@ -102,6 +105,36 @@ const ChatMessage = memo(({
       }, 2000);
     }
   }, []);
+
+  // Gestione reazioni rapide
+  const handleQuickReaction = useCallback(async (emoji) => {
+    if (disabled) return;
+    
+    try {
+      setLoadingReactions(prev => ({ ...prev, [emoji]: true }));
+      await toggleMessageReaction(message.messageId, emoji);
+      
+      // Aggiungi effetto di feedback
+      const button = document.querySelector(`[data-message-id="${message.messageId}"] .quick-reactions-button`);
+      if (button) {
+        button.classList.add('reaction-feedback');
+        setTimeout(() => {
+          button.classList.remove('reaction-feedback');
+        }, 600);
+      }
+      
+      // Emetti evento per aggiornare le reazioni
+      document.dispatchEvent(
+        new CustomEvent("message-reaction-updated", {
+          detail: { messageId: message.messageId }
+        })
+      );
+    } catch (error) {
+      console.error("Errore nell'aggiunta della reazione:", error);
+    } finally {
+      setLoadingReactions(prev => ({ ...prev, [emoji]: false }));
+    }
+  }, [disabled, message.messageId, toggleMessageReaction]);
 
   const originalMessage = findOriginalMessage(message.replyToMessageId);
   
@@ -468,6 +501,7 @@ const ChatMessage = memo(({
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.2 }}
         id={`message-${message.messageId}`}
+        data-message-id={message.messageId}
       >
         {/* Avatar per messaggi ricevuti */}
         {(!isOwnMessage || isOwnMessage == '0') && (
@@ -490,18 +524,50 @@ const ChatMessage = memo(({
             </div>
           )}
           
-          {/* Bubble messaggio */}
-          <div className="flex items-center gap-2">
-            {/* Bandierina per messaggi colorati */}
-            { message.messageColor && (
-              <span
-                className="message-flag animate-flag"
-                style={{ color: message.messageColor }}
-                title={`Colore: ${message.messageColor}`}
-              >
-                <FaFlag />
-              </span>
-            )}
+            {/* Bubble messaggio */}
+           <div className="flex items-center gap-2">
+             {/* Bandierina per messaggi colorati */}
+             { message.messageColor && (
+               <span
+                 className="message-flag animate-flag"
+                 style={{ color: message.messageColor }}
+                 title={`Colore: ${message.messageColor}`}
+               >
+                 <FaFlag />
+               </span>
+             )}
+             
+             {/* Icona emoji per reazioni rapide - posizionata a sinistra per messaggi inviati, a destra per messaggi ricevuti */}
+             {!disabled && !message._isTemporary && (
+               <div className={`relative ${isOwnMessage ? 'order-first' : 'order-last'}`}>
+                 <button
+                   className={`p-1.5 rounded-full quick-reactions-button ${
+                     showQuickReactions ? "bg-blue-100 text-blue-600" : "text-gray-400 hover:text-gray-600"
+                   } ${message.reactions && Object.keys(message.reactions).length > 0 ? "message-with-reactions" : ""}`}
+                   onClick={(e) => {
+                     e.stopPropagation();
+                     setShowQuickReactions(!showQuickReactions);
+                     setShowActions(false); // Chiudi il menu azioni se aperto
+                   }}
+                   title="Reazioni rapide"
+                 >
+                   <Smile className="h-4 w-4" />
+                 </button>
+                 
+                                 {/* Popup reazioni rapide */}
+                <QuickReactionsPopup
+                  isOpen={showQuickReactions}
+                  onClose={() => setShowQuickReactions(false)}
+                  onReactionSelect={handleQuickReaction}
+                  position={isOwnMessage ? "top" : "bottom"}
+                  disabled={disabled}
+                  loadingReactions={loadingReactions}
+                  messageId={message.messageId}
+                  isOwnMessage={isOwnMessage}
+
+                />
+               </div>
+             )}
             
             <div
               className={`message-bubble relative ${(isOwnMessage || isOwnMessage == '1') ? 'sent' : 'received'}`}
@@ -657,7 +723,12 @@ const ChatMessage = memo(({
               
               {/* Reazioni */}
               {message.reactions ? (
-                <div className={`message-reactions flex flex-wrap gap-1 mt-1`}>
+                <motion.div 
+                  className={`message-reactions flex flex-wrap gap-1 mt-1`}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
                   {Object.entries(groupReactionsByType(message.reactions)).map(([reactionType, reactors]) => {
                     const userReaction = reactors.find(r => r.UserID === currentUserId);
                     const hasCurrentUserReacted = !!userReaction;
@@ -665,27 +736,29 @@ const ChatMessage = memo(({
                     const isLoading = loadingReactions[reactionType];
                     
                     return (
-                      <button
+                      <motion.button
                         key={reactionType}
-                        className={`reaction-badge flex items-center rounded-full px-1.5 py-0.5 text-xs ${
+                        className={`reaction-badge flex items-center rounded-full px-1.5 py-0.5 text-xs transition-all duration-200 hover:scale-105 ${
                           hasCurrentUserReacted
-                            ? "bg-blue-100 text-blue-700"
+                            ? "bg-blue-100 text-blue-700 shadow-sm"
                             : "bg-gray-100 hover:bg-gray-200 text-black"
                         }`}
                         onClick={() => handleReaction(reactionType)}
                         title={userNames}
                         disabled={disabled || isLoading}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                       >
                         {isLoading ? (
                           <Loader2 className="h-3 w-3 animate-spin mr-1" />
                         ) : (
                           <span className="mr-1">{reactionType}</span>
                         )}
-                        <span className="reaction-count">{reactors.length}</span>
-                      </button>
+                        <span className="reaction-count font-medium">{reactors.length}</span>
+                      </motion.button>
                     );
                   })}
-                </div>
+                </motion.div>
               ) : (
                 <MessageReactions
                   messageId={message.messageId}

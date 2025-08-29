@@ -4,7 +4,7 @@ import { Reply, Palette, Edit, History, Trash2, Loader2 } from "lucide-react";
 import { FaRegSmile } from "react-icons/fa";
 import ReactionPicker from "./ReactionPicker";
 
-// Common quick reactions
+// Common quick reactions (ora gestite dal popup dedicato)
 const QuickReactions = [
   { emoji: "👍", title: "Mi piace" },
   { emoji: "👎", title: "Non mi piace" },
@@ -66,37 +66,7 @@ const MessageActionsMenu = ({
       }}
     >
       <div className="py-1 px-1">
-        {/* Non mostrare le reazioni se il messaggio è stato eliminato */}
-        {!hasLeftChat &&
-          !isCancelled &&
-          typeof onAddReaction === "function" && (
-            <div className="flex flex-col bg-gray-100 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">
-              <div className="mb-1 text-xs text-gray-500 font-medium">
-                Reazioni rapide
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {QuickReactions.map((reaction) => (
-                  <button
-                    key={reaction.emoji}
-                    className="p-1.5 hover:bg-gray-200 rounded-full transition-colors relative"
-                    onClick={() => handleAddReaction(reaction.emoji)}
-                    title={reaction.title}
-                    disabled={loadingReactions[reaction.emoji]}
-                  >
-                    {loadingReactions[reaction.emoji] ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <span className="text-base">{reaction.emoji}</span>
-                    )}
-                  </button>
-                ))}
-                <ReactionPicker
-                  onReactionSelect={handleAddReaction}
-                  style={{ zIndex: 99999 }}
-                />
-              </div>
-            </div>
-          )}
+        {/* Reazioni rapide ora gestite dal popup dedicato - rimuoviamo questa sezione */}
 
         {/* Non mostrare l'opzione di risposta se il messaggio è stato eliminato */}
         {!hasLeftChat && !isCancelled && typeof onReply === "function" && (
