@@ -15,11 +15,11 @@ import { useNotifications } from "@/redux/features/notifications/notificationsHo
 
 const DoNotDisturbToggle = () => {
   const [enabled, setEnabled] = useState(
-    notificationService.isInDoNotDisturbMode(),
+      notificationService.isInDoNotDisturbMode(),
   );
   const [isUpdating, setIsUpdating] = useState(false);
   const { loadNotifications, reloadNotifications, restartNotificationWorker } =
-    useNotifications();
+      useNotifications();
 
   // Effetto per sincronizzare lo stato con il servizio
   useEffect(() => {
@@ -68,10 +68,10 @@ const DoNotDisturbToggle = () => {
         if (!token) return;
 
         const response = await axios.get(
-          `${config.API_BASE_URL}/do-not-disturb/status`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
+            `${config.API_BASE_URL}/do-not-disturb/status`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
         );
 
         if (response.data && response.data.success) {
@@ -90,12 +90,11 @@ const DoNotDisturbToggle = () => {
   }, [enabled]);
 
   // Gestisci il cambio dello stato con un approccio più aggressivo
-  const handleToggle = async () => {
+  const handleToggle = async (newState) => {
     try {
       if (isUpdating) return; // Previene doppi click
       setIsUpdating(true);
 
-      const newState = !enabled;
       // Aggiorna prima l'interfaccia per un feedback immediato
       setEnabled(newState);
 
@@ -106,9 +105,9 @@ const DoNotDisturbToggle = () => {
       const token = localStorage.getItem("token");
       if (token) {
         await axios.post(
-          `${config.API_BASE_URL}/do-not-disturb/toggle`,
-          { enabled: newState },
-          { headers: { Authorization: `Bearer ${token}` } },
+            `${config.API_BASE_URL}/do-not-disturb/toggle`,
+            { enabled: newState },
+            { headers: { Authorization: `Bearer ${token}` } },
         );
       }
 
@@ -120,8 +119,8 @@ const DoNotDisturbToggle = () => {
             notificationService.resetService();
           } catch (e) {
             console.error(
-              "Errore durante il reset del servizio di notifica:",
-              e,
+                "Errore durante il reset del servizio di notifica:",
+                e,
             );
           }
         }
@@ -133,8 +132,8 @@ const DoNotDisturbToggle = () => {
               loadNotifications();
             } catch (e) {
               console.error(
-                "Errore durante il ricaricamento delle notifiche:",
-                e,
+                  "Errore durante il ricaricamento delle notifiche:",
+                  e,
               );
             }
           }, 300);
@@ -162,7 +161,7 @@ const DoNotDisturbToggle = () => {
           }, 800);
         } else {
           console.warn(
-            "Impossibile riavviare il worker delle notifiche: metodo non disponibile",
+              "Impossibile riavviare il worker delle notifiche: metodo non disponibile",
           );
         }
       }
@@ -171,53 +170,53 @@ const DoNotDisturbToggle = () => {
     } catch (error) {
       console.error("Error toggling Do Not Disturb mode:", error);
       // Ripristina lo stato precedente in caso di errore
-      setEnabled(!enabled);
+      setEnabled(!newState);
       setIsUpdating(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-between space-y-2 mb-2">
-      <div className="flex items-center space-x-2">
-        {enabled ? (
-          <BellOff className="h-5 w-5 text-red-500" />
-        ) : (
-          <Bell className="h-5 w-5 text-gray-600" />
-        )}
-        <span
-          className={`text-sm font-medium ${enabled ? "text-red-500" : "text-gray-700"}`}
-        >
+      <div className="flex items-center justify-between space-y-2 mb-2">
+        <div className="flex items-center space-x-2">
+          {enabled ? (
+              <BellOff className="h-5 w-5 text-red-500" />
+          ) : (
+              <Bell className="h-5 w-5 text-gray-600" />
+          )}
+          <span
+              className={`text-sm font-medium ${enabled ? "text-red-500" : "text-gray-700"}`}
+          >
           Non disturbare
         </span>
 
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Info className="h-4 w-4 text-gray-400 cursor-help" />
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              <p>
-                Quando attivo, non riceverai notifiche push.
-                <strong>
-                  {" "}
-                  I messaggi ricevuti durante questo periodo non genereranno
-                  notifiche
-                </strong>{" "}
-                anche dopo la disattivazione.
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-4 w-4 text-gray-400 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>
+                  Quando attivo, non riceverai notifiche push.
+                  <strong>
+                    {" "}
+                    I messaggi ricevuti durante questo periodo non genereranno
+                    notifiche
+                  </strong>{" "}
+                  anche dopo la disattivazione.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
 
-      <Switch
-        checked={enabled}
-        onChange={handleToggle}
-        className={`${enabled ? "bg-red-500" : ""} ${isUpdating ? "opacity-50" : ""}`}
-        aria-label="Toggle Do Not Disturb mode"
-        disabled={isUpdating}
-      />
-    </div>
+        <Switch
+            checked={enabled}
+            onCheckedChange={handleToggle}
+            disabled={isUpdating}
+            className={isUpdating ? "opacity-50" : ""}
+            aria-label="Toggle Do Not Disturb mode"
+        />
+      </div>
   );
 };
 

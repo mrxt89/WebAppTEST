@@ -814,7 +814,7 @@ const TaskDetailsPanel = ({
                       <History className="h-4 w-4" />
                       Storico
                     </TabsTrigger>
-                    <TabsTrigger value="calendar" className="flex items-center gap-2">
+                    <TabsTrigger value="calendar" className="flex items-center gap-2 d-none">
                       <CalendarClock className="h-4 w-4" />
                       Calendario
                       {editedTask?.CalendarEventsCount > 0 && (

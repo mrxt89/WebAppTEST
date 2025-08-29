@@ -350,7 +350,7 @@ const PagesTab = ({
             <Switch
               id="page-status"
               checked={!pageDisabled}
-              onChange={(e) => handlePageDisabledChange(e.target.checked)}
+              onCheckedChange={handlePageDisabledChange}
             />
             <Label htmlFor="page-status" className="cursor-pointer">
               Pagina {pageDisabled ? "disabilitata" : "attiva"}
@@ -361,7 +361,7 @@ const PagesTab = ({
             <Switch
               id="page-inheritance"
               checked={pageInheritPermissions}
-              onChange={(e) => handleInheritanceChange(e.target.checked)}
+              onCheckedChange={handleInheritanceChange}
             />
             <Label htmlFor="page-inheritance" className="cursor-pointer">
               Eredita permessi
