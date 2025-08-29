@@ -1,26 +1,41 @@
-/* WikiTour Styles */
+/* WikiTour Styles - Design System Compliant */
+
 .wiki-tour-highlight {
   position: relative;
   animation: pulse 2s infinite;
+  border-radius: 16px;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
 }
 
 @keyframes pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 0 0 rgba(108, 99, 255, 0.5);
   }
   70% {
-    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 10px rgba(108, 99, 255, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 0 rgba(108, 99, 255, 0);
   }
 }
 
 /* Stili specifici per i tour nelle notifiche */
 .notification-tooltip {
-  z-index: 10001 !important; /* Assicuriamo che sia sempre visibile sopra la sidebar */
+  z-index: 10001 !important;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
+  color: #1A202C;
+  font-family: Inter, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 16px;
 }
 
 #notification-sidebar .wiki-tour-highlight {
-  z-index: 10002 !important; /* Incrementiamo lo z-index per gli elementi evidenziati nella sidebar */
+  z-index: 10002 !important;
+  background: linear-gradient(90deg, #6C63FF, #3AA8F2);
+  border-radius: 16px;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
 }

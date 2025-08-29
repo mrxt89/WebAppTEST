@@ -112,7 +112,7 @@ const NavigationDrawer = ({
         {/* Footer */}
         <div className="nav-drawer-footer">
           <p className="nav-footer-text">
-            Usa <kbd className="nav-footer-kbd">ESC</kbd> per chiudere
+            Usa <kbd className="nav-footer-kbd bg-dark">ESC</kbd> per chiudere
           </p>
         </div>
       </nav>

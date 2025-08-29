@@ -652,6 +652,7 @@ const notificationsSlice = createSlice({
     loadingHighlights: false,
     attachmentsLoading: false,
     notificationAttachments: {},
+    optimisticUpdateInProgress: false, // NUOVO: Flag per aggiornamenti ottimistici
   },
   reducers: {
     initChatPagination: (state, action) => {
@@ -740,6 +741,10 @@ const notificationsSlice = createSlice({
     
     updateUnreadCount: (state, action) => {
       state.unreadCount = action.payload;
+    },
+    
+    setOptimisticUpdateInProgress: (state, action) => {
+      state.optimisticUpdateInProgress = action.payload;
     },
     // NUOVO: Sostituisci messaggio temporaneo con quello reale
     replaceTemporaryMessage: (state, action) => {
@@ -1020,9 +1025,33 @@ const notificationsSlice = createSlice({
      const notificationId = parseInt(action.payload);
      state.openChatIds.add(notificationId);
      
+     // IMPORTANTE: Se la notifica non era letta, aggiorna il contatore
+     const notification = state.notifications.find(n => n.notificationId === notificationId);
+     if (notification && !notification.isReadByUser) {
+       // Setta il flag di aggiornamento ottimistico
+       state.optimisticUpdateInProgress = true;
+       
+       // Aggiorna la notifica come letta
+       notification.isReadByUser = true;
+       
+       // Ricalcola il contatore
+       const newUnreadCount = state.notifications.filter(
+         (n) => n && n.isReadByUser === false && n.archived !== "1" && n.archived !== 1
+       ).length;
+       
+       state.unreadCount = newUnreadCount;
+       state.unreadCountLastModified = Date.now();
+       
+       // Reset del flag dopo 3 secondi
+       setTimeout(() => {
+         state.optimisticUpdateInProgress = false;
+       }, 3000);
+       
+       console.log(`📊 Chat ${notificationId} aperta, unreadCount aggiornato a: ${newUnreadCount}`);
+     }
+     
      // Inizializza openChatData se non esiste
      if (!state.openChatData[notificationId]) {
-       const notification = state.notifications.find(n => n.notificationId === notificationId);
        if (notification) {
          state.openChatData[notificationId] = {
            ...notification,
@@ -1620,11 +1649,10 @@ const notificationsSlice = createSlice({
       
             state.notifications = notificationsCopy;
             
-            // IMPORTANTE: NON aggiornare unreadCount qui se c'è un aggiornamento in corso dal worker
-            // Lascia che sia il worker a gestire il contatore totale
-            if (!state.unreadCountLastModified || Date.now() - state.unreadCountLastModified > 5000) {
-              state.unreadCount = newUnreadCount;
-            }
+            // IMPORTANTE: Aggiorna sempre il contatore dopo un toggle esplicito
+            state.unreadCount = newUnreadCount;
+            state.optimisticUpdateInProgress = false; // Reset del flag
+            state.unreadCountLastModified = Date.now();
       
             if (isReadByUser) {
               state.unreadMessages = state.unreadMessages.filter(
@@ -1657,6 +1685,7 @@ const notificationsSlice = createSlice({
           }
         } catch (error) {
           console.error("Errore nell'aggiornamento dello stato di lettura:", error);
+          state.optimisticUpdateInProgress = false; // Reset del flag in caso di errore
         }
       })
       
@@ -1933,12 +1962,18 @@ const notificationsSlice = createSlice({
         
         state.notifications = updatedNotifications;
         
-        // CALCOLO CORRETTO di unreadCount escludendo le chat aperte
-        state.unreadCount = updatedNotifications.filter(
-          (n) => n && n.isReadByUser === false && n.archived !== "1" && n.archived !== 1
-        ).length;
-        
-        console.log(`📊 UnreadCount aggiornato: ${state.unreadCount}`);
+        // IMPORTANTE: Aggiorna il contatore solo se non c'è un aggiornamento ottimistico in corso
+        if (!state.optimisticUpdateInProgress) {
+          // CALCOLO CORRETTO di unreadCount escludendo le chat aperte
+          const newUnreadCount = updatedNotifications.filter(
+            (n) => n && n.isReadByUser === false && n.archived !== "1" && n.archived !== 1
+          ).length;
+          
+          state.unreadCount = newUnreadCount;
+          console.log(`📊 UnreadCount aggiornato dal worker: ${newUnreadCount}`);
+        } else {
+          console.log(`🚫 Worker: Ignorando aggiornamento contatore (aggiornamento ottimistico in corso)`);
+        }
         
       } catch (error) {
         console.error("Errore in updateFromWorker:", error);
@@ -2027,6 +2062,7 @@ export const {
  setPendingUnreadCount,
  clearPendingUnreadCount,
  updateUnreadCount,
+ setOptimisticUpdateInProgress,
  initChatPagination,
  removeOpenChatData,
  appendMessagesToChat,

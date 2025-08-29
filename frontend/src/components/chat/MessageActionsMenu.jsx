@@ -116,7 +116,7 @@ const MessageActionsMenu = ({
             onClick={onColorSelect}
           >
             <Palette className="h-4 w-4 mr-3 text-indigo-500" />
-            <span>Colore messaggio</span>
+            <span>Colore</span>
           </button>
         )}
 
@@ -130,7 +130,7 @@ const MessageActionsMenu = ({
               onClick={onEdit}
             >
               <Edit className="h-4 w-4 mr-3 text-green-500" />
-              <span>Modifica messaggio</span>
+              <span>Modifica</span>
             </button>
           )}
 

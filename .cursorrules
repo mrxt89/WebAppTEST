@@ -1,0 +1,180 @@
+# CURSOR AI RULES
+# Regole di comportamento per Cursor AI per questo progetto
+
+## STRUTTURA DEL PROGETTO
+Questo è un progetto full-stack con:
+- **Frontend**: React + Vite + TailwindCSS (cartella frontend/)
+- **Backend**: Node.js/Express (cartella backend/)
+- **Database**: SQL Server
+- **Deploy**: Docker con SSL/HTTPS
+- **Environment**: Sviluppo in Docker con certificati SSL
+
+## REGOLE GENERALI
+
+### Linguaggio e Comunicazione
+- Rispondi sempre in **ITALIANO**
+- Usa terminologia tecnica italiana quando possibile
+- Sii conciso ma completo nelle spiegazioni
+- Fornisci sempre esempi pratici
+
+### Stile di Codice
+- Usa **camelCase** per variabili e funzioni JavaScript
+- Usa **PascalCase** per componenti React
+- Usa **kebab-case** per nomi file CSS/HTML
+- Mantieni consistenza con il codice esistente
+- Aggiungi sempre commenti significativi in italiano
+
+## FRONTEND REACT
+
+### Componenti
+- Crea componenti funzionali con hooks
+- Usa TypeScript quando appropriato
+- Implementa error boundaries
+- Ottimizza per performance con React.memo quando necessario
+
+### Styling
+- **Priorità**: TailwindCSS > CSS Modules > CSS vanilla
+- Usa le classi Tailwind esistenti nel progetto
+- Per componenti complessi, crea CSS modules
+- Mantieni responsive design (mobile-first)
+
+### State Management
+- Usa `useState` e `useReducer` per stato locale
+- Implementa Redux Toolkit per stato globale quando necessario
+- Gestisci loading e error states
+
+### Routing
+- Usa React Router DOM v6
+- Implementa lazy loading per le route
+- Gestisci protezione delle route
+
+## BACKEND
+
+### API Design
+- Segui REST principles
+- Usa HTTP status codes appropriati
+- Implementa validazione input
+- Gestisci errori con middleware centralizzato
+- Documenta endpoint con commenti
+
+### Database
+- Usa SQL Server come da configurazione (.env)
+- Implementa connection pooling
+- Gestisci transazioni per operazioni complesse
+- Usa prepared statements per sicurezza
+
+### Sicurezza
+- Implementa autenticazione JWT
+- Valida e sanitizza input
+- Usa HTTPS (certificati SSL configurati)
+- Implementa rate limiting
+- Gestisci CORS appropriatamente
+
+## DOCKER & SSL
+
+### Configurazione
+- Rispetta la configurazione Docker esistente
+- I certificati SSL sono in ssl/ (root, frontend/, backend/)
+- Usa HTTPS per default (porte 5173 frontend, 3443 backend)
+- HTTP solo per compatibilità (5174 frontend, 3001 backend)
+
+### Environment
+- Database: `host.docker.internal\ARCHASERVER`
+- WebAppTEST come database di sviluppo
+- Usa variabili d'ambiente per configurazioni
+
+## LIBRERIE E DIPENDENZE
+
+### Frontend Disponibili
+- UI: Radix UI, Material-UI, Bootstrap
+- Charts: Recharts
+- Tables: AG-Grid, Tanstack Table
+- Forms: React Hook Form + Zod
+- Icons: FontAwesome, Lucide React
+- Utils: Lodash, date-fns, axios
+
+### Raccomandazioni
+- Non aggiungere nuove dipendenze senza necessità
+- Usa le librerie già incluse nel package.json
+- Verifica compatibilità prima di suggerire upgrade
+
+## PATTERNS E BEST PRACTICES
+
+### Error Handling
+```javascript
+// Gestione errori async/await
+try {
+  const result = await apiCall();
+  return result;
+} catch (error) {
+  console.error('Errore durante chiamata API:', error);
+  throw new Error('Operazione fallita');
+}
+```
+
+### API Calls
+```javascript
+// Usa axios con interceptors per gestire errori globalmente
+const api = axios.create({
+  baseURL: '/api',
+  timeout: 10000
+});
+```
+
+### Component Structure
+```jsx
+// Struttura componente React
+import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
+
+const MioComponente = ({ prop1, prop2 }) => {
+  const [state, setState] = useState(null);
+
+  useEffect(() => {
+    // Logica di inizializzazione
+  }, []);
+
+  return (
+    <div className="p-4 bg-white rounded-lg">
+      {/* JSX content */}
+    </div>
+  );
+};
+
+MioComponente.propTypes = {
+  prop1: PropTypes.string.required,
+  prop2: PropTypes.number
+};
+
+export default MioComponente;
+```
+
+## DEBUGGING & DEVELOPMENT
+
+### Console Logging
+- Usa `console.log` per debug temporaneo
+- Implementa logger strutturato per produzione
+- Rimuovi console.log prima del commit
+
+### Performance
+- Monitora bundle size (configurato in vite.config.js)
+- Usa lazy loading per componenti pesanti
+- Ottimizza immagini e assets
+
+## TESTING
+- Suggerisci test unitari per logica complessa
+- Implementa test di integrazione per API critiche
+- Usa Jest/Vitest per testing
+
+## DEPLOYMENT
+- Rispetta la configurazione SSL esistente
+- Testa sempre in ambiente Docker
+- Verifica HTTPS endpoints prima del deploy
+
+## DOMANDE DA FARE
+Prima di implementare soluzioni complesse, chiedi:
+1. Serve per frontend, backend o entrambi?
+2. Ci sono vincoli di performance?
+3. Deve essere responsive?
+4. Serve autenticazione?
+5. Serve persistenza dati?

@@ -268,10 +268,11 @@ const notificationsWorkerMiddleware = (store) => {
       
             case "unread_count_update":
               const state = store.getState();
-              const { pendingUnreadCount, unreadCountLastModified } = state.notifications;
+              const { pendingUnreadCount, unreadCountLastModified, optimisticUpdateInProgress } = state.notifications;
               
-              // Se c'è una modifica locale recente, ignora l'update del worker
-              if (unreadCountLastModified && Date.now() - unreadCountLastModified < 5000) {
+              // Se c'è una modifica locale recente o un aggiornamento ottimistico in corso, ignora l'update del worker
+              if ((unreadCountLastModified && Date.now() - unreadCountLastModified < 5000) || optimisticUpdateInProgress) {
+                console.log(`🚫 Worker: Ignorando aggiornamento contatore (modifica locale in corso o aggiornamento ottimistico)`);
                 return;
               }
               

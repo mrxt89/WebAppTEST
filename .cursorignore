@@ -1,0 +1,157 @@
+# === CURSOR IGNORE FILE ===
+# File e cartelle da escludere dall'analisi di Cursor AI
+
+# Node modules
+**/node_modules/
+**/jspm_packages/
+
+# Build outputs
+**/dist/
+**/build/
+**/.next/
+**/.nuxt/
+**/out/
+
+# Cache directories
+**/.cache/
+**/.parcel-cache/
+**/.vite/
+**/.turbo/
+**/.nx/
+**/coverage/
+**/.nyc_output/
+
+# SSL Certificates (sensibili)
+**/ssl/
+**/*.pem
+**/*.key
+**/*.crt
+**/*.cert
+
+# Environment files (contengono dati sensibili)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Database files
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+
+# Logs
+**/logs/
+**/*.log
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/lerna-debug.log*
+**/.pnpm-debug.log*
+
+# Runtime data
+**/pids/
+**/*.pid
+**/*.seed
+**/*.pid.lock
+
+# Docker
+**/Dockerfile
+**/docker-compose*.yml
+**/.dockerignore
+
+# IDE files
+**/.vscode/
+**/.idea/
+**/*.swp
+**/*.swo
+**/*.tmp
+
+# OS files
+**/.DS_Store
+**/Thumbs.db
+**/desktop.ini
+
+# Temporary files
+**/tmp/
+**/temp/
+**/.temp/
+
+# Package manager files
+**/package-lock.json
+**/yarn.lock
+**/pnpm-lock.yaml
+**/.yarn/
+**/.pnp.*
+
+# Test coverage
+**/lcov-report/
+**/*.lcov
+
+# ESLint cache
+**/.eslintcache
+**/.stylelintcache
+
+# TypeScript cache
+**/*.tsbuildinfo
+
+# Webpack
+**/.webpack/
+
+# Storybook
+**/storybook-static/
+
+# Editor directories and files
+**/.vscode-test/
+
+# Large media files (non necessari per l'analisi del codice)
+**/*.mp4
+**/*.avi
+**/*.mov
+**/*.wmv
+**/*.flv
+**/*.webm
+**/*.mp3
+**/*.wav
+**/*.flac
+**/*.aac
+**/*.ogg
+
+# Large image files
+**/*.psd
+**/*.ai
+**/*.eps
+**/*.tiff
+**/*.bmp
+
+# Backup files
+**/*.bak
+**/*.backup
+**/*.old
+
+# Minified files
+**/*.min.js
+**/*.min.css
+
+# Source maps (opzionale, puoi rimuovere se necessario)
+**/*.map
+
+# Localization files (se molto grandi)
+**/locales/*.json
+
+# Documentation builds
+**/docs/build/
+**/docs/.docusaurus/
+
+# Cypress
+**/cypress/videos/
+**/cypress/screenshots/
+
+# Jest
+**/jest-results.xml
+
+# Playwright
+**/test-results/
+**/playwright-report/
+
+# Profiling
+**/*.cpuprofile
+**/*.heapprofile

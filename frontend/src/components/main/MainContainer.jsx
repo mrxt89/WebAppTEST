@@ -33,9 +33,9 @@ const MainContainer = ({
   currentLevelItems,
   children, // Aggiungo il supporto per i children
 }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+    useNavigate();
+    const location = useLocation();
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const drawerTriggerRef = useRef(null);
   
