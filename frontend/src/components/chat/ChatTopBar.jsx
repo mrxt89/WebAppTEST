@@ -790,8 +790,8 @@ const ChatTopBar = ({
               className={`font-medium text-base md:text-lg truncate text-center ${
                 disableTitleEdit ? '' : 'cursor-pointer group'
               } relative`}
-              onClick={disableTitleEdit ? undefined : handleTitleEdit}
-              title={disableTitleEdit ? title : "Clicca per modificare il titolo"}
+              onDoubleClick={disableTitleEdit ? undefined : handleTitleEdit}
+              title={disableTitleEdit ? title : "Doppio click per modificare il titolo"}
             >
               {title}
               {isArchived && (

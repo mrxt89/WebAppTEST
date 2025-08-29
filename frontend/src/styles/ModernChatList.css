@@ -84,12 +84,11 @@
 }
 
 .message-bubble.received {
-  background: #ffffff59;
-  color: #1A202C;
-  margin-right: auto;
-  border-bottom-left-radius: 6px;
-  box-shadow: 0px 4px 12px rgba(112, 0, 110, 0.07);
-  border: 1px solid #6b86a826;
+  background: linear-gradient(135deg, #0a767ee1 0%, #0d868fbd 100%);
+  color: #FFFFFF;
+  margin-left: auto;
+  border-bottom-right-radius: 6px;
+  box-shadow: 0px 4px 12px rgba(108, 99, 255, 0.08);
 }
 
 .message-bubble.sent:hover {
@@ -98,9 +97,8 @@
 }
 
 .message-bubble.received:hover {
-  background: #d0d3d930;
-  box-shadow: 0px 6px 18px rgba(160, 174, 192, 0.13);
-  transition: all 0.1s 
+  background: linear-gradient(135deg, #0a7077e1 0%, #0c7981bd 100%);
+  box-shadow: 0px 6px 18px rgba(108, 99, 255, 0.13);
 }
 
 .message-timestamp {
