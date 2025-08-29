@@ -8,7 +8,8 @@ import {
   updatePaginatedNotification, 
   updateUnreadCount,
   setPendingUnreadCount,
-  clearPendingUnreadCount 
+  clearPendingUnreadCount,
+  setOptimisticUpdateInProgress
 } from "@/redux/features/notifications/notificationsSlice";
 import { swal } from "@/lib/common";
 import {
@@ -572,6 +573,9 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
       
       // Se la notifica non è letta, aggiornala immediatamente
       if (!notification.isReadByUser) {
+        // IMPORTANTE: Setta il flag di aggiornamento ottimistico
+        dispatch(setOptimisticUpdateInProgress(true));
+        
         // Aggiornamento ottimistico immediato
         setOptimisticUpdates(prev => ({
           ...prev,
@@ -596,6 +600,14 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
           notificationId: notification.notificationId,
           updates: { isReadByUser: true }
         }));
+        
+        // Aggiorna il contatore globale
+        dispatch(updateUnreadCount(newUnreadCount));
+        
+        // Reset del flag dopo 3 secondi
+        setTimeout(() => {
+          dispatch(setOptimisticUpdateInProgress(false));
+        }, 3000);
         
         // Rimuovi l'aggiornamento ottimistico dopo un delay
         setTimeout(() => {
@@ -639,6 +651,9 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
     
     const newUnreadCount = Math.max(0, unreadCount + deltaCount);
     
+    // IMPORTANTE: Setta il flag di aggiornamento ottimistico
+    dispatch(setOptimisticUpdateInProgress(true));
+    
     // IMPORTANTE: Setta il contatore pendente in Redux
     dispatch(setPendingUnreadCount({ 
       count: newUnreadCount, 
@@ -670,9 +685,10 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
         updates: { isReadByUser: newReadState }
       }));
       
-      // Dopo 5 secondi, pulisci il pendingCount
+      // Dopo 5 secondi, pulisci il pendingCount e reset del flag
       setTimeout(() => {
         dispatch(clearPendingUnreadCount());
+        dispatch(setOptimisticUpdateInProgress(false));
       }, 5000);
       
       // Rimuovi ottimistico
@@ -689,6 +705,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
       
       // In caso di errore, ripristina tutto
       dispatch(clearPendingUnreadCount());
+      dispatch(setOptimisticUpdateInProgress(false)); // Reset del flag
       dispatch(updateUnreadCount(unreadCount)); // Ripristina valore originale
       
       setOptimisticUpdates(prev => {
@@ -1888,7 +1905,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                         onClick={(e) => handleToggleReadUnread(notification.notificationId, notification.isReadByUser, e)}
                         id={`notification-read-indicator-${notification.notificationId}`}
                         title={notification.isReadByUser ? "Segna come non letto" : "Segna come letto"}
-                      ></div>
+                      />
                     </div>
                   );
                 })}

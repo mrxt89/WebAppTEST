@@ -1,4 +1,4 @@
-/* Development Theme */
+/* Development Theme - Design System Compliant */
 .development:root {
   --background: 0 0% 100%;
   --foreground: 240 10% 3.9%;
@@ -14,18 +14,27 @@
   --destructive-foreground: 0 0% 98%;
   --ring: 240 10% 3.9%;
 
-  /* Development specific colors */
-  --primary: #2a2a2a;
-  --secondary: #212121;
-  --accent: #ecf0f1;
-  --muted: #bdc3c7;
-  --background: #ffffff;
-  --foreground: #000000;
-  --border: #e5e7eb;
-  --radius: 0.5rem;
+  /* Development specific colors - Design System */
+  --primary: #6C63FF;
+  --secondary: #3AA8F2;
+  --accent: #F8F9FC;
+  --muted: #A0AEC0;
+  --background: #F8F9FC;
+  --foreground: #1A202C;
+  --border: #E2E8F0;
+  --radius: 16px;
+  --shadow: 0px 4px 12px rgba(0,0,0,0.05);
+  --font-family: Inter, sans-serif;
+  --font-size: 14px;
+  --line-height: 1.5;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
 }
 
-/* Production Theme */
+/* Production Theme - Design System Compliant */
 .production:root {
   --background: 0 0% 100%;
   --foreground: 240 10% 3.9%;
@@ -41,18 +50,27 @@
   --destructive-foreground: 0 0% 98%;
   --ring: 240 10% 3.9%;
 
-  /* Production specific colors */
-  --primary: #1b263b;
-  --secondary: #1b263b;
-  --accent: #ecf0f1;
-  --muted: #bdc3c7;
-  --background: #ffffff;
-  --foreground: #000000;
-  --border: #e5e7eb;
-  --radius: 0.5rem;
+  /* Production specific colors - Design System */
+  --primary: #6C63FF;
+  --secondary: #3AA8F2;
+  --accent: #F8F9FC;
+  --muted: #A0AEC0;
+  --background: #F8F9FC;
+  --foreground: #1A202C;
+  --border: #E2E8F0;
+  --radius: 16px;
+  --shadow: 0px 4px 12px rgba(0,0,0,0.05);
+  --font-family: Inter, sans-serif;
+  --font-size: 14px;
+  --line-height: 1.5;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
 }
 
-/* Dark theme (mantiene lo stesso per entrambi gli ambienti) */
+/* Dark theme - Design System Compliant */
 .dark {
   --background: 240 10% 3.9%;
   --foreground: 0 0% 98%;
@@ -73,4 +91,23 @@
   --border: 240 3.7% 15.9%;
   --input: 240 3.7% 15.9%;
   --ring: 240 4.9% 83.9%;
+
+  /* Dark theme specific colors - Design System */
+  --primary: #6C63FF;
+  --secondary: #3AA8F2;
+  --accent: #1A202C;
+  --muted: #4A5568;
+  --background: #1A202C;
+  --foreground: #FFFFFF;
+  --border: #2D3748;
+  --radius: 16px;
+  --shadow: 0px 4px 12px rgba(0,0,0,0.3);
+  --font-family: Inter, sans-serif;
+  --font-size: 14px;
+  --line-height: 1.5;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
 }

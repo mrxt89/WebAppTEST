@@ -1,39 +1,46 @@
-/* Stili per ChatBottomBar */
+/* Stili per ChatBottomBar - Design System Compliant */
 .chat-bottom-bar-container {
   max-height: var(--chat-bottom-bar-height, 180px);
   overflow-y: visible;
   position: relative;
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
 }
 
 .drag-overlay {
   position: absolute;
   inset: 0;
-  background-color: rgba(219, 234, 254, 0.7);
+  background-color: rgba(108, 99, 255, 0.1);
   backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
-  border: 2px dashed #93c5fd;
-  border-radius: 0.5rem;
+  border: 2px dashed #6C63FF;
+  border-radius: 16px;
 }
 
 .drag-overlay-content {
   text-align: center;
-  padding: 1rem;
+  padding: 16px;
+  color: #1A202C;
+  font-family: Inter, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .drag-overlay-icon {
   margin: 0 auto;
-  height: 2rem;
-  width: 2rem;
-  color: #3b82f6;
-  margin-bottom: 0.5rem;
+  height: 24px;
+  width: 24px;
+  color: #6C63FF;
+  margin-bottom: 8px;
 }
 
 .drag-overlay-text {
-  color: #1d4ed8;
-  font-weight: 500;
+  color: #4A5568;
+  font-weight: 600;
 }
 
 /* Stili per EditMessageModal */
@@ -41,6 +48,8 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
 }
 
 .edit-message-modal-content {
@@ -52,6 +61,10 @@
   max-height: 80vh !important;
   width: 100% !important;
   max-width: 500px !important;
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid #E2E8F0;
 }
 
 .emoji-picker-container {
@@ -59,18 +72,25 @@
   bottom: 40px;
   right: 10px;
   z-index: 10;
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid #E2E8F0;
 }
 
 .emoji-button {
   background: none;
   border: none;
   cursor: pointer;
-  color: #6b7280;
+  color: #A0AEC0;
   transition: color 0.2s;
+  padding: 8px;
+  border-radius: 12px;
 }
 
 .emoji-button:hover {
-  color: #3b82f6;
+  color: #6C63FF;
+  background: #F7FAFC;
 }
 
 .mention-suggestions {
@@ -80,23 +100,26 @@
   width: 100%;
   max-height: 150px;
   overflow-y: auto;
-  background-color: white;
-  color: #374151;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background-color: #FFFFFF;
+  color: #1A202C;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
   z-index: 50;
+  font-family: Inter, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .mention-item {
   padding: 8px 12px;
   cursor: pointer;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #F7FAFC;
   transition: background-color 0.2s;
 }
 
 .mention-item:hover {
-  background-color: #f3f4f6;
+  background-color: #F7FAFC;
 }
 
 .mention-item:last-child {
@@ -106,14 +129,14 @@
 /* Stili per MinimizedChatsDock */
 .window-dock {
   padding: 8px;
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(5px);
   border-radius: 999px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
   display: flex;
   flex-direction: row;
-  gap: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  gap: 8px;
+  border: 1px solid #E2E8F0;
   z-index: 100000;
   transition: opacity 0.2s ease;
   opacity: 0.7;
@@ -128,6 +151,7 @@
     transform 0.2s ease,
     opacity 0.2s ease,
     background-color 0.2s ease;
+  padding: 8px;
 }
 
 .minimized-chat-icon.unread-pulse {
@@ -137,7 +161,7 @@
 
 @keyframes pulse-red {
   0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    box-shadow: 0 0 0 0 rgba(245, 101, 101, 0.7);
     transform: scale(1);
   }
   50% {
@@ -155,7 +179,9 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 20px;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
 }
 
 .version-history-modal {
@@ -169,42 +195,59 @@
   margin: 0 !important;
   display: flex !important;
   flex-direction: column !important;
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid #E2E8F0;
 }
 
 .version-history-header {
   position: sticky;
   top: 0;
-  background-color: white;
+  background-color: #FFFFFF;
   z-index: 10;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #E2E8F0;
+  padding: 16px;
+  font-family: Inter, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #1A202C;
 }
 
 .version-card {
   transition: all 0.2s ease;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 16px;
+  margin: 8px;
 }
 
 .version-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
 }
 
 .current-version-card {
-  background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
-  border-color: #93c5fd;
+  background: linear-gradient(135deg, rgba(108, 99, 255, 0.1) 0%, rgba(58, 168, 242, 0.1) 100%);
+  border-color: #6C63FF;
 }
 
 .edit-badge {
   display: inline-flex;
   align-items: center;
-  background-color: #f3f4f6;
+  background-color: #F7FAFC;
   border-radius: 9999px;
-  padding: 2px 8px;
-  font-size: 0.75rem;
-  color: #4b5563;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #4A5568;
+  font-family: Inter, sans-serif;
+  font-weight: 600;
 }
 
 .loading-spinner {
   animation: spin 1s linear infinite;
+  color: #6C63FF;
 }
 
 @keyframes spin {
@@ -234,4 +277,8 @@
 .message-text {
   white-space: pre-line;
   word-break: break-word;
+  font-family: Inter, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1A202C;
 }
