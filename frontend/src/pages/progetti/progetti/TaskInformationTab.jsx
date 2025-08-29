@@ -27,7 +27,9 @@ import {
   UserCheck,
   Info,
   AlertCircle,
-  X
+  X,
+  ChevronDown,
+  Search
 } from "lucide-react";
 import { config } from "../../../config";
 
@@ -54,6 +56,7 @@ const TaskInformationTab = ({
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [participantSearch, setParticipantSearch] = useState("");
+  const [isParticipantDropdownOpen, setIsParticipantDropdownOpen] = useState(false);
   
   // Stati per dipendenze multiple
   const [selectedPredecessors, setSelectedPredecessors] = useState([]);
@@ -408,116 +411,186 @@ const TaskInformationTab = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Colonna sinistra - Partecipanti */}
             <div className="space-y-2">
-              <div className="flex justify-between items-center mb-2">
-                <Label className="text-sm font-medium flex items-center gap-1">
-                  <UserPlus className="h-3 w-3" />
-                  Partecipanti ({selectedParticipants.length})
-                </Label>
-                {isEditing && (
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="showSelected"
-                      checked={showSelectedOnly}
-                      onCheckedChange={setShowSelectedOnly}
-                      className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+              <Label className="text-sm font-medium flex items-center gap-1">
+                <UserPlus className="h-3 w-3" />
+                Partecipanti ({selectedParticipants.length})
+              </Label>
+
+              {isEditing ? (
+                <div className="relative">
+                  {/* Trigger del dropdown */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between"
+                    onClick={() => setIsParticipantDropdownOpen(!isParticipantDropdownOpen)}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Search className="h-4 w-4" />
+                      {participantSearch ? `Cerca: ${participantSearch}` : "Seleziona partecipanti..."}
+                    </span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isParticipantDropdownOpen ? 'rotate-180' : ''}`} />
+                  </Button>
+
+                  {/* Dropdown menu */}
+                  {isParticipantDropdownOpen && (
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-80 overflow-hidden">
+                      {/* Header con ricerca e filtri */}
+                      <div className="p-3 border-b border-gray-200 bg-gray-50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Search className="h-4 w-4 text-gray-400" />
+                          <Input
+                            placeholder="Cerca partecipante..."
+                            value={participantSearch}
+                            onChange={(e) => setParticipantSearch(e.target.value)}
+                            className="flex-1"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="showSelected"
+                            checked={showSelectedOnly}
+                            onCheckedChange={setShowSelectedOnly}
+                            className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500 border-primary"
+                          />
+                          <Label htmlFor="showSelected" className="text-sm text-gray-600 cursor-pointer">
+                            Solo selezionati
+                          </Label>
+                        </div>
+                      </div>
+
+                      {/* Lista partecipanti */}
+                      <ScrollArea className="max-h-60">
+                        <div className="p-2 space-y-1">
+                          {filteredAssignableUsers.length > 0 ? (
+                            filteredAssignableUsers.map((user) => {
+                              const isChecked = selectedParticipants.includes(user.userId.toString());
+                              return (
+                                <div
+                                  key={user.userId}
+                                  className="flex items-center space-x-3 hover:bg-gray-50 p-2 rounded-md transition-colors"
+                                >
+                                  <Checkbox
+                                    checked={isChecked}
+                                    onCheckedChange={(checked) => {
+                                      setSelectedParticipants((prev) => {
+                                        const userId = user.userId.toString();
+                                        if (checked) {
+                                          return prev.includes(userId) ? prev : [...prev, userId];
+                                        } else {
+                                          return prev.filter((id) => id !== userId);
+                                        }
+                                      });
+                                    }}
+                                    className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                                  />
+                                  <div 
+                                    className="flex items-center gap-2 flex-grow cursor-pointer"
+                                    onClick={() => {
+                                      setSelectedParticipants((prev) => {
+                                        const userId = user.userId.toString();
+                                        if (prev.includes(userId)) {
+                                          return prev.filter((id) => id !== userId);
+                                        }
+                                        return [...prev, userId];
+                                      });
+                                    }}
+                                  >
+                                    <Avatar className="h-6 w-6">
+                                      <AvatarFallback className="text-xs">
+                                        {getInitials(user.firstName, user.lastName)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-sm font-normal">
+                                      {user.firstName} {user.lastName}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-center py-8 text-sm text-gray-500">
+                              {participantSearch
+                                ? "Nessun partecipante trovato"
+                                : "Nessun partecipante disponibile"}
+                            </div>
+                          )}
+                        </div>
+                      </ScrollArea>
+
+                      {/* Footer con azioni rapide */}
+                      <div className="p-2 border-t border-gray-200 bg-gray-50">
+                        <div className="flex justify-between items-center text-xs text-gray-600">
+                          <span>{selectedParticipants.length} selezionati</span>
+                          {selectedParticipants.length > 0 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedParticipants([])}
+                              className="h-6 px-2 text-red-600 hover:text-red-700"
+                            >
+                              Deseleziona tutti
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Overlay per chiudere il dropdown */}
+                  {isParticipantDropdownOpen && (
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setIsParticipantDropdownOpen(false)}
                     />
-                    <Label htmlFor="showSelected" className="text-sm text-gray-600 cursor-pointer">
-                      Solo selezionati
-                    </Label>
+                  )}
+                </div>
+              ) : null}
+
+                             {/* Visualizzazione partecipanti selezionati */}
+               <div className="min-h-[120px] bg-gray-50 rounded-lg p-3 border border-gray-200">
+                 {getParticipantDetails().length > 0 ? (
+                   <div className="space-y-2">
+                     {getParticipantDetails().map((participant, index) => (
+                       <div
+                         key={index}
+                         className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-md border border-gray-200 shadow-sm w-full"
+                       >
+                         <Avatar className="h-6 w-6">
+                           <AvatarFallback className="text-xs">
+                             {getInitials(participant.firstName, participant.lastName)}
+                           </AvatarFallback>
+                         </Avatar>
+                         <span className="text-sm font-medium flex-1">
+                           {participant.firstName} {participant.lastName}
+                         </span>
+                         {isEditing && (
+                           <Button
+                             type="button"
+                             variant="ghost"
+                             size="sm"
+                             onClick={() => {
+                               setSelectedParticipants(prev => 
+                                 prev.filter(id => id !== participant.userId.toString())
+                               );
+                             }}
+                             className="h-4 w-4 p-0 text-gray-400 hover:text-red-500"
+                           >
+                             <X className="h-3 w-3" />
+                           </Button>
+                         )}
+                       </div>
+                     ))}
+                   </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <span className="text-sm text-gray-500 italic">
+                      {isEditing ? "Nessun partecipante selezionato" : "Nessun partecipante aggiuntivo"}
+                    </span>
                   </div>
                 )}
               </div>
-
-              {isEditing && (
-                <Input
-                  placeholder="Cerca partecipante..."
-                  value={participantSearch}
-                  onChange={(e) => setParticipantSearch(e.target.value)}
-                  className="w-full mb-2"
-                />
-              )}
-
-              {isEditing ? (
-                <Card className="border-dashed">
-                  <ScrollArea className="h-[280px]">
-                    <div className="p-2 space-y-1">
-                      {filteredAssignableUsers.length > 0 ? (
-                        filteredAssignableUsers.map((user) => {
-                          const isChecked = selectedParticipants.includes(user.userId.toString());
-                          return (
-                            <div
-                              key={user.userId}
-                              className="flex items-center space-x-3 hover:bg-gray-50 p-2 rounded-md transition-colors"
-                            >
-                              <input
-                                type="checkbox"
-                                id={`user-${user.userId}`}
-                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedParticipants((prev) => {
-                                    const userId = user.userId.toString();
-                                    if (prev.includes(userId)) {
-                                      return prev.filter((id) => id !== userId);
-                                    }
-                                    return [...prev, userId];
-                                  });
-                                }}
-                              />
-                              <label
-                                htmlFor={`user-${user.userId}`}
-                                className="flex-grow cursor-pointer font-normal"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  const checkbox = document.getElementById(`user-${user.userId}`);
-                                  if (checkbox) {
-                                    checkbox.click();
-                                  }
-                                }}
-                              >
-                                {user.firstName} {user.lastName}
-                              </label>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="text-center py-8 text-sm text-gray-500">
-                          {participantSearch
-                            ? "Nessun partecipante trovato"
-                            : "Nessun partecipante disponibile"}
-                        </div>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </Card>
-              ) : (
-                <div className="bg-gray-50 rounded-lg p-4 min-h-[280px]">
-                  <div className="flex flex-wrap gap-2">
-                    {getParticipantDetails().length > 0 ? (
-                      getParticipantDetails().map((participant, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-2 bg-white px-3 py-2 rounded-md border border-gray-200"
-                        >
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-xs">
-                              {getInitials(participant.firstName, participant.lastName)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm">
-                            {participant.firstName} {participant.lastName}
-                          </span>
-                        </div>
-                      ))
-                    ) : (
-                      <span className="text-sm text-gray-500 italic">
-                        Nessun partecipante aggiuntivo
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Colonna destra - Responsabile e Gruppo */}
