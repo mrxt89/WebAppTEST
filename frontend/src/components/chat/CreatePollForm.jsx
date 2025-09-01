@@ -1,7 +1,7 @@
 // CreatePollForm.jsx - Versione completa con tutto lo stile originale
 
 import React, { useState } from "react";
-import { X, Plus, Trash2, Calendar, Users, BarChart, AlertCircle } from "lucide-react";
+import { X, Plus, Trash2, Calendar, Users, BarChart, AlertCircle, Sparkles } from "lucide-react";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import { swal } from "@/lib/common";
 import DatePicker from "react-datepicker";
@@ -214,280 +214,275 @@ const CreatePollForm = ({ notificationId, onSuccess, onCancel }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-auto">
-      {/* Header */}
-      <div className="px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded-t-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <BarChart className="h-6 w-6 text-white mr-3" />
-            <h3 className="text-xl font-semibold text-white">
-              Crea nuovo sondaggio
-            </h3>
+    <div className="poll-modal-overlay">
+      <div className="poll-modal-container">
+        {/* Header con gradiente moderno */}
+        <div className="poll-modal-header">
+          <div className="poll-header-content">
+            <div className="poll-header-icon">
+              <Sparkles className="h-6 w-6 text-white" />
+            </div>
+            <div className="poll-header-text">
+              <h3 className="poll-title">Crea nuovo sondaggio</h3>
+              <p className="poll-subtitle">Raccogli feedback dalla tua squadra</p>
+            </div>
           </div>
           <button
             onClick={onCancel}
-            className="text-white hover:text-gray-200 transition-colors"
+            className="poll-close-button"
             disabled={isSubmitting}
           >
-            <X className="h-6 w-6" />
+            <X className="h-5 w-5" />
           </button>
         </div>
-      </div>
 
-      <form onSubmit={handleSubmit} className="p-6">
-        {/* Domanda */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Domanda del sondaggio <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              value={question}
-              onChange={(e) => {
-                setQuestion(e.target.value);
-                if (errors.question) {
-                  const newErrors = { ...errors };
-                  delete newErrors.question;
-                  setErrors(newErrors);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Tab" && !e.shiftKey) {
-                  e.preventDefault();
-                  const firstOption = document.querySelector('input[name="option_0"]');
-                  if (firstOption) {
-                    firstOption.focus();
-                  }
-                }
-              }}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
-                errors.question 
-                  ? "border-red-300 focus:ring-red-500" 
-                  : "border-gray-300 focus:ring-blue-500"
-              }`}
-              placeholder="Es: Qual è il tuo colore preferito?"
-              disabled={isSubmitting}
-              maxLength={500}
-            />
-            {errors.question && (
-              <div className="absolute right-3 top-3">
-                <AlertCircle className="h-5 w-5 text-red-500" />
-              </div>
-            )}
-          </div>
-          <div className="flex justify-between items-center mt-1">
-            {errors.question && (
-              <p className="text-sm text-red-500">{errors.question}</p>
-            )}
-            <p className="text-xs text-gray-500 ml-auto">
-              {question.length}/500 caratteri
-            </p>
-          </div>
-        </div>
-
-        {/* Opzioni */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Opzioni di risposta <span className="text-red-500">*</span>
-          </label>
-          {errors.options && (
-            <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center">
-              <AlertCircle className="h-4 w-4 text-red-500 mr-2" />
-              <p className="text-sm text-red-700">{errors.options}</p>
+        <form onSubmit={handleSubmit} className="poll-form">
+          {/* Sezione Domanda */}
+          <div className="poll-section">
+            <div className="poll-section-header">
+              <BarChart className="h-5 w-5 text-blue-600" />
+              <h4 className="poll-section-title">Domanda del sondaggio</h4>
             </div>
-          )}
-          {errors.duplicates && (
-            <div className="mb-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center">
-              <AlertCircle className="h-4 w-4 text-yellow-600 mr-2" />
-              <p className="text-sm text-yellow-700">{errors.duplicates}</p>
-            </div>
-          )}
-          
-          <div className="space-y-3">
-            {options.map((option, index) => (
-              <div key={index} className="flex items-center gap-3 group">
-                <span className="text-sm font-medium text-gray-500 w-6 text-center">
-                  {index + 1}.
-                </span>
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    name={`option_${index}`}
-                    value={option}
-                    onChange={(e) => updateOption(index, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(e, index)}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
-                      errors[`option_${index}`]
-                        ? "border-red-300 focus:ring-red-500"
-                        : "border-gray-300 focus:ring-blue-500 hover:border-gray-400"
-                    }`}
-                    placeholder={`Opzione ${index + 1}`}
-                    disabled={isSubmitting}
-                    maxLength={200}
-                  />
-                  {errors[`option_${index}`] && (
-                    <div className="absolute right-3 top-2.5">
-                      <AlertCircle className="h-5 w-5 text-red-500" />
-                    </div>
-                  )}
-                </div>
-                {options.length > 2 && (
-                  <button
-                    type="button"
-                    onClick={() => removeOption(index)}
-                    className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                    disabled={isSubmitting}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {options.length < 10 && (
-            <button
-              type="button"
-              onClick={addOption}
-              className="mt-4 flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium transition-colors"
-              disabled={isSubmitting}
-            >
-              <div className="p-1 bg-blue-100 rounded">
-                <Plus className="h-4 w-4" />
-              </div>
-              <span>Aggiungi opzione</span>
-            </button>
-          )}
-          
-          <p className="text-xs text-gray-500 mt-2">
-            Suggerimento: premi Tab sull'ultima opzione per aggiungerne una nuova
-          </p>
-        </div>
-
-        {/* Impostazioni aggiuntive */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">
-            Impostazioni aggiuntive
-          </h4>
-          
-          {/* Risposte multiple */}
-          <label className="flex items-center cursor-pointer group">
-            <input
-              type="checkbox"
-              id="multipleAnswers"
-              checked={allowMultipleAnswers}
-              onChange={(e) => setAllowMultipleAnswers(e.target.checked)}
-              onKeyDown={(e) => handleCheckboxKeyDown(e, 'hasExpiration')}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
-              disabled={isSubmitting}
-            />
-            <div className="ml-3 flex items-center gap-2">
-              <Users className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
-              <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                Consenti risposte multiple
-              </span>
-            </div>
-          </label>
-
-          {/* Scadenza */}
-          <div>
-            <label className="flex items-center cursor-pointer group">
+            
+            <div className="poll-input-group">
               <input
-                type="checkbox"
-                id="hasExpiration"
-                checked={hasExpiration}
+                type="text"
+                value={question}
                 onChange={(e) => {
-                  setHasExpiration(e.target.checked);
-                  if (!e.target.checked) {
-                    setExpirationDate(null);
-                    if (errors.expiration) {
-                      const newErrors = { ...errors };
-                      delete newErrors.expiration;
-                      setErrors(newErrors);
-                    }
+                  setQuestion(e.target.value);
+                  if (errors.question) {
+                    const newErrors = { ...errors };
+                    delete newErrors.question;
+                    setErrors(newErrors);
                   }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Tab" && !e.shiftKey) {
                     e.preventDefault();
-                    document.querySelector('button[type="submit"]').focus();
+                    const firstOption = document.querySelector('input[name="option_0"]');
+                    if (firstOption) {
+                      firstOption.focus();
+                    }
                   }
                 }}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                className={`poll-input ${errors.question ? 'poll-input-error' : ''}`}
+                placeholder="Es: Qual è il tuo colore preferito?"
                 disabled={isSubmitting}
+                maxLength={500}
               />
-              <div className="ml-3 flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
-                <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                  Imposta data di scadenza
-                </span>
-              </div>
-            </label>
+              {errors.question && (
+                <div className="poll-error-icon">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+              )}
+            </div>
+            
+            <div className="poll-input-footer">
+              {errors.question && (
+                <p className="poll-error-text">{errors.question}</p>
+              )}
+              <p className="poll-char-count">
+                {question.length}/500 caratteri
+              </p>
+            </div>
+          </div>
 
-            {hasExpiration && (
-              <div className="ml-7 mt-3">
-                <DatePicker
-                  selected={expirationDate}
-                  onChange={(date) => {
-                    setExpirationDate(date);
-                    if (errors.expiration) {
-                      const newErrors = { ...errors };
-                      delete newErrors.expiration;
-                      setErrors(newErrors);
-                    }
-                  }}
-                  showTimeSelect
-                  timeFormat="HH:mm"
-                  timeIntervals={15}
-                  dateFormat="dd/MM/yyyy HH:mm"
-                  minDate={new Date()}
-                  locale={it}
-                  className={`px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
-                    errors.expiration
-                      ? "border-red-300 focus:ring-red-500"
-                      : "border-gray-300 focus:ring-blue-500"
-                  }`}
-                  placeholderText="Seleziona data e ora"
+          {/* Sezione Opzioni */}
+          <div className="poll-section">
+            <div className="poll-section-header">
+              <div className="">
+                <span className="poll-option-number">1</span>
+              </div>
+              <div className="poll-section-title">Opzioni di risposta </div>
+            </div>
+            
+            {errors.options && (
+              <div className="poll-alert poll-alert-error">
+                <AlertCircle className="h-4 w-4" />
+                <p>{errors.options}</p>
+              </div>
+            )}
+            
+            {errors.duplicates && (
+              <div className="poll-alert poll-alert-warning">
+                <AlertCircle className="h-4 w-4" />
+                <p>{errors.duplicates}</p>
+              </div>
+            )}
+            
+            <div className="poll-options-container">
+              {options.map((option, index) => (
+                <div key={index} className="poll-option-item">
+                  <div className="poll-option-number-badge">
+                    {index + 1}
+                  </div>
+                  <div className="poll-option-input-wrapper">
+                    <input
+                      type="text"
+                      name={`option_${index}`}
+                      value={option}
+                      onChange={(e) => updateOption(index, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e, index)}
+                      className={`poll-option-input ${errors[`option_${index}`] ? 'poll-input-error' : ''}`}
+                      placeholder={`Opzione ${index + 1}`}
+                      disabled={isSubmitting}
+                      maxLength={200}
+                    />
+                    {errors[`option_${index}`] && (
+                      <div className="poll-error-icon">
+                        <AlertCircle className="h-4 w-4" />
+                      </div>
+                    )}
+                  </div>
+                  {options.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => removeOption(index)}
+                      className="poll-remove-button"
+                      disabled={isSubmitting}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {options.length < 10 && (
+              <button
+                type="button"
+                onClick={addOption}
+                className="poll-add-button"
+                disabled={isSubmitting}
+              >
+                <Plus className="h-4 w-4" />
+                <span>Aggiungi opzione</span>
+              </button>
+            )}
+          
+          </div>
+
+          {/* Sezione Impostazioni */}
+          <div className="poll-settings-section">
+            <div className="poll-section-header">
+              <div className="poll-settings-icon">
+                <span className="poll-settings-dot"></span>
+              </div>
+              <h4 className="poll-section-title">Impostazioni aggiuntive</h4>
+            </div>
+            
+            <div className="poll-settings-grid">
+              {/* Risposte multiple */}
+              <label className="poll-checkbox-item">
+                <input
+                  type="checkbox"
+                  id="multipleAnswers"
+                  checked={allowMultipleAnswers}
+                  onChange={(e) => setAllowMultipleAnswers(e.target.checked)}
+                  onKeyDown={(e) => handleCheckboxKeyDown(e, 'hasExpiration')}
+                  className="poll-checkbox"
                   disabled={isSubmitting}
                 />
-                {errors.expiration && (
-                  <p className="text-sm text-red-500 mt-1">{errors.expiration}</p>
+                <div className="poll-checkbox-content">
+                  <Users className="h-4 w-4 text-blue-600" />
+                  <span>Consenti risposte multiple</span>
+                </div>
+              </label>
+
+              {/* Scadenza */}
+              <div className="poll-expiration-group">
+                <label className="poll-checkbox-item">
+                  <input
+                    type="checkbox"
+                    id="hasExpiration"
+                    checked={hasExpiration}
+                    onChange={(e) => {
+                      setHasExpiration(e.target.checked);
+                      if (!e.target.checked) {
+                        setExpirationDate(null);
+                        if (errors.expiration) {
+                          const newErrors = { ...errors };
+                          delete newErrors.expiration;
+                          setErrors(newErrors);
+                        }
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Tab" && !e.shiftKey) {
+                        e.preventDefault();
+                        document.querySelector('button[type="submit"]').focus();
+                      }
+                    }}
+                    className="poll-checkbox"
+                    disabled={isSubmitting}
+                  />
+                  <div className="poll-checkbox-content">
+                    <Calendar className="h-4 w-4 text-blue-600" />
+                    <span>Imposta data di scadenza</span>
+                  </div>
+                </label>
+
+                {hasExpiration && (
+                  <div className="poll-date-picker-wrapper">
+                    <DatePicker
+                      selected={expirationDate}
+                      onChange={(date) => {
+                        setExpirationDate(date);
+                        if (errors.expiration) {
+                          const newErrors = { ...errors };
+                          delete newErrors.expiration;
+                          setErrors(newErrors);
+                        }
+                      }}
+                      showTimeSelect
+                      timeFormat="HH:mm"
+                      timeIntervals={15}
+                      dateFormat="dd/MM/yyyy HH:mm"
+                      minDate={new Date()}
+                      locale={it}
+                      className={`poll-date-picker ${errors.expiration ? 'poll-input-error' : ''}`}
+                      placeholderText="Seleziona data e ora"
+                      disabled={isSubmitting}
+                    />
+                    {errors.expiration && (
+                      <p className="poll-error-text">{errors.expiration}</p>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
 
-        {/* Pulsanti azione */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-6 py-2.5 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-all font-medium"
-            disabled={isSubmitting}
-          >
-            Annulla
-          </button>
-          <button
-            type="submit"
-            className="px-6 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm hover:shadow-md"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                <span>Creazione in corso...</span>
-              </>
-            ) : (
-              <>
-                <BarChart className="h-4 w-4" />
-                <span>Crea sondaggio</span>
-              </>
-            )}
-          </button>
-        </div>
-      </form>
+          {/* Pulsanti azione */}
+          <div className="poll-actions">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="poll-button poll-button-secondary"
+              disabled={isSubmitting}
+            >
+              Annulla
+            </button>
+            <button
+              type="submit"
+              className="poll-button poll-button-primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="poll-spinner"></div>
+                  <span>Creazione in corso...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  <span>Crea sondaggio</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

@@ -84,7 +84,7 @@
 }
 
 .message-bubble.received {
-  background: linear-gradient(135deg, #0a767ee1 0%, #0d868fbd 100%);
+  background: linear-gradient(135deg, #08585ee1 0%, #0e7077bd 100%);
   color: #FFFFFF;
   margin-left: auto;
   border-bottom-right-radius: 6px;
