@@ -87,7 +87,7 @@
   background: linear-gradient(135deg, #08585ee1 0%, #0e7077bd 100%);
   color: #FFFFFF;
   margin-left: auto;
-  border-bottom-right-radius: 6px;
+  border-bottom-left-radius: 6px;
   box-shadow: 0px 4px 12px rgba(108, 99, 255, 0.08);
 }
 
@@ -120,12 +120,12 @@
 }
 
 .chat-date-separator span {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(4px);
   color: #4A5568;
-  padding: 4px 16px;
+  padding: 1px 16px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   margin: 0 auto;
   box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
@@ -142,7 +142,7 @@
 }
 
 .message-quote {
-  background: #F7FAFC;
+  background: linear-gradient(135deg, #dfdfdf 0%, #ffffffbd 100%);
   border-left: 3px solid #6C63FF;
   border-radius: 12px;
   padding: 8px 12px;

@@ -515,10 +515,10 @@ const ChatMessage = memo(({
               className="message-quote cursor-pointer mb-1" 
               onClick={() => handleReplyClick(originalMessage.messageId)}
             >
-              <div className="text-sm font-semibold text-gray-700">
+              <div className="text-sm font-medium text-gray-700">
                 {originalMessage.senderName}
               </div>
-              <div className="text-xs text-gray-700 line-clamp-2">
+              <div className="text-xs font-normal text-gray-700 line-clamp-2">
                 {originalMessage.message}
               </div>
             </div>
