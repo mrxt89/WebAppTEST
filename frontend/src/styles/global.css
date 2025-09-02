@@ -1339,14 +1339,6 @@ button:disabled {
   word-break: break-word;
 }
 
-.message-bubble.sent {
-  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
-  color: #fff;
-  margin-left: auto;
-  border-bottom-right-radius: 6px;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
-}
-
 /* Message timestamp */
 .message-timestamp {
   font-size: 0.78rem;

@@ -32,6 +32,17 @@ const MessageActionsMenu = ({
 
   if (!isOpen) return null;
 
+  // Controlla se ci sono azioni disponibili
+  const hasAvailableActions = 
+    (!hasLeftChat && !isCancelled && typeof onReply === "function") ||
+    (!isCancelled && typeof onColorSelect === "function") ||
+    (canEdit && !hasLeftChat && !isCancelled && typeof onEdit === "function") ||
+    (canEdit && !hasLeftChat && !isCancelled && typeof onDelete === "function") ||
+    (isEdited && !isCancelled && typeof onViewHistory === "function");
+
+  // Se non ci sono azioni disponibili, non mostrare il menu
+  if (!hasAvailableActions) return null;
+
   // Function to handle reaction addition - with defensive check
   const handleAddReaction = async (emoji) => {
     // Only call onAddReaction if it exists and chat isn't left
@@ -51,83 +62,84 @@ const MessageActionsMenu = ({
   };
 
   return (
-    <motion.div
-      className="message-actions-menu absolute bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden"
-      initial={{ opacity: 0, scale: 0.95, y: -10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95, y: -10 }}
-      transition={{ duration: 0.15 }}
-      style={{
-        minWidth: "200px",
-        top: "33px",
-        zIndex: 9999,
-        left: isCurrentUserMessage ? "auto" : "0",
-        right: isCurrentUserMessage ? "0" : "auto",
-      }}
-    >
-      <div className="py-1 px-1">
-        {/* Reazioni rapide ora gestite dal popup dedicato - rimuoviamo questa sezione */}
+         <motion.div
+       className="message-actions-menu absolute backdrop-blur-md overflow-hidden"
+       initial={{ opacity: 0, scale: 0.95, y: -10 }}
+       animate={{ opacity: 1, scale: 1, y: 0 }}
+       exit={{ opacity: 0, scale: 0.95, y: -10 }}
+       transition={{ 
+         duration: 0.2,
+         ease: [0.4, 0, 0.2, 1]
+       }}
+       style={{
+         minWidth: "200px",
+         top: "33px",
+         zIndex: 9999,
+         left: isCurrentUserMessage ? "auto" : "0",
+         right: isCurrentUserMessage ? "0" : "auto",
+         backgroundColor: "rgba(255, 255, 255, 0.425)",
+         borderRadius: "20px",
+         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+       }}
+     >
+      <div className="py-2 px-2">
+        {/* Risposta */}
+        <motion.button
+          className={`flex items-center w-full px-3 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg transition-all duration-200 ${(!hasLeftChat && !isCancelled && typeof onReply === "function") ? 'visible' : 'hidden'}`}
+          onClick={onReply}
+          whileHover={{ scale: 1.02, x: 2 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <Reply className="h-4 w-4 mr-3 text-blue-500" />
+          <span>Rispondi</span>
+        </motion.button>
 
-        {/* Non mostrare l'opzione di risposta se il messaggio è stato eliminato */}
-        {!hasLeftChat && !isCancelled && typeof onReply === "function" && (
-          <button
-            className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
-            onClick={onReply}
-          >
-            <Reply className="h-4 w-4 mr-3 text-blue-500" />
-            <span>Rispondi</span>
-          </button>
-        )}
+        {/* Colore */}
+        <motion.button
+          className={`flex items-center w-full px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-all duration-200 ${(!isCancelled && typeof onColorSelect === "function") ? 'visible' : 'hidden'}`}
+          onClick={() => {
+            onColorSelect();
+            onClose();
+          }}
+          whileHover={{ scale: 1.02, x: 2 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <Palette className="h-4 w-4 mr-3 text-indigo-500" />
+          <span>Colore</span>
+        </motion.button>
 
-        {/* Non mostrare l'opzione di colore se il messaggio è stato eliminato */}
-        {!isCancelled && typeof onColorSelect === "function" && (
-          <button
-            className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
-            onClick={onColorSelect}
-          >
-            <Palette className="h-4 w-4 mr-3 text-indigo-500" />
-            <span>Colore</span>
-          </button>
-        )}
+        {/* Modifica */}
+        <motion.button
+          className={`flex items-center w-full px-3 py-2.5 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 rounded-lg transition-all duration-200 ${(canEdit && !hasLeftChat && !isCancelled && typeof onEdit === "function") ? 'visible' : 'hidden'}`}
+          onClick={onEdit}
+          whileHover={{ scale: 1.02, x: 2 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <Edit className="h-4 w-4 mr-3 text-green-500" />
+          <span>Modifica</span>
+        </motion.button>
 
-        {/* Non mostrare l'opzione di modifica se il messaggio è stato eliminato */}
-        {canEdit &&
-          !hasLeftChat &&
-          !isCancelled &&
-          typeof onEdit === "function" && (
-            <button
-              className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
-              onClick={onEdit}
-            >
-              <Edit className="h-4 w-4 mr-3 text-green-500" />
-              <span>Modifica</span>
-            </button>
-          )}
+        {/* Elimina */}
+        <motion.button
+          className={`flex items-center w-full px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-all duration-200 ${(canEdit && !hasLeftChat && !isCancelled && typeof onDelete === "function") ? 'visible' : 'hidden'}`}
+          onClick={onDelete}
+          whileHover={{ scale: 1.02, x: 2 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <Trash2 className="h-4 w-4 mr-3 text-red-500" />
+          <span>Elimina</span>
+        </motion.button>
 
-        {/* Non mostrare l'opzione di eliminazione se il messaggio è già stato eliminato */}
-        {canEdit &&
-          !hasLeftChat &&
-          !isCancelled &&
-          typeof onDelete === "function" && (
-            <button
-              className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md"
-              onClick={onDelete}
-            >
-              <Trash2 className="h-4 w-4 mr-3 text-red-500" />
-              <span>Elimina</span>
-            </button>
-          )}
-
-        {/* Mostra l'opzione di cronologia versioni SOLO se il messaggio è stato modificato e non è stato eliminato */}
-        {isEdited && !isCancelled && typeof onViewHistory === "function" && (
-          <button
-            className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
-            onClick={onViewHistory}
-          >
-            <History className="h-4 w-4 mr-3 text-purple-500" />
-            <span>Cronologia versioni</span>
-          </button>
-        )}
+        {/* Cronologia versioni */}
+        <motion.button
+          className={`flex items-center w-full px-3 py-2.5 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 rounded-lg transition-all duration-200 ${(isEdited && !isCancelled && typeof onViewHistory === "function") ? 'visible' : 'hidden'}`}
+          onClick={onViewHistory}
+          whileHover={{ scale: 1.02, x: 2 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <History className="h-4 w-4 mr-3 text-purple-500" />
+          <span>Cronologia</span>
+        </motion.button>
       </div>
     </motion.div>
   );
