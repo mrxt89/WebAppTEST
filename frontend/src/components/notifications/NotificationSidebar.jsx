@@ -567,6 +567,11 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
   // Handlers
   const handleNotificationClick = (notification, e) => {
     e.stopPropagation();
+    // Non fare nulla con il singolo click
+  };
+
+  const handleNotificationDoubleClick = (notification, e) => {
+    e.stopPropagation();
     
     if (notification && notification.notificationId && openChatModal) {
       saveScrollPosition();
@@ -590,7 +595,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
               unreadCount: newUnreadCount,
               notificationId: parseInt(notification.notificationId),
               forced: true,
-              source: 'sidebar-click-open'
+              source: 'sidebar-doubleclick-open'
             }
           })
         );
@@ -1798,6 +1803,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                               ${animatingItemId === notification.notificationId && animationPhase === "enter" ? "pin-enter-active" : ""}
                               ${isUpdating ? "updating" : ""}`}
                       onClick={(e) => handleNotificationClick(notification, e)}
+                      onDoubleClick={(e) => handleNotificationDoubleClick(notification, e)}
                       id={`notification-item-${notification.notificationId}`}
                       data-notification-id={notification.notificationId}
                       data-is-read={notification.isReadByUser ? "true" : "false"}

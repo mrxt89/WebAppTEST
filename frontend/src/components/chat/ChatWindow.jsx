@@ -685,7 +685,7 @@ const ChatWindow = ({
   // Contenuto della finestra
   const windowContent = (
     <div className="flex flex-col w-full h-full overflow-hidden" style={{
-      backgroundColor: 'rgba(255, 255, 255, 0.6)',
+      backgroundColor: 'rgba(255, 255, 255, 0.75)',
       backdropFilter: 'blur(4px)'
     }}>
       <div
