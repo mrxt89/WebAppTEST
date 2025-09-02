@@ -214,6 +214,28 @@ const ChatBottomBar = ({
     setPlaceholderVisible(value.length === 0 && !isFocused);
     setMessage(value);
     
+    // Calcola dinamicamente l'altezza dell'input in base al contenuto
+    if (inputRef.current && isFocused) {
+      const scrollHeight = inputRef.current.scrollHeight;
+      const containerHeight = Math.min(Math.max(scrollHeight + 16, 32), 150); // 16px per padding
+      
+      // Aggiorna l'altezza del contenitore se necessario
+      if (containerHeight > 32) {
+        const container = inputRef.current.parentElement.parentElement;
+        if (container) {
+          container.style.height = `${containerHeight}px`;
+        }
+      }
+    }
+    
+    // Se il messaggio è vuoto e non è focalizzato, resetta l'altezza
+    if (!value && !isFocused) {
+      const container = inputRef.current?.parentElement?.parentElement;
+      if (container) {
+        container.style.height = "32px";
+      }
+    }
+    
     // Gestione menzioni
     const mentionTriggerIndex = value.lastIndexOf("@", value.length - 1);
     if (mentionTriggerIndex > -1) {
@@ -715,6 +737,34 @@ const ChatBottomBar = ({
     };
   }, []);
 
+  // Listener per click fuori dalla bottombar
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Controlla se il click è fuori dalla bottombar
+      const bottomBar = document.querySelector('.chat-bottom-bar-container');
+      if (bottomBar && !bottomBar.contains(event.target)) {
+        // Se non c'è testo, rimuovi il focus e riduci l'altezza
+        if (!message) {
+          setIsFocused(false);
+          setPlaceholderVisible(true);
+          // Reset dell'altezza
+          if (inputRef.current?.parentElement?.parentElement) {
+            inputRef.current.parentElement.parentElement.style.height = "32px";
+          }
+        }
+      }
+    };
+
+    // Aggiungi il listener solo se l'input è focalizzato
+    if (isFocused) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [isFocused, message]);
+
   useEffect(() => {
     const handlePaste = (e) => {
       if (disabled) return;
@@ -970,8 +1020,28 @@ const ChatBottomBar = ({
               </div>
             </div>
 
-            {/* Input area */}
-            <div className="flex-1 bg-gray-100 rounded-xl" style={{ height: "48px" }}>
+                        {/* Input area */}
+            <div 
+              className="flex-1 bg-gray-100 rounded-xl transition-all duration-300 ease-in-out"
+              style={{ 
+                height: isFocused ? "150px" : "32px"
+              }}
+              onMouseEnter={() => setIsFocused(true)}
+              onMouseLeave={() => {
+                // Controlla se l'input è realmente focalizzato dal DOM
+                const isInputFocused = inputRef.current?.matches(':focus');
+                
+                // Se non c'è testo e non è focalizzato, riduci l'altezza
+                if (!message && !isInputFocused) {
+                  setIsFocused(false);
+                  // Reset dell'altezza
+                  const container = inputRef.current?.parentElement?.parentElement;
+                  if (container) {
+                    container.style.height = "32px";
+                  }
+                }
+              }}
+            >
               <div className="relative h-full">
                 <div
                   contentEditable
@@ -983,16 +1053,25 @@ const ChatBottomBar = ({
                     setPlaceholderVisible(false);
                   }}
                   onBlur={() => {
-                    setIsFocused(false);
-                    setPlaceholderVisible(!message);
+                    // Controlla se c'è del testo prima di rimuovere il focus
+                    if (!message) {
+                      setIsFocused(false);
+                      setPlaceholderVisible(true);
+                      // Reset dell'altezza quando non c'è testo
+                      if (inputRef.current?.parentElement?.parentElement) {
+                        inputRef.current.parentElement.parentElement.style.height = "32px";
+                      }
+                    }
                   }}
-                  className="py-1.5 px-3 w-full outline-none rounded-xl"
+                  className="py-1.5 px-3 w-full outline-none rounded-xl transition-all duration-300 ease-in-out"
                   style={{
                     whiteSpace: "pre-wrap",
                     wordWrap: "break-word",
                     minHeight: "32px",
-                    maxHeight: "48px",
+                    height: "100%",
+                    maxHeight: "100%",
                     overflowY: "auto",
+                    resize: "none"
                   }}
                   suppressContentEditableWarning={true}
                 />
@@ -1092,9 +1171,7 @@ const ChatBottomBar = ({
 
         {/* Suggerimenti */}
         <div className="flex items-center justify-between pt-0.5">
-          <p className="text-xs text-gray-400 leading-tight">
-            Premi Invio per inviare, Shift+Invio per andare a capo
-          </p>
+
 
           {localReceiversList && (
             <p className="text-xs text-blue-600 flex items-center">

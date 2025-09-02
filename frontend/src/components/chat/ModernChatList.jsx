@@ -11,9 +11,8 @@ import { cn } from "@/lib/utils";
 import { debounce } from "lodash";
 import "@/styles/ModernChatList.css";
 import {
-  ArrowBigDown,
-  ChevronUp,
   ChevronDown,
+  ChevronUp,
   Loader2,
   Reply,
 } from "lucide-react";
@@ -683,7 +682,10 @@ const ModernChatList = ({
     if (messages.length > 0 && !initialScrollDone && chatListRef.current) {
       setTimeout(() => {
         if (chatListRef.current) {
-          chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+          chatListRef.current.scrollTo({
+            top: chatListRef.current.scrollHeight,
+            behavior: 'smooth'
+          });
           setInitialScrollDone(true);
         }
       }, 100);
@@ -708,20 +710,26 @@ const ModernChatList = ({
         
         setTimeout(() => {
           if (chatListRef.current) {
-            chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+            chatListRef.current.scrollTo({
+              top: chatListRef.current.scrollHeight,
+              behavior: 'smooth'
+            });
           }
           setTimeout(() => {
             scrollingToBottomRef.current = false;
-          }, 500);
+          }, 1000);
         }, 50);
       }
       // Altrimenti scrolla solo se l'utente non ha scrollato manualmente
       else if ((hasNewMessages || localHasNewMessages) && !userHasScrolledRef.current && chatListRef.current) {
         scrollingToBottomRef.current = true;
-        chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+        chatListRef.current.scrollTo({
+          top: chatListRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
         setTimeout(() => {
           scrollingToBottomRef.current = false;
-        }, 500);
+        }, 1000);
       }
     }
   }, [hasNewMessages, localHasNewMessages, messages, currentUserId]);
@@ -749,11 +757,14 @@ const ModernChatList = ({
         
         setTimeout(() => {
           if (chatListRef.current) {
-            chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+            chatListRef.current.scrollTo({
+              top: chatListRef.current.scrollHeight,
+              behavior: 'smooth'
+            });
           }
           setTimeout(() => {
             scrollingToBottomRef.current = false;
-          }, 500);
+          }, 1000);
         }, 100);
       }
     };
@@ -861,7 +872,10 @@ const ModernChatList = ({
             if (!userHasScrolledRef.current) {
               setTimeout(() => {
                 if (chatListRef.current) {
-                  chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+                  chatListRef.current.scrollTo({
+                    top: chatListRef.current.scrollHeight,
+                    behavior: 'smooth'
+                  });
                 }
               }, 100);
             } else {
@@ -1079,7 +1093,13 @@ const ModernChatList = ({
   const handleScrollToBottom = useCallback(() => {
     if (chatListRef.current) {
       scrollingToBottomRef.current = true;
-      chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+      
+      // Scroll fluido e graduale verso il basso
+      chatListRef.current.scrollTo({
+        top: chatListRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+      
       setUserHasScrolled(false);
       setShowScrollButton(false);
       setLocalHasNewMessages(false);
@@ -1099,9 +1119,10 @@ const ModernChatList = ({
         onMarkAsInteracted();
       }
       
+      // Aumenta il timeout per permettere lo scroll fluido di completarsi
       setTimeout(() => {
         scrollingToBottomRef.current = false;
-      }, 500);
+      }, 1000);
     }
   }, [hasNewMessages, localHasNewMessages, onMarkAsInteracted, messages, notificationId]);
 
@@ -1345,7 +1366,7 @@ const ModernChatList = ({
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
         >
-          <ArrowBigDown className="h-6 w-6" />
+          <ChevronDown className="h-6 w-6" />
         </motion.button>
       )}
 
