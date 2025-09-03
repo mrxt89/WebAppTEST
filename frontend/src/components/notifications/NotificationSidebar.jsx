@@ -1202,7 +1202,7 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
       id="notification-sidebar"
       ref={sidebarRef}
     >
-      <div className="header" style={{ height: isFilterExpanded ? "9rem" : "9rem" }}>
+      <div className="header border-bottom rounded-4 shadow-sm" style={{ height: isFilterExpanded ? "9rem" : "9rem" }}>
         <div className="flex justify-between items-center p-2">
           <div className="text-lg font-semibold" id="notification-sidebar-title">
             Notifiche
@@ -1275,7 +1275,8 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
             )}
           </div>
   
-          <div className="flex items-center justify-center w-100 z-50 px-2 mb-1">
+          <div 
+              className="flex items-center justify-center w-100 z-50 px-2 mb-1">
             <div className="flex w-100 z-50 items-center space-x-2">
               <button
                 className={`p-2 flex items-center justify-center ${isFilterExpanded ? "bg-blue-50 text-blue-600" : "bg-white text-gray-700"} border border-gray-200 rounded-lg hover:bg-gray-50`}
@@ -1577,8 +1578,8 @@ const NotificationSidebar = ({ closeSidebar, visible, openChatModal }) => {
                 onChange={handleDocumentsSearchChange}
                 className="w-full p-2 pl-9 pr-9 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <Search className="w-4 h-4 text-gray-400" />
+              <div className="inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <Search className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 transform -translate-y-1/2" />
               </div>
               {documentsSearchTerm && (
                 <button
