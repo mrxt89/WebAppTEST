@@ -43,6 +43,9 @@ const TaskCard = ({
   canManage,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const hoverTimeoutRef = useRef(null);
+  const mouseEnterTimeRef = useRef(null);
+  const lastMousePositionRef = useRef({ x: 0, y: 0 });
   
   const priorityConfig = {
     ALTA: { 
@@ -91,16 +94,108 @@ const TaskCard = ({
 
   const priority = priorityConfig[task.Priority] || priorityConfig.BASSA;
 
+  // Funzioni per gestire il delay di hover
+  const handleMouseEnter = (e) => {
+    // Non attivare hover se la card è in drag o in aggiornamento
+    if (isDragging || isUpdating || task.TaskDisabled) {
+      return;
+    }
+    
+    // Registra il tempo di entrata e la posizione del mouse
+    mouseEnterTimeRef.current = Date.now();
+    lastMousePositionRef.current = { x: e.clientX, y: e.clientY };
+    
+    // Cancella eventuali timeout precedenti
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    
+    // Imposta un delay di 200ms prima di attivare l'hover
+    hoverTimeoutRef.current = setTimeout(() => {
+      // Verifica nuovamente che non sia in drag/update prima di attivare
+      if (!isDragging && !isUpdating && !task.TaskDisabled) {
+        setIsHovered(true);
+      }
+    }, 200);
+  };
+
+  const handleMouseMove = (e) => {
+    // Se il mouse si muove troppo velocemente, cancella l'hover
+    if (mouseEnterTimeRef.current && lastMousePositionRef.current) {
+      const timeDiff = Date.now() - mouseEnterTimeRef.current;
+      const distance = Math.sqrt(
+        Math.pow(e.clientX - lastMousePositionRef.current.x, 2) + 
+        Math.pow(e.clientY - lastMousePositionRef.current.y, 2)
+      );
+      
+      // Se il mouse si muove più di 50px in meno di 100ms, cancella l'hover
+      if (timeDiff < 100 && distance > 50) {
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current);
+          hoverTimeoutRef.current = null;
+        }
+        setIsHovered(false);
+      }
+    }
+    
+    // Aggiorna la posizione del mouse
+    lastMousePositionRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseLeave = () => {
+    // Cancella il timeout se il mouse esce prima del delay
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    
+    // Reset dei ref
+    mouseEnterTimeRef.current = null;
+    lastMousePositionRef.current = { x: 0, y: 0 };
+    
+    // Disattiva immediatamente l'hover
+    setIsHovered(false);
+  };
+
+  // Cleanup del timeout quando il componente viene smontato
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Disattiva hover quando inizia il drag o l'aggiornamento
+  useEffect(() => {
+    if (isDragging || isUpdating) {
+      setIsHovered(false);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+    }
+  }, [isDragging, isUpdating]);
+
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      whileHover={{ scale: task.TaskDisabled ? 1 : 1.02 }}
+      whileHover={{ 
+        scale: task.TaskDisabled ? 1 : 1.02,
+        y: task.TaskDisabled ? 0 : -2,
+        transition: { duration: 0.2, ease: [0.4, 0.0, 0.2, 1] }
+      }}
       whileDrag={{ scale: 1.05, rotate: 2 }}
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      transition={{ 
+        layout: { duration: 0.3, ease: [0.4, 0.0, 0.2, 1] },
+        default: { duration: 0.2, ease: "easeOut" }
+      }}
     >
       <Card
         className={`
@@ -187,7 +282,7 @@ const TaskCard = ({
         )}
         
         {/* Contenuto compatto di default */}
-        <div className={`transition-all duration-300 ${isHovered ? 'p-3' : 'p-2.5'} group`}>
+        <div className={`group transition-all duration-200 ${isHovered ? 'p-3' : 'p-2.5'}`}>
           {/* Versione compatta - sempre visibile */}
           <div className="space-y-1.5">
             {/* Titolo con indicatore ritardo */}
@@ -197,8 +292,14 @@ const TaskCard = ({
               </h4>
               {isDelayed() && (
                 <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
+                  initial={{ scale: 0, rotate: -10 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ 
+                    type: "spring", 
+                    stiffness: 500, 
+                    damping: 25,
+                    delay: 0.1
+                  }}
                   className="flex-shrink-0"
                 >
                   <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -234,10 +335,22 @@ const TaskCard = ({
           <AnimatePresence>
             {isHovered && !task.TaskDisabled && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
+                initial={{ 
+                  opacity: 0, 
+                  height: 0
+                }}
+                animate={{ 
+                  opacity: 1, 
+                  height: "auto"
+                }}
+                exit={{ 
+                  opacity: 0, 
+                  height: 0
+                }}
+                transition={{ 
+                  duration: 0.25,
+                  ease: [0.4, 0.0, 0.2, 1]
+                }}
                 className="overflow-hidden"
               >
                 <div className="pt-2 mt-2 border-t border-gray-100 space-y-2">
@@ -599,37 +712,11 @@ const TasksKanban = ({
 
   return (
     <div className="h-full flex flex-col" style={{ height: 'calc(100vh - 110px - 60px - 48px - 40px - 40px)' }}>
-      {/* Filtro task in ritardo */}
-      {delayedTasksCount > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-3 rounded-xl border shadow-sm mb-3 mx-4"
-        >
-          <div className="flex items-center gap-3">
-            <Checkbox
-              id="show-delayed"
-              checked={showDelayedOnly}
-              onCheckedChange={setShowDelayedOnly}
-              className="data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500"
-            />
-            <Label
-              htmlFor="show-delayed"
-              className="text-sm font-medium cursor-pointer flex items-center gap-2 flex-1"
-            >
-              Mostra solo attività in ritardo
-              <Badge variant="destructive" className="ml-auto">
-                <AlertTriangle className="w-3 h-3 mr-1" />
-                {delayedTasksCount}
-              </Badge>
-            </Label>
-          </div>
-        </motion.div>
-      )}
+    
 
       {/* Kanban Board */}
       <div className="flex-1 px-4 pb-4 overflow-hidden">
-        <div className="h-full flex gap-3 overflow-x-auto pb-2">
+        <div className="h-full flex gap-1 overflow-x-auto pb-2">
           {Object.entries(tasksByStatus).map(([status, statusTasks], index) => {
             const config = statusConfig[status];
             const StatusIcon = config.icon;
@@ -647,38 +734,44 @@ const TasksKanban = ({
               >
                 <div
                   className={`
-                    h-full bg-white rounded-xl border-2 transition-all duration-300
+                    h-full bg-white/80 backdrop-blur-sm rounded-2xl border transition-all duration-300
                     ${isDropTarget 
-                      ? `${config.borderColor} ${config.bgColor} shadow-2xl scale-[1.02]` 
-                      : "border-gray-200 hover:border-gray-300 hover:shadow-lg"
+                      ? `${config.borderColor} ${config.bgColor} shadow-2xl scale-[1.02] border-2` 
+                      : "border-gray-200/60 hover:border-gray-300/80 hover:shadow-xl hover:bg-white/90"
                     }
-                    overflow-hidden flex flex-col
+                    overflow-hidden flex flex-col relative
+                    before:absolute before:inset-0 before:bg-gradient-to-br before:from-white/40 before:to-transparent before:pointer-events-none
+                    shadow-gray-200/50
                   `}
                   onDragOver={(e) => handleDragOver(e, status)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, status)}
                 >
-                  {/* Header più compatto */}
-                  <div className={`bg-gradient-to-r ${config.gradient} p-3`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`${config.iconBg} p-1.5 rounded-lg`}>
-                          <StatusIcon className={`w-4 h-4 text-white ${config.iconAnimation || ""}`} />
+                  {/* Header moderno con glassmorphism */}
+                  <div className={`bg-gradient-to-r ${config.gradient} p-2 relative overflow-hidden`}>
+                    {/* Effetto glassmorphism */}
+                    <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"></div>
+                    
+                    <div className="relative z-10 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm border border-white/30 shadow-lg">
+                          <StatusIcon className={`w-5 h-5 text-white ${config.iconAnimation || ""}`} />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-white text-base">{config.label}</h3>
-                          <p className="text-white/80 text-xs">{statusTasks.length} attività</p>
+                          <h3 className="font-bold text-white text-lg tracking-tight">{config.label}</h3>
+                          <p className="text-white/90 text-sm font-medium">{statusTasks.length} attività</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2">
                         {disabledInSection > 0 && (
-                          <Badge className="bg-gray-500 text-white border-0 text-xs">
+                          <Badge className="bg-gray-600/90 text-white border-0 text-xs px-2 py-1 rounded-full shadow-lg backdrop-blur-sm">
                             <Ban className="w-3 h-3 mr-1" />
                             {disabledInSection}
                           </Badge>
                         )}
                         {delayedInSection > 0 && status !== "COMPLETATA" && (
-                          <Badge className="bg-red-500 text-white border-0 text-xs">
+                          <Badge className="bg-red-500/90 text-white border-0 text-xs px-2 py-1 rounded-full shadow-lg backdrop-blur-sm">
                             <AlertTriangle className="w-3 h-3 mr-1" />
                             {delayedInSection}
                           </Badge>
@@ -687,8 +780,8 @@ const TasksKanban = ({
                     </div>
                   </div>
 
-                  {/* Tasks container con padding ridotto */}
-                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  {/* Tasks container moderno */}
+                  <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5 bg-gradient-to-b from-transparent to-gray-50/30">
                     <AnimatePresence>
                       {statusTasks.length > 0 ? (
                         statusTasks.map((task) => {
@@ -712,15 +805,15 @@ const TasksKanban = ({
                         })
                       ) : (
                         <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-center py-8"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-center py-12"
                         >
-                          <div className={`${config.iconBg} w-12 h-12 rounded-full mx-auto mb-2 flex items-center justify-center`}>
-                            <Sparkles className="w-6 h-6 text-gray-400" />
+                          <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 shadow-lg">
+                            <Sparkles className="w-8 h-8 text-gray-500" />
                           </div>
-                          <p className="text-gray-500 text-sm">Nessuna attività</p>
-                          <p className="text-gray-400 text-xs mt-1">Trascina qui per aggiungere</p>
+                          <p className="text-gray-600 text-sm font-medium mb-1">Nessuna attività</p>
+                          <p className="text-gray-400 text-xs">Trascina qui per aggiungere</p>
                         </motion.div>
                       )}
                     </AnimatePresence>

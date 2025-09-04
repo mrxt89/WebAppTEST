@@ -38,6 +38,7 @@ export const hasAdminPermission = (project, userId) => {
  * @returns {Boolean} - True if the current user can edit the target user's role
  */
 export const canEditMemberRole = (project, currentUserId, targetUserId) => {
+  console.log(project, currentUserId, targetUserId);
   if (!project || !project.members || !currentUserId || !targetUserId)
     return false;
 

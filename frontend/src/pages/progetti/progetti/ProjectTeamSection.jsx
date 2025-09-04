@@ -58,10 +58,9 @@ const GroupMembersSelector = React.memo(({
   }, [onSelectionChange]);
 
   return (
-    <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-100">
+    <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs text-blue-700 font-medium">
-          <AlertTriangle className="h-3 w-3 inline mr-1" />
+        <p className="text-sm text-blue-700 font-medium">
           Utenti disponibili ({members.length}):
         </p>
         <Button
@@ -310,8 +309,13 @@ const ProjectTeamSection = ({
 
   return (
     <>
-      <div className="flex-none flex flex-row items-center justify-between">
-        <h3 className="text-xl font-semibold">Team di Progetto</h3>
+      <div className="flex-none flex flex-row items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg">
+            <Users className="h-5 w-5 text-white" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-900">Team di Progetto</h3>
+        </div>
         {canAddMembers && (
           <Dialog
             open={isAddMemberDialogOpen}
@@ -323,14 +327,14 @@ const ProjectTeamSection = ({
                 Aggiungi Utente
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden">
-              <DialogHeader className="border-b pb-2 mb-3">
-                <DialogTitle className="flex items-center gap-2">
-                  <UserPlus className="h-5 w-5 text-blue-500" />
+            <DialogContent className="sm:max-w-[700px] h-[700px] overflow-hidden">
+              <DialogHeader className="border-b pb-4 mb-4">
+                <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
+                  <UserPlus className="h-5 w-5 text-blue-600" />
                   Aggiungi utente al progetto
                 </DialogTitle>
               </DialogHeader>
-              <div className="space-y-3 overflow-y-auto pr-2">
+              <div className="space-y-3 overflow-y-auto pr-2 h-[580px]">
                 {/* Tabs per la selezione del tipo di assegnazione */}
                 <Tabs
                   value={assignmentType}
@@ -348,11 +352,13 @@ const ProjectTeamSection = ({
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="individual" className="mt-3">
+                  <TabsContent value="individual" className="mt-4">
                     <div className="grid grid-cols-2 gap-4">
                       {/* Colonna sinistra - Lista utenti */}
-                      <div className="bg-gray-50 p-3 rounded-lg space-y-3">
-                        <h3 className="text-xs font-medium text-gray-500">Seleziona utente</h3>
+                      <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                        <h3 className="text-sm font-medium text-gray-700">
+                          Seleziona utente
+                        </h3>
                         <div>
                           <Label htmlFor="userId" className="flex items-center text-sm">
                             <User className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
@@ -374,7 +380,7 @@ const ProjectTeamSection = ({
                                     getFilteredUsers().find(
                                       (user) => user.userId.toString() === newMember.userId
                                     )?.lastName
-                                  : "Seleziona utente dal team"}
+                                  : "Seleziona utente"}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
@@ -415,8 +421,10 @@ const ProjectTeamSection = ({
                       </div>
 
                       {/* Colonna destra - Ruolo */}
-                      <div className="bg-gray-50 p-3 rounded-lg space-y-3">
-                        <h3 className="text-xs font-medium text-gray-500">Assegnazione ruolo</h3>
+                      <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                        <h3 className="text-sm font-medium text-gray-700">
+                          Assegnazione ruolo
+                        </h3>
                         <div>
                           <Label htmlFor="role" className="flex items-center text-sm">
                             <Shield className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
@@ -460,11 +468,13 @@ const ProjectTeamSection = ({
                     </div>
                   </TabsContent>
 
-                  <TabsContent value="group" className="mt-3">
+                  <TabsContent value="group" className="mt-4">
                     <div className="grid grid-cols-2 gap-4">
                       {/* Colonna sinistra - Lista utenti del gruppo */}
-                      <div className="bg-gray-50 p-3 rounded-lg space-y-3">
-                        <h3 className="text-xs font-medium text-gray-500">Seleziona gruppo</h3>
+                      <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                        <h3 className="text-sm font-medium text-gray-700">
+                          Seleziona gruppo
+                        </h3>
                         <div>
                           <Label htmlFor="groupId" className="flex items-center text-sm">
                             <Users className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
@@ -525,8 +535,10 @@ const ProjectTeamSection = ({
                       </div>
 
                       {/* Colonna destra - Ruolo */}
-                      <div className="bg-gray-50 p-3 rounded-lg space-y-3">
-                        <h3 className="text-xs font-medium text-gray-500">Assegnazione ruolo</h3>
+                      <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                        <h3 className="text-sm font-medium text-gray-700">
+                          Assegnazione ruolo
+                        </h3>
                         <div>
                           <Label htmlFor="role" className="flex items-center text-sm">
                             <Shield className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
@@ -575,7 +587,6 @@ const ProjectTeamSection = ({
                   {assignmentType === "individual" ? (
                     <Button
                       onClick={handleAddMember}
-                      className="shadow-sm"
                       disabled={!newMember.userId || !project}
                     >
                       <UserPlus className="h-4 w-4 mr-2" />
@@ -584,7 +595,6 @@ const ProjectTeamSection = ({
                   ) : (
                     <Button
                       onClick={handleAddGroupMembers}
-                      className="shadow-sm"
                       disabled={!selectedGroupId || selectedMemberIds.length === 0 || !project}
                     >
                       <Users className="h-4 w-4 mr-2" />
@@ -597,28 +607,34 @@ const ProjectTeamSection = ({
           </Dialog>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto min-h-0 space-y-3 mt-2">
+      <div className="flex-1 overflow-y-auto min-h-0 mt-2">
         {project.members?.length > 0 ? (
-          project.members.map((member) => (
-            <TeamMemberWithRole
-              key={member.ProjectMemberID}
-              member={member}
-              onRemove={
-                canAddMembers ? handleRemoveMember : null
-              }
-              onRoleUpdate={updateMemberRole}
-              canEditRole={canEditMemberRole(
-                project,
-                currentUserId,
-                member.UserID,
-              )}
-              currentUserId={currentUserId}
-            />
-          ))
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {project.members.map((member) => (
+              <TeamMemberWithRole
+                key={member.ProjectMemberID}
+                member={member}
+                onRemove={
+                  canAddMembers ? handleRemoveMember : null
+                }
+                onRoleUpdate={updateMemberRole}
+                canEditRole={canEditMemberRole(
+                  project,
+                  currentUserId,
+                  member.UserID,
+                )}
+                currentUserId={currentUserId}
+              />
+            ))}
+          </div>
         ) : (
-          <Alert>
-            <AlertDescription>Nessun utente nel team.</AlertDescription>
-          </Alert>
+          <div className="bg-gradient-to-br from-gray-50/80 to-gray-100/60 backdrop-blur-sm p-6 rounded-2xl border border-gray-200/60 shadow-lg text-center">
+            <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 shadow-lg">
+              <Users className="w-8 h-8 text-gray-500" />
+            </div>
+            <p className="text-gray-600 text-sm font-medium mb-1">Nessun utente nel team</p>
+            <p className="text-gray-400 text-xs">Aggiungi il primo membro per iniziare</p>
+          </div>
         )}
       </div>
     </>

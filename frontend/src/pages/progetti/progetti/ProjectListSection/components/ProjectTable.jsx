@@ -24,7 +24,7 @@ const ProjectTable = ({
   fetchProjects,
   filters
 }) => {
-  const [columnWidths, setColumnWidths] = useState([90, ...DEFAULT_COLUMN_WIDTHS]);
+  const [columnWidths, setColumnWidths] = useState([DEFAULT_COLUMN_WIDTHS[7], 90, ...DEFAULT_COLUMN_WIDTHS.slice(0, 7)]);
   const [isResizingColumn, setIsResizingColumn] = useState(null);
 
   const handleColumnMouseDown = (e, index) => {
@@ -104,6 +104,8 @@ const ProjectTable = ({
         >
           <TableHeader className="sticky top-0 bg-gray-100 z-10">
             <TableRow>
+              <TableHead style={{ width: `${columnWidths[7]}px` }} className="text-center">
+              </TableHead>
               <TableHead
                 style={{ width: `${columnWidths[0]}px`, position: 'relative' }}
                 className="whitespace-nowrap text-center font-bold"
@@ -232,9 +234,6 @@ const ProjectTable = ({
               <TableHead style={{ width: `${columnWidths[6]}px` }} className="text-center">
                 Attività
               </TableHead>
-              <TableHead style={{ width: `${columnWidths[7]}px` }} className="text-center">
-                Azioni
-              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -254,6 +253,17 @@ const ProjectTable = ({
                   `}
                   onClick={() => onSelectProject(project.ProjectID)}
                 >
+                  <TableCell className="py-1 text-center">
+                    <ProjectActions
+                      project={project}
+                      isPinned={isPinned}
+                      onSelectProject={onSelectProject}
+                      manageProjectPin={manageProjectPin}
+                      setPinnedProjects={setPinnedProjects}
+                      fetchProjects={fetchProjects}
+                      filters={filters}
+                    />
+                  </TableCell>
                   <TableCell className="py-1 text-xs text-center font-mono whitespace-nowrap font-bold">
                     {project.ProjectErpID || "-"}
                   </TableCell>
@@ -321,17 +331,6 @@ const ProjectTable = ({
                         </div>
                       )}
                     </div>
-                  </TableCell>
-                  <TableCell className="py-1 text-center">
-                    <ProjectActions
-                      project={project}
-                      isPinned={isPinned}
-                      onSelectProject={onSelectProject}
-                      manageProjectPin={manageProjectPin}
-                      setPinnedProjects={setPinnedProjects}
-                      fetchProjects={fetchProjects}
-                      filters={filters}
-                    />
                   </TableCell>
                 </TableRow>
               );

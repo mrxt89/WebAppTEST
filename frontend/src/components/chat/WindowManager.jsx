@@ -42,7 +42,7 @@ const WindowManager = ({
           [id]: {
             id,
             x: Math.max(0, (window.innerWidth - 900) / 2),
-            y: 0, // Posizione più in alto
+            y: 0, // Posizione piÃ¹ in alto
             width: 900,
             height: 700,
             isMaximized: false,

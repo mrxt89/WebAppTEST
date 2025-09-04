@@ -60,6 +60,8 @@ const MainPage = () => {
   
   // Window manager hook
   const windowManager = useWindowManager();
+
+  
   const {
     createWindow,
     activateWindow,
@@ -177,8 +179,6 @@ const MainPage = () => {
     const handleOpenNewMessageModal = (event) => {
       const props = event.detail || {};
       
-      console.log("MainPage - Evento openNewMessageModal ricevuto:", props);
-      
       const newWindowId = `new-message-${Date.now()}`;
       
       // Crea la finestra nel window manager
@@ -258,8 +258,6 @@ const openChatModal = async (notificationId) => {
   }
 
   try {
-    console.log(`🔄 MainPage: Caricando prima pagina di messaggi per chat ${notificationId}`);
-    
     // Inizializza la paginazione PRIMA di caricare i dati
     dispatch(initChatPagination({ 
       notificationId,
@@ -281,15 +279,7 @@ const openChatModal = async (notificationId) => {
     const initialData = response.data;
 
     if (initialData) {
-      // Log per debug
-      console.log(`📥 Dati iniziali ricevuti:`, {
-        messageCount: initialData.messageCount,
-        totalMessageCount: initialData.totalMessageCount,
-        hasMoreMessages: initialData.hasMoreMessages,
-        messagesLength: Array.isArray(initialData.messages) 
-          ? initialData.messages.length 
-          : (typeof initialData.messages === 'string' ? JSON.parse(initialData.messages || "[]").length : 0)
-      });
+      
 
       // Salva i dati iniziali in openChatData con info di paginazione
       dispatch(setOpenChatData({
@@ -361,7 +351,7 @@ const openChatModal = async (notificationId) => {
         )
       );
 
-      console.log(`✅ MainPage: Chat ${notificationId} aperta con ${initialData.messages?.length || 0} messaggi iniziali`);
+      
     }
   } catch (error) {
     console.error("Errore durante l'apertura della chat:", error);
@@ -516,12 +506,12 @@ const openChatModal = async (notificationId) => {
       return;
     }
 
-    console.log(`[MainPage] Minimizzando chat ${notification.notificationId}`);
+    
 
     // 1. Prima di tutto, aggiorna il window manager
     if (windowManager?.toggleMinimize) {
       windowManager.toggleMinimize(notification.notificationId);
-      console.log(`[MainPage] WindowManager minimizzazione completata per ${notification.notificationId}`);
+      
     }
 
     // 2. Aggiungi alle chat minimizzate se non è già presente
@@ -531,11 +521,11 @@ const openChatModal = async (notificationId) => {
       );
       
       if (!isAlreadyMinimized) {
-        console.log(`[MainPage] Aggiunta chat ${notification.notificationId} alle minimizzate`);
+        
         return [...prevMinimized, notification];
       }
       
-      console.log(`[MainPage] Chat ${notification.notificationId} già nelle minimizzate`);
+      
       return prevMinimized;
     });
 
@@ -546,11 +536,11 @@ const openChatModal = async (notificationId) => {
       );
       
       if (!existingChat) {
-        console.log(`[MainPage] Aggiunta chat ${notification.notificationId} alle aperte`);
+        
         return [...prevChats, notification];
       }
       
-      console.log(`[MainPage] Chat ${notification.notificationId} già nelle aperte`);
+      
       return prevChats;
     });
   };
@@ -565,12 +555,12 @@ const openChatModal = async (notificationId) => {
       return;
     }
 
-    console.log(`[MainPage] Ripristinando chat ${notification.notificationId}`);
+    
 
     // 1. Prima di tutto, aggiorna il window manager
     if (windowManager?.toggleMinimize) {
       windowManager.toggleMinimize(notification.notificationId);
-      console.log(`[MainPage] WindowManager ripristino completato per ${notification.notificationId}`);
+      
     }
 
     // 2. Rimuovi dalle chat minimizzate
@@ -578,7 +568,7 @@ const openChatModal = async (notificationId) => {
       const filtered = prevMinimized.filter(
         (chat) => chat.notificationId !== notification.notificationId,
       );
-      console.log(`[MainPage] Chat ${notification.notificationId} rimossa dalle minimizzate`);
+
       return filtered;
     });
 
@@ -592,11 +582,11 @@ const openChatModal = async (notificationId) => {
         // Aggiorna la chat esistente
         const updatedChats = [...prevChats];
         updatedChats[existingChatIndex] = notification;
-        console.log(`[MainPage] Chat ${notification.notificationId} aggiornata nelle aperte`);
+
         return updatedChats;
       } else {
         // Aggiungi se non esiste
-        console.log(`[MainPage] Chat ${notification.notificationId} aggiunta alle aperte`);
+        
         return [...prevChats, notification];
       }
     });
@@ -605,7 +595,7 @@ const openChatModal = async (notificationId) => {
     if (windowManager?.activateWindow) {
       setTimeout(() => {
         windowManager.activateWindow(notification.notificationId);
-        console.log(`[MainPage] Finestra ${notification.notificationId} attivata`);
+        
       }, 100);
     }
   };
@@ -617,7 +607,7 @@ const openChatModal = async (notificationId) => {
       return;
     }
   
-    console.log(`🔒 Chiudendo chat ${notificationId}`);
+    
   
     // 1. Chiudi la finestra se esiste
     if (windowManager?.closeWindow) {
@@ -627,7 +617,7 @@ const openChatModal = async (notificationId) => {
     // 2. IMPORTANTE: Annulla la registrazione PRIMA di rimuovere dai state
     if (unregisterOpenChat) {
       unregisterOpenChat(notificationId);
-      console.log(`✅ Chat ${notificationId} rimossa da openChatIds`);
+      
     }
   
     // 3. Rimuovi dagli state locali
@@ -635,7 +625,7 @@ const openChatModal = async (notificationId) => {
       const newChats = prevChats.filter(
         (chat) => chat.notificationId !== notificationId,
       );
-      console.log(`📊 Chat aperte rimanenti: ${newChats.map(c => c.notificationId).join(', ')}`);
+      
       return newChats;
     });
   
@@ -1100,6 +1090,33 @@ useEffect(() => {
     setWindowManagerMenuOpen(!windowManagerMenuOpen);
   };
 
+
+  // Sincronizza lo stato delle chat minimizzate con il windowManager
+  useEffect(() => {
+    if (!windowManager?.windowStates) return;
+
+    const windowStates = windowManager.windowStates;
+    const minimizedFromWindowManager = [];
+
+    // Trova tutte le chat minimizzate dal windowManager
+    Object.entries(windowStates).forEach(([windowId, state]) => {
+      if (state.isMinimized) {
+        const chat = openChats.find(c => c.notificationId.toString() === windowId.toString());
+        if (chat) {
+          minimizedFromWindowManager.push(chat);
+        }
+      }
+    });
+
+    // Aggiorna lo stato locale solo se è diverso
+    const currentMinimizedIds = minimizedChats.map(c => c.notificationId).sort();
+    const newMinimizedIds = minimizedFromWindowManager.map(c => c.notificationId).sort();
+    
+    if (JSON.stringify(currentMinimizedIds) !== JSON.stringify(newMinimizedIds)) {
+      
+      setMinimizedChats(minimizedFromWindowManager);
+    }
+  }, [windowManager?.windowStates, openChats, minimizedChats]);
 
   const showWindowControls = openChats.length > 0;
 

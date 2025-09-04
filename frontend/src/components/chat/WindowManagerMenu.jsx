@@ -6,24 +6,12 @@ import {
   Columns,
   Layers,
   XCircle,
-  Maximize,
   Minimize,
-  Monitor,
-  LayoutGrid,
 } from "lucide-react";
 
 /**
  * WindowManagerMenu component provides a floating control panel
  * for managing multiple chat windows arrangement
- *
- * @param {boolean} isOpen - Whether the menu is visible
- * @param {Function} onClose - Function to call to close the menu
- * @param {Object} windowManager - The window manager instance with window arrangement functions
- * @param {Function} onCloseAll - Function to close all chat windows
- * @param {Array} openChats - Array of open chat objects
- * @param {Array} minimizedChats - Array of minimized chat objects
- * @param {Function} onMinimizeChat - Function to minimize a chat
- * @param {Function} restoreChat - Function to restore a chat
  */
 const WindowManagerMenu = ({
   isOpen,
@@ -35,8 +23,13 @@ const WindowManagerMenu = ({
   onMinimizeChat,
   restoreChat,
 }) => {
+
+
   // Don't render if closed or no chats
-  if (!isOpen || openChats.length === 0) return null;
+  if (!isOpen || openChats.length === 0) {
+   
+    return null;
+  }
 
   // Animation variants
   const menuVariants = {
@@ -44,11 +37,92 @@ const WindowManagerMenu = ({
     visible: { opacity: 1, scale: 1, y: 0 },
   };
 
-  const handleMinimizeToggle = () => {
-    console.log('[WindowManagerMenu] handleMinimizeToggle chiamato');
-    console.log('openChats:', openChats.map(c => ({ id: c.notificationId, title: c.title })));
-    console.log('minimizedChats:', minimizedChats.map(c => ({ id: c.notificationId, title: c.title })));
+  const handleArrangeGrid = () => {
+   
     
+    if (!windowManager) {
+      console.error('[WindowManagerMenu] windowManager non disponibile');
+      return;
+    }
+    
+    if (!windowManager.arrangeWindowsGrid) {
+      console.error('[WindowManagerMenu] windowManager.arrangeWindowsGrid non disponibile');
+     
+      return;
+    }
+    
+  
+    
+    try {
+      windowManager.arrangeWindowsGrid();
+     
+    } catch (error) {
+      console.error('[WindowManagerMenu] Errore in arrangeWindowsGrid:', error);
+    }
+    
+    onClose();
+  };
+
+  const handleTileVertical = () => {
+    
+    if (!windowManager?.tileWindowsVertically) {
+      console.error('[WindowManagerMenu] windowManager.tileWindowsVertically non disponibile');
+      return;
+    }
+    
+    try {
+      windowManager.tileWindowsVertically();
+    
+    } catch (error) {
+      console.error('[WindowManagerMenu] Errore in tileWindowsVertically:', error);
+    }
+    
+    onClose();
+  };
+
+  const handleTileHorizontal = () => {
+    
+    
+    if (!windowManager?.tileWindowsHorizontally) {
+      console.error('[WindowManagerMenu] windowManager.tileWindowsHorizontally non disponibile');
+      return;
+    }
+    
+    
+    
+    try {
+      windowManager.tileWindowsHorizontally();
+     
+    } catch (error) {
+      console.error('[WindowManagerMenu] Errore in tileWindowsHorizontally:', error);
+    }
+    
+    onClose();
+  };
+
+  const handleCascade = () => {
+    
+    
+    if (!windowManager?.cascadeWindows) {
+      console.error('[WindowManagerMenu] windowManager.cascadeWindows non disponibile');
+      return;
+    }
+    
+    
+    
+    try {
+      windowManager.cascadeWindows();
+     
+    } catch (error) {
+      console.error('[WindowManagerMenu] Errore in cascadeWindows:', error);
+    }
+    
+    onClose();
+  };
+
+  const handleMinimizeToggle = () => {
+    
+      
     // Trova le chat visibili (in openChats ma non in minimizedChats)
     const visibleChats = openChats.filter(
       (chat) =>
@@ -57,47 +131,32 @@ const WindowManagerMenu = ({
         ),
     );
 
-    console.log('visibleChats:', visibleChats.map(c => ({ id: c.notificationId, title: c.title })));
+   
 
     if (visibleChats.length > 0) {
       // Minimizza tutte le chat visibili
-      console.log('[WindowManagerMenu] Minimizzando tutte le chat visibili');
       visibleChats.forEach((chat, index) => {
         setTimeout(() => {
-          console.log(`[WindowManagerMenu] Minimizzando chat ${chat.notificationId}`);
           
-          // Aggiorna il window manager
+          
           if (windowManager?.toggleMinimize) {
             windowManager.toggleMinimize(chat.notificationId);
           }
-          
-          // Aggiorna lo stato delle chat minimizzate
-          if (onMinimizeChat) {
-            onMinimizeChat(chat);
-          }
-        }, index * 50); // Piccolo delay per evitare conflitti
+        }, index * 50);
       });
     } else if (minimizedChats.length > 0) {
       // Ripristina tutte le chat minimizzate
-      console.log('[WindowManagerMenu] Ripristinando tutte le chat minimizzate');
       minimizedChats.forEach((chat, index) => {
         setTimeout(() => {
-          console.log(`[WindowManagerMenu] Ripristinando chat ${chat.notificationId}`);
           
-          // Aggiorna il window manager
+          
           if (windowManager?.toggleMinimize) {
             windowManager.toggleMinimize(chat.notificationId);
           }
-          
-          // Ripristina la chat
-          if (restoreChat) {
-            restoreChat(chat);
-          }
-        }, index * 50); // Piccolo delay per evitare conflitti
+        }, index * 50);
       });
     }
     
-    // Chiudi il menu dopo l'operazione
     setTimeout(() => {
       onClose();
     }, 200);
@@ -133,10 +192,7 @@ const WindowManagerMenu = ({
             <div className="grid grid-cols-2 gap-2">
               <button
                 className="flex flex-col items-center justify-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                onClick={() => {
-                  windowManager.cascadeWindows();
-                  onClose();
-                }}
+                onClick={handleCascade}
                 title="Disponi a cascata"
               >
                 <Layers className="h-5 w-5 text-blue-600 mb-1" />
@@ -145,10 +201,7 @@ const WindowManagerMenu = ({
 
               <button
                 className="flex flex-col items-center justify-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                onClick={() => {
-                  windowManager.tileWindowsVertically();
-                  onClose();
-                }}
+                onClick={handleTileVertical}
                 title="Affianca orizzontalmente"
               >
                 <Rows className="h-5 w-5 text-green-600 mb-1" />
@@ -157,10 +210,7 @@ const WindowManagerMenu = ({
 
               <button
                 className="flex flex-col items-center justify-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                onClick={() => {
-                  windowManager.tileWindowsHorizontally();
-                  onClose();
-                }}
+                onClick={handleTileHorizontal}
                 title="Affianca verticalmente"
               >
                 <Columns className="h-5 w-5 text-purple-600 mb-1" />
@@ -169,10 +219,7 @@ const WindowManagerMenu = ({
 
               <button
                 className="flex flex-col items-center justify-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                onClick={() => {
-                  windowManager.arrangeWindowsGrid();
-                  onClose();
-                }}
+                onClick={handleArrangeGrid}
                 title="Disponi a griglia"
               >
                 <Grid className="h-5 w-5 text-amber-600 mb-1" />
@@ -185,6 +232,7 @@ const WindowManagerMenu = ({
                 <button
                   className="flex items-center justify-center p-2 text-sm bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
                   onClick={() => {
+                   
                     onCloseAll();
                     onClose();
                   }}
@@ -197,14 +245,22 @@ const WindowManagerMenu = ({
                 <button
                   className="flex items-center justify-center p-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
                   onClick={handleMinimizeToggle}
-                  title="Minimizza/Ripristina"
+                  title="Minimizza tutte le finestre visibili o ripristina tutte quelle minimizzate"
                 >
                   <Minimize className="h-4 w-4 mr-1" />
-                  <span>Min/Max</span>
+                  <span>Min/Ripristina</span>
                 </button>
               </div>
             </div>
           </div>
+
+          {/* Debug info - rimuovi in produzione */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="p-2 border-t border-gray-100 text-xs text-gray-500">
+              <div>Open: {openChats.length}, Min: {minimizedChats.length}</div>
+              <div>WM: {windowManager ? 'OK' : 'NO'}</div>
+            </div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>
