@@ -1,6 +1,8 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Trash2 } from "lucide-react";
 import MemberRoleSelect from "./MemberRoleSelect";
 
 export const TeamMemberWithRole = ({
@@ -27,41 +29,48 @@ export const TeamMemberWithRole = ({
       .toUpperCase();
   };
 
+
   return (
-    <div className="flex items-center justify-between p-3 border rounded-lg bg-white hover:bg-gray-50">
-      <div className="flex items-center gap-3">
-        <Avatar className="h-9 w-9">
-          <AvatarFallback className="bg-blue-100 text-blue-800">
+    <div className="group flex flex-col p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200">
+      {/* Top row - Avatar and name */}
+      <div className="flex items-center gap-3 mb-2">
+        <Avatar className="h-8 w-8">
+          <AvatarFallback className="bg-gray-100 text-gray-700 text-sm font-medium">
             {getInitials(member.userName)}
           </AvatarFallback>
         </Avatar>
-        <div>
-          <p className="font-medium">{member.userName}</p>
-          <div className="flex items-center gap-2 mt-1">
-            <MemberRoleSelect
-              member={member}
-              onRoleUpdate={handleRoleUpdate}
-              disabled={!canEditRole}
-            />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h4 className="font-medium text-gray-900 text-sm truncate">
+              {member.userName}
+            </h4>
             {isCurrentUser && (
-              <span className="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">
+              <Badge variant="secondary" className="bg-blue-50 text-blue-600 text-xs px-2 py-0.5">
                 Tu
-              </span>
+              </Badge>
             )}
           </div>
         </div>
+        {onRemove && !isCurrentUser && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-red-500 hover:text-red-700 hover:bg-red-50 p-1"
+            onClick={() => onRemove(member.ProjectMemberID)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </div>
-
-      {onRemove && !isCurrentUser && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-          onClick={() => onRemove(member.ProjectMemberID)}
-        >
-          Rimuovi
-        </Button>
-      )}
+      
+      {/* Bottom row - Role selector */}
+      <div className="flex justify-start">
+        <MemberRoleSelect
+          member={member}
+          onRoleUpdate={handleRoleUpdate}
+          disabled={!canEditRole}
+        />
+      </div>
     </div>
   );
 };

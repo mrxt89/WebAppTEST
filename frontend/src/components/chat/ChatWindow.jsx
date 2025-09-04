@@ -114,7 +114,7 @@ const ChatWindow = ({
     shouldFetchUsers,
   } = useMemoizedUsers(standaloneData?.users || hookUsers);
 
-  // Stati per finestra
+  // Stati per finestra - SINCRONIZZATI CON WINDOWMANAGER
   const windowRef = useRef(null);
   const nodeRef = useRef(null);
   const dragHandleRef = useRef(null);
@@ -122,19 +122,31 @@ const ChatWindow = ({
   const sizeRef = useRef({ width: 900, height: 700 });
   const chatListRef = useRef(null);
   
+  // IMPORTANTE: Usa sempre lo stato del windowManager come fonte di verità
+  const windowState = windowManager?.windowStates?.[notification?.notificationId];
+  
   const initialX = Math.max(0, Math.floor((window.innerWidth - 900) / 2));
   const initialY = Math.max(0, Math.floor(20));
 
+  // Posizione e dimensione dalla windowManager o valori di default
   const [position, setPosition] = useState({
-    x: isNaN(initialX) ? 0 : initialX,
-    y: isNaN(initialY) ? 0 : initialY
+    x: windowState?.x ?? (isNaN(initialX) ? 0 : initialX),
+    y: windowState?.y ?? (isNaN(initialY) ? 0 : initialY)
   });
-  const [size, setSize] = useState({ width: 900, height: 700 });
+  
+  const [size, setSize] = useState({ 
+    width: windowState?.width ?? 900, 
+    height: windowState?.height ?? 700 
+  });
+  
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [isMaximized, setIsMaximized] = useState(false);
-  const [zIndex, setZIndex] = useState(1000);
+  
+  // CRITICO: Usa sempre lo stato del windowManager per questi valori
+  const isMinimized = windowState?.isMinimized ?? false;
+  const isMaximized = windowState?.isMaximized ?? false;
+  const zIndex = windowState?.zIndex ?? 1000;
+  
   const [initialLoaded, setInitialLoaded] = useState(false);
 
   // Usa i dati standalone se disponibili, altrimenti usa quelli dall'hook
@@ -150,13 +162,44 @@ const ChatWindow = ({
     [isStandalone, standaloneData?.responseOptions, hookResponseOptions]
   );
 
+  // NUOVO: Sincronizzazione automatica con windowManager
+  useEffect(() => {
+    if (!windowManager || !notification?.notificationId || isStandalone) return;
+
+    const windowState = windowManager.windowStates?.[notification.notificationId];
+    if (!windowState) return;
+
+    // Aggiorna posizione se è cambiata
+    if (windowState.x !== position.x || windowState.y !== position.y) {
+
+      setPosition({ x: windowState.x, y: windowState.y });
+      
+      // Applica immediatamente al DOM se nodeRef esiste
+      if (nodeRef.current) {
+        nodeRef.current.style.left = `${windowState.x}px`;
+        nodeRef.current.style.top = `${windowState.y}px`;
+      }
+    }
+
+    // Aggiorna dimensioni se sono cambiate
+    if (windowState.width !== size.width || windowState.height !== size.height) {
+
+      
+      setSize({ width: windowState.width, height: windowState.height });
+      sizeRef.current = { width: windowState.width, height: windowState.height };
+      
+      // Applica immediatamente al DOM se nodeRef esiste
+      if (nodeRef.current) {
+        nodeRef.current.style.width = `${windowState.width}px`;
+        nodeRef.current.style.height = `${windowState.height}px`;
+      }
+    }
+  }, [windowManager?.windowStates, notification?.notificationId, position, size, isStandalone]);
 
   // NUOVO: Handler per marcare come interagito
   const handleMarkAsInteracted = useCallback(() => {
-    console.log("[ChatWindow] Marcando come interagito");
     markAsInteracted();
   }, [markAsInteracted]);
-
 
   // Funzione dedicata per il caricamento degli utenti
   const loadUsers = useCallback(async () => {
@@ -223,7 +266,7 @@ const ChatWindow = ({
 
   const handleMinimize = useCallback(() => {
     if (onMinimize && notification) {
-      console.log(`[ChatWindow] Minimizzando chat ${notification.notificationId}`);
+
       onMinimize(notification);
     }
   }, [onMinimize, notification]);
@@ -242,11 +285,28 @@ const ChatWindow = ({
     }
   }, [onClose, notification, messages]);
 
-  const handleActivate = useCallback(() => {
+  const handleActivate = useCallback((e) => {
+    // Non attivare se stiamo facendo drag o resize
+    if (isDragging || isResizing || isDraggingRef.current) {
+      return;
+    }
+    
+    // Non attivare se l'evento proviene da elementi interattivi specifici
+    if (e && e.target) {
+      const target = e.target;
+      const isInteractiveElement = target.closest('button, input, textarea, select, a, [role="button"], [onclick]');
+      
+      // Se è un elemento interattivo, non attivare la finestra
+      if (isInteractiveElement) {
+        return;
+      }
+    }
+    
     if (windowManager?.activateWindow && notification?.notificationId) {
+     
       windowManager.activateWindow(notification.notificationId);
     }
-  }, [windowManager, notification]);
+  }, [windowManager, notification, isDragging, isResizing]);
 
   const handleReply = useCallback((message) => {
     setReplyToMessage(message);
@@ -264,8 +324,6 @@ const ChatWindow = ({
         ...notificationData,
         receiversList: notificationData.receiversList || receiversList || ""
       };
-      
-      console.log("ChatWindow - Invio messaggio con dati:", dataToSend);
       
       // Usa sendMessage da useOpenChat
       const result = await sendMessage({
@@ -294,7 +352,6 @@ const ChatWindow = ({
 
   // Handler per aggiornamento destinatari
   const handleReceiversUpdate = useCallback((updatedList) => {
-    console.log("ChatWindow - handleReceiversUpdate chiamato con:", updatedList);
     setReceiversList(updatedList);
   }, []);
 
@@ -444,7 +501,7 @@ const ChatWindow = ({
     markAsInteracted();
   }, [markAsInteracted]);
 
-  // Gestione drag della finestra
+  // Gestione drag della finestra - AGGIORNATO per sincronizzare con windowManager
   const handleDragStart = useCallback((e) => {
     const isHandleElement = e.target.closest(".chat-window-handle");
     if (!isHandleElement) return;
@@ -455,7 +512,11 @@ const ChatWindow = ({
 
     setIsDragging(true);
     isDraggingRef.current = true;
-    handleActivate();
+    
+    // Attiva la finestra solo all'inizio del drag, non durante
+    if (windowManager?.activateWindow && notification?.notificationId) {
+      windowManager.activateWindow(notification.notificationId);
+    }
 
     const startX = e.clientX;
     const startY = e.clientY;
@@ -528,6 +589,7 @@ const ChatWindow = ({
           y: finalY,
         });
 
+        // IMPORTANTE: Aggiorna il windowManager con la nuova posizione
         if (windowManager?.updatePosition && notification?.notificationId) {
           windowManager.updatePosition(notification.notificationId, finalX, finalY);
         }
@@ -536,13 +598,16 @@ const ChatWindow = ({
 
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
-  }, [position, size.width, size.height, handleActivate, windowManager, notification]);
+  }, [position, size.width, size.height, windowManager, notification]);
 
-  // Gestione resize
+  // Gestione resize - AGGIORNATO per sincronizzare con windowManager
   const handleResizeStart = useCallback(() => {
     setIsResizing(true);
-    handleActivate();
-  }, [handleActivate]);
+    // Attiva la finestra quando inizia il resize
+    if (windowManager?.activateWindow && notification?.notificationId) {
+      windowManager.activateWindow(notification.notificationId);
+    }
+  }, [windowManager, notification]);
 
   const handleResize = useCallback((e, direction, ref, d) => {
     const newWidth = sizeRef.current.width + d.width;
@@ -586,88 +651,42 @@ const ChatWindow = ({
       height: finalHeight,
     });
 
+    // IMPORTANTE: Aggiorna il windowManager con la nuova dimensione
     if (windowManager?.updateSize && notification?.notificationId) {
       windowManager.updateSize(notification.notificationId, finalWidth, finalHeight);
     }
   }, [size, windowManager, notification]);
 
-  // CORREZIONE: Sincronizza stato minimized con windowManager
+  // Sincronizza stato con windowManager all'inizializzazione
   useEffect(() => {
     if (windowManager && notification && !initialLoaded) {
       const windowId = notification.notificationId;
       const windowState = windowManager.windowStates?.[windowId];
 
       if (windowState) {
-        setPosition({ 
+        const newPosition = { 
           x: windowState.x !== undefined ? windowState.x : initialX, 
           y: windowState.y !== undefined ? windowState.y : initialY
-        });
-
-        setSize({
-          width: windowState.width || 900,
-          height: windowState.height || 700,
-        });
-
-        sizeRef.current = {
+        };
+        
+        const newSize = {
           width: windowState.width || 900,
           height: windowState.height || 700,
         };
 
-        // IMPORTANTE: Sincronizza stato minimizzato
-        setIsMinimized(windowState.isMinimized || false);
-        setIsMaximized(windowState.isMaximized || false);
+        setPosition(newPosition);
+        setSize(newSize);
+        sizeRef.current = newSize;
 
-        setInitialLoaded(true);
-        
-        console.log(`[ChatWindow] Stato finestra sincronizzato:`, {
-          windowId,
-          isMinimized: windowState.isMinimized,
-          isMaximized: windowState.isMaximized
-        });
-      }
-
-      if (windowManager.getZIndex) {
-        setZIndex(windowManager.getZIndex(windowId));
       }
 
       if (windowManager.activateWindow) {
         windowManager.activateWindow(windowId);
       }
+
+      setInitialLoaded(true);
     }
   }, [windowManager, notification, initialX, initialY, initialLoaded]);
-
-  // NUOVO: Effect per ascoltare cambiamenti di stato del windowManager
-  useEffect(() => {
-    if (!windowManager || !notification) return;
-
-    const windowId = notification.notificationId;
-    const checkWindowState = () => {
-      const windowState = windowManager.windowStates?.[windowId];
-      if (windowState) {
-        const newIsMinimized = windowState.isMinimized || false;
-        const newIsMaximized = windowState.isMaximized || false;
-        
-        // Aggiorna solo se lo stato è cambiato
-        if (newIsMinimized !== isMinimized) {
-          console.log(`[ChatWindow] Aggiornamento stato minimized: ${isMinimized} -> ${newIsMinimized}`);
-          setIsMinimized(newIsMinimized);
-        }
-        
-        if (newIsMaximized !== isMaximized) {
-          console.log(`[ChatWindow] Aggiornamento stato maximized: ${isMaximized} -> ${newIsMaximized}`);
-          setIsMaximized(newIsMaximized);
-        }
-      }
-    };
-
-    // Controlla immediatamente
-    checkWindowState();
-
-    // Controlla periodicamente per sincronizzazione
-    const interval = setInterval(checkWindowState, 100);
-
-    return () => clearInterval(interval);
-  }, [windowManager, notification, isMinimized, isMaximized]);
 
   // Segna come letto all'apertura
   useEffect(() => {
@@ -678,16 +697,19 @@ const ChatWindow = ({
 
   // IMPORTANTE: Return null se minimizzata o non c'è notification
   if (!notification || isMinimized) {
-    
     return null;
   }
 
   // Contenuto della finestra
   const windowContent = (
-    <div className="flex flex-col w-full h-full overflow-hidden" style={{
-      backgroundColor: 'rgba(255, 255, 255, 0.75)',
-      backdropFilter: 'blur(4px)'
-    }}>
+    <div 
+      className="flex flex-col w-full h-full overflow-hidden" 
+      onClick={handleActivate}
+      style={{
+        backgroundColor: 'rgba(255, 255, 255, 0.75)',
+        backdropFilter: 'blur(4px)'
+      }}
+    >
       <div
         className={`${isStandalone ? "" : "chat-window-handle cursor-move border-b"}`}
         ref={dragHandleRef}
@@ -719,7 +741,7 @@ const ChatWindow = ({
         />
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden" onClick={handleActivate}>
         <ChatLayout
           messages={messages}
           sending={sending}
@@ -888,7 +910,6 @@ const ChatWindow = ({
       >
         <div
           className="absolute overflow-hidden rounded-lg"
-          onClick={handleActivate}
           style={{
             width: "100%",
             height: "100%",

@@ -195,7 +195,7 @@ const ProjectListSection = ({
 
   return (
     <div 
-      className={`h-full flex flex-col p-4 transition-all duration-300 ${
+      className={`h-full flex flex-col p-2 transition-all duration-300 ${
         isLeftPanelCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
       style={{ 

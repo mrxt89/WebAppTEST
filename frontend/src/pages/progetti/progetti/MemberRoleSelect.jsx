@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, ChevronDown, Edit } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 const MemberRoleSelect = ({ member, onRoleUpdate, disabled = false }) => {
@@ -68,20 +68,20 @@ const MemberRoleSelect = ({ member, onRoleUpdate, disabled = false }) => {
   const getRoleBadgeColor = () => {
     switch (role) {
       case "ADMIN":
-        return "bg-red-100 text-red-800 border-red-200";
+        return "bg-red-50 text-red-700 border-red-200";
       case "MANAGER":
-        return "bg-blue-100 text-blue-800 border-blue-200";
+        return "bg-blue-50 text-blue-700 border-blue-200";
       case "USER":
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return "bg-gray-50 text-gray-700 border-gray-200";
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return "bg-gray-50 text-gray-700 border-gray-200";
     }
   };
 
   // Se disabilitato, mostra solo un badge con il ruolo
   if (disabled) {
     return (
-      <Badge variant="outline" className={getRoleBadgeColor()}>
+      <Badge variant="outline" className={`${getRoleBadgeColor()} text-xs`}>
         {role}
       </Badge>
     );
@@ -93,19 +93,14 @@ const MemberRoleSelect = ({ member, onRoleUpdate, disabled = false }) => {
       onValueChange={handleRoleChange}
       disabled={isUpdating || disabled}
     >
-      <SelectTrigger className={`w-32 ${getRoleBadgeColor()} relative group`}>
+      <SelectTrigger className={`w-24 h-6 ${getRoleBadgeColor()} text-xs relative`}>
         {isUpdating ? (
-          <div className="flex items-center">
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            <span>Aggiornando...</span>
+          <div className="flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>...</span>
           </div>
         ) : (
-          <>
-            <SelectValue placeholder="Seleziona ruolo" />
-            <span className="absolute right-8 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Edit className="h-3 w-3 text-blue-500" />
-            </span>
-          </>
+          <SelectValue placeholder="Ruolo" />
         )}
       </SelectTrigger>
       <SelectContent>
