@@ -76,6 +76,7 @@ import {
   removeMessageReaction,
   selectMessageReactions,
   selectReactionsLoading,
+  invalidateReactionCache,
 } from "./messageReactionsSlice";
 
 // Importa funzionalità da messageManagementSlice
@@ -1021,12 +1022,60 @@ const handleFetchAttachmentViewStats = useCallback(
         if (isNaN(numericMessageId)) {
           throw new Error('MessageId deve essere un numero valido');
         }
+
+        // Ottieni l'ID utente corrente dal token
+        const token = localStorage.getItem("token");
+        if (!token) {
+          throw new Error("No authentication token available");
+        }
+
+        // Decodifica il token per ottenere l'ID utente (assumendo JWT)
+        let currentUserId = null;
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          currentUserId = payload.userId || payload.id;
+        } catch (e) {
+          console.warn('Could not decode token, using fallback');
+          // Fallback: cerca nell'array users se disponibile
+          const state = store.getState();
+          const openChatData = state.notifications.openChatData;
+          if (openChatData && openChatData.users && openChatData.users.length > 0) {
+            // Assumiamo che il primo utente sia quello corrente (logica di fallback)
+            currentUserId = openChatData.users[0].userId;
+          }
+        }
+
+        // Determina se l'utente ha già reagito a questo tipo di reazione
+        const state = store.getState();
+        const currentReactions = state.messageReactions.reactions[numericMessageId] || [];
+        const hasCurrentUserReacted = currentReactions.some(r => 
+          r.ReactionType === reactionType && r.UserID === currentUserId
+        );
+
+        // Ottieni il nome utente corrente
+        let currentUserName = 'You';
+        if (currentUserId) {
+          const state = store.getState();
+          const openChatData = state.notifications.openChatData;
+          if (openChatData && openChatData.users) {
+            const currentUser = openChatData.users.find(u => u.userId === currentUserId);
+            if (currentUser) {
+              currentUserName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 
+                               currentUser.username || 
+                               currentUser.email || 
+                               'You';
+            }
+          }
+        }
         
         // Chiama il thunk con i parametri corretti come oggetto
         const result = await dispatch(
           toggleMessageReaction({ 
             messageId: numericMessageId, 
-            reactionType: reactionType 
+            reactionType: reactionType,
+            hasCurrentUserReacted,
+            currentUserId,
+            currentUserName
           })
         ).unwrap();
         
@@ -1036,6 +1085,16 @@ const handleFetchAttachmentViewStats = useCallback(
         if (result && result.notificationId) {
           // Forza un aggiornamento completo della notifica
           await dispatch(fetchNotificationById(result.notificationId, true));
+          
+          // IMPORTANTE: Carica esplicitamente le reazioni per questo messaggio
+          // perché fetchNotificationById potrebbe non includerle
+          try {
+            console.log('🔄 Caricamento reazioni per messaggio:', numericMessageId);
+            const reactionResult = await dispatch(loadMessageReactions([numericMessageId]));
+            console.log('✅ Reazioni caricate:', reactionResult);
+          } catch (reactionError) {
+            console.warn('❌ Error loading reactions after toggle:', reactionError);
+          }
           
           // Emetti l'evento per aggiornare i componenti
           document.dispatchEvent(
