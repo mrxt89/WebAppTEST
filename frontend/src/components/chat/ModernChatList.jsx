@@ -29,6 +29,15 @@ import { useNotifications } from "@/redux/features/notifications/notificationsHo
 import { useSelector, useDispatch } from "react-redux";
 import { selectOpenChatData } from "@/redux/features/notifications/notificationsSlice";
 import { loadMoreMessages } from "@/redux/features/notifications/notificationsActions";
+import { 
+  loadMessageReactions, 
+  updateVisibleMessages, 
+  invalidateReactionCache,
+  selectReactionsExpired,
+  selectVisibleMessages,
+  selectMessageReactions
+} from "@/redux/features/notifications/messageReactionsSlice";
+import { store } from "@/redux/store";
 import axios from 'axios';
 import { config } from '@/config';
 import { useOpenChat } from "@/hooks/useOpenChat";
@@ -110,8 +119,12 @@ const ModernChatList = ({
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [selectedMessageVersions, setSelectedMessageVersions] = useState(null);
   const [loadingVersions, setLoadingVersions] = useState(false);
-  const [messageReactionsCache, setMessageReactionsCache] = useState({});
   const [localHasNewMessages, setLocalHasNewMessages] = useState(false);
+  
+  // Stati per gestione reazioni intelligente
+  const [pendingReactionRequests, setPendingReactionRequests] = useState(new Set());
+  const [lastVisibleUpdate, setLastVisibleUpdate] = useState(0);
+  const [pendingImmediateRequests, setPendingImmediateRequests] = useState(new Set());
   
   // Stati per il divisore dei messaggi non letti
   const [unreadMessagesDividerIndex, setUnreadMessagesDividerIndex] = useState(null);
@@ -123,12 +136,12 @@ const ModernChatList = ({
   const scrollingToBottomRef = useRef(false);
   const userHasScrolledRef = useRef(false);
   const visibleMessagesRef = useRef(new Set());
-  const pendingReactionsRequestsRef = useRef({});
-  const fetchedReactionsRef = useRef(new Set());
-  const reactionBatchSize = 20;
   const lastMessageCountRef = useRef(messages.length);
   const previousMessagesRef = useRef([]);
   const lastVisibleMessageRef = useRef(null);
+  const reactionUpdateIntervalRef = useRef(null);
+  const immediateReactionTimeoutRef = useRef(null);
+  const scrollDebounceTimeoutRef = useRef(null);
 
   // Calcola il conteggio totale dei messaggi
   const totalMessageCount = useMemo(() => {
@@ -313,21 +326,40 @@ const ModernChatList = ({
     }
   }, []);
 
-  // Observer per tracciare i messaggi visibili
+  // Observer per tracciare i messaggi visibili con caricamento immediato reazioni
   useEffect(() => {
     if (!chatListRef?.current) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
+        const now = Date.now();
+        const newVisibleMessages = new Set(visibleMessagesRef.current);
+        let hasNewVisibleMessages = false;
+
         entries.forEach((entry) => {
-          const messageId = entry.target.id.replace("message-", "");
+          const messageId = parseInt(entry.target.id.replace("message-", ""));
 
           if (entry.isIntersecting) {
-            visibleMessagesRef.current.add(parseInt(messageId));
+            newVisibleMessages.add(messageId);
+            // Se il messaggio è appena diventato visibile, programma il caricamento con debouncing
+            if (!visibleMessagesRef.current.has(messageId)) {
+              hasNewVisibleMessages = true;
+              scheduleImmediateReactionLoad(messageId); // Usa debouncing per accorpare le richieste
+            }
           } else {
-            visibleMessagesRef.current.delete(parseInt(messageId));
+            newVisibleMessages.delete(messageId);
           }
         });
+
+        visibleMessagesRef.current = newVisibleMessages;
+        
+        // Aggiorna Redux con i messaggi visibili (array serializzabile)
+        dispatch(updateVisibleMessages(Array.from(newVisibleMessages)));
+
+        // Se ci sono nuovi messaggi visibili, aggiorna il timestamp
+        if (hasNewVisibleMessages) {
+          setLastVisibleUpdate(now);
+        }
       },
       {
         root: chatListRef.current,
@@ -343,157 +375,141 @@ const ModernChatList = ({
     return () => {
       observer.disconnect();
     };
-  }, [chatListRef.current, messages]);
+  }, [chatListRef.current, messages, dispatch]);
 
-  // Funzione per pianificare il caricamento delle reazioni in batch
-  const scheduleReactionsFetch = useCallback(
-    debounce(() => {
-      if (visibleMessagesRef.current.size === 0) return;
+  // Funzione per caricare reazioni per un singolo messaggio
+  const loadReactionsForMessage = useCallback(async (messageId, immediate = false) => {
+    if (!messageId || pendingReactionRequests.has(messageId)) return;
 
-      const messageIds = Array.from(visibleMessagesRef.current).filter(
-        (id) =>
-          !messageReactionsCache[id] &&
-          !pendingReactionsRequestsRef.current[id],
+    // Verifica se le reazioni sono già in cache e non sono scadute
+    const state = store.getState();
+    const isExpired = selectReactionsExpired(state, messageId, immediate ? 5 : 30);
+    
+    if (!isExpired) return; // Le reazioni sono ancora valide
+
+    setPendingReactionRequests(prev => new Set(prev).add(messageId));
+
+    try {
+      await dispatch(loadMessageReactions([messageId])).unwrap();
+    } catch (error) {
+      console.error(`Error loading reactions for message ${messageId}:`, error);
+    } finally {
+      setPendingReactionRequests(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(messageId);
+        return newSet;
+      });
+    }
+  }, [dispatch, pendingReactionRequests]);
+
+  // Funzione per gestire richieste immediate con debouncing (solo per scroll)
+  const scheduleImmediateReactionLoad = useCallback((messageId) => {
+    // Aggiungi alla lista delle richieste pendenti
+    setPendingImmediateRequests(prev => new Set(prev).add(messageId));
+
+    // Cancella il timeout precedente se esiste
+    if (scrollDebounceTimeoutRef.current) {
+      clearTimeout(scrollDebounceTimeoutRef.current);
+    }
+
+    // Imposta un nuovo timeout per accorpare le richieste
+    scrollDebounceTimeoutRef.current = setTimeout(async () => {
+      const currentPending = pendingImmediateRequests;
+      if (currentPending.size === 0) return;
+
+      // Filtra solo i messaggi che hanno reazioni scadute
+      const state = store.getState();
+      const expiredIds = Array.from(currentPending).filter(id => 
+        selectReactionsExpired(state, id, 5)
       );
 
-      if (messageIds.length === 0) return;
-
-      for (let i = 0; i < messageIds.length; i += reactionBatchSize) {
-        const batch = messageIds.slice(i, i + reactionBatchSize);
-        batchLoadReactions(batch);
-      }
-    }, 5000), // 5 secondi
-    [messageReactionsCache],
-  );
-
-  // Carica le reazioni in batch
-  const batchLoadReactions = useCallback(
-    async (messageIds) => {
-      if (!messageIds || messageIds.length === 0 || !getMessageReactions)
-        return;
-  
-      // MODIFICA: Filtra solo i messageId validi (non temporanei e non null)
-      const validMessageIds = messageIds.filter((id) => {
-        // Escludi ID temporanei (che iniziano con "temp_")
-        if (typeof id === 'string' && id.startsWith('temp_')) {
-          return false;
-        }
-        // Escludi null, undefined, 0, o altri valori non validi
-        if (!id || id === 0 || id === '0') {
-          return false;
-        }
-        // Escludi se non è un numero valido
-        const numericId = parseInt(id);
-        if (isNaN(numericId) || numericId <= 0) {
-          return false;
-        }
-        return true;
-      });
-  
-      // Se non ci sono ID validi, esci
-      if (validMessageIds.length === 0) {
-        console.log('Nessun messageId valido per caricare le reazioni');
+      if (expiredIds.length === 0) {
+        setPendingImmediateRequests(new Set());
         return;
       }
-  
-      const unrequestedIds = validMessageIds.filter(
-        (id) =>
-          !fetchedReactionsRef.current.has(id) &&
-          !pendingReactionsRequestsRef.current[id],
-      );
-  
-      if (unrequestedIds.length === 0) return;
-  
-      unrequestedIds.forEach((id) => {
-        pendingReactionsRequestsRef.current[id] = true;
-        fetchedReactionsRef.current.add(id);
-      });
-  
-      try {
-        const token = localStorage.getItem("token");
-  
-        if (!token) {
-          throw new Error("Token non disponibile per caricare le reazioni");
-        }
-  
-        let newReactionsCache = {};
-  
+
+      // Carica in batch di 5 per non sovraccaricare
+      const batchSize = 5;
+      for (let i = 0; i < expiredIds.length; i += batchSize) {
+        const batch = expiredIds.slice(i, i + batchSize);
         try {
-          // Prova a usare l'endpoint batch
-          const batchResponse = await axios.post(
-            `${config.API_BASE_URL}/messages/batch-reactions`,
-            { messageIds: unrequestedIds },
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-  
-          if (batchResponse.data && batchResponse.data.success) {
-            newReactionsCache = batchResponse.data.reactions || {};
-          }
-        } catch (err) {
-          console.log('Endpoint batch non disponibile, uso richieste singole');
-          const maxParallelRequests = 5;
-  
-          for (let i = 0; i < unrequestedIds.length; i += maxParallelRequests) {
-            const batch = unrequestedIds.slice(i, i + maxParallelRequests);
-  
-            const responses = await Promise.all(
-              batch.map((messageId) =>
-                axios.get(
-                  `${config.API_BASE_URL}/messages/${messageId}/reactions`,
-                  {
-                    headers: { Authorization: `Bearer ${token}` },
-                  },
-                ).catch(error => {
-                  // Gestisci errori per singolo messaggio
-                  console.warn(`Errore nel caricamento reazioni per messaggio ${messageId}:`, error);
-                  return { data: { success: false, reactions: [] } };
-                }),
-              ),
-            );
-  
-            responses.forEach((response, index) => {
-              const messageId = batch[index];
-  
-              if (response.data && response.data.success) {
-                newReactionsCache[messageId] = response.data.reactions || [];
-              } else {
-                newReactionsCache[messageId] = [];
-              }
-            });
-  
-            if (i + maxParallelRequests < unrequestedIds.length) {
-              await new Promise((resolve) => setTimeout(resolve, 100));
-            }
-          }
+          await dispatch(loadMessageReactions(batch)).unwrap();
+        } catch (error) {
+          console.error('Error loading immediate batch reactions:', error);
         }
-  
-        if (Object.keys(newReactionsCache).length > 0) {
-          setMessageReactionsCache((prev) => ({
-            ...prev,
-            ...newReactionsCache,
-          }));
+        
+        // Piccola pausa tra i batch
+        if (i + batchSize < expiredIds.length) {
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
-      } catch (error) {
-        console.error("Error batch loading reactions:", error);
-      } finally {
-        unrequestedIds.forEach((id) => {
-          delete pendingReactionsRequestsRef.current[id];
-        });
       }
-    },
-    [getMessageReactions],
-  );
 
-  // Ottieni le reazioni per un messaggio specifico
+      // Pulisci le richieste pendenti
+      setPendingImmediateRequests(new Set());
+    }, 300); // 300ms di debounce per accorpare le richieste durante lo scroll
+  }, [dispatch, pendingImmediateRequests]);
+
+  // Funzione per caricamento immediato (senza debouncing) per azioni utente
+  const loadReactionsImmediately = useCallback(async (messageId) => {
+    if (!messageId || pendingReactionRequests.has(messageId)) return;
+
+    // Verifica se le reazioni sono già in cache e non sono scadute
+    const state = store.getState();
+    const isExpired = selectReactionsExpired(state, messageId, 5);
+    
+    if (!isExpired) return; // Le reazioni sono ancora valide
+
+    setPendingReactionRequests(prev => new Set(prev).add(messageId));
+
+    try {
+      await dispatch(loadMessageReactions([messageId])).unwrap();
+    } catch (error) {
+      console.error(`Error loading reactions for message ${messageId}:`, error);
+    } finally {
+      setPendingReactionRequests(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(messageId);
+        return newSet;
+      });
+    }
+  }, [dispatch, pendingReactionRequests]);
+
+  // Funzione per caricare reazioni in batch per messaggi visibili
+  const loadVisibleReactions = useCallback(async () => {
+    const visibleIds = Array.from(visibleMessagesRef.current);
+    if (visibleIds.length === 0) return;
+
+    const state = store.getState();
+    const expiredIds = visibleIds.filter(id => selectReactionsExpired(state, id, 30));
+    
+    if (expiredIds.length === 0) return;
+
+    // Carica in batch di 10 per non sovraccaricare
+    const batchSize = 10;
+    for (let i = 0; i < expiredIds.length; i += batchSize) {
+      const batch = expiredIds.slice(i, i + batchSize);
+      try {
+        await dispatch(loadMessageReactions(batch)).unwrap();
+      } catch (error) {
+        console.error('Error loading batch reactions:', error);
+      }
+      
+      // Piccola pausa tra i batch
+      if (i + batchSize < expiredIds.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+  }, [dispatch]);
+
+  // Ottieni le reazioni per un messaggio specifico da Redux
   const getReactionsForMessage = useCallback(
     (messageId) => {
-      if (messageReactionsCache[messageId]) {
-        return messageReactionsCache[messageId];
-      }
-      return [];
+      const state = store.getState();
+      return selectMessageReactions(state, messageId);
     },
-    [messageReactionsCache],
+    [],
   );
+
 
   // Ascolta gli eventi di aggiornamento reazioni
   useEffect(() => {
@@ -501,17 +517,13 @@ const ModernChatList = ({
       const { messageId } = event.detail || {};
 
       if (messageId) {
-        fetchedReactionsRef.current.delete(messageId);
-        delete pendingReactionsRequestsRef.current[messageId];
-
-        setMessageReactionsCache((prevCache) => {
-          const newCache = { ...prevCache };
-          delete newCache[messageId];
-          return newCache;
-        });
-
-        visibleMessagesRef.current.add(parseInt(messageId));
-        scheduleReactionsFetch();
+        // Invalida la cache per questo messaggio
+        dispatch(invalidateReactionCache(messageId));
+        
+        // Se il messaggio è visibile, ricarica immediatamente (azione utente)
+        if (visibleMessagesRef.current.has(parseInt(messageId))) {
+          loadReactionsImmediately(parseInt(messageId));
+        }
       }
     };
 
@@ -526,52 +538,38 @@ const ModernChatList = ({
         handleMessageReactionUpdated,
       );
     };
-  }, [scheduleReactionsFetch]);
+  }, [dispatch, loadReactionsForMessage]);
 
-  // Aggiornamento periodico delle reazioni per i messaggi visibili
+  // Aggiornamento periodico intelligente delle reazioni per i messaggi visibili
   useEffect(() => {
     if (!notificationId || hasLeftChat) return;
 
-    const refreshVisibleReactions = async () => {
-      const visibleIds = Array.from(visibleMessagesRef.current);
-      if (visibleIds.length === 0) return;
-
-      visibleIds.forEach((id) => {
-        fetchedReactionsRef.current.delete(id);
-        delete pendingReactionsRequestsRef.current[id];
-      });
-
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) return;
-
-        const response = await axios.post(
-          `${config.API_BASE_URL}/messages/batch-reactions`,
-          {
-            messageIds: visibleIds,
-            userId: currentUserId,
-          },
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
-        console.log("🔄 ModernChatList: Aggiornamento reazioni visibili:", response.data);
-        if (response.data && response.data.success) {
-          const freshReactions = response.data.reactions || {};
-
-          setMessageReactionsCache((prev) => ({
-            ...prev,
-            ...freshReactions,
-          }));
-        }
-      } catch (error) {
-        console.error("Error refreshing reactions:", error);
+    // Avvia l'aggiornamento periodico solo per messaggi visibili
+    const startPeriodicUpdate = () => {
+      if (reactionUpdateIntervalRef.current) {
+        clearInterval(reactionUpdateIntervalRef.current);
       }
+
+      reactionUpdateIntervalRef.current = setInterval(() => {
+        // Aggiorna solo se ci sono messaggi visibili
+        if (visibleMessagesRef.current.size > 0) {
+          loadVisibleReactions();
+        }
+      }, 5000); // 5 secondi
     };
 
-    refreshVisibleReactions();
-    const intervalId = setInterval(refreshVisibleReactions, 5000);
+    // Avvia subito l'aggiornamento periodico
+    startPeriodicUpdate();
 
-    return () => clearInterval(intervalId);
-  }, [notificationId, hasLeftChat, currentUserId]);
+    return () => {
+      if (reactionUpdateIntervalRef.current) {
+        clearInterval(reactionUpdateIntervalRef.current);
+      }
+      if (scrollDebounceTimeoutRef.current) {
+        clearTimeout(scrollDebounceTimeoutRef.current);
+      }
+    };
+  }, [notificationId, hasLeftChat, loadVisibleReactions]);
 
   // Effetto per gestire i nuovi messaggi
   useEffect(() => {

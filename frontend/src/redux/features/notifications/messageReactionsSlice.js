@@ -114,7 +114,7 @@ export const loadMessageReactions = createAsyncThunk(
 
 export const toggleMessageReaction = createAsyncThunk(
   "messageReactions/toggleReaction",
-  async ({ messageId, reactionType }, { rejectWithValue, dispatch }) => {
+  async ({ messageId, reactionType, hasCurrentUserReacted, currentUserId, currentUserName }, { rejectWithValue, dispatch, getState }) => {
     try {
       if (!messageId || !reactionType) {
         return rejectWithValue("Invalid messageId or reactionType");
@@ -145,8 +145,11 @@ export const toggleMessageReaction = createAsyncThunk(
         );
       }
 
+      // Determine the HTTP method based on whether user has already reacted
+      const httpMethod = hasCurrentUserReacted ? 'delete' : 'post';
+      
       // Call API to add/remove the reaction
-      const response = await axios.post(
+      const response = await axios[httpMethod](
         `${config.API_BASE_URL}/messages/${messageId}/reactions`,
         { reactionType },
         {
@@ -188,6 +191,9 @@ export const toggleMessageReaction = createAsyncThunk(
         reactionType,
         notificationId,
         action: response.data.action || "modified",
+        hasCurrentUserReacted,
+        currentUserId,
+        currentUserName,
       };
     } catch (error) {
       console.error("Error toggling message reaction:", error);
@@ -285,8 +291,11 @@ const messageReactionsSlice = createSlice({
   name: "messageReactions",
   initialState: {
     reactions: {}, // Organized by messageId
+    cacheTimestamps: {}, // TTL per cache delle reazioni
     loading: false,
     error: null,
+    visibleMessages: [], // Messaggi attualmente visibili (array serializzabile)
+    lastUpdate: null, // Timestamp ultimo aggiornamento
   },
   reducers: {
     clearMessageReactions: (state, action) => {
@@ -294,10 +303,28 @@ const messageReactionsSlice = createSlice({
         // Clear reactions for a specific message
         const messageId = action.payload;
         delete state.reactions[messageId];
+        delete state.cacheTimestamps[messageId];
       } else {
         // Clear all reactions
         state.reactions = {};
+        state.cacheTimestamps = {};
       }
+    },
+    updateVisibleMessages: (state, action) => {
+      state.visibleMessages = action.payload; // Array già serializzabile
+    },
+    invalidateReactionCache: (state, action) => {
+      const messageId = action.payload;
+      if (messageId) {
+        delete state.cacheTimestamps[messageId];
+      } else {
+        // Invalida tutta la cache
+        state.cacheTimestamps = {};
+      }
+    },
+    setReactionCacheTimestamp: (state, action) => {
+      const { messageId, timestamp } = action.payload;
+      state.cacheTimestamps[messageId] = timestamp;
     },
   },
   extraReducers: (builder) => {
@@ -310,6 +337,7 @@ const messageReactionsSlice = createSlice({
         state.loading = false;
         const { messageId, reactions } = action.payload;
         state.reactions[messageId] = reactions;
+        state.cacheTimestamps[messageId] = Date.now();
       })
       .addCase(fetchMessageReactions.rejected, (state, action) => {
         state.loading = false;
@@ -322,11 +350,19 @@ const messageReactionsSlice = createSlice({
       })
       .addCase(loadMessageReactions.fulfilled, (state, action) => {
         state.loading = false;
+        const timestamp = Date.now();
+        console.log('📦 Redux: Caricate reazioni batch:', action.payload);
         // Merge the batch results into the existing reactions
         state.reactions = {
           ...state.reactions,
           ...action.payload,
         };
+        // Aggiorna timestamp per tutti i messaggi caricati
+        Object.keys(action.payload).forEach(messageId => {
+          state.cacheTimestamps[messageId] = timestamp;
+        });
+        state.lastUpdate = timestamp;
+        console.log('📦 Redux: Stato finale reazioni:', state.reactions);
       })
       .addCase(loadMessageReactions.rejected, (state, action) => {
         state.loading = false;
@@ -339,8 +375,8 @@ const messageReactionsSlice = createSlice({
       })
       .addCase(toggleMessageReaction.fulfilled, (state, action) => {
         state.loading = false;
-        // We don't update the reactions directly here,
-        // as we'll get the updated list from fetchNotificationById
+        // Non aggiorniamo lo stato locale qui, lasciamo che sia il backend a gestire tutto
+        // attraverso fetchNotificationById che aggiornerà le reazioni
       })
       .addCase(toggleMessageReaction.rejected, (state, action) => {
         state.loading = false;
@@ -364,12 +400,28 @@ const messageReactionsSlice = createSlice({
 });
 
 // Export actions
-export const { clearMessageReactions } = messageReactionsSlice.actions;
+export const { 
+  clearMessageReactions, 
+  updateVisibleMessages, 
+  invalidateReactionCache, 
+  setReactionCacheTimestamp 
+} = messageReactionsSlice.actions;
 
 // Export selectors
 export const selectMessageReactions = (state, messageId) =>
   state.messageReactions.reactions[messageId] || [];
 export const selectReactionsLoading = (state) => state.messageReactions.loading;
 export const selectReactionsError = (state) => state.messageReactions.error;
+export const selectVisibleMessages = (state) => new Set(state.messageReactions.visibleMessages);
+export const selectReactionCacheTimestamp = (state, messageId) => 
+  state.messageReactions.cacheTimestamps[messageId];
+export const selectLastReactionUpdate = (state) => state.messageReactions.lastUpdate;
+
+// Helper selector per verificare se le reazioni sono scadute
+export const selectReactionsExpired = (state, messageId, ttlSeconds = 30) => {
+  const timestamp = state.messageReactions.cacheTimestamps[messageId];
+  if (!timestamp) return true;
+  return (Date.now() - timestamp) > (ttlSeconds * 1000);
+};
 
 export default messageReactionsSlice.reducer;

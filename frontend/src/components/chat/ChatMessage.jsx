@@ -29,6 +29,8 @@ import {
 import FileViewer from '@/components/ui/fileViewer';
 import { swal } from '@/lib/common';
 import { useNotifications } from '@/redux/features/notifications/notificationsHooks';
+import { useSelector } from 'react-redux';
+import { selectMessageReactions } from '@/redux/features/notifications/messageReactionsSlice';
 import DOMPurify from 'dompurify';
 import PollModal from './PollModal';
 import MessageColorPicker from './MessageColorPicker';
@@ -88,6 +90,18 @@ const ChatMessage = memo(({
     toggleMessageReaction
   } = useNotifications();
 
+  // Ottieni le reazioni dal Redux store
+  const reactionsFromStore = useSelector(state => selectMessageReactions(state, message.messageId));
+  
+  // Debug: log delle reazioni
+  useEffect(() => {
+    console.log(`🔍 ChatMessage ${message.messageId}:`, {
+      messageReactions: message.reactions,
+      storeReactions: reactionsFromStore,
+      finalReactions: message.reactions || reactionsFromStore
+    });
+  }, [message.reactions, reactionsFromStore, message.messageId]);
+
   // Trova il messaggio originale per una risposta
   const findOriginalMessage = useCallback((replyToMessageId) => {
     if (!replyToMessageId || replyToMessageId === "0") return null;
@@ -112,6 +126,7 @@ const ChatMessage = memo(({
     
     try {
       setLoadingReactions(prev => ({ ...prev, [emoji]: true }));
+      
       await toggleMessageReaction(message.messageId, emoji);
       
       // Aggiungi effetto di feedback
@@ -349,6 +364,7 @@ const ChatMessage = memo(({
   const handleReaction = async (reactionType) => {
     try {
       setLoadingReactions(prev => ({ ...prev, [reactionType]: true }));
+      
       await toggleMessageReaction(message.messageId, reactionType);
       
       document.dispatchEvent(
@@ -722,14 +738,14 @@ const ChatMessage = memo(({
               )}
               
               {/* Reazioni */}
-              {message.reactions ? (
+              {(message.reactions || reactionsFromStore.length > 0) ? (
                 <motion.div 
                   className={`message-reactions flex flex-wrap gap-1 mt-1`}
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  {Object.entries(groupReactionsByType(message.reactions)).map(([reactionType, reactors]) => {
+                  {Object.entries(groupReactionsByType(message.reactions || reactionsFromStore)).map(([reactionType, reactors]) => {
                     const userReaction = reactors.find(r => r.UserID === currentUserId);
                     const hasCurrentUserReacted = !!userReaction;
                     const userNames = reactors.map(r => r.UserName).join(", ");
