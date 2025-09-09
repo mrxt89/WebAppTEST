@@ -368,7 +368,7 @@ export const useOpenChat = (notificationId, options = {}) => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [dispatch, notificationId, isLoadingMore, messageStats]);
+  }, [dispatch, notificationId, isLoadingMore, messageStats.hasMoreMessages, messageStats.oldestMessageId]);
   
   // Gestione invio messaggi
   const sendMessage = useCallback(async (messageData) => {
@@ -625,25 +625,44 @@ export const useOpenChat = (notificationId, options = {}) => {
   
   // Effect per gestire il focus della finestra e il caricamento dei messaggi
   useEffect(() => {
+    let isHandlingFocus = false;
+    
     const handleFocus = async () => {
-      if (!isRefreshing && !isLoadingMore) {
+      // Previeni chiamate multiple simultanee
+      if (isHandlingFocus || isRefreshing || isLoadingMore) {
+        return;
+      }
+      
+      isHandlingFocus = true;
+      
+      try {
         // Prima carica i messaggi precedenti se necessario
         if (messageStats.hasMoreMessages && !isLoadingMore) {
           await loadMore();
         }
         // Poi aggiorna i dati
         await refreshData();
+      } finally {
+        isHandlingFocus = false;
       }
     };
     
     const handleVisibilityChange = async () => {
-      if (!document.hidden && !isRefreshing && !isLoadingMore) {
+      if (document.hidden || isHandlingFocus || isRefreshing || isLoadingMore) {
+        return;
+      }
+      
+      isHandlingFocus = true;
+      
+      try {
         // Prima carica i messaggi precedenti se necessario
         if (messageStats.hasMoreMessages && !isLoadingMore) {
           await loadMore();
         }
         // Poi aggiorna i dati
         await refreshData();
+      } finally {
+        isHandlingFocus = false;
       }
     };
     
@@ -654,7 +673,7 @@ export const useOpenChat = (notificationId, options = {}) => {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [refreshData, isRefreshing, isLoadingMore, messageStats, loadMore]);
+  }, [refreshData, isRefreshing, isLoadingMore, messageStats.hasMoreMessages, messageStats.oldestMessageId, loadMore]);
   
   // Funzioni per gestione chat
   const chatActions = useMemo(() => ({

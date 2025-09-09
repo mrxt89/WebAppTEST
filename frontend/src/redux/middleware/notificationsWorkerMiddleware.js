@@ -109,16 +109,19 @@ const notificationsWorkerMiddleware = (store) => {
   // MODIFICA: Funzione migliorata per aggiornare le chat aperte nel worker
   const updateWorkerOpenChats = () => {
     if (worker && isWorkerInitialized) {
-      const state = store.getState();
-      const openChatIds = Array.from(state.notifications?.openChatIds || []);
+      // Usa setTimeout per evitare di chiamare getState durante l'esecuzione del reducer
+      setTimeout(() => {
+        const state = store.getState();
+        const openChatIds = Array.from(state.notifications?.openChatIds || []);
       
       
-      worker.postMessage({
-        type: "update_open_chats",
-        data: {
-          openChatIds: openChatIds
-        }
-      });
+        worker.postMessage({
+          type: "update_open_chats",
+          data: {
+            openChatIds: openChatIds
+          }
+        });
+      }, 0);
     }
   };
 
@@ -236,30 +239,33 @@ const notificationsWorkerMiddleware = (store) => {
       
             if (newNotifications) {
               try {
-                const currentState = store.getState();
-                const currentNotifications = currentState.notifications?.notifications || [];
-                const openChatIds = currentState.notifications?.openChatIds || new Set();
+                // Usa setTimeout per evitare di chiamare getState durante l'esecuzione del reducer
+                setTimeout(() => {
+                  const currentState = store.getState();
+                  const currentNotifications = currentState.notifications?.notifications || [];
+                  const openChatIds = currentState.notifications?.openChatIds || new Set();
                 
                 const hasChanges = hasNotificationChanges(currentNotifications, newNotifications);
                 
-                if (hasChanges) {
-                  store.dispatch({
-                    type: "notifications/updateFromWorker",
-                    payload: newNotifications.map(notif => {
-                      if (openChatIds.has(notif.notificationId)) {
-                        return {
-                          ...notif,
-                          messages: []
-                        };
-                      }
-                      return notif;
-                    }),
-                    meta: {
-                      source: "worker",
-                      timestamp: Date.now(),
-                    },
-                  });
-                }
+                  if (hasChanges) {
+                    store.dispatch({
+                      type: "notifications/updateFromWorker",
+                      payload: newNotifications.map(notif => {
+                        if (openChatIds.has(notif.notificationId)) {
+                          return {
+                            ...notif,
+                            messages: []
+                          };
+                        }
+                        return notif;
+                      }),
+                      meta: {
+                        source: "worker",
+                        timestamp: Date.now(),
+                      },
+                    });
+                  }
+                }, 0);
               } catch (error) {
                 console.error("Error processing notification update:", error);
               }
@@ -267,8 +273,10 @@ const notificationsWorkerMiddleware = (store) => {
             break;
       
             case "unread_count_update":
-              const state = store.getState();
-              const { pendingUnreadCount, unreadCountLastModified, optimisticUpdateInProgress } = state.notifications;
+              // Usa setTimeout per evitare di chiamare getState durante l'esecuzione del reducer
+              setTimeout(() => {
+                const state = store.getState();
+                const { pendingUnreadCount, unreadCountLastModified, optimisticUpdateInProgress } = state.notifications;
               
               // Se c'è una modifica locale recente o un aggiornamento ottimistico in corso, ignora l'update del worker
               if ((unreadCountLastModified && Date.now() - unreadCountLastModified < 5000) || optimisticUpdateInProgress) {
@@ -282,23 +290,26 @@ const notificationsWorkerMiddleware = (store) => {
                 payload: unreadCount
               });
               
-              // Emetti evento per aggiornare l'header
-              document.dispatchEvent(
-                new CustomEvent("unread-count-changed", {
-                  detail: {
-                    unreadCount,
-                    timestamp,
-                    source: "worker-update"
-                  },
-                }),
-              );
+                // Emetti evento per aggiornare l'header
+                document.dispatchEvent(
+                  new CustomEvent("unread-count-changed", {
+                    detail: {
+                      unreadCount,
+                      timestamp,
+                      source: "worker-update"
+                    },
+                  }),
+                );
+              }, 0);
               break;
       
             case "partial_notifications_update":
               // NUOVO: Aggiornamento parziale per notifiche paginate
               if (metadata && newNotifications) {
-                const currentState = store.getState();
-                const currentPage = currentState.notifications?.notificationsPagination?.currentPage || 1;
+                // Usa setTimeout per evitare di chiamare getState durante l'esecuzione del reducer
+                setTimeout(() => {
+                  const currentState = store.getState();
+                  const currentPage = currentState.notifications?.notificationsPagination?.currentPage || 1;
                 
                 // MODIFICA: Aggiorna sempre le notifiche paginate, non solo alla prima pagina
                 store.dispatch({
@@ -322,17 +333,18 @@ const notificationsWorkerMiddleware = (store) => {
                            new Date(n.lastMessage) > new Date(currentNotif.lastMessage || 0);
                   });
                   
-                  if (notificationsWithNewMessages.length > 0) {
-                    document.dispatchEvent(
-                      new CustomEvent("sidebar-notifications-update", {
-                        detail: {
-                          notifications: notificationsWithNewMessages,
-                          timestamp: Date.now()
-                        }
-                      })
-                    );
+                    if (notificationsWithNewMessages.length > 0) {
+                      document.dispatchEvent(
+                        new CustomEvent("sidebar-notifications-update", {
+                          detail: {
+                            notifications: notificationsWithNewMessages,
+                            timestamp: Date.now()
+                          }
+                        })
+                      );
+                    }
                   }
-                }
+                }, 0);
               }
               break;
       
@@ -372,63 +384,65 @@ const notificationsWorkerMiddleware = (store) => {
             
             case "new_message":
               if (event.data.newMessagesInfo) {
-                try {
-                  const state = store.getState();
-                  if (!state?.notifications) {
-                    return;
-                  }
-
-                  const doNotDisturbEnabled = localStorage.getItem("doNotDisturbEnabled") === "true";
-                  
-                  if (doNotDisturbEnabled) {
-                    console.log("[Middleware] DND abilitato, skip notifica");
-                  }
-
-                  let currentUserId = null;
+                // Usa setTimeout per evitare di chiamare getState durante l'esecuzione del reducer
+                setTimeout(() => {
                   try {
-                    const userStr = localStorage.getItem("user");
-                    if (userStr) {
-                      const userData = JSON.parse(userStr);
-                      currentUserId = userData.userId || userData.UserId || userData.id;
-                    }
-                  } catch (e) {
-                    console.error("Errore recupero userId:", e);
-                  }
-
-                  // IMPORTANTE: Marca che stiamo processando nuovi messaggi
-                  // Questo previene interferenze con altri aggiornamenti del contatore
-                  store.dispatch({
-                    type: "notifications/setPendingUnreadCount",
-                    payload: {
-                      count: state.notifications.unreadCount,
-                      timestamp: Date.now()
-                    }
-                  });
-
-                  event.data.newMessagesInfo.forEach((messageInfo) => {
-                    const {
-                      notificationId,
-                      newMessageCount,
-                      senderName,
-                      messagePreview,
-                      isRecent,
-                      isOwnMessage,
-                      isOpenChat,
-                      senderId
-                    } = messageInfo;
-
-                    if (isOwnMessage) {
-                      console.log(`[Middleware] Skip messaggio proprio per chat ${notificationId}`);
+                    const state = store.getState();
+                    if (!state?.notifications) {
                       return;
                     }
 
-                    const isActuallyOpen = state.notifications.openChatIds.has(parseInt(notificationId));
-                    
-                    console.log(`[Middleware] Nuovo messaggio per chat ${notificationId}, aperta: ${isActuallyOpen}`);
+                    const doNotDisturbEnabled = localStorage.getItem("doNotDisturbEnabled") === "true";
+                  
+                    if (doNotDisturbEnabled) {
+                      console.log("[Middleware] DND abilitato, skip notifica");
+                    }
 
-                    if (isActuallyOpen) {
-                      console.log(`[Middleware] Chat ${notificationId} è aperta, aggiorno solo i dati`);
-                      store.dispatch(fetchNotificationById(parseInt(notificationId), true));
+                    let currentUserId = null;
+                    try {
+                      const userStr = localStorage.getItem("user");
+                      if (userStr) {
+                        const userData = JSON.parse(userStr);
+                        currentUserId = userData.userId || userData.UserId || userData.id;
+                      }
+                    } catch (e) {
+                      console.error("Errore recupero userId:", e);
+                    }
+
+                    // IMPORTANTE: Marca che stiamo processando nuovi messaggi
+                    // Questo previene interferenze con altri aggiornamenti del contatore
+                    store.dispatch({
+                      type: "notifications/setPendingUnreadCount",
+                      payload: {
+                        count: state.notifications.unreadCount,
+                        timestamp: Date.now()
+                      }
+                    });
+
+                    event.data.newMessagesInfo.forEach((messageInfo) => {
+                      const {
+                        notificationId,
+                        newMessageCount,
+                        senderName,
+                        messagePreview,
+                        isRecent,
+                        isOwnMessage,
+                        isOpenChat,
+                        senderId
+                      } = messageInfo;
+
+                      if (isOwnMessage) {
+                        console.log(`[Middleware] Skip messaggio proprio per chat ${notificationId}`);
+                        return;
+                      }
+
+                      const isActuallyOpen = state.notifications.openChatIds.has(parseInt(notificationId));
+                      
+                      console.log(`[Middleware] Nuovo messaggio per chat ${notificationId}, aperta: ${isActuallyOpen}`);
+
+                      if (isActuallyOpen) {
+                        console.log(`[Middleware] Chat ${notificationId} è aperta, aggiorno solo i dati`);
+                        store.dispatch(fetchNotificationById(parseInt(notificationId), true));
                       
                       document.dispatchEvent(
                         new CustomEvent("open-chat-new-message", {
@@ -523,30 +537,31 @@ const notificationsWorkerMiddleware = (store) => {
                     // Aggiorna la notifica nello store
                     store.dispatch(fetchNotificationById(notificationId, false));
                   });
-                  
-                  // IMPORTANTE: Forza un reload delle notifiche per ottenere il contatore aggiornato
-                  // con un delay leggermente maggiore per evitare race conditions
-                  if (event.data.newMessagesInfo.length > 0) {
-                    console.log("[Middleware] Forzando reload notifiche per aggiornare contatore...");
                     
-                    // Delay maggiore per dare tempo al backend di aggiornare completamente
-                    setTimeout(() => {
-                      // Clear pending count prima del reload
-                      store.dispatch({
-                        type: "notifications/clearPendingUnreadCount"
-                      });
+                    // IMPORTANTE: Forza un reload delle notifiche per ottenere il contatore aggiornato
+                    // con un delay leggermente maggiore per evitare race conditions
+                    if (event.data.newMessagesInfo.length > 0) {
+                      console.log("[Middleware] Forzando reload notifiche per aggiornare contatore...");
                       
-                      // Usa l'azione di reload del worker
-                      store.dispatch({
-                        type: "notifications/reload",
-                        payload: { highPriority: true }
-                      });
-                    }, 1000); // Aumentato a 1 secondo
+                      // Delay maggiore per dare tempo al backend di aggiornare completamente
+                      setTimeout(() => {
+                        // Clear pending count prima del reload
+                        store.dispatch({
+                          type: "notifications/clearPendingUnreadCount"
+                        });
+                        
+                        // Usa l'azione di reload del worker
+                        store.dispatch({
+                          type: "notifications/reload",
+                          payload: { highPriority: true }
+                        });
+                      }, 1000); // Aumentato a 1 secondo
+                    }
+                    
+                  } catch (e) {
+                    console.error("Errore elaborazione nuovi messaggi:", e);
                   }
-                  
-                } catch (e) {
-                  console.error("Errore elaborazione nuovi messaggi:", e);
-                }
+                }, 0);
               }
               break;
 
@@ -659,20 +674,23 @@ const notificationsWorkerMiddleware = (store) => {
 
     // MODIFICA: Intercetta updateFromWorker per gestire le chat aperte
     else if (action.type === "notifications/updateFromWorker") {
-      const state = store.getState();
-      const openChatIds = state.notifications?.openChatIds || new Set();
+      // Usa setTimeout per evitare di chiamare getState durante l'esecuzione del reducer
+      setTimeout(() => {
+        const state = store.getState();
+        const openChatIds = state.notifications?.openChatIds || new Set();
       
-      // Marca come lette le notifiche delle chat aperte
-      if (action.payload && Array.isArray(action.payload)) {
-        action.payload = action.payload.map(notification => {
-          if (openChatIds.has(notification.notificationId)) {
-            return { ...notification, isReadByUser: true };
-          }
-          return notification;
-        });
-      }
-      
-      return next(action);
+        // Marca come lette le notifiche delle chat aperte
+        if (action.payload && Array.isArray(action.payload)) {
+          action.payload = action.payload.map(notification => {
+            if (openChatIds.has(notification.notificationId)) {
+              return { ...notification, isReadByUser: true };
+            }
+            return notification;
+          });
+        }
+        
+        return next(action);
+      }, 0);
     }
 
     else if (action.type === "notifications/reload") {

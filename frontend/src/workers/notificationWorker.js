@@ -37,7 +37,6 @@ function logError(...args) {
 function logDebug(...args) {
   if (debugEnabled) {
     const timestamp = new Date().toISOString();
-    console.log(`[Worker ${timestamp}]`, ...args);
   }
 }
 
@@ -125,13 +124,13 @@ async function fetchNotifications(notificationIdToFetch = null) {
 
   if (timeSinceLastRequest < MIN_INTERVAL_BETWEEN_REQUESTS && !notificationIdToFetch && !forcedRefreshRequested) {
     logDebug(`Throttling: solo ${timeSinceLastRequest}ms dall'ultima richiesta`);
-    scheduleNextFetch(POLLING_INTERVAL);
+    // Non programmare il prossimo fetch se siamo in throttling
     return;
   }
 
   if (isRequestInProgress) {
     logDebug("Richiesta già in corso, skip");
-    scheduleNextFetch(POLLING_INTERVAL);
+    // Non programmare il prossimo fetch se c'è già una richiesta in corso
     return;
   }
 
@@ -186,8 +185,11 @@ async function fetchNotifications(notificationIdToFetch = null) {
       handlePaginatedUpdate(data);
     }
 
-    forcedRefreshRequested = false;
-    highPriorityUpdate = false;
+    // Reset dei flag solo se la richiesta è andata a buon fine
+    if (isWorkerActive) {
+      forcedRefreshRequested = false;
+      highPriorityUpdate = false;
+    }
 
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -202,7 +204,11 @@ async function fetchNotifications(notificationIdToFetch = null) {
     });
   } finally {
     isRequestInProgress = false;
-    scheduleNextFetch(POLLING_INTERVAL);
+    
+    // Solo se il worker è ancora attivo e non c'è un refresh forzato in corso
+    if (isWorkerActive && !forcedRefreshRequested) {
+      scheduleNextFetch(POLLING_INTERVAL);
+    }
   }
 }
 

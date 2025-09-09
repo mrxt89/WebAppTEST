@@ -93,14 +93,6 @@ const ChatMessage = memo(({
   // Ottieni le reazioni dal Redux store
   const reactionsFromStore = useSelector(state => selectMessageReactions(state, message.messageId));
   
-  // Debug: log delle reazioni
-  useEffect(() => {
-    console.log(`🔍 ChatMessage ${message.messageId}:`, {
-      messageReactions: message.reactions,
-      storeReactions: reactionsFromStore,
-      finalReactions: message.reactions || reactionsFromStore
-    });
-  }, [message.reactions, reactionsFromStore, message.messageId]);
 
   // Trova il messaggio originale per una risposta
   const findOriginalMessage = useCallback((replyToMessageId) => {

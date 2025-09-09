@@ -351,7 +351,6 @@ const messageReactionsSlice = createSlice({
       .addCase(loadMessageReactions.fulfilled, (state, action) => {
         state.loading = false;
         const timestamp = Date.now();
-        console.log('📦 Redux: Caricate reazioni batch:', action.payload);
         // Merge the batch results into the existing reactions
         state.reactions = {
           ...state.reactions,
@@ -362,7 +361,7 @@ const messageReactionsSlice = createSlice({
           state.cacheTimestamps[messageId] = timestamp;
         });
         state.lastUpdate = timestamp;
-        console.log('📦 Redux: Stato finale reazioni:', state.reactions);
+      
       })
       .addCase(loadMessageReactions.rejected, (state, action) => {
         state.loading = false;
@@ -408,11 +407,16 @@ export const {
 } = messageReactionsSlice.actions;
 
 // Export selectors
+const EMPTY_REACTIONS_ARRAY = [];
 export const selectMessageReactions = (state, messageId) =>
-  state.messageReactions.reactions[messageId] || [];
+  state.messageReactions.reactions[messageId] || EMPTY_REACTIONS_ARRAY;
 export const selectReactionsLoading = (state) => state.messageReactions.loading;
 export const selectReactionsError = (state) => state.messageReactions.error;
-export const selectVisibleMessages = (state) => new Set(state.messageReactions.visibleMessages);
+const EMPTY_VISIBLE_MESSAGES_SET = new Set();
+export const selectVisibleMessages = (state) => {
+  const visibleMessages = state.messageReactions.visibleMessages;
+  return visibleMessages && visibleMessages.length > 0 ? new Set(visibleMessages) : EMPTY_VISIBLE_MESSAGES_SET;
+};
 export const selectReactionCacheTimestamp = (state, messageId) => 
   state.messageReactions.cacheTimestamps[messageId];
 export const selectLastReactionUpdate = (state) => state.messageReactions.lastUpdate;

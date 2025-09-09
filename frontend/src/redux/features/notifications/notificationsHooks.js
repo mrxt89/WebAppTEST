@@ -1,5 +1,5 @@
 // src/redux/features/notifications/notificationsHooks.js
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { swal } from "../../../lib/common";
 import axios from "axios";
@@ -151,6 +151,10 @@ export const useNotifications = () => {
   // NUOVO: Selettore per openChatData
   const openChatData = useSelector(state => state.notifications.openChatData);
 
+  // Memoized selectors to prevent unnecessary re-renders
+  const memoizedOpenChatIds = useMemo(() => Array.from(openChatIds), [openChatIds]);
+  const memoizedStandaloneChats = useMemo(() => Array.from(standaloneChats), [standaloneChats]);
+
   // Stato locale per tracciare l'ultima volta che è stato eseguito un aggiornamento
   const [lastUpdateTime, setLastUpdateTime] = useState(0);
   // Ref per tenere traccia delle operazioni in corso
@@ -254,7 +258,7 @@ export const useNotifications = () => {
         
         // IMPORTANTE: Carica anche i sondaggi per questa notifica
         try {
-          console.log(`📊 Caricamento sondaggi per notifica ${notificationId}...`);
+         
           await dispatch(getNotificationPolls(notificationId));
         } catch (pollError) {
           console.error('Errore nel caricamento dei sondaggi:', pollError);
@@ -551,13 +555,7 @@ export const useNotifications = () => {
   
         const token = localStorage.getItem("token");
         if (!token) throw new Error("No token available");
-  
-        console.log(`🔍 searchInNotifications chiamato:`, {
-          searchText: searchText.trim(),
-          notificationId,
-          pageSize,
-          lastMessageId
-        });
+
   
         let url = `${config.API_BASE_URL}/search?searchText=${encodeURIComponent(searchText.trim())}`;
         
@@ -578,12 +576,7 @@ export const useNotifications = () => {
             "Cache-Control": "no-cache"
           },
         });
-  
-        console.log(`✅ Ricerca completata:`, {
-          success: response.data.success,
-          resultsCount: response.data.results?.length || 0,
-          searchScope: response.data.searchScope
-        });
+
   
         if (response.data.success) {
           // Se è una ricerca in una chat specifica, restituisci la notifica
@@ -734,11 +727,7 @@ const handleFetchAttachmentViewStats = useCallback(
 
   const handleSendNotificationWithAttachments = useCallback(
     (notificationData, attachments = []) => {
-      console.log(
-        "Invio notifica con allegati:",
-        notificationData,
-        attachments,
-      );
+
       return dispatch(
         sendNotificationWithAttachments({ notificationData, attachments }),
       ).unwrap();
@@ -748,7 +737,7 @@ const handleFetchAttachmentViewStats = useCallback(
 
   const handleRefreshAttachments = useCallback(
     (notificationId) => {
-      console.log("refreshAttachments", notificationId);
+   
       return dispatch(refreshAttachments(notificationId)).unwrap();
     },
     [dispatch],
@@ -1009,7 +998,7 @@ const handleFetchAttachmentViewStats = useCallback(
   const handleToggleMessageReaction = useCallback(
     async (messageId, reactionType) => {
       try {
-        console.log('handleToggleMessageReaction chiamato con:', { messageId, reactionType });
+
         
         // Validazione parametri
         if (!messageId || !reactionType) {
@@ -1079,7 +1068,7 @@ const handleFetchAttachmentViewStats = useCallback(
           })
         ).unwrap();
         
-        console.log('Risultato toggleMessageReaction:', result);
+
         
         // Se abbiamo un notificationId nel risultato, aggiorna la notifica
         if (result && result.notificationId) {
@@ -1089,9 +1078,9 @@ const handleFetchAttachmentViewStats = useCallback(
           // IMPORTANTE: Carica esplicitamente le reazioni per questo messaggio
           // perché fetchNotificationById potrebbe non includerle
           try {
-            console.log('🔄 Caricamento reazioni per messaggio:', numericMessageId);
+   
             const reactionResult = await dispatch(loadMessageReactions([numericMessageId]));
-            console.log('✅ Reazioni caricate:', reactionResult);
+         
           } catch (reactionError) {
             console.warn('❌ Error loading reactions after toggle:', reactionError);
           }
@@ -1462,13 +1451,13 @@ const handleFetchAttachmentViewStats = useCallback(
     sending,
     error,
     unreadMessages,
-    openChatIds: Array.from(openChatIds), // Convert Set to Array
+    openChatIds: memoizedOpenChatIds,
     dbViewCreated,
     highlights,
     loadingHighlights,
     attachmentsLoading,
     notificationAttachments,
-    standaloneChats: Array.from(standaloneChats), // Convert Set to Array
+    standaloneChats: memoizedStandaloneChats,
     openChat,
     searchInNotifications: handleSearchInNotifications,
     fetchChatParticipants: handleFetchChatParticipants,
