@@ -1031,8 +1031,13 @@ const ChatBottomBar = ({
                 // Controlla se l'input è realmente focalizzato dal DOM
                 const isInputFocused = inputRef.current?.matches(':focus');
                 
-                // Se non c'è testo e non è focalizzato, riduci l'altezza
-                if (!message && !isInputFocused) {
+                // Controlla se il mouse è su una delle icone
+                const activeElement = document.activeElement;
+                const bottomBar = document.querySelector('.chat-bottom-bar-container');
+                const isFocusOnIcon = bottomBar && bottomBar.contains(activeElement);
+                
+                // Se non c'è testo, non è focalizzato e non è su un'icona, riduci l'altezza
+                if (!message && !isInputFocused && !isFocusOnIcon) {
                   setIsFocused(false);
                   // Reset dell'altezza
                   const container = inputRef.current?.parentElement?.parentElement;
@@ -1053,15 +1058,24 @@ const ChatBottomBar = ({
                     setPlaceholderVisible(false);
                   }}
                   onBlur={() => {
-                    // Controlla se c'è del testo prima di rimuovere il focus
-                    if (!message) {
-                      setIsFocused(false);
-                      setPlaceholderVisible(true);
-                      // Reset dell'altezza quando non c'è testo
-                      if (inputRef.current?.parentElement?.parentElement) {
-                        inputRef.current.parentElement.parentElement.style.height = "32px";
+                    // Usa setTimeout per controllare se il nuovo focus è su una delle icone
+                    setTimeout(() => {
+                      const activeElement = document.activeElement;
+                      const bottomBar = document.querySelector('.chat-bottom-bar-container');
+                      
+                      // Controlla se il nuovo focus è dentro la bottombar (icone)
+                      const isFocusOnIcon = bottomBar && bottomBar.contains(activeElement);
+                      
+                      // Controlla se c'è del testo prima di rimuovere il focus
+                      if (!message && !isFocusOnIcon) {
+                        setIsFocused(false);
+                        setPlaceholderVisible(true);
+                        // Reset dell'altezza quando non c'è testo
+                        if (inputRef.current?.parentElement?.parentElement) {
+                          inputRef.current.parentElement.parentElement.style.height = "32px";
+                        }
                       }
-                    }
+                    }, 0);
                   }}
                   className="py-1.5 px-3 w-full outline-none rounded-xl transition-all duration-300 ease-in-out"
                   style={{

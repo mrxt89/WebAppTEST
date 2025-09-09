@@ -88,9 +88,10 @@ const ModernChatList = ({
     autoRefresh: false, // Disabilita auto-refresh perché è già gestito dal componente padre
   });
   // IMPORTANTE: Ottieni lo stato della paginazione da Redux
-  const chatPagination = useSelector(state => 
-    state.notifications.chatPagination[notificationId] || {}
+  const chatPaginationRaw = useSelector(state => 
+    state.notifications.chatPagination[notificationId]
   );
+  const chatPagination = useMemo(() => chatPaginationRaw || {}, [chatPaginationRaw]);
 
   // Ottieni dati completi da openChatData
   const openChatData = useSelector(state => 
