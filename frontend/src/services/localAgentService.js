@@ -4,9 +4,18 @@ import { toast } from 'react-toastify';
 
 class LocalAgentService {
   constructor() {
-    this.baseURL = 'http://localhost:7865';
+    // Usa 127.0.0.1 invece di localhost per evitare problemi DNS/IPv6
+    this.baseURL = 'http://127.0.0.1:7865';
     this.isAvailable = null;
     this.checkInterval = null;
+    
+    // Configura axios per ignorare errori CORS/SSL in dev
+    this.axiosInstance = axios.create({
+      baseURL: this.baseURL,
+      timeout: 3000,
+      validateStatus: () => true, // Accetta tutti gli status code
+      withCredentials: false // Evita problemi CORS preflight
+    });
     
     // Check iniziale
     this.checkAvailability();
@@ -29,13 +38,13 @@ class LocalAgentService {
   
   async checkAvailability() {
     try {
-      const response = await axios.get(`${this.baseURL}/ping`, {
-        timeout: 2000
-      });
+      const response = await this.axiosInstance.get('/ping');
       
-      this.isAvailable = response.data.pong === true;
+      // Verifica che la risposta sia OK e contenga pong
+      this.isAvailable = response.status === 200 && response.data?.pong === true;
       return this.isAvailable;
     } catch (error) {
+      console.log('Agent not available:', error.message);
       this.isAvailable = false;
       return false;
     }
@@ -43,9 +52,10 @@ class LocalAgentService {
   
   async getStatus() {
     try {
-      const response = await axios.get(`${this.baseURL}/status`);
-      return response.data;
+      const response = await this.axiosInstance.get('/status');
+      return response.status === 200 ? response.data : null;
     } catch (error) {
+      console.error('Error getting agent status:', error.message);
       throw new Error('Agent non disponibile');
     }
   }
@@ -82,7 +92,7 @@ class LocalAgentService {
       console.log('Sending file open request to agent...');
       console.log('File data:', fileData);
       
-      const response = await axios.post(`${this.baseURL}/open-file`, {
+      const response = await this.axiosInstance.post('/open-file', {
         attachmentId: fileData.attachmentId,
         fileName: fileData.fileName,
         filePath: fileData.filePath,
@@ -96,18 +106,19 @@ class LocalAgentService {
         notificationId: fileData.notificationId,
         itemCode: fileData.itemCode,
         projectItemId: fileData.projectItemId,
-        lockId: lockResponse.data.lockId // Passa l'ID del lock all'agent
+        lockId: lockResponse.data.lockId
       });
       
       console.log('Agent response:', response.data);
       
-      if (response.data.success) {
+      if (response.status === 200 && response.data?.success) {
         // Salva sessionId per tracking
         this.saveSession(response.data.sessionId, fileData);
         
         return response.data;
       } else {
-        throw new Error(response.data.message || 'Errore apertura file');
+        const error = response.data?.error || response.data?.message || 'Errore apertura file';
+        throw new Error(error);
       }
     } catch (error) {
       console.error('Lock error details:', {
@@ -157,21 +168,22 @@ class LocalAgentService {
   
   async getSessions() {
     try {
-      const response = await axios.get(`${this.baseURL}/sessions`);
-      return response.data.sessions;
+      const response = await this.axiosInstance.get('/sessions');
+      return response.status === 200 ? (response.data?.sessions || []) : [];
     } catch (error) {
+      console.error('Error getting sessions:', error.message);
       return [];
     }
   }
   
   async closeSession(sessionId, forceClose = false, saveChanges = true) {
     try {
-      const response = await axios.post(
-        `${this.baseURL}/close-session/${sessionId}`,
+      const response = await this.axiosInstance.post(
+        `/close-session/${sessionId}`,
         { forceClose, saveChanges }
       );
       
-      if (response.data.success) {
+      if (response.status === 200 && response.data?.success) {
         // Rilascia il lock sul server
         try {
           const session = this.getLocalSessions()[sessionId];
@@ -198,7 +210,7 @@ class LocalAgentService {
         return response.data;
       }
       
-      throw new Error('Errore chiusura sessione');
+      throw new Error(response.data?.message || 'Errore chiusura sessione');
     } catch (error) {
       console.error('Error closing session:', error);
       throw error;

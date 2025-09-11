@@ -44,7 +44,12 @@ const LocalAgentMonitor = () => {
   
   const checkAgentAndSessions = async () => {
     try {
+      // Usa un timeout breve per evitare lunghe attese
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      
       const available = await localAgentService.checkAvailability();
+      clearTimeout(timeoutId);
       
       if (available) {
         setAgentStatus('online');
@@ -58,7 +63,10 @@ const LocalAgentMonitor = () => {
         setIsVisible(false);
       }
     } catch (error) {
-      setAgentStatus('error');
+      // Ignora silenziosamente gli errori CORS/network durante il caricamento
+      setAgentStatus('offline');
+      setSessions([]);
+      setIsVisible(false);
     }
   };
   
@@ -221,16 +229,22 @@ export const AgentStatusBadge = () => {
     const checkStatus = async () => {
       try {
         const statusData = await localAgentService.getStatus();
-        setStatus('online');
-        // Gestisci sia il caso in cui sessions è un numero che un array
-        if (typeof statusData.sessions === 'number') {
-          setSessionCount(statusData.sessions);
-        } else if (Array.isArray(statusData.sessions)) {
-          setSessionCount(statusData.sessions.length);
+        if (statusData) {
+          setStatus('online');
+          // Gestisci sia il caso in cui sessions è un numero che un array
+          if (typeof statusData.sessions === 'number') {
+            setSessionCount(statusData.sessions);
+          } else if (Array.isArray(statusData.sessions)) {
+            setSessionCount(statusData.sessions.length);
+          } else {
+            setSessionCount(0);
+          }
         } else {
+          setStatus('offline');
           setSessionCount(0);
         }
-      } catch {
+      } catch (error) {
+        // Ignora silenziosamente errori di connessione
         setStatus('offline');
         setSessionCount(0);
       }
@@ -314,4 +328,3 @@ export const AgentStatusBadge = () => {
     </div>
   );
 };
-

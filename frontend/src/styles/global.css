@@ -2055,6 +2055,18 @@ button:disabled {
     box-shadow 0.2s ease,
     transform 0.2s ease;
   will-change: transform;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.chat-window.dragging {
+  transition: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .chat-window:hover {
@@ -2064,6 +2076,10 @@ button:disabled {
 .chat-window-handle {
   touch-action: none;
   cursor: move;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 /* Animation for minimizing/maximizing */

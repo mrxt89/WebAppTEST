@@ -313,7 +313,7 @@ const openChatModal = async (notificationId) => {
       } else {
         const defaultPos = {
           x: Math.max(0, (window.innerWidth - 900) / 2),
-          y: 0,
+          y: 50,
           width: 900,
           height: 700,
         };
