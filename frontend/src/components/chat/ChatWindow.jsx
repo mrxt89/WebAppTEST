@@ -508,6 +508,7 @@ const ChatWindow = ({
 
     if (e.type === "mousedown") {
       e.preventDefault();
+      e.stopPropagation();
     }
 
     setIsDragging(true);
@@ -545,6 +546,9 @@ const ChatWindow = ({
     const handleMouseMove = (moveEvent) => {
       if (!isDraggingRef.current || !nodeRef.current) return;
 
+      moveEvent.preventDefault();
+      moveEvent.stopPropagation();
+
       const deltaX = moveEvent.clientX - startX;
       const deltaY = moveEvent.clientY - startY;
 
@@ -563,7 +567,12 @@ const ChatWindow = ({
       }
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (upEvent) => {
+      if (upEvent) {
+        upEvent.preventDefault();
+        upEvent.stopPropagation();
+      }
+      
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
 
@@ -867,18 +876,18 @@ const ChatWindow = ({
 
   // Render normale con resize
   return (
-    <div
-      ref={nodeRef}
-      className="chat-window"
-      style={{
-        position: "absolute",
-        top: position.y,
-        left: position.x,
-        width: size.width,
-        height: size.height,
-        zIndex: zIndex,
-        cursor: isDragging ? "grabbing" : "auto",
-      }}
+      <div
+        ref={nodeRef}
+        className={`chat-window ${isDragging ? "dragging" : ""}`}
+        style={{
+          position: "absolute",
+          top: position.y,
+          left: position.x,
+          width: size.width,
+          height: size.height,
+          zIndex: zIndex,
+          cursor: isDragging ? "grabbing" : "auto",
+        }}
     >
       <Resizable
         size={size}
