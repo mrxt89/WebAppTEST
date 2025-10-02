@@ -469,12 +469,29 @@ const BOMHeaderEdit = () => {
           operations.push({
             type: 'components',
             execute: async () => {
-              // Trova il componente padre se necessario
+              // Trova il componente per ottenere il BOMId corretto
               const component = bomComponents.find(c => c.ComponentId === parseInt(componentId));
-              const parentBOMId = component?.ParentBOMId || changes.bomId || bom.Id;
+              
+              // Il BOMId dovrebbe essere l'ID della distinta base che CONTIENE il componente
+              // Per UPDATE_COMPONENT, dobbiamo usare il ParentBOMId, non il BOMId del componente stesso
+              // Il BOMId del componente è la sua distinta base, il ParentBOMId è la distinta che lo contiene
+              const bomId = component?.ParentBOMId || changes.bomId || bom.Id;
+              
+              console.log('UPDATE_COMPONENT payload:', {
+                Id: bomId,
+                Line: changes.line,
+                ComponentId: componentId,
+                changes: changes.bomComponentChanges,
+                componentData: {
+                  ComponentId: component?.ComponentId,
+                  BOMId: component?.BOMId,
+                  ParentBOMId: component?.ParentBOMId,
+                  Level: component?.Level
+                }
+              });
 
               const result = await addUpdateBOM("UPDATE_COMPONENT", {
-                Id: parentBOMId,
+                Id: bomId,
                 Line: changes.line,
                 ...changes.bomComponentChanges
               });
@@ -654,17 +671,24 @@ const BOMHeaderEdit = () => {
 
   // Conferma annullamento
   const handleConfirmCancel = () => {
+    // Cancella tutte le modifiche pendenti
     setPendingChanges({});
     setShowCancelConfirmDialog(false);
     setEditMode(false);
     
-    // Ripristina i valori originali
+    // Ripristina i valori originali dell'header
     if (bom) {
       setBomData({
         code: bom.BOM || "",
         description: bom.Description || "",
         status: bom.BOMStatus || "BOZZA",
       });
+    }
+
+    // Forza il refresh dei dati per assicurarsi che tutto sia ripristinato dal server
+    // Questo è più sicuro che modificare manualmente lo stato locale
+    if (smartRefresh) {
+      smartRefresh();
     }
   };
 
@@ -703,10 +727,10 @@ const BOMHeaderEdit = () => {
 
   return (
     <>
-      <div className="bg-amber-50 p-4 border-b border-amber-200">
-        <div className="space-y-4">
+      <div className="bg-amber-50 p-2 border-b border-amber-200">
+        <div className="space-y-2">
           {/* Form di modifica header */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2">
             <div>
               <Label htmlFor="bomCode">Codice BOM</Label>
               <Input
@@ -750,7 +774,7 @@ const BOMHeaderEdit = () => {
             </div>
           </div>
 
-          {/* Pulsanti ricodifica */}
+          {/* Pulsanti ricodifica e export */}
           <div className="flex items-center gap-2 pt-2 border-t border-amber-200">
             <Button
               variant="outline"
@@ -775,10 +799,7 @@ const BOMHeaderEdit = () => {
                 Ricodifica selezionati ({selectedComponents.length})
               </Button>
             )}
-          </div>
 
-          {/* Pulsanti Export/Sync ERP */}
-          <div className="flex items-center gap-2 pt-2 border-t border-amber-200">
             {/* Export in ERP - solo se non già esportato */}
             {bom?.stato_erp !== 1 && (
               <Button
@@ -840,8 +861,8 @@ const BOMHeaderEdit = () => {
           </div>
 
           {/* Riepilogo modifiche e pulsanti azione */}
-          <div className="flex items-center justify-between pt-2 border-t border-amber-200">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between pt-1 border-t border-amber-200">
+            <div className="flex items-center gap-2">
               {totalChanges > 0 && (
                 <>
                   <div className="flex items-center gap-2">

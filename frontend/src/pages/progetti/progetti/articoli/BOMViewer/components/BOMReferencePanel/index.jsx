@@ -150,7 +150,7 @@ const BOMReferencePanel = ({ activeItem = null, setDragSettings = null }) => {
             </TabsTrigger>
             <TabsTrigger
               value="projects"
-              className="flex-1 flex items-center justify-center"
+              className="flex-1 flex items-center justify-center d-none"
             >
               <Folder className="h-4 w-4 mr-2" />
               Progetti

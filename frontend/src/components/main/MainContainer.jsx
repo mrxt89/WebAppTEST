@@ -12,6 +12,8 @@ import CategoriesPage from "../../pages/progetti/categorie/ProjectCategories";
 import TemplatesPage from "../../pages/progetti/templates/projectTemplates";
 import ProjectCustomers from "../../pages/progetti/clienti/ProjectCustomers";
 import MyTasksPage from "../../pages/progetti/attivita/MyTasksPage";
+import ArticlePage from "../../pages/progetti/progetti/articoli/ArticlePage";
+import BOMCosting from "../../pages/progetti/progetti/articoli/BOMCosting";
 import ChangePassword from "../../pages/user/ChangePassword";
 import UserProfile from "../../pages/user/UserProfile";
 import MainMenu from "../MainMenu";
@@ -246,6 +248,22 @@ const MainContainer = ({
                   element={
                     <ProtectedRoute>
                       <ProjectCustomers onExit={navigateToPreviousLevel} />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/progetti/articoli"
+                  element={
+                    <ProtectedRoute>
+                      <ArticlePage onExit={navigateToPreviousLevel} />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/progetti/articoli/bom-costing"
+                  element={
+                    <ProtectedRoute>
+                      <BOMCosting onExit={navigateToPreviousLevel} />
                     </ProtectedRoute>
                   }
                 />

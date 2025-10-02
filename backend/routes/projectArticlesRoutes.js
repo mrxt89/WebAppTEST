@@ -34,7 +34,9 @@ const {
     validateItemCode,
     checkItemCodeExists,
     updateItemDetailsWithValidation,
-    searchSimilarArticles
+    searchSimilarArticles,
+    getArticleBOMTree,
+    getComponentAttachments
 } = require('../queries/projectArticlesManagement');
 
 // Ottieni stati degli articoli di progetto
@@ -1068,6 +1070,73 @@ router.get('/projectArticles/searchSimilar', authenticateToken, async (req, res)
         res.status(500).json({
             success: 0,
             msg: error.message || 'Errore durante la ricerca articoli simili'
+        });
+    }
+});
+
+// Ottieni la struttura BOM ad albero per l'espansione nella lista articoli
+router.get('/projectArticles/:itemId/bom-tree', authenticateToken, async (req, res) => {
+    try {
+        const { itemId } = req.params;
+        const { maxLevel = 3, includeAttachments = 'true' } = req.query;
+        const companyId = req.user.CompanyId;
+
+        if (!itemId) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'ID articolo richiesto'
+            });
+        }
+
+        const bomTree = await getArticleBOMTree(
+            companyId, 
+            parseInt(itemId), 
+            parseInt(maxLevel), 
+            includeAttachments === 'true'
+        );
+
+        res.json({
+            success: 1,
+            data: bomTree
+        });
+    } catch (error) {
+        console.error('Error getting article BOM tree:', error);
+        res.status(500).json({
+            success: 0,
+            msg: error.message || 'Errore durante il recupero della struttura BOM'
+        });
+    }
+});
+
+// Ottieni gli allegati per un componente specifico
+router.get('/projectArticles/component/:componentId/attachments', authenticateToken, async (req, res) => {
+    try {
+        const { componentId } = req.params;
+        const { isProjectItem = 'true' } = req.query;
+        const companyId = req.user.CompanyId;
+
+        if (!componentId) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'ID componente richiesto'
+            });
+        }
+
+        const attachments = await getComponentAttachments(
+            companyId, 
+            componentId, 
+            isProjectItem === 'true'
+        );
+
+        res.json({
+            success: 1,
+            data: attachments
+        });
+    } catch (error) {
+        console.error('Error getting component attachments:', error);
+        res.status(500).json({
+            success: 0,
+            msg: error.message || 'Errore durante il recupero degli allegati'
         });
     }
 });

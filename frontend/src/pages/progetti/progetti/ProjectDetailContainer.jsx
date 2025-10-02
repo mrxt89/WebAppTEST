@@ -930,7 +930,7 @@ const handleDisableProject = async (projectId) => {
           id="project-management-split-view"
         >
           <div className="flex-none">
-            <TabsList>
+            <TabsList className="navbar-style-tabs">
               <TabsTrigger value="overview" id="project-overview-tab">
                 <Info className="h-4 w-4 mr-2" />
                 Panoramica

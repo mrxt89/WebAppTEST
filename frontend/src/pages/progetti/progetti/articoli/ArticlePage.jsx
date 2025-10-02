@@ -23,6 +23,12 @@ const ArticlePage = () => {
         setLoading(true);
         setError(null);
 
+        // Se non ci sono parametri, reindirizza alla costificazione
+        if (!mode && !projectId && !itemId) {
+          navigate('/progetti/articoli/bom-costing', { replace: true });
+          return;
+        }
+
         // Verifica che il mode sia valido
         if (!["new", "edit", "copy"].includes(mode)) {
           throw new Error(`Modalità non valida: ${mode}`);
@@ -53,7 +59,7 @@ const ArticlePage = () => {
     };
 
     validateAndLoad();
-  }, [mode, projectId, itemId]);
+  }, [mode, projectId, itemId, navigate]);
 
   // Funzione per caricare informazioni progetto
   const loadProject = async (id) => {

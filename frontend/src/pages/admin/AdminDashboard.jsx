@@ -152,7 +152,7 @@ const AdminDashboard = () => {
         >
           <div className="flex items-center">
             <div className="flex items-center gap-4">
-              <TabsList>
+              <TabsList className="navbar-style-tabs">
                 <TabsTrigger value="users">Utenti</TabsTrigger>
                 <TabsTrigger value="groups">Gruppi</TabsTrigger>
                 <TabsTrigger value="pages">Pagine</TabsTrigger>

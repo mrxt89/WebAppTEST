@@ -150,6 +150,9 @@ const codingRulesRoutes = require('./routes/codingRulesRoutes');
 const smbLinkRoutes = require('./routes/smbLinkRoutes');
 const erpExport = require('./routes/erpExportRoutes');
 const healthRoutes = require('./routes/healthRoutes');
+const bomCostingRoutes = require('./routes/bomCostingRoutes');
+const utilityManagementRoutes = require('./routes/utilityManagementRoutes');
+const knownDataRoutes = require('./routes/knownDataRoutes');
 
 const app = express();
 
@@ -243,6 +246,9 @@ app.use('/api', codingRulesRoutes);
 app.use('/api', smbLinkRoutes);
 app.use('/api', erpExport);
 app.use('/api', healthRoutes);
+app.use('/api/bom-costing', bomCostingRoutes);
+app.use('/api/utility', utilityManagementRoutes);
+app.use('/api/known-data', knownDataRoutes);
 
 // Endpoint per servire i file uploadati
 app.get('/api/uploads/*', (req, res) => {

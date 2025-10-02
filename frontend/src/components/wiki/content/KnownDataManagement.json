@@ -1,0 +1,54 @@
+{
+  "title": "Sistema Dati Noti",
+  "description": "Guida completa per l'utilizzo e la configurazione del sistema di calcolo automatico dei costi",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "Panoramica",
+      "content": "Il sistema 'Dati Noti' è una funzionalità avanzata che permette di calcolare automaticamente i costi dei materiali e delle operazioni utilizzando parametri predefiniti e formule personalizzate, invece di utilizzare solo i costi fissi memorizzati nel database."
+    },
+    {
+      "id": "how-it-works",
+      "title": "Come Funziona",
+      "content": "Il sistema funziona in 4 fasi principali: 1) Configurazione parametri specifici per ogni materiale/operazione, 2) Creazione formule matematiche che utilizzano i parametri e i valori dalla BOM, 3) Definizione regole di matching per associare i dati noti agli articoli, 4) Calcolo automatico durante la costificazione BOM."
+    },
+    {
+      "id": "examples",
+      "title": "Esempi Pratici",
+      "content": "Esempi di utilizzo: TUBO con parametri €/kg=6, kg/mt=3 e formula '€/kg * kg/mt * L * QTA' per calcolare 6*3*650*0.75=8,775€. SALDATURA con parametro €/mm=0.015 e formula '€/mm * L * QTA' per calcolare 0.015*650*1=9.75€."
+    },
+    {
+      "id": "configuration",
+      "title": "Configurazione",
+      "content": "Per configurare il sistema: 1) Definisci parametri con nome, valore e unità di misura, 2) Crea formule usando operatori supportati (+, -, *, /, ()), 3) Imposta regole di matching (EXACT, CONTAINS, TAG), 4) Testa sempre le configurazioni prima dell'uso."
+    },
+    {
+      "id": "best-practices",
+      "title": "Best Practices",
+      "content": "Cosa fare: usare nomenclatura consistente (€/kg, kg/mt, €/mm), testare sempre le formule, documentare parametri e formule, impostare priorità corrette per le regole. Cosa evitare: formule troppo complesse, parametri duplicati, regole conflittuali, valori non testati."
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Risoluzione Problemi",
+      "content": "Problemi comuni: sistema non usa dati noti (verifica UnitCost=0 e configurazione), calcolo restituisce 0 (controlla sintassi formula e parametri), matching non funziona (verifica regole e priorità), errori sintassi (usa solo operatori supportati). Usa sempre il tool di test per verificare."
+    }
+  ],
+  "quickTips": [
+    "Il sistema ha priorità inferiore rispetto ai costi standard (UnitCost)",
+    "Usa sempre il tool di test per verificare le formule",
+    "Mantieni formule semplici con solo operatori base",
+    "Documenta sempre parametri e formule per facilità di manutenzione"
+  ],
+  "relatedPages": [
+    {
+      "title": "Costificazione BOM",
+      "path": "/progetti/articoli/bom-costing",
+      "description": "Gestione della costificazione delle distinte base"
+    },
+    {
+      "title": "Gestione Articoli",
+      "path": "/progetti/articoli",
+      "description": "Gestione degli articoli e delle distinte base"
+    }
+  ]
+}

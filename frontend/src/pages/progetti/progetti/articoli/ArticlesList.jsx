@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Table,
   TableBody,
@@ -26,8 +26,13 @@ import {
   Database,
   ListFilter,
   Eye,
+  ChevronRight,
+  ChevronDown,
+  Calculator,
 } from "lucide-react";
 import ArticleActionsDropdown from "./ArticleActionsDropdown";
+import ArticleBOMExpansion from "./ArticleBOMExpansion";
+import useArticleBOMExpansion from "@/hooks/useArticleBOMExpansion";
 
 /**
  * ArticlesList - Componente per la visualizzazione della lista di articoli
@@ -47,6 +52,7 @@ const ArticlesList = ({
   loading,
   onSelect,
   onViewBOM,
+  onCostingBOM,
   onCopy,
   canEdit,
   project,
@@ -54,6 +60,16 @@ const ArticlesList = ({
   selectedRowId,
   onRowClick,
 }) => {
+  // Hook per gestire l'espansione BOM
+  const {
+    loading: bomLoading,
+    toggleRowExpansion,
+    isRowExpanded,
+    getBOMData,
+    loadComponentAttachments,
+    loadItemAttachments
+  } = useArticleBOMExpansion();
+
   // Funzione per ottenere icona e colori in base alla natura dell'articolo
   const getNatureDetails = (nature) => {
     switch (nature) {
@@ -151,6 +167,7 @@ const ArticlesList = ({
               const natureDetails = getNatureDetails(item.Nature);
               const statusDetails = getStatusDetails(item.StatusCode);
               const isFromERP = item.stato_erp === 1;
+              const isExpanded = isRowExpanded(item.Id);
 
               // Dimensioni
               const dimensions = [];
@@ -161,16 +178,34 @@ const ArticlesList = ({
               if (item.MediumRadius) dimensions.push(`R${item.MediumRadius}`);
 
               return (
-                <TableRow 
-                  key={item.Id} 
-                  className={`hover:bg-slate-50 cursor-pointer ${
-                    selectedRowId === item.Id ? 'bg-yellow-50 hover:bg-yellow-100' : ''
-                  }`}
-                  onClick={() => onRowClick(item)}
-                >
+                <React.Fragment key={item.Id}>
+                  <TableRow 
+                    className={`hover:bg-slate-50 cursor-pointer ${
+                      selectedRowId === item.Id ? 'bg-yellow-50 hover:bg-yellow-100' : ''
+                    }`}
+                    onClick={() => onRowClick(item)}
+                  >
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      {item.Item}
+                      {/* Pulsante espansione BOM */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleRowExpansion(item.Id);
+                        }}
+                        className="h-6 w-6 p-0"
+                        title="Espandi struttura BOM"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </Button>
+                      
+                      <span>{item.Item}</span>
                       {isFromERP && (
                         <TooltipProvider>
                           <Tooltip>
@@ -251,6 +286,28 @@ const ArticlesList = ({
                         </Tooltip>
                       </TooltipProvider>
 
+                      {/* Bottone per costificazione BOM */}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCostingBOM(item);
+                              }}
+                              className="h-8 w-8"
+                            >
+                              <Calculator className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Costificazione BOM</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
                       {/* Bottone per visualizzare i dettagli */}
                       <TooltipProvider>
                         <Tooltip>
@@ -285,7 +342,28 @@ const ArticlesList = ({
                       />
                     </div>
                   </TableCell>
-                </TableRow>
+                  </TableRow>
+
+                  {/* Riga espansa con struttura BOM */}
+                  {isExpanded && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="p-0">
+                        <div className="border-t bg-gray-50">
+                          <ArticleBOMExpansion
+                            item={item}
+                            project={project}
+                            canEdit={canEdit}
+                            onRefresh={onRefresh}
+                            bomData={getBOMData(item.Id)}
+                            loading={bomLoading}
+                            loadComponentAttachments={loadComponentAttachments}
+                            loadItemAttachments={loadItemAttachments}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               );
             })}
           </TableBody>

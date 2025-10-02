@@ -2039,6 +2039,69 @@ button:disabled {
 
 /* --- END MODERN CHAT STYLES --- */
 
+/* --- NAVBAR STYLE TABS --- */
+/* Classe personalizzata per le tabs con stile navbar */
+.navbar-style-tabs {
+  background: linear-gradient(135deg, #283856 0%, #0d131d 100%) !important;
+  color: #FFFFFF !important;
+  border-radius: 8px !important;
+  padding: 4px !important;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.1) !important;
+  width: 100% !important;
+  display: flex !important;
+  justify-content: stretch !important;
+}
+
+/* Assicura che ogni tab si espanda per riempire lo spazio disponibile */
+.navbar-style-tabs [role="tab"] {
+  flex: 1 !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+}
+
+/* Sovrascrive le classi grid di Tailwind per usare flexbox */
+.navbar-style-tabs.grid {
+  display: flex !important;
+  grid-template-columns: none !important;
+}
+
+.navbar-style-tabs.grid-cols-2,
+.navbar-style-tabs.grid-cols-3,
+.navbar-style-tabs.grid-cols-4,
+.navbar-style-tabs.grid-cols-5 {
+  display: flex !important;
+  grid-template-columns: none !important;
+}
+
+.navbar-style-tabs [data-state="active"] {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #FFFFFF !important;
+  border-radius: 6px !important;
+  box-shadow: 0px 2px 8px rgba(0,0,0,0.1) !important;
+}
+
+.navbar-style-tabs [data-state="inactive"] {
+  color: rgba(255, 255, 255, 0.8) !important;
+  transition: all 0.2s ease !important;
+}
+
+.navbar-style-tabs [data-state="inactive"]:hover {
+  color: #FFFFFF !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.navbar-style-tabs [data-state="inactive"]:disabled {
+  color: rgba(255, 255, 255, 0.4) !important;
+  cursor: not-allowed !important;
+}
+
+/* Stile per le icone nelle tabs navbar */
+.navbar-style-tabs svg {
+  color: inherit !important;
+}
+
+/* --- END NAVBAR STYLE TABS --- */
+
 
 
 /* Contenitore messaggi: altezza e overflow */

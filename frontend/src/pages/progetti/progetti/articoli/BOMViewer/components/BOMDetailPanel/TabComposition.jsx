@@ -693,6 +693,7 @@ const TabComposition = () => {
 
   return (
     <div className="p-4">
+      
       {/* Intestazione dettagli nodo */}
       <div className="border-b pb-3 flex justify-between items-center">
         <h3 className="text-lg font-medium">

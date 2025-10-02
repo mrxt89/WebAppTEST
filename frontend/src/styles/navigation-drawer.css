@@ -1,9 +1,9 @@
 /* Navigation Drawer Styles - Design System Compliant */
 
 /* Animations */
-@keyframes slideInLeft {
+@keyframes slideInRight {
     from {
-      transform: translateX(-100%);
+      transform: translateX(100%);
       opacity: 0;
     }
     to {
@@ -36,16 +36,16 @@
   .nav-drawer {
     position: fixed;
     top: 0;
-    left: 0;
+    right: 0;
     height: 100vh;
     width: 320px;
     background: #FFFFFF;
     box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
     z-index: 1300;
-    transform: translateX(-100%);
+    transform: translateX(100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: transform;
-    border-right: 1px solid #E2E8F0;
+    border-left: 1px solid #E2E8F0;
   }
   
   .nav-drawer.open {
@@ -305,13 +305,13 @@
   .nav-tree-item.active::after {
     content: '';
     position: absolute;
-    left: 0;
+    right: 0;
     top: 50%;
     transform: translateY(-50%);
     width: 4px;
     height: 70%;
     background: linear-gradient(135deg,var(--primary) 0%, #3AA8F2 100%);
-    border-radius: 0 4px 4px 0;
+    border-radius: 4px 0 0 4px;
   }
   
   /* Tree Icons */
@@ -352,7 +352,7 @@
     height: 16px;
     color: #A0AEC0;
     opacity: 0;
-    transform: translateX(-8px);
+    transform: translateX(8px);
     transition: all 0.2s ease;
   }
   
@@ -369,7 +369,7 @@
   .nav-tree-children::before {
     content: '';
     position: absolute;
-    left: 28px;
+    right: 28px;
     top: 0;
     bottom: 0;
     width: 1px;

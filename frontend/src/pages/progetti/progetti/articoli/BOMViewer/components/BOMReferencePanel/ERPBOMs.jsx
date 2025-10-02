@@ -168,21 +168,21 @@ const ERPBOMs = ({ importOptions }) => {
           </div>
         ) : filteredBOMs.length > 0 ? (
           <div className="space-y-1 p-3 h-10">
-            {filteredBOMs.map((bom) => (
+            {filteredBOMs.map((bom, index) => (
               <div
-                key={`erp-${bom.BOM || bom.Item}`}
+                key={`erp-${bom.BOM || bom.Item}-${index}`}
                 className="relative group"
                 onDoubleClick={() => handleAddItem(bom)}
               >
                 <DraggableItem
                   item={{
-                    id: `erp-${bom.BOM || bom.Item}`,
+                    id: `erp-${bom.BOM || bom.Item}-${index}`,
                     type: "bom",
                     data: bom,
                   }}
-                  expanded={!!expandedItems[`erp-${bom.BOM || bom.Item}`]}
+                  expanded={!!expandedItems[`erp-${bom.BOM || bom.Item}-${index}`]}
                   onToggle={() =>
-                    handleToggleItem(`erp-${bom.BOM || bom.Item}`)
+                    handleToggleItem(`erp-${bom.BOM || bom.Item}-${index}`)
                   }
                 />
 

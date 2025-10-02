@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/use-toast";
 import {
   Select,
   SelectContent,
@@ -105,7 +106,7 @@ const NotificationsTab = ({
 
   const handleEditFormSubmit = () => {
     if (!editFormData.name || !editFormData.description || !editFormData.hexColor || !editFormData.defaultResponseOptionId) {
-      swal.fire("Errore", "Campi obbligatori: nome canale, descrizione, colore, risposta di default", "error");
+      toast.error("Campi obbligatori: nome canale, descrizione, colore, risposta di default");
       return;
     }
 
@@ -130,12 +131,7 @@ const NotificationsTab = ({
           "Errore durante l'aggiornamento del canale di notifica:",
           error,
         );
-        swal.fire(
-          "Errore",
-          error.response?.data ||
-            "Errore durante l'aggiornamento del canale di notifica.",
-          "error",
-        );
+        toast.error(error.response?.data || "Errore durante l'aggiornamento del canale di notifica.");
       })
       .finally(() => {
         setLoading(false);
@@ -163,11 +159,7 @@ const NotificationsTab = ({
             "Errore durante l'aggiunta destinatari al canale:",
             error,
           );
-          swal.fire(
-            "Errore",
-            "Errore durante l'aggiunta destinatari al canale.",
-            "error",
-          );
+          toast.error(error.response?.data || "Errore durante l'aggiunta destinatari al canale.");
         });
     }
   };
@@ -180,11 +172,7 @@ const NotificationsTab = ({
         ),
       )
         .then(() => {
-          swal.fire(
-            "Successo",
-            "Destinatari rimossi dal canale con successo.",
-            "success",
-          );
+          toast.success("Destinatari rimossi dal canale con successo.");
           refreshData(); // Aggiorna i dati mantenendo i filtri
           setSelectedUsers([]); // Reset selezione
         })
@@ -193,11 +181,7 @@ const NotificationsTab = ({
             "Errore durante la rimozione destinatari dal canale:",
             error,
           );
-          swal.fire(
-            "Errore",
-            "Errore durante la rimozione destinatari dal canale.",
-            "error",
-          );
+          toast.error(error.response?.data || "Errore durante la rimozione destinatari dal canale.");
         });
     }
   };

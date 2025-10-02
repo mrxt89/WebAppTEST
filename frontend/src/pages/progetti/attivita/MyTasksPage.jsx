@@ -561,7 +561,7 @@ const MyTasksPage = () => {
           id="tabs"
         >
           <div className="flex items-center justify-between" id="tabsList">
-            <TabsList className="mb-4">
+            <TabsList className="mb-4 navbar-style-tabs">
               <TabsTrigger value="tasks" className="flex items-center gap-2">
                 <ListTodo className="h-4 w-4" />
                 <span>Attività</span>

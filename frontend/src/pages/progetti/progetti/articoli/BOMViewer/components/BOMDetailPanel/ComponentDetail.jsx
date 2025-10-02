@@ -39,6 +39,8 @@ const ComponentDetail = ({ component, editMode }) => {
     ComponentType: component?.ComponentType || 7798784,
     Quantity: component?.Quantity || 1,
     UoM: component?.UoM || "PZ",
+    UnitCost: component?.UnitCost || 0,
+    FixedCost: component?.FixedCost || 0,
 
     // Campi Item
     Code: component?.ComponentItemCode || component?.ComponentCode || "",
@@ -104,6 +106,8 @@ const ComponentDetail = ({ component, editMode }) => {
         ComponentType: component.ComponentType || 7798784,
         Quantity: component.Quantity || 1,
         UoM: component.UoM || "PZ",
+        UnitCost: component.UnitCost || 0,
+        FixedCost: component.FixedCost || 0,
 
         // Campi Item
         Code: component.ComponentItemCode || component.ComponentCode || "",
@@ -125,6 +129,37 @@ const ComponentDetail = ({ component, editMode }) => {
       // Questo permette di mantenere le modifiche mentre si naviga tra i componenti
     }
   }, [component]);
+
+  // Ripristina i dati del form quando le modifiche pendenti vengono cancellate
+  useEffect(() => {
+    if (component && !pendingChanges[component.ComponentId]) {
+      // Se non ci sono più modifiche pendenti per questo componente, ripristina i dati originali
+      const originalData = {
+        // Campi BOM Component
+        ComponentId: component.ComponentId,
+        ComponentType: component.ComponentType || 7798784,
+        Quantity: component.Quantity || 1,
+        UoM: component.UoM || "PZ",
+        UnitCost: component.UnitCost || 0,
+        FixedCost: component.FixedCost || 0,
+
+        // Campi Item
+        Code: component.ComponentItemCode || component.ComponentCode || "",
+        Description:
+          component.Description || component.ComponentItemDescription || "",
+        Notes: component.Notes || "",
+        Nature: component.ComponentNature || component.Nature || 22413312,
+        Diameter: component.Diameter || 0,
+        Bxh: component.Bxh || "",
+        Depth: component.Depth || 0,
+        Length: component.Length || 0,
+        MediumRadius: component.MediumRadius || 0,
+        CustomerItemReference: component.CustomerItemReference || "",
+      };
+
+      setFormData(originalData);
+    }
+  }, [component, pendingChanges]);
 
   // Gestisce il cambiamento nei campi del form
   const handleChange = (field, value) => {
@@ -148,23 +183,48 @@ const ComponentDetail = ({ component, editMode }) => {
             bomComponentChanges: {},
             itemDetailsChanges: {},
             original: component,
-            bomId: component.BOMId || component.ParentBOMId,
+            // Il BOMId dovrebbe essere l'ID della distinta base che CONTIENE il componente
+            // Per UPDATE_COMPONENT, dobbiamo sempre usare il ParentBOMId (la distinta che contiene il componente)
+            // Il BOMId del componente è la sua distinta base, il ParentBOMId è la distinta che lo contiene
+            bomId: component.ParentBOMId || component.BOMId,
             line: component.Line,
             parentBOMId: parentComponent?.BOMId || null,
           };
         }
 
         // Determina se il campo appartiene ai componenti BOM o ai dettagli dell'articolo
-        const bomFields = ["ComponentType", "Quantity", "UoM"];
+        const bomFields = ["ComponentType", "Quantity", "UoM", "UnitCost", "FixedCost"];
         const itemFields = ["Code", "Description", "Notes", "Nature", "Diameter", "Bxh", "Depth", "Length", "MediumRadius", "CustomerItemReference"];
 
         if (bomFields.includes(field)) {
           // Controlla se il valore è diverso dall'originale
           if (component[field] !== value) {
             newChanges[componentId].bomComponentChanges[field] = value;
+            
+            // Se è stata modificata la Quantity, UnitCost o FixedCost, ricalcola il TotalCost
+            if (field === 'Quantity' || field === 'UnitCost' || field === 'FixedCost') {
+              const currentUnitCost = field === 'UnitCost' ? value : (formData.UnitCost || 0);
+              const currentQuantity = field === 'Quantity' ? value : (formData.Quantity || 1);
+              const currentFixedCost = field === 'FixedCost' ? value : (formData.FixedCost || 0);
+              
+              const newTotalCost = (currentUnitCost * currentQuantity) + currentFixedCost;
+              newChanges[componentId].bomComponentChanges.TotalCost = newTotalCost;
+              
+              console.log('Ricalcolo TotalCost:', {
+                UnitCost: currentUnitCost,
+                Quantity: currentQuantity,
+                FixedCost: currentFixedCost,
+                TotalCost: newTotalCost
+              });
+            }
           } else {
             // Se il valore è tornato all'originale, rimuovi la modifica
             delete newChanges[componentId].bomComponentChanges[field];
+            
+            // Se era stata modificata la Quantity, UnitCost o FixedCost, rimuovi anche il TotalCost
+            if (field === 'Quantity' || field === 'UnitCost' || field === 'FixedCost') {
+              delete newChanges[componentId].bomComponentChanges.TotalCost;
+            }
           }
         } else if (itemFields.includes(field)) {
           // Per i campi dell'articolo, controlla contro i valori originali
@@ -392,7 +452,7 @@ const ComponentDetail = ({ component, editMode }) => {
           <Input
             id="quantity"
             type="number"
-            step="0.001"
+            step="0.1"
             value={formData.Quantity}
             onChange={(e) =>
               handleChange("Quantity", parseFloat(e.target.value))
@@ -587,6 +647,80 @@ const ComponentDetail = ({ component, editMode }) => {
           </div>
         </div>
       </div>
+
+      {/* Costi */}
+      <div className="border rounded-md p-3 bg-green-50">
+        <h4 className="text-sm font-medium mb-2 text-green-700">
+          Costi Componente
+        </h4>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <Label htmlFor="unitCost" className="text-xs text-green-700">
+              Costo Unitario (€)
+              {hasFieldChange("UnitCost") && (
+                <span className="ml-1 text-amber-600">*</span>
+              )}
+            </Label>
+            <Input
+              id="unitCost"
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.UnitCost || 0}
+              onChange={(e) =>
+                handleChange("UnitCost", parseFloat(e.target.value) || 0)
+              }
+              className={cn(
+                "bg-white h-8 text-sm",
+                hasFieldChange("UnitCost") && "ring-2 ring-amber-500"
+              )}
+              disabled={!editMode || component?.parentBOMStato_erp == "1"}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="fixedCost" className="text-xs text-green-700">
+              Costo Fisso (€)
+              {hasFieldChange("FixedCost") && (
+                <span className="ml-1 text-amber-600">*</span>
+              )}
+            </Label>
+            <Input
+              id="fixedCost"
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.FixedCost || 0}
+              onChange={(e) =>
+                handleChange("FixedCost", parseFloat(e.target.value) || 0)
+              }
+              className={cn(
+                "bg-white h-8 text-sm",
+                hasFieldChange("FixedCost") && "ring-2 ring-amber-500"
+              )}
+              disabled={!editMode || component?.parentBOMStato_erp == "1"}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="totalCost" className="text-xs text-green-700">
+              Costo Totale (€)
+            </Label>
+            <div className="h-8 px-3 py-2 flex items-center border rounded-md bg-gray-100 text-sm font-medium">
+              {(() => {
+                const unitCost = formData.UnitCost || 0;
+                const quantity = formData.Quantity || 1;
+                const fixedCost = formData.FixedCost || 0;
+                const totalCost = (unitCost * quantity) + fixedCost;
+                return totalCost.toFixed(2) + ' €';
+              })()}
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 text-xs text-green-600">
+          <strong>Formula:</strong> Costo Totale = (Costo Unitario × Quantità) + Costo Fisso
+        </div>
+      </div>
       
       {/* Customer Reference */}
       <div className="border rounded-md p-3 bg-blue-50">
@@ -619,10 +753,10 @@ const ComponentDetail = ({ component, editMode }) => {
 
       {/* Indicatore modifiche pendenti */}
       {editMode && pendingChanges[component.ComponentId] && (
-        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
-          <div className="flex items-center gap-2 text-sm text-amber-700">
-            <AlertTriangle className="h-4 w-4" />
-            <span className="font-medium">Modifiche non salvate per questo componente</span>
+        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
+          <div className="flex items-center gap-2 text-xs text-amber-700">
+            <AlertTriangle className="h-3 w-3" />
+            <span className="font-medium">Modifiche non salvate</span>
           </div>
         </div>
       )}

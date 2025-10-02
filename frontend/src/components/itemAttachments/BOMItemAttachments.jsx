@@ -52,13 +52,7 @@ import { swal } from "@/lib/common";
 
 /**
  * BOMItemAttachments - Componente specializzato per mostrare gli allegati nel contesto della distinta base
- *
- * @param {string} itemCode - Codice dell'articolo (per articoli da ERP)
- * @param {number} projectItemId - ID dell'articolo progetto (per articoli temporanei)
- * @param {boolean} readOnly - Flag per modalità sola lettura
- * @param {boolean} isComponentItem - Flag che indica se l'articolo è un componente della distinta
- * @param {string} componentName - Nome del componente (opzionale)
- * @param {boolean} compact - Flag per modalità compatta (adatta alla visualizzazione in una tab)
+ * Versione minimal per integrazione BOM
  */
 function BOMItemAttachments({
   itemCode = null,
@@ -67,6 +61,8 @@ function BOMItemAttachments({
   isComponentItem = false,
   componentName = null,
   compact = true,
+  autoLoad = true,
+  initialAttachments = null,
 }) {
   // Stati del componente
   const [uploaderOpen, setUploaderOpen] = useState(false);
@@ -77,14 +73,18 @@ function BOMItemAttachments({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  // Stati per dialoghi rimossi, utilizziamo SweetAlert
   const [detailsTabValue, setDetailsTabValue] = useState(0);
   const auth = useAuth();
   const userCompanyId = auth.user?.CompanyId;
+  
+  // Ref per tracciare se abbiamo già impostato gli allegati iniziali
+  const initialAttachmentsSet = useRef(false);
+  
   // Hook per le azioni sugli allegati
   const {
     loading,
     attachments,
+    setAttachments,
     getAttachmentsByItemCode,
     getAttachmentsByProjectItemId,
     downloadAttachment,
@@ -102,19 +102,29 @@ function BOMItemAttachments({
     addAttachmentVersion,
   } = useItemAttachmentsActions();
 
-  // Caricamento iniziale degli allegati
+  // Reset del flag quando cambiano i parametri del componente
   useEffect(() => {
-    if (itemCode) {
-      getAttachmentsByItemCode(itemCode);
-    } else if (projectItemId) {
-      getAttachmentsByProjectItemId(projectItemId);
+    initialAttachmentsSet.current = false;
+  }, [itemCode, projectItemId]);
+
+  // Gestione degli allegati iniziali
+  useEffect(() => {
+    if (initialAttachments && initialAttachments.length >= 0 && !initialAttachmentsSet.current) {
+      setAttachments(initialAttachments);
+      initialAttachmentsSet.current = true;
     }
-  }, [
-    itemCode,
-    projectItemId,
-    getAttachmentsByItemCode,
-    getAttachmentsByProjectItemId,
-  ]);
+  }, [initialAttachments, setAttachments]);
+
+  // Caricamento automatico degli allegati
+  useEffect(() => {
+    if (autoLoad && !initialAttachmentsSet.current) {
+      if (itemCode) {
+        getAttachmentsByItemCode(itemCode);
+      } else if (projectItemId) {
+        getAttachmentsByProjectItemId(projectItemId);
+      }
+    }
+  }, [autoLoad, itemCode, projectItemId, getAttachmentsByItemCode, getAttachmentsByProjectItemId]);
 
   // Gestione apertura uploader
   const handleUploaderOpen = () => {
@@ -125,6 +135,39 @@ function BOMItemAttachments({
   const handleUploaderClose = () => {
     setUploaderOpen(false);
     refreshAttachments();
+  };
+
+  // Download di tutti gli allegati
+  const handleDownloadAll = () => {
+    if (itemCode) {
+      downloadAllAttachmentsByItemCode(itemCode);
+    } else if (projectItemId) {
+      downloadAllAttachmentsByProjectItemId(projectItemId);
+    }
+  };
+
+  // Gestione versioni allegato
+  const handleVersions = (attachment) => {
+    setSelectedAttachment(attachment);
+    setDialogType("versions");
+    setDialogOpen(true);
+    handleMenuClose();
+  };
+
+  // Gestione condivisione allegato
+  const handleShare = (attachment) => {
+    setSelectedAttachment(attachment);
+    setDialogType("sharing");
+    setDialogOpen(true);
+    handleMenuClose();
+  };
+
+  // Gestione categorie allegato
+  const handleCategories = (attachment) => {
+    setSelectedAttachment(attachment);
+    setDialogType("categories");
+    setDialogOpen(true);
+    handleMenuClose();
   };
 
   // Gestione apertura menu contestuale
@@ -153,15 +196,6 @@ function BOMItemAttachments({
     handleMenuClose();
   };
 
-  // Download di tutti gli allegati
-  const handleDownloadAll = () => {
-    if (itemCode) {
-      downloadAllAttachmentsByItemCode(itemCode);
-    } else if (projectItemId) {
-      downloadAllAttachmentsByProjectItemId(projectItemId);
-    }
-  };
-
   // Visualizza anteprima dell'allegato
   const handleViewPreview = (attachment) => {
     setSelectedAttachment(attachment);
@@ -173,50 +207,24 @@ function BOMItemAttachments({
   const handleViewDetails = (attachment) => {
     setSelectedAttachment(attachment);
     setDialogType("details");
-    setDetailsTabValue(0); // Tab di visualizzazione
+    setDetailsTabValue(0);
     setDialogOpen(true);
     handleMenuClose();
   };
 
   // Modifica dell'allegato
   const handleEdit = (attachment) => {
-    // Controlla se l'utente può modificare l'allegato (proprietario dell'allegato)
     if (!readOnly) {
       setSelectedAttachment(attachment);
       setDialogType("details");
-      setDetailsTabValue(1); // Tab di modifica
+      setDetailsTabValue(1);
       setDialogOpen(true);
     } else {
-      // Se in modalità sola lettura, mostra solo i dettagli
       setSelectedAttachment(attachment);
       setDialogType("details");
-      setDetailsTabValue(0); // Tab di visualizzazione
+      setDetailsTabValue(0);
       setDialogOpen(true);
     }
-    handleMenuClose();
-  };
-
-  // Gestione versioni allegato
-  const handleVersions = (attachment) => {
-    setSelectedAttachment(attachment);
-    setDialogType("versions");
-    setDialogOpen(true);
-    handleMenuClose();
-  };
-
-  // Gestione condivisione allegato
-  const handleShare = (attachment) => {
-    setSelectedAttachment(attachment);
-    setDialogType("sharing");
-    setDialogOpen(true);
-    handleMenuClose();
-  };
-
-  // Gestione categorie allegato
-  const handleCategories = (attachment) => {
-    setSelectedAttachment(attachment);
-    setDialogType("categories");
-    setDialogOpen(true);
     handleMenuClose();
   };
 
@@ -224,7 +232,6 @@ function BOMItemAttachments({
   const handleDelete = (attachment) => {
     setSelectedAttachment(attachment);
 
-    // Usiamo sempre SweetAlert
     swal
       .fire({
         title: "Conferma eliminazione",
@@ -248,94 +255,13 @@ function BOMItemAttachments({
   const performDelete = (attachment) => {
     deleteAttachment(attachment.AttachmentID)
       .then(() => {
-        // Aggiorna la lista degli allegati dopo l'eliminazione
         refreshAttachments();
-
-        // Mostra messaggio di successo
-        swal.fire(
-          "Eliminato!",
-          "L'allegato è stato eliminato con successo.",
-          "success",
-        );
+        swal.fire("Eliminato!", "L'allegato è stato eliminato con successo.", "success");
       })
       .catch((error) => {
         console.error("Errore nell'eliminazione dell'allegato:", error);
-
-        // Mostra messaggio di errore
-        swal.fire(
-          "Errore",
-          "Si è verificato un errore durante l'eliminazione dell'allegato.",
-          "error",
-        );
+        swal.fire("Errore", "Si è verificato un errore durante l'eliminazione dell'allegato.", "error");
       });
-  };
-
-  // Conferma eliminazione (dialog standard)
-  const handleConfirmDelete = () => {
-    if (selectedAttachment) {
-      performDelete(selectedAttachment);
-    }
-    setConfirmDeleteOpen(false);
-  };
-
-  // Gestione ripristino allegato (da soft delete)
-  const handleRestore = (attachment) => {
-    if (readOnly) return; // Non permettere ripristino in modalità sola lettura
-
-    setSelectedAttachment(attachment);
-
-    // Usiamo sempre SweetAlert
-    swal
-      .fire({
-        title: "Conferma ripristino",
-        text: `Sei sicuro di voler ripristinare l'allegato "${attachment.FileName}"?`,
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonText: "Sì, ripristina",
-        cancelButtonText: "Annulla",
-        confirmButtonColor: "#4caf50",
-      })
-      .then((result) => {
-        if (result.isConfirmed) {
-          performRestore(attachment);
-        }
-      });
-
-    handleMenuClose();
-  };
-
-  // Funzione di supporto per eseguire il ripristino
-  const performRestore = (attachment) => {
-    restoreAttachment(attachment.AttachmentID)
-      .then(() => {
-        // Aggiorna la lista degli allegati dopo il ripristino
-        refreshAttachments();
-
-        // Mostra messaggio di successo
-        swal.fire(
-          "Ripristinato!",
-          "L'allegato è stato ripristinato con successo.",
-          "success",
-        );
-      })
-      .catch((error) => {
-        console.error("Errore nel ripristino dell'allegato:", error);
-
-        // Mostra messaggio di errore
-        swal.fire(
-          "Errore",
-          "Si è verificato un errore durante il ripristino dell'allegato.",
-          "error",
-        );
-      });
-  };
-
-  // Conferma ripristino (dialog standard)
-  const handleConfirmRestore = () => {
-    if (selectedAttachment) {
-      performRestore(selectedAttachment);
-    }
-    setConfirmRestoreOpen(false);
   };
 
   // Gestione chiusura dialogo
@@ -347,334 +273,195 @@ function BOMItemAttachments({
   // Formatta dimensione file
   const formatBytes = (bytes, decimals = 2) => {
     if (!bytes) return "0 Bytes";
-
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
     const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
   };
 
   // Icona per tipo di file
   const getFileIcon = (fileType, fileName) => {
-    const extension = fileName.split(".").pop().toLowerCase();
-
-    return <FileIcon />;
+    return <FileIcon sx={{ fontSize: 14 }} />;
   };
 
-  // Contenuto principale del componente
   return (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* Intestazione con indicazione del componente selezionato */}
-      {isComponentItem && componentName && (
-        <Paper
-          elevation={0}
-          sx={{
-            p: 1.5,
-            mb: 2,
-            display: "flex",
-            alignItems: "center",
-            backgroundColor: "info.light",
-            color: "info.contrastText",
-          }}
-        >
-          <InfoIcon sx={{ mr: 1, fontSize: 18 }} />
-          <Typography variant="body2">
-            Allegati del componente: <strong>{componentName}</strong>
-          </Typography>
-        </Paper>
-      )}
-
-      {/* Barra delle azioni */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 1.5,
-        }}
-      >
-        <Box sx={{ display: "flex", gap: 1 }}>
+    <Box>
+      {/* Header minimal con pulsanti essenziali */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5, px: 0.5 }}>
+        <Box sx={{ display: "flex", gap: 0.5 }}>
           <Button
-            variant="contained"
-            color="primary"
+            variant="outlined"
+            size="small"
             startIcon={<UploadIcon />}
             onClick={handleUploaderOpen}
-            size={compact ? "small" : "medium"}
+            sx={{ 
+              height: 24, 
+              fontSize: '0.9rem', 
+              px: 1,
+              minWidth: 'auto',
+              '& .MuiButton-startIcon': { 
+                marginRight: 0.5,
+                '& svg': { fontSize: '0.9rem' }
+              }
+            }}
           >
             Carica
           </Button>
-
           {attachments.length > 0 && (
             <Button
               variant="outlined"
+              size="small"
               startIcon={<DownloadIcon />}
               onClick={handleDownloadAll}
-              size={compact ? "small" : "medium"}
+              sx={{ 
+                height: 24, 
+                fontSize: '0.9rem', 
+                px: 1,
+                minWidth: 'auto',
+                '& .MuiButton-startIcon': { 
+                  marginRight: 0.5,
+                  '& svg': { fontSize: '0.9rem' }
+                }
+              }}
             >
-              Scarica tutti
+              Tutti
             </Button>
           )}
         </Box>
-
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Tooltip title="Aggiorna">
-            <IconButton onClick={refreshAttachments} size="small">
-              <RefreshIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Box>
+        
+        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+          {attachments.length} file
+        </Typography>
       </Box>
 
-      {/* Lista allegati */}
-      {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
-          <CircularProgress size={24} />
-        </Box>
-      ) : attachments.length === 0 ? (
-        <Paper
-          elevation={0}
-          sx={{
-            p: 3,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "background.default",
-            borderRadius: 1,
-            border: "1px dashed",
-            borderColor: "divider",
-            flex: 1,
-          }}
-        >
-          <InfoIcon color="disabled" sx={{ fontSize: 48, mb: 2 }} />
-          <Typography color="textSecondary">
-            Nessun allegato disponibile per questo{" "}
-            {isComponentItem ? "componente" : "articolo"}
-          </Typography>
-          <Button
-            variant="outlined"
-            color="primary"
-            startIcon={<UploadIcon />}
-            onClick={handleUploaderOpen}
-            sx={{ mt: 2 }}
-            size="small"
-          >
-            Carica un allegato
-          </Button>
-        </Paper>
-      ) : (
-        <List
-          sx={{
-            maxHeight: compact ? 300 : "auto",
-            overflow: "auto",
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 1,
-            backgroundColor: "background.paper",
-            flex: 1,
-          }}
-        >
-          {attachments.map((attachment) => (
-            <React.Fragment key={attachment.AttachmentID}>
-              <ListItem
-                sx={{
-                  "&:hover": {
-                    backgroundColor: "action.hover",
-                  },
-                  // Aggiunge uno stile visivo se l'allegato è nascosto
-                  ...(attachment.IsVisible === false && {
-                    opacity: 0.6,
-                    backgroundColor: "action.disabledBackground",
-                  }),
-                }}
-              >
-                <ListItemIcon>
-                  {getFileIcon(attachment.FileType, attachment.FileName)}
-                </ListItemIcon>
-                <ListItemText
-                  primary={
-                    <Typography
-                      variant="body2"
-                      component="div"
-                      sx={{
-                        fontWeight: "medium",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                    >
-                      {attachment.FileName}
-                    </Typography>
-                  }
-                  secondary={
-                    <Typography variant="caption" color="text.secondary">
-                      {formatBytes(attachment.FileSizeKB * 1024)} •
-                      {formatDistanceToNow(new Date(attachment.UploadedAt), {
-                        addSuffix: true,
-                        locale: it,
-                      })}
-                    </Typography>
-                  }
-                />
-                <ListItemSecondaryAction>
-                  <Box sx={{ display: "flex" }}>
-                    {/* Per allegati nascosti (con soft delete), mostra pulsante di ripristino */}
-                    {attachment.IsVisible === false && !readOnly ? (
-                      <Tooltip title="Ripristina">
+      {/* Lista allegati con altezza dinamica */}
+      <List disablePadding sx={{  overflow: 'auto' }}>
+        {attachments.map((attachment, index) => (
+          <React.Fragment key={attachment.AttachmentID}>
+            <ListItem
+              sx={{
+                py: 0.25,
+                px: 0.5,
+                minHeight: 28,
+                "&:hover": { backgroundColor: "action.hover" },
+                ...(attachment.IsVisible === false && {
+                  opacity: 0.6,
+                  backgroundColor: "action.disabledBackground",
+                }),
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 58 }}>
+                {getFileIcon(attachment.FileType, attachment.FileName)}
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <Typography
+                    variant="caption"
+                    component="div"
+                    sx={{ 
+                      fontSize: '0.9rem',
+                      lineHeight: 1.3,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '400px'
+                    }}
+                  >
+                    {attachment.FileName}
+                  </Typography>
+                }
+                secondary={
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ 
+                      fontSize: '0.75rem',
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {formatBytes(attachment.FileSizeKB * 1024)}
+                  </Typography>
+                }
+              />
+              <ListItemSecondaryAction>
+                <Box sx={{ display: "flex", gap: 1.55 }}>
+                  {attachment.IsVisible !== false ? (
+                    <>
+                      <Tooltip title="Scarica">
                         <IconButton
                           edge="end"
-                          aria-label="restore"
-                          onClick={() => handleRestore(attachment)}
+                          onClick={() => handleDownload(attachment)}
                           size="small"
-                          color="primary"
+                          sx={{ width: 18, height: 18, p: 1 }}
                         >
-                          <RestoreIcon fontSize="small" />
+                          <DownloadIcon sx={{ fontSize: 20 }} />
                         </IconButton>
                       </Tooltip>
-                    ) : (
-                      <>
-                        <Tooltip title="Scarica">
-                          <IconButton
-                            edge="end"
-                            aria-label="download"
-                            onClick={() => handleDownload(attachment)}
-                            size="small"
-                          >
-                            <DownloadIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Visualizza">
-                          <IconButton
-                            edge="end"
-                            aria-label="preview"
-                            onClick={() => handleViewPreview(attachment)}
-                            size="small"
-                          >
-                            <ViewIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        {!readOnly && (
-                          <Tooltip title="Modifica">
-                            <IconButton
-                              edge="end"
-                              aria-label="edit"
-                              onClick={() => handleEdit(attachment)}
-                              size="small"
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
+                      <Tooltip title="Visualizza">
+                        <IconButton
+                          edge="end"
+                          onClick={() => handleViewPreview(attachment)}
+                          size="small"
+                          sx={{ width: 18, height: 18, p: 1 }}
+                        >
+                          <ViewIcon sx={{ fontSize: 20 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Modifica">
+                        <IconButton
+                          edge="end"
+                          onClick={() => handleEdit(attachment)}
+                          size="small"
+                          sx={{ width: 18, height: 18, p: 0 }}
+                        >
+                          <EditIcon sx={{ fontSize: 20 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Elimina">
+                        <IconButton
+                          edge="end"
+                          onClick={() => handleDelete(attachment)}
+                          size="small"
+                          color="error"
+                          sx={{ width: 18, height: 18, p: 1 }}
+                        >
+                          <DeleteIcon sx={{ fontSize: 20 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Altro">
+                        <IconButton
+                          edge="end"
+                          onClick={(e) => handleMenuOpen(e, attachment)}
+                          size="small"
+                          sx={{ width: 18, height: 18, p: 1 }}
+                        >
+                          <MoreIcon sx={{ fontSize: 20 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </>
+                  ) : (
+                    <Tooltip title="Ripristina">
+                      <IconButton
+                        edge="end"
+                        onClick={() => {/* handle restore */}}
+                        size="small"
+                        color="primary"
+                        sx={{ width: 18, height: 18, p: 1 }}
+                      >
+                        <RestoreIcon sx={{ fontSize: 20 }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Box>
+              </ListItemSecondaryAction>
+            </ListItem>
+            {index < attachments.length - 1 && <Divider component="li" sx={{ my: 0 }} />}
+          </React.Fragment>
+        ))}
+      </List>
 
-                        <Tooltip title="Elimina">
-                          <IconButton
-                            edge="end"
-                            aria-label="delete"
-                            onClick={() => handleDelete(attachment)}
-                            size="small"
-                            color="error"
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Altre opzioni">
-                          <IconButton
-                            edge="end"
-                            aria-label="more"
-                            onClick={(e) => handleMenuOpen(e, attachment)}
-                            size="small"
-                          >
-                            <MoreIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </>
-                    )}
-                  </Box>
-                </ListItemSecondaryAction>
-              </ListItem>
-              <Divider component="li" />
-            </React.Fragment>
-          ))}
-        </List>
-      )}
-
-      {/* Menu contestuale */}
-      <Menu
-        anchorEl={menuAnchorEl}
-        open={Boolean(menuAnchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={() => handleViewDetails(selectedAttachment)}>
-          <ListItemIcon>
-            <InfoIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Dettagli</ListItemText>
-        </MenuItem>
-
-        <MenuItem onClick={() => handleDownload(selectedAttachment)}>
-          <ListItemIcon>
-            <DownloadIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Scarica</ListItemText>
-        </MenuItem>
-
-        <MenuItem onClick={() => handleViewPreview(selectedAttachment)}>
-          <ListItemIcon>
-            <ViewIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Visualizza</ListItemText>
-        </MenuItem>
-
-        <MenuItem onClick={() => handleVersions(selectedAttachment)}>
-          <ListItemIcon>
-            <HistoryIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Versioni</ListItemText>
-        </MenuItem>
-
-        {!readOnly && (
-          <>
-            <MenuItem onClick={() => handleShare(selectedAttachment)}>
-              <ListItemIcon>
-                <ShareIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Condividi</ListItemText>
-            </MenuItem>
-
-            <MenuItem onClick={() => handleCategories(selectedAttachment)}>
-              <ListItemIcon>
-                <LabelIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Categorie</ListItemText>
-            </MenuItem>
-
-            <Divider />
-
-            <MenuItem onClick={() => handleEdit(selectedAttachment)}>
-              <ListItemIcon>
-                <EditIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Modifica</ListItemText>
-            </MenuItem>
-          </>
-        )}
-
-        <MenuItem
-          onClick={() => handleDelete(selectedAttachment)}
-          sx={{ color: "error.main" }}
-        >
-          <ListItemIcon sx={{ color: "error.main" }}>
-            <DeleteIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Elimina</ListItemText>
-        </MenuItem>
-      </Menu>
-
-      {/* Rimossi dialog di conferma, utilizziamo SweetAlert */}
-
-      {/* Dialog uploader */}
+      {/* Uploader */}
       <ItemAttachmentUploader
         open={uploaderOpen}
         onClose={handleUploaderClose}
@@ -686,18 +473,44 @@ function BOMItemAttachments({
         }}
       />
 
-      {/* Dialog per i dettagli */}
-      {selectedAttachment && dialogOpen && dialogType === "details" && (
-        <ItemAttachmentDetails
-          open={dialogOpen}
-          attachment={selectedAttachment}
-          onClose={handleDialogClose}
-          tabValue={detailsTabValue}
-          onTabChange={setDetailsTabValue}
-          readOnly={readOnly}
-          onUpdate={handleDialogClose}
-        />
-      )}
+      {/* Menu contestuale completo */}
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={Boolean(menuAnchorEl)}
+        onClose={handleMenuClose}
+        PaperProps={{
+          sx: { minWidth: 180 }
+        }}
+      >
+        <MenuItem onClick={() => handleViewDetails(selectedAttachment)} sx={{ py: 0.75, fontSize: '0.85rem' }}>
+          <InfoIcon sx={{ fontSize: 16, mr: 1 }} />
+          Dettagli
+        </MenuItem>
+        <MenuItem onClick={() => handleDownload(selectedAttachment)} sx={{ py: 0.75, fontSize: '0.85rem' }}>
+          <DownloadIcon sx={{ fontSize: 16, mr: 1 }} />
+          Scarica
+        </MenuItem>
+        <MenuItem onClick={() => handleViewPreview(selectedAttachment)} sx={{ py: 0.75, fontSize: '0.85rem' }}>
+          <ViewIcon sx={{ fontSize: 16, mr: 1 }} />
+          Visualizza
+        </MenuItem>
+        <MenuItem onClick={() => handleVersions(selectedAttachment)} sx={{ py: 0.75, fontSize: '0.85rem' }}>
+          <HistoryIcon sx={{ fontSize: 16, mr: 1 }} />
+          Versioni
+        </MenuItem>
+        {!readOnly && (
+          <>
+            <MenuItem onClick={() => handleShare(selectedAttachment)} sx={{ py: 0.75, fontSize: '0.85rem' }}>
+              <ShareIcon sx={{ fontSize: 16, mr: 1 }} />
+              Condividi
+            </MenuItem>
+            <MenuItem onClick={() => handleCategories(selectedAttachment)} sx={{ py: 0.75, fontSize: '0.85rem' }}>
+              <LabelIcon sx={{ fontSize: 16, mr: 1 }} />
+              Categorie
+            </MenuItem>
+          </>
+        )}
+      </Menu>
 
       {/* Dialog per le versioni */}
       {selectedAttachment && dialogOpen && dialogType === "versions" && (
