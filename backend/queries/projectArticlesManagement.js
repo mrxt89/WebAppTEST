@@ -89,6 +89,35 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
         let pool = await sql.connect(config.dbConfig);
         const request = pool.request();
 
+        // DEBUG: Verifica se la BOM esiste per ADD_COMPONENT
+        if (action === 'ADD_COMPONENT' && bomData.Id) {
+            console.log(`[DEBUG] Verificando esistenza BOM ${bomData.Id} per CompanyId ${companyId}`);
+            
+            const bomCheck = await pool.request()
+                .input('CompanyId', sql.Int, companyId)
+                .input('BOMId', sql.BigInt, bomData.Id)
+                .query(`
+                    SELECT Id, MainRefBOMId, BOM, Description, ItemId, Version
+                    FROM dbo.MA_ProjectArticles_BillOfMaterials
+                    WHERE CompanyId = @CompanyId AND Id = @BOMId
+                `);
+            
+            if (bomCheck.recordset.length === 0) {
+                console.error(`[ERROR] BOM ${bomData.Id} non trovata per CompanyId ${companyId}`);
+                throw new Error(`BOM ${bomData.Id} non trovata`);
+            }
+            
+            const bomInfo = bomCheck.recordset[0];
+            console.log(`[DEBUG] BOM trovata:`, {
+                Id: bomInfo.Id,
+                MainRefBOMId: bomInfo.MainRefBOMId,
+                BOM: bomInfo.BOM,
+                Description: bomInfo.Description,
+                ItemId: bomInfo.ItemId,
+                Version: bomInfo.Version
+            });
+        }
+
         // Parametri obbligatori
         request.input('Action', sql.NVarChar(50), action);
         request.input('CompanyId', sql.Int, companyId);
@@ -96,7 +125,10 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
 
         // Gestione dei parametri in base all'azione
         // IMPORTANTE: Gestisci prima i casi specifici, poi quelli generici
-
+        if (bomData.MainRefBOMId !== undefined) {
+            request.input('MainRefBOMId', sql.BigInt, bomData.MainRefBOMId);
+        }
+        
         // CASO 1: REPLACE_WITH_NEW_COMPONENT - Gestito per primo per evitare conflitti
         if (action === 'REPLACE_WITH_NEW_COMPONENT') {
             request.input('Id', sql.BigInt, bomData.Id);
@@ -173,6 +205,14 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
         }
         // CASO 6: Azioni relative ai componenti (ADD_COMPONENT, UPDATE_COMPONENT, DELETE_COMPONENT)
         else if (action.includes('COMPONENT')) {
+            console.log(`[${action}] Processing component action with data:`, {
+                Id: bomData.Id,
+                Line: bomData.Line,
+                ComponentId: bomData.ComponentId,
+                ComponentCode: bomData.ComponentCode,
+                bomData: bomData
+            });
+            
             request.input('Id', sql.BigInt, bomData.Id);
             request.input('ComponentAction', sql.NVarChar(50), action.replace('_COMPONENT', ''));
             
@@ -244,6 +284,7 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
                 }
                 
                 if (bomData.TotalCost !== undefined) {
+                    console.log(`[${action}] Setting ComponentTotalCost:`, bomData.TotalCost);
                     request.input('ComponentTotalCost', sql.Float, bomData.TotalCost);
                 }
                 
@@ -327,11 +368,61 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
             throw new Error(request.parameters.ErrorMessage.value || `Error code: ${errorCode}`);
         }
 
+        // DEBUG: Controlla il ReturnValue
+        const returnValue = request.parameters.ReturnValue.value;
+        console.log(`[DEBUG] ReturnValue dalla stored procedure:`, returnValue);
+        console.log(`[DEBUG] Tipo ReturnValue:`, typeof returnValue);
+        
         const result = {
             success: 1,
-            bomId: request.parameters.ReturnValue.value,
+            bomId: returnValue,
             msg: `BOM ${action} operation completed successfully`
         };
+        
+        // DEBUG: Se bomId è null, proviamo a recuperarlo dal database
+        if (returnValue === null && action === 'ADD_COMPONENT' && bomData.Id) {
+            console.log(`[DEBUG] ReturnValue è null, proviamo a recuperare l'ID dal database`);
+            console.log(`[DEBUG] ParentComponentId:`, bomData.ParentComponentId);
+            
+            // Se c'è un ParentComponentId, potrebbe essere stata creata una nuova BOM per il padre
+            if (bomData.ParentComponentId) {
+                console.log(`[DEBUG] Verificando se è stata creata una BOM per il componente padre ${bomData.ParentComponentId}`);
+                
+                const parentBomCheck = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('ParentComponentId', sql.BigInt, bomData.ParentComponentId)
+                    .query(`
+                        SELECT Id, MainRefBOMId, BOM, Description
+                        FROM dbo.MA_ProjectArticles_BillOfMaterials
+                        WHERE CompanyId = @CompanyId AND ItemId = @ParentComponentId
+                        ORDER BY Id DESC
+                    `);
+                
+                if (parentBomCheck.recordset.length > 0) {
+                    const parentBomInfo = parentBomCheck.recordset[0];
+                    result.bomId = parentBomInfo.Id;
+                    console.log(`[DEBUG] Trovata BOM per componente padre:`, parentBomInfo);
+                }
+            }
+            
+            // Fallback: usa l'ID originale se non troviamo nulla
+            if (!result.bomId) {
+                const bomCheck = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('BOMId', sql.BigInt, bomData.Id)
+                    .query(`
+                        SELECT Id, MainRefBOMId
+                        FROM dbo.MA_ProjectArticles_BillOfMaterials
+                        WHERE CompanyId = @CompanyId AND Id = @BOMId
+                    `);
+                
+                if (bomCheck.recordset.length > 0) {
+                    const bomInfo = bomCheck.recordset[0];
+                    result.bomId = bomInfo.Id;
+                    console.log(`[DEBUG] Recuperato BOM ID originale dal database:`, bomInfo.Id);
+                }
+            }
+        }
 
         // NUOVO: Aggiungi CreatedComponentCode al risultato se disponibile
         if (request.parameters.CreatedComponentCode && request.parameters.CreatedComponentCode.value) {
@@ -2839,6 +2930,311 @@ const searchSimilarArticles = async (companyId, rootCode = '', description = '',
     }
 };
 
+// Ottiene la struttura BOM ad albero per l'espansione nella lista articoli
+const getArticleBOMTree = async (companyId, itemId, maxLevel = 3, includeAttachments = true) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+
+        // Parametri per la stored procedure esistente
+        request.input('Action', sql.NVarChar(50), 'GET_BOM_MULTILEVEL');
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('ItemId', sql.BigInt, itemId);
+        request.input('MaxLevel', sql.Int, maxLevel);
+        request.input('IncludeDisabled', sql.Bit, 0);
+        request.input('ExpandPhantoms', sql.Bit, 1);
+        request.input('IncludeRouting', sql.Bit, 0); // Disabilitato per performance
+        request.output('ErrorCode', sql.Int);
+        request.output('ErrorMessage', sql.NVarChar(4000));
+
+        console.log('BOM Tree Query Parameters:', {
+            companyId,
+            itemId,
+            maxLevel,
+            includeAttachments
+        });
+
+        // Esecuzione della stored procedure esistente
+        console.log('Executing stored procedure MA_ProjectArticles_GetBOMDatas...');
+        const result = await request.execute('MA_ProjectArticles_GetBOMDatas');
+        console.log('Stored procedure executed successfully');
+
+        // Controllo errori
+        const errorCode = request.parameters.ErrorCode.value || 0;
+        const errorMsg = request.parameters.ErrorMessage.value;
+        console.log('Stored procedure result:', {
+            errorCode,
+            errorMessage: errorMsg,
+            recordsetsCount: result.recordsets.length
+        });
+
+        if (errorCode !== 0) {
+            console.log('Stored procedure failed, trying fallback query...');
+            return await getArticleBOMTreeFallback(companyId, itemId, maxLevel, includeAttachments);
+        }
+
+        console.log('BOM Tree Query Result:', {
+            recordsetsCount: result.recordsets.length,
+            firstRecordsetLength: result.recordsets[0]?.length || 0,
+            firstRecord: result.recordsets[0]?.[0] || null
+        });
+
+        // Organizza i risultati in una struttura ad albero
+        // Per GET_BOM_MULTILEVEL, recordsets[0] contiene i componenti
+        const treeData = organizeBOMTreeData([result.recordsets[0] || [], [], []]);
+
+        // Se richiesto, carica gli allegati per ogni componente
+        if (includeAttachments && treeData.components.length > 0) {
+            console.log('Loading attachments for components...');
+            await loadAttachmentsForComponents(pool, companyId, treeData.components);
+        }
+
+        console.log('Organized BOM Tree Data:', {
+            componentsCount: treeData.components.length,
+            totalComponents: treeData.totalComponents
+        });
+
+        return treeData;
+    } catch (err) {
+        console.error('Error getting article BOM tree:', err);
+        // Se anche la stored procedure fallisce, prova il fallback
+        console.log('Trying fallback query...');
+        return await getArticleBOMTreeFallback(companyId, itemId, maxLevel, includeAttachments);
+    }
+};
+
+// Carica gli allegati per tutti i componenti in modo ricorsivo
+const loadAttachmentsForComponents = async (pool, companyId, components) => {
+    for (const component of components) {
+        try {
+            // Carica allegati per il componente corrente
+            if (component.ComponentItemCode) {
+                const attachments = await getComponentAttachments(companyId, component.ComponentId, true);
+                component.attachments = attachments || [];
+            }
+            
+            // Carica allegati per i componenti figli ricorsivamente
+            if (component.children && component.children.length > 0) {
+                await loadAttachmentsForComponents(pool, companyId, component.children);
+            }
+        } catch (err) {
+            console.error(`Error loading attachments for component ${component.ComponentId}:`, err);
+            component.attachments = [];
+        }
+    }
+};
+
+// Funzione di fallback per ottenere la struttura BOM
+const getArticleBOMTreeFallback = async (companyId, itemId, maxLevel = 3, includeAttachments = true) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        // Query semplificata per ottenere solo i componenti di primo livello
+        const query = `
+            SELECT 
+                1 as Level,
+                comp.ComponentId,
+                @ItemId as ParentId,
+                bom.Id as BOMId,
+                bom.Id as ParentBOMId,
+                comp.Line,
+                comp.ComponentType,
+                CAST(@ItemId AS NVARCHAR(MAX)) + '.' + CAST(comp.ComponentId AS NVARCHAR(MAX)) as Path,
+                comp.Quantity,
+                comp.Quantity as CalculatedQty,
+                comp.UoM,
+                comp.UnitCost,
+                comp.TotalCost,
+                comp.FixedCost,
+                -- Informazioni articolo
+                COALESCE(item.Item, erp.Item) AS ComponentItemCode,
+                COALESCE(item.Description, erp.Description) AS ComponentItemDescription,
+                COALESCE(item.Nature, erp.Nature) AS ComponentNature,
+                'ACTIVE' AS StatusCode,
+                'Attivo' AS StatusDescription,
+                COALESCE(item.stato_erp, erp.stato_erp, 0) AS stato_erp,
+                -- Flag per indicare se ha figli
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM MA_ProjectArticles_BillOfMaterials childBOM 
+                    WHERE childBOM.ItemId = comp.ComponentId AND childBOM.CompanyId = @CompanyId
+                ) THEN 1 ELSE 0 END AS HasChildren
+            FROM MA_ProjectArticles_BillOfMaterials bom
+            JOIN MA_ProjectArticles_BOMComponents comp ON comp.BOMId = bom.Id AND comp.CompanyId = @CompanyId
+            LEFT JOIN MA_ProjectArticles_Items item ON item.Id = comp.ComponentId AND item.CompanyId = @CompanyId
+            LEFT JOIN MA_Items erp ON erp.Item = item.Item AND erp.CompanyId = @CompanyId
+            WHERE bom.ItemId = @ItemId 
+            AND bom.CompanyId = @CompanyId
+            AND comp.ComponentId IS NOT NULL
+            ORDER BY comp.Line
+        `;
+
+        const request = pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('ItemId', sql.BigInt, itemId)
+            .input('MaxLevel', sql.Int, maxLevel);
+
+        console.log('Fallback query parameters:', {
+            companyId,
+            itemId,
+            maxLevel
+        });
+
+        const result = await request.query(query);
+
+        console.log('Fallback query result:', {
+            recordCount: result.recordset.length,
+            firstRecord: result.recordset[0] || null
+        });
+
+        // Organizza i risultati in una struttura ad albero
+        const treeData = organizeBOMTreeData([result.recordset, [], []]);
+
+        // Se richiesto, carica gli allegati per ogni componente
+        if (includeAttachments && treeData.components.length > 0) {
+            console.log('Loading attachments for fallback components...');
+            await loadAttachmentsForComponents(pool, companyId, treeData.components);
+        }
+
+        console.log('Fallback organized BOM Tree Data:', {
+            componentsCount: treeData.components.length,
+            totalComponents: treeData.totalComponents
+        });
+
+        return treeData;
+    } catch (err) {
+        console.error('Error in fallback query:', err);
+        throw err;
+    }
+};
+
+// Organizza i dati della BOM in una struttura ad albero per il frontend
+const organizeBOMTreeData = (recordsets) => {
+    try {
+        const [components, routing, attachments] = recordsets;
+
+        // Crea una mappa per i componenti
+        const componentMap = new Map();
+        const rootComponents = [];
+
+        // Processa i componenti
+        if (components && components.length > 0) {
+            components.forEach(comp => {
+                const componentData = {
+                    ...comp,
+                    children: [],
+                    routing: [],
+                    attachments: [],
+                    expanded: false,
+                    hasChildren: false
+                };
+                componentMap.set(comp.ComponentId, componentData);
+
+                // Se è un componente di primo livello, aggiungilo alla root
+                if (comp.Level === 1) {
+                    rootComponents.push(componentData);
+                }
+            });
+
+            // Organizza la gerarchia
+            components.forEach(comp => {
+                if (comp.Level > 1) {
+                    // Trova il componente padre
+                    const parent = Array.from(componentMap.values())
+                        .find(p => p.Level === comp.Level - 1 && 
+                               comp.Path.startsWith(p.Path + '.'));
+                    
+                    if (parent) {
+                        parent.children.push(componentMap.get(comp.ComponentId));
+                        parent.hasChildren = true;
+                    }
+                }
+            });
+        }
+
+        // Aggiungi i routing se presenti
+        if (routing && routing.length > 0) {
+            routing.forEach(rtg => {
+                const component = componentMap.get(rtg.ComponentId);
+                if (component) {
+                    component.routing.push(rtg);
+                }
+            });
+        }
+
+        // Aggiungi gli allegati se presenti
+        if (attachments && attachments.length > 0) {
+            attachments.forEach(att => {
+                const component = componentMap.get(att.ComponentId);
+                if (component) {
+                    component.attachments.push(att);
+                }
+            });
+        }
+
+        return {
+            components: rootComponents,
+            totalComponents: components ? components.length : 0,
+            hasRouting: routing && routing.length > 0,
+            hasAttachments: attachments && attachments.length > 0
+        };
+    } catch (err) {
+        console.error('Error organizing BOM tree data:', err);
+        return {
+            components: [],
+            totalComponents: 0,
+            hasRouting: false,
+            hasAttachments: false
+        };
+    }
+};
+
+// Ottiene gli allegati per un componente specifico
+const getComponentAttachments = async (companyId, componentId, isProjectItem = true) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        let query = `
+            SELECT 
+                att.AttachmentID,
+                att.FileName,
+                att.FilePath,
+                att.FileType,
+                att.FileSizeKB,
+                att.Description,
+                att.UploadedAt,
+                att.IsPublic,
+                att.IsVisible,
+                u.FirstName + ' ' + u.LastName AS UploadedByName,
+                cat.CategoryName
+            FROM MA_ItemAttachments att
+            LEFT JOIN AR_Users u ON att.UploadedBy = u.userId
+            LEFT JOIN MA_ItemAttachmentCategoryMap map ON att.AttachmentID = map.AttachmentID
+            LEFT JOIN MA_ItemAttachmentCategories cat ON map.CategoryID = cat.CategoryID
+            WHERE att.CompanyId = @CompanyId
+            AND att.IsVisible = 1
+        `;
+
+        const request = pool.request()
+            .input('CompanyId', sql.Int, companyId);
+
+        if (isProjectItem) {
+            query += ` AND att.ProjectItemId = @ComponentId`;
+            request.input('ComponentId', sql.BigInt, componentId);
+        } else {
+            query += ` AND att.ItemCode = @ItemCode`;
+            request.input('ItemCode', sql.VarChar(64), componentId);
+        }
+
+        query += ` ORDER BY att.UploadedAt DESC`;
+
+        const result = await request.query(query);
+        return result.recordset || [];
+    } catch (err) {
+        console.error('Error getting component attachments:', err);
+        throw err;
+    }
+};
+
 // Esporta tutte le funzioni
 module.exports = {
     addUpdateItem,
@@ -2876,4 +3272,6 @@ module.exports = {
     checkItemCodeExists,
     updateItemDetailsWithValidation,
     searchSimilarArticles,
+    getArticleBOMTree,
+    getComponentAttachments
 };

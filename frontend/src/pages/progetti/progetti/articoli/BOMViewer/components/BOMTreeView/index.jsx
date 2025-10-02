@@ -865,12 +865,12 @@ const BOMTreeView = ({
             {isExpanded ? (
               <>
                 <Minimize className="h-3.5 w-3.5 mr-1" />
-                Comprimi
+                
               </>
             ) : (
               <>
                 <Maximize className="h-3.5 w-3.5 mr-1" />
-                Espandi
+                
               </>
             )}
           </Button>

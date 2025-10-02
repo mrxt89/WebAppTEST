@@ -42,9 +42,9 @@ const DoNotDisturbIndicator = () => {
   if (!isActive) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 bg-red-100 text-red-800 px-3 py-2 rounded-full shadow-md flex items-center space-x-2 z-50 animate-pulse">
+    <div className="fixed bottom-4 left-4 bg-red-100 text-red-800 px-3 py-2 rounded-full shadow-md flex items-center z-50 animate-pulse">
       <BellOff className="w-4 h-4" />
-      <span className="text-xs font-medium">Non disturbare attivo</span>
+      <span className="text-xs font-medium"></span>
     </div>
   );
 };

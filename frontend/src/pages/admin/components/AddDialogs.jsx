@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "@/components/ui/use-toast";
 import {
   Select,
   SelectContent,
@@ -37,12 +38,13 @@ export const AddUserDialog = ({ open, onOpenChange, onConfirm, companies = [] })
 
   const handleSubmit = () => {
     if (!formData.username || !formData.firstName || !formData.password) {
-      swal.fire("Errore", "Username, nome e password sono obbligatori", "error");
+      // Avviso con toast
+      toast.error("Username, nome e password sono obbligatori");
       return;
     }
 
     if (formData.companies.length === 0) {
-      swal.fire("Errore", "Seleziona almeno un'azienda", "error");
+      toast.error("Seleziona almeno un'azienda");
       return;
     }
 
@@ -186,6 +188,7 @@ export const AddUserDialog = ({ open, onOpenChange, onConfirm, companies = [] })
                     id={`company-${company.CompanyId}`}
                     checked={formData.companies.includes(company.CompanyId)}
                     onCheckedChange={(checked) => handleCompanyChange(company.CompanyId, checked)}
+                    className="w-4 h-4 bg-primary"
                   />
                   <Label htmlFor={`company-${company.CompanyId}`} className="text-sm">
                     {company.Description}
@@ -404,6 +407,7 @@ export const AddNotificationChannelDialog = ({ open, onOpenChange, onConfirm }) 
                 id="intercompany"
                 checked={formData.intercompany}
                 onCheckedChange={(checked) => setFormData({ ...formData, intercompany: checked })}
+                className="w-4 h-4 bg-primary"
               />
               <Label htmlFor="intercompany" className="text-sm">
                 Canale Intercompany

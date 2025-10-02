@@ -8,6 +8,7 @@ import BOMTreeView from "./components/BOMTreeView";
 import BOMDetailPanel from "./components/BOMDetailPanel";
 import BOMReferencePanel from "./components/BOMReferencePanel";
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import "./BOMViewer.css";
 
 /**
  * BOMViewer - Componente principale per la visualizzazione e modifica delle distinte base
@@ -59,40 +60,65 @@ const BOMViewer = ({ item, project, canEdit = false, onRefresh }) => {
           activeItem,
           setDragSettings,
         }) => (
-          <div className="flex flex-col h-full border rounded-md overflow-hidden" id="bom-viewer">
-            {/* Header con codice BOM, descrizione e selettore versione */}
-            <BOMHeader />
+          <div className="flex flex-col" id="bom-viewer" style={{ height: "calc(100vh - 275px)" }}>
+            {/* Header con codice BOM, descrizione e selettore versione - COMPLETAMENTE FISSO */}
+            <div id="bom-header-section" className="flex-shrink-0 bg-white border-b shadow-sm">
+              <BOMHeader />
+            </div>
 
-            {/* Area principale con 3 pannelli ridimensionabili */}
-            <ResizablePanelGroup direction="horizontal" className="flex-1">
-              {/* Pannello sinistro - Vista ad albero (struttura BOM) */}
-              <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
-                <div className="h-full overflow-auto border-r" id="bom-tree-view">
-                  <BOMTreeView
-                    draggingOver={draggingOver}
-                    dropTarget={dropTarget}
-                    dropMode={dropMode}
-                  />
+            {/* Area principale con 3 pannelli ridimensionabili - ALTEZZA CALCOLATA */}
+            <div id="bom-main-content" className="flex-1 min-h-0 flex">
+              <ResizablePanelGroup direction="horizontal">
+                {/* Pannello sinistro - Vista ad albero (struttura BOM) */}
+                <div className="d-grid w-25">
+                  <div className="flex-col border-r" id="bom-tree-container">
+                    {/* Header del pannello albero - FISSO */}
+                    <div id="bom-tree-header" className="flex-shrink-0 p-3 border-b bg-gray-50">
+                      <h3 className="text-sm font-medium text-gray-700">Struttura BOM</h3>
+                    </div>
+                    {/* Contenuto albero - SCROLLABILE INDIPENDENTE */}
+                    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" id="bom-tree-content">
+                      <BOMTreeView
+                        draggingOver={draggingOver}
+                        dropTarget={dropTarget}
+                        dropMode={dropMode}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </ResizablePanel>
 
-              {/* Pannello centrale - Vista dettagli con schede */}
-              <ResizablePanel defaultSize={50} minSize={30}>
-                <div className="h-full overflow-auto border-r" id="bom-detail-panel">
-                  <BOMDetailPanel />
+                {/* Pannello centrale - Vista dettagli con schede */}
+                <div className="d-grid w-50">
+                  <div className="flex flex-col border-r" id="bom-detail-container">
+                    {/* Header del pannello dettagli - FISSO */}
+                    <div id="bom-detail-header" className="flex-shrink-0 p-3 border-b bg-gray-50">
+                      <h3 className="text-sm font-medium text-gray-700">Dettagli Componente</h3>
+                    </div>
+                    {/* Contenuto dettagli - SCROLLABILE INDIPENDENTE */}
+                    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" id="bom-detail-content">
+                      <BOMDetailPanel />
+                    </div>
+                  </div>
                 </div>
-              </ResizablePanel>
 
-              {/* Pannello destro - BOM di riferimento */}
-              <ResizablePanel defaultSize={20} minSize={20} maxSize={30}>
-                <div className="h-full overflow-auto">
-                  <BOMReferencePanel
-                    activeItem={activeItem}
-                    setDragSettings={setDragSettings}
-                  />
+                {/* Pannello destro - BOM di riferimento */}
+                <div className="d-grid w-25">
+                  <div className="flex flex-col" id="bom-reference-container">
+                    {/* Header del pannello riferimento - FISSO */}
+                    <div id="bom-reference-header" className="flex-shrink-0 p-3 border-b bg-gray-50">
+                      <h3 className="text-sm font-medium text-gray-700">BOM di Riferimento</h3>
+                    </div>
+                    {/* Contenuto riferimento - SCROLLABILE INDIPENDENTE */}
+                    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" id="bom-reference-content">
+                      <BOMReferencePanel
+                        activeItem={activeItem}
+                        setDragSettings={setDragSettings}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </ResizablePanel>
-            </ResizablePanelGroup>
+              </ResizablePanelGroup>
+            </div>
           </div>
         )}
       </DndContextProvider>

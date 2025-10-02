@@ -612,9 +612,9 @@ const TreeNode = ({
           {/* 1. First show associated cycles */}
           {node.type === "component" &&
             hasRoutingCycles &&
-            nodeCycles.map((cycle) => {
+            nodeCycles.map((cycle, index) => {
               const cycleNode = {
-                id: `cycle-${cycle.BOMId}-${cycle.RtgStep}`,
+                id: `cycle-${cycle.BOMId}-${cycle.RtgStep}-${index}`,
                 type: "cycle",
                 level: node.level + 1,
                 data: cycle,

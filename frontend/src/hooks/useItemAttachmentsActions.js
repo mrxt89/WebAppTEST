@@ -954,6 +954,7 @@ const useItemAttachmentsActions = () => {
     error,
     attachments,
     categories,
+    setAttachments, // Esposto per permettere impostazione diretta degli allegati
     // Getter per allegati
     getAttachmentsByItemCode,
     getAttachmentsByProjectItemId,

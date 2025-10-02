@@ -187,8 +187,8 @@ const ReferenceBOMs = ({ importOptions }) => {
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             />
           </div>
-          <Button size="icon" onClick={handleSearch}>
-            <Search className="h-4 w-4" />
+          <Button  onClick={handleSearch}>
+            <Search className="h-4 w-4 text-gray-500" />
           </Button>
         </div>
 

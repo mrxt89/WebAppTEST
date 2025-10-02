@@ -20,12 +20,14 @@ import {
   ListFilter,
   Copy,
   FileSpreadsheet,
+  Calculator,
 } from "lucide-react";
 import { swal } from "@/lib/common";
 import ArticleForm from "./ArticleForm";
 import ArticlesList from "./ArticlesList";
 import ArticleDetails from "./ArticleDetails";
 import BOMViewer from "./BOMViewer";
+import BOMCosting from "./BOMCosting";
 import ArticleSelectionModal from "./ArticleSelectionModal";
 import useProjectArticlesActions from "@/hooks/useProjectArticlesActions";
 
@@ -272,6 +274,12 @@ const handleItemSelection = async (
     setSelectedTab("bom");
   };
 
+  // Gestione costificazione BOM
+  const handleCostingBOM = (item) => {
+    setSelectedItem(item);
+    setSelectedTab("bom-costing");
+  };
+
   // Gestione cambio filtri
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -308,7 +316,7 @@ const handleItemSelection = async (
           className="flex-1 flex flex-col"
         >
           <div className="px-6 pt-2 border-b sticky top-0 bg-white z-10">
-            <TabsList>
+            <TabsList className="navbar-style-tabs">
               <TabsTrigger value="list" onClick={() => setSelectedTab("list")}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Lista Articoli
@@ -328,6 +336,13 @@ const handleItemSelection = async (
                   >
                     <ListFilter className="h-4 w-4 mr-2" />
                     Distinta Base
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="bom-costing"
+                    onClick={() => setSelectedTab("bom-costing")}
+                  >
+                    <Calculator className="h-4 w-4 mr-2" />
+                    Costificazione BOM
                   </TabsTrigger>
                 </>
               
@@ -452,6 +467,7 @@ const handleItemSelection = async (
                 loading={isLoading}
                 onSelect={handleItemSelect}
                 onViewBOM={handleViewBOM}
+                onCostingBOM={handleCostingBOM}
                 onCopy={canEdit ? handleCopyItem : undefined}
                 canEdit={canEdit}
                 project={project}
@@ -509,6 +525,14 @@ const handleItemSelection = async (
                 Seleziona un articolo per visualizzarne la distinta base
               </div>
             )}
+          </TabsContent>
+
+          {/* Tab Costificazione BOM */}
+          <TabsContent
+            value="bom-costing"
+            className="flex-1 overflow-hidden m-0 border-none"
+          >
+            <BOMCosting selectedItem={selectedItem} />
           </TabsContent>
 
           {/* Tab Form Articolo */}

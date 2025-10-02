@@ -1,4 +1,5 @@
 import { swal } from "../../../lib/common";
+import { toast } from "@/components/ui/use-toast";
 
 export const handleAddUser = (addUser, refreshData, companies = []) => {
   // Prepara le opzioni per le aziende
@@ -79,7 +80,7 @@ export const handleAddUser = (addUser, refreshData, companies = []) => {
       if (result.isConfirmed) {
         addUser(result.value)
           .then(() => {
-            swal.fire("Successo", "Utente aggiunto con successo.", "success");
+            toast.success("Utente aggiunto con successo.");
             if (refreshData) refreshData("users");
           })
           .catch((error) => {
@@ -120,16 +121,12 @@ export const handleAddGroup = (addGroup, refreshData) => {
       if (result.isConfirmed) {
         addGroup(result.value)
           .then(() => {
-            swal.fire("Successo", "Gruppo aggiunto con successo.", "success");
+            toast.success("Gruppo aggiunto con successo.");
             if (refreshData) refreshData("groups");
           })
           .catch((error) => {
             console.error("Errore durante l'aggiunta del gruppo:", error);
-            swal.fire(
-              "Errore",
-              error.response?.data || "Errore durante l'aggiunta del gruppo.",
-              "error",
-            );
+            toast.error(error.response?.data || "Errore durante l'aggiunta del gruppo.");
           });
       }
     });
@@ -197,11 +194,7 @@ export const handleAddNotificationChannel = (
       if (result.isConfirmed) {
         addNotificationChannel(result.value)
           .then(() => {
-            swal.fire(
-              "Successo",
-              "Canale di notifica aggiunto con successo.",
-              "success",
-            );
+            toast.success("Canale di notifica aggiunto con successo.");
             if (refreshData) refreshData("notificationsChannel");
           })
           .catch((error) => {
@@ -209,12 +202,8 @@ export const handleAddNotificationChannel = (
               "Errore durante l'aggiunta del canale di notifica:",
               error,
             );
-            swal.fire(
-              "Errore",
-              error.response?.data ||
-                "Errore durante l'aggiunta del canale di notifica.",
-              "error",
-            );
+            toast.error(error.response?.data || "Errore durante l'aggiunta del canale di notifica.");
+            
           });
       }
     });

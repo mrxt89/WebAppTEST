@@ -262,9 +262,9 @@ loadInitialData();
           isLeftPanelCollapsed ? 'left-2' : 'left-2'
         }`}
         style={{
-          left: isLeftPanelCollapsed ? '8px' : `calc(${leftPanelWidth}% - 40px)`,
+          left: isLeftPanelCollapsed ? '-10px' : `calc(${leftPanelWidth}% - 40px)`,
           top: '50%',
-          transform: 'translateY(-50%)'
+          
         }}
       >
         {isLeftPanelCollapsed ? (

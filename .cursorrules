@@ -178,3 +178,24 @@ Prima di implementare soluzioni complesse, chiedi:
 3. Deve essere responsive?
 4. Serve autenticazione?
 5. Serve persistenza dati?
+
+
+
+# Database Schema Context
+
+## Database Information
+- Database type: SQL SERVER
+- Schema location: ./frontend/database/schema.sql
+- Main tables: users, orders, products (lista le tue tabelle principali)
+
+## Important Rules
+- Always reference the database schema in ./frontend/database/schema.sql when working with database queries
+- Use the stored procedures defined in ./frontend/database/stored_procedures.sql when possible
+- Follow the naming conventions established in the schema
+- When suggesting database changes, update the schema files accordingly
+
+
+## Query Patterns
+- Prefer prepared statements for security
+- Use transactions for multi-table operations
+- Follow the established error handling patterns

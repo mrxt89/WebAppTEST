@@ -1,0 +1,125 @@
+/* BOM Viewer - Stili per layout fisso e scroll indipendente */
+
+#bom-viewer {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header completamente fisso */
+#bom-header-section {
+  flex-shrink: 0;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+/* Area principale con altezza calcolata */
+#bom-main-content {
+  flex: 1;
+  min-height: 0; /* CRITICO: Permette al flexbox di ridurre l'altezza */
+  display: flex;
+  overflow: hidden;
+}
+
+/* Container dei pannelli */
+#bom-tree-container,
+#bom-detail-container,
+#bom-reference-container {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header dei pannelli - fissi */
+#bom-tree-header,
+#bom-detail-header,
+#bom-reference-header {
+  flex-shrink: 0;
+  padding: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+}
+
+/* Contenuto dei pannelli - scrollabile indipendente */
+#bom-tree-content,
+#bom-detail-content,
+#bom-reference-content {
+  flex: 1;
+  min-height: 0; /* CRITICO: Permette al flexbox di ridurre l'altezza */
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+}
+
+/* Stili per la scrollbar personalizzata */
+#bom-tree-content::-webkit-scrollbar,
+#bom-detail-content::-webkit-scrollbar,
+#bom-reference-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+#bom-tree-content::-webkit-scrollbar-track,
+#bom-detail-content::-webkit-scrollbar-track,
+#bom-reference-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+#bom-tree-content::-webkit-scrollbar-thumb,
+#bom-detail-content::-webkit-scrollbar-thumb,
+#bom-reference-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+#bom-tree-content::-webkit-scrollbar-thumb:hover,
+#bom-detail-content::-webkit-scrollbar-thumb:hover,
+#bom-reference-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Assicuriamo che i pannelli ridimensionabili funzionino correttamente */
+[data-panel-id] {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Stili per ResizablePanelGroup */
+[data-panel-group] {
+  display: flex !important;
+}
+
+[data-panel] {
+  min-height: 0 !important;
+}
+
+/* Stili per il drag and drop */
+.drag-over {
+  background-color: #eff6ff;
+  border: 2px dashed #3b82f6;
+}
+
+.drop-indicator {
+  height: 2px;
+  background-color: #3b82f6;
+  margin: 2px 0;
+  border-radius: 1px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  #bom-tree-header,
+  #bom-detail-header,
+  #bom-reference-header {
+    padding: 0.5rem;
+  }
+  
+  #bom-tree-header h3,
+  #bom-detail-header h3,
+  #bom-reference-header h3 {
+    font-size: 0.875rem;
+  }
+}

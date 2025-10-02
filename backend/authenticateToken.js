@@ -28,6 +28,9 @@ function authenticateToken(req, res, next) {
       });
     }
     
+    // Debug log per verificare il contenuto del token
+    console.log('Token verified, user data:', user);
+    
     req.user = user;
     next();
   });
