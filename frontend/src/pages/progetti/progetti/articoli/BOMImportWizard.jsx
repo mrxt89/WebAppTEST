@@ -22,6 +22,7 @@ import {
   Layers,
   Maximize2,
   Minimize2,
+  ArrowLeft,
 } from "lucide-react";
 import {
   Tooltip,
@@ -31,6 +32,7 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/use-toast";
 import useProjectArticlesActions from "@/hooks/useProjectArticlesActions";
+import BOMVersionSelector from "./BOMVersionSelector";
 
 const BOMImportWizard = ({
   isOpen,
@@ -45,6 +47,11 @@ const BOMImportWizard = ({
   const [componentOptions, setComponentOptions] = useState({});
   const [loading, setLoading] = useState(false);
   const [createNewBOM, setCreateNewBOM] = useState(true);
+  
+  // Stati per la selezione delle versioni
+  const [showVersionSelector, setShowVersionSelector] = useState(false);
+  const [selectedBOMVersion, setSelectedBOMVersion] = useState(null);
+  const [currentStep, setCurrentStep] = useState('version-selection'); // 'version-selection' o 'bom-structure'
 
   const { getBOMData } = useProjectArticlesActions();
 
@@ -54,23 +61,34 @@ const BOMImportWizard = ({
     return text.substring(0, maxLength) + '...';
   };
 
-  // Carica la struttura completa della distinta
+  // Reset degli stati quando si apre/chiude il dialog
   useEffect(() => {
     if (isOpen && sourceItem) {
-      loadBOMStructure();
+      // Solo se non siamo già in un processo di selezione
+      if (currentStep === 'version-selection') {
+        setSelectedBOMVersion(null);
+        setBomStructure(null);
+        setExpandedNodes({});
+        setSelectedComponents({});
+        setComponentOptions({});
+      }
+    } else if (!isOpen) {
+      setCurrentStep('version-selection');
+      setSelectedBOMVersion(null);
+      setBomStructure(null);
     }
   }, [isOpen, sourceItem]);
 
-  const loadBOMStructure = async () => {
+  const loadBOMStructure = async (bomVersion) => {
     try {
       setLoading(true);
       
-      // Carica la struttura multilivello della distinta
+      // Carica la struttura multilivello della distinta usando il BOMId
       const data = await getBOMData(
         "GET_BOM_MULTILEVEL",
-        null,
-        sourceItem.Id || sourceItem.ItemId,
-        null,
+        bomVersion.Id, // Usa il BOMId invece dell'ItemId
+        null, // ItemId non più necessario
+        bomVersion.Version, // Passa la versione specifica
         {
           maxLevel: 10,
           includeRouting: true,
@@ -78,12 +96,9 @@ const BOMImportWizard = ({
         }
       );
 
-      console.log('BOM data loaded:', data);
-
       if (data) {
         // Costruisci la struttura ad albero
         const tree = buildTreeStructure(data.components || data);
-        console.log('Tree structure built:', tree);
         setBomStructure(tree);
         
         // Espandi automaticamente il primo livello
@@ -117,6 +132,25 @@ const BOMImportWizard = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  // Gestisce la selezione di una versione BOM
+  const handleVersionSelected = async (bomVersion) => {
+    setSelectedBOMVersion(bomVersion);
+    setCurrentStep('bom-structure');
+    
+    // Carica la struttura BOM per la versione selezionata
+    await loadBOMStructure(bomVersion);
+  };
+
+  // Torna alla selezione delle versioni
+  const handleBackToVersionSelection = () => {
+    setCurrentStep('version-selection');
+    setSelectedBOMVersion(null);
+    setBomStructure(null);
+    setExpandedNodes({});
+    setSelectedComponents({});
+    setComponentOptions({});
   };
 
   // Costruisce la struttura ad albero dai componenti flat
@@ -512,6 +546,7 @@ const BOMImportWizard = ({
     const importData = {
       createNewBOM,
       sourceItem,
+      selectedBOMVersion, // Aggiungi le informazioni della versione selezionata
       components: [],
     };
 
@@ -574,29 +609,63 @@ const BOMImportWizard = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Layers className="h-5 w-5" />
-            Importazione Distinta Base
+            {currentStep === 'version-selection' 
+              ? 'Seleziona Versione BOM da Copiare'
+              : 'Importazione Distinta Base'
+            }
           </DialogTitle>
+          {currentStep === 'bom-structure' && selectedBOMVersion && (
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <span>Versione selezionata:</span>
+              <Badge variant="outline">
+                Versione {selectedBOMVersion.Version} - {selectedBOMVersion.Description}
+              </Badge>
+            </div>
+          )}
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col">
-          {/* Info articolo sorgente */}
-          <div className="p-4 bg-gray-50 rounded-lg mb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-medium">{sourceItem?.Item || sourceItem?.BOM}</h3>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <p className="text-sm text-gray-600 cursor-help">
-                        {truncateText(sourceItem?.Description || sourceItem?.ItemDescription)}
-                      </p>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-md">
-                      <p>{sourceItem?.Description || sourceItem?.ItemDescription}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
+          {currentStep === 'version-selection' ? (
+            // Mostra il selettore di versioni
+            <BOMVersionSelector
+              isOpen={true}
+              onClose={onClose}
+              sourceItem={sourceItem}
+              onVersionSelected={handleVersionSelected}
+              project={project}
+            />
+          ) : (
+            // Mostra la struttura BOM
+            <>
+              {/* Info articolo sorgente */}
+              <div className="p-4 bg-gray-50 rounded-lg mb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBackToVersionSelection}
+                      className="flex items-center"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Torna alle Versioni
+                    </Button>
+                    <div>
+                      <h3 className="font-medium">{sourceItem?.Item || sourceItem?.BOM}</h3>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <p className="text-sm text-gray-600 cursor-help">
+                              {truncateText(sourceItem?.Description || sourceItem?.ItemDescription)}
+                            </p>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-md">
+                            <p>{sourceItem?.Description || sourceItem?.ItemDescription}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Button
@@ -666,28 +735,32 @@ const BOMImportWizard = ({
             )}
           </ScrollArea>
 
-          {/* Contatore selezione */}
-          <div className="mt-4 text-sm text-gray-600">
-            Selezionati {getSelectedCount()} componenti su {getTotalCount()}
-            {getSelectedCount() === 0 && (
-              <span className="ml-2 text-amber-600">
-                - Seleziona almeno un componente per procedere
-              </span>
-            )}
-          </div>
+              {/* Contatore selezione */}
+              <div className="mt-4 text-sm text-gray-600">
+                Selezionati {getSelectedCount()} componenti su {getTotalCount()}
+                {getSelectedCount() === 0 && (
+                  <span className="ml-2 text-amber-600">
+                    - Seleziona almeno un componente per procedere
+                  </span>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Annulla
-          </Button>
-          <Button 
-            onClick={handleConfirm} 
-            disabled={loading || getSelectedCount() === 0}
-          >
-            Importa Selezione
-          </Button>
-        </DialogFooter>
+        {currentStep === 'bom-structure' && (
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Annulla
+            </Button>
+            <Button 
+              onClick={handleConfirm} 
+              disabled={loading || getSelectedCount() === 0}
+            >
+              Importa Selezione
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

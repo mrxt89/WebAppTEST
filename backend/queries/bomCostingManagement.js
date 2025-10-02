@@ -693,7 +693,7 @@ const getBOMVersions = async (companyId, itemId) => {
                     Id, BOM, Version, Description, BOMStatus,
                     TotalCost as LastCalculatedCost,
                     TBCreated as CreatedDate,
-                    TBModified as ModifiedDate
+                    TBCreated as ModifiedDate
                 FROM dbo.MA_ProjectArticles_BillOfMaterials
                 WHERE CompanyId = @CompanyId AND ItemId = @ItemId
                 ORDER BY Version DESC
