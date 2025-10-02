@@ -447,13 +447,13 @@ router.get('/operations-breakdown/:bomId', authenticateToken, async (req, res) =
         const companyId = req.user.CompanyId;
         const { bomId } = req.params;
         const { includeMultilevel } = req.query;
-        
+
         const result = await bomCostingQueries.getBOMOperationsCostBreakdown(
             companyId,
             parseInt(bomId),
             includeMultilevel === 'true'
         );
-        
+
         res.json(result);
     } catch (error) {
         console.error('Error getting BOM operations cost breakdown:', error);
@@ -467,6 +467,78 @@ router.get('/operations-breakdown/:bomId', authenticateToken, async (req, res) =
         res.status(500).json({
             success: false,
             message: 'Errore nel recupero del breakdown costi operazioni',
+            error: error.message
+        });
+    }
+});
+
+// =============================================
+// Route: Salva storico parametri costificazione
+// =============================================
+router.post('/history', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const userId = req.user.UserId;
+        const { bomId, costingData } = req.body;
+
+        if (!bomId) {
+            return res.status(400).json({
+                success: false,
+                message: 'bomId è richiesto'
+            });
+        }
+
+        if (!costingData) {
+            return res.status(400).json({
+                success: false,
+                message: 'costingData è richiesto'
+            });
+        }
+
+        const result = await bomCostingQueries.saveBOMCostingHistory(
+            companyId,
+            parseInt(bomId),
+            costingData,
+            userId
+        );
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error saving BOM costing history:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Errore nel salvataggio dello storico parametri',
+            error: error.message
+        });
+    }
+});
+
+// =============================================
+// Route: Ottieni storico parametri costificazione
+// =============================================
+router.get('/history', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { bomId, top, orderBy } = req.query;
+
+        const result = await bomCostingQueries.getBOMCostingParametersHistory(
+            companyId,
+            bomId ? parseInt(bomId) : null,
+            top ? parseInt(top) : null,
+            orderBy || 'CostingDate DESC'
+        );
+
+        res.json({
+            success: true,
+            message: 'Storico parametri recuperato con successo',
+            data: result,
+            count: result.length
+        });
+    } catch (error) {
+        console.error('Error getting BOM costing parameters history:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Errore nel recupero dello storico parametri',
             error: error.message
         });
     }

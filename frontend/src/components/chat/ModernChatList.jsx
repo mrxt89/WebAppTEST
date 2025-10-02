@@ -26,8 +26,8 @@ import EditMessageModal from "./EditMessageModal";
 import VersionHistoryModal from "./VersionHistoryModal";
 import ChatMessage from "./ChatMessage";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
-import { useSelector, useDispatch } from "react-redux";
-import { selectOpenChatData } from "@/redux/features/notifications/notificationsSlice";
+import { useSelector, useDispatch, shallowEqual } from "react-redux";
+import { selectOpenChatData, selectChatPagination } from "@/redux/features/notifications/notificationsSlice";
 import { loadMoreMessages } from "@/redux/features/notifications/notificationsActions";
 import { 
   loadMessageReactions, 
@@ -87,15 +87,16 @@ const ModernChatList = ({
   } = useOpenChat(notificationId, {
     autoRefresh: false, // Disabilita auto-refresh perché è già gestito dal componente padre
   });
-  // IMPORTANTE: Ottieni lo stato della paginazione da Redux
-  const chatPaginationRaw = useSelector(state => 
-    state.notifications.chatPagination[notificationId]
+  // IMPORTANTE: Ottieni lo stato della paginazione da Redux usando selector memoizzato
+  const chatPagination = useSelector(
+    state => selectChatPagination(state, notificationId),
+    shallowEqual
   );
-  const chatPagination = useMemo(() => chatPaginationRaw || {}, [chatPaginationRaw]);
 
-  // Ottieni dati completi da openChatData
-  const openChatData = useSelector(state => 
-    selectOpenChatData(state, parseInt(notificationId))
+  // Ottieni dati completi da openChatData usando selector memoizzato con shallowEqual
+  const openChatData = useSelector(
+    state => selectOpenChatData(state, parseInt(notificationId)),
+    shallowEqual
   );
 
   // Hook per funzionalità notifiche

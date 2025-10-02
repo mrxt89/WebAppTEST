@@ -1,5 +1,5 @@
 // src/redux/features/notifications/notificationsSlice.js
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk, createSelector } from "@reduxjs/toolkit";
 import { enableMapSet } from "immer";
 import axios from "axios";
 import { config } from "../../../config";
@@ -645,8 +645,8 @@ const notificationsSlice = createSlice({
     sending: false,
     error: null,
     unreadMessages: [],
-    openChatIds: new Set(),
-    standaloneChats: new Set(),
+    openChatIds: [], // Changed from Set to Array for Redux compatibility
+    standaloneChats: [], // Changed from Set to Array for Redux compatibility
     dbViewCreated: false,
     highlights: {},
     loadingHighlights: false,
@@ -1023,7 +1023,10 @@ const notificationsSlice = createSlice({
 
     registerOpenChat: (state, action) => {
      const notificationId = parseInt(action.payload);
-     state.openChatIds.add(notificationId);
+     // Changed from Set.add to Array.push with duplicate check
+     if (!state.openChatIds.includes(notificationId)) {
+       state.openChatIds.push(notificationId);
+     }
      
      // IMPORTANTE: Se la notifica non era letta, aggiorna il contatore
      const notification = state.notifications.find(n => n.notificationId === notificationId);
@@ -1063,7 +1066,8 @@ const notificationsSlice = createSlice({
 
     unregisterOpenChat: (state, action) => {
      const notificationId = parseInt(action.payload);
-     state.openChatIds.delete(notificationId);
+     // Changed from Set.delete to Array.filter
+     state.openChatIds = state.openChatIds.filter(id => id !== notificationId);
      delete state.openChatData[notificationId];
     },
 
@@ -1096,25 +1100,34 @@ const notificationsSlice = createSlice({
     },
 
     registerStandaloneChat: (state, action) => {
-      state.standaloneChats.add(parseInt(action.payload));
+      const chatId = parseInt(action.payload);
+      // Changed from Set.add to Array.push with duplicate check
+      if (!state.standaloneChats.includes(chatId)) {
+        state.standaloneChats.push(chatId);
+      }
 
       try {
        const current = JSON.parse(localStorage.getItem("standalone_chats") || "[]");
-        if (!current.includes(parseInt(action.payload))) {
+        if (!current.includes(chatId)) {
           localStorage.setItem(
             "standalone_chats",
-            JSON.stringify([...current, parseInt(action.payload)]),
+            JSON.stringify([...current, chatId]),
           );
         }
       } catch (e) {
         console.error("Error saving standalone chat to localStorage:", e);
       }
 
-      state.openChatIds.add(parseInt(action.payload));
+      // Changed from Set.add to Array.push with duplicate check
+      if (!state.openChatIds.includes(chatId)) {
+        state.openChatIds.push(chatId);
+      }
     },
 
     unregisterStandaloneChat: (state, action) => {
-      state.standaloneChats.delete(parseInt(action.payload));
+      const chatId = parseInt(action.payload);
+      // Changed from Set.delete to Array.filter
+      state.standaloneChats = state.standaloneChats.filter(id => id !== chatId);
 
       try {
        const current = JSON.parse(localStorage.getItem("standalone_chats") || "[]");
@@ -1130,23 +1143,25 @@ const notificationsSlice = createSlice({
     initializeStandaloneChats: (state, action) => {
       try {
         if (action.payload && Array.isArray(action.payload)) {
-         state.standaloneChats = new Set(action.payload.map((id) => parseInt(id)));
+         // Changed from Set to Array - remove duplicates
+         state.standaloneChats = [...new Set(action.payload.map((id) => parseInt(id)))];
           return;
         }
 
        const storedChats = JSON.parse(localStorage.getItem("standalone_chats") || "[]");
-        state.standaloneChats = new Set(storedChats.map((id) => parseInt(id)));
+        // Changed from Set to Array - remove duplicates
+        state.standaloneChats = [...new Set(storedChats.map((id) => parseInt(id)))];
       } catch (e) {
         console.error("Error loading standalone chats from localStorage:", e);
-        state.standaloneChats = new Set();
+        state.standaloneChats = [];
       }
     },
 
     cleanupStandaloneChats: (state, action) => {
       const toRemove = action.payload || [];
-      toRemove.forEach((id) => {
-        state.standaloneChats.delete(parseInt(id));
-      });
+      // Changed from Set.delete to Array.filter
+      const toRemoveSet = new Set(toRemove.map(id => parseInt(id)));
+      state.standaloneChats = state.standaloneChats.filter(id => !toRemoveSet.has(id));
     },
   },
 
@@ -1198,7 +1213,7 @@ const notificationsSlice = createSlice({
             ...state.paginatedNotifications[index],
             ...updatedNotif,
             // Assicurati che isReadByUser sia aggiornato correttamente
-            isReadByUser: state.openChatIds.has(updatedNotif.notificationId) 
+            isReadByUser: state.openChatIds.includes(updatedNotif.notificationId) 
               ? true 
               : updatedNotif.isReadByUser
           };
@@ -1207,7 +1222,7 @@ const notificationsSlice = createSlice({
           // Inseriscila all'inizio
           state.paginatedNotifications.unshift({
             ...updatedNotif,
-            isReadByUser: state.openChatIds.has(updatedNotif.notificationId) 
+            isReadByUser: state.openChatIds.includes(updatedNotif.notificationId) 
               ? true 
               : updatedNotif.isReadByUser
           });
@@ -1327,12 +1342,12 @@ const notificationsSlice = createSlice({
         const notificationId = notification.notificationId;
         
         // IMPORTANTE: Se la chat è aperta, marca SEMPRE come letta
-        if (state.openChatIds.has(notificationId)) {
+        if (state.openChatIds.includes(notificationId)) {
           notification.isReadByUser = true;
         }
         
         // GESTIONE MIGLIORATA PER CHAT APERTE
-        if (state.openChatIds.has(notificationId)) {
+        if (state.openChatIds.includes(notificationId)) {
           const existingOpenChat = state.openChatData[notificationId];
           
           // Estrai i messaggi dalla notifica
@@ -1429,7 +1444,7 @@ const notificationsSlice = createSlice({
             // Crea notifica aggiornata per sidebar
             const sidebarNotification = {
               ...notification,
-              isReadByUser: state.openChatIds.has(notificationId) ? true : notification.isReadByUser,
+              isReadByUser: state.openChatIds.includes(notificationId) ? true : notification.isReadByUser,
               messages: Array.isArray(notification.messages) 
                 ? notification.messages.slice(-5) 
                 : (typeof notification.messages === "string" 
@@ -1465,7 +1480,7 @@ const notificationsSlice = createSlice({
             state.notifications[index] = {
               ...state.notifications[index],
               ...notification,
-              isReadByUser: state.openChatIds.has(notificationId) ? true : notification.isReadByUser,
+              isReadByUser: state.openChatIds.includes(notificationId) ? true : notification.isReadByUser,
               messages: Array.isArray(notification.messages) 
                 ? notification.messages.slice(-5) 
                 : (typeof notification.messages === "string" 
@@ -1477,7 +1492,7 @@ const notificationsSlice = createSlice({
           // Nuova notifica - inserisci nella posizione corretta
           const sidebarNotification = {
             ...notification,
-            isReadByUser: state.openChatIds.has(notificationId) ? true : notification.isReadByUser,
+            isReadByUser: state.openChatIds.includes(notificationId) ? true : notification.isReadByUser,
             messages: Array.isArray(notification.messages) 
               ? notification.messages.slice(-5) 
               : (typeof notification.messages === "string" 
@@ -1512,7 +1527,7 @@ const notificationsSlice = createSlice({
         // Ricalcola unreadCount
         try {
           state.unreadCount = state.notifications.filter(
-            (n) => n && !n.isReadByUser && n.archived !== 1 && !state.openChatIds.has(n.notificationId)
+            (n) => n && !n.isReadByUser && n.archived !== 1 && !state.openChatIds.includes(n.notificationId)
           ).length;
         } catch (e) {
           console.error("Errore nel calcolo unreadCount:", e);
@@ -1540,7 +1555,7 @@ const notificationsSlice = createSlice({
         if (!notificationId) return;
         
         // Se la chat è aperta, emetti evento per ricaricare
-        if (state.openChatIds.has(notificationId)) {
+        if (state.openChatIds.includes(notificationId)) {
           document.dispatchEvent(
             new CustomEvent("reload-open-chat", {
               detail: { 
@@ -1900,7 +1915,7 @@ const notificationsSlice = createSlice({
         // PER OGNI NOTIFICA DAL WORKER
         newNotifications.forEach(workerNotif => {
           // SE LA CHAT È APERTA, FORZA isReadByUser = true
-          if (state.openChatIds.has(workerNotif.notificationId)) {
+          if (state.openChatIds.includes(workerNotif.notificationId)) {
             workerNotif.isReadByUser = true; // MODIFICA CHIAVE
             
             const openChat = state.openChatData[workerNotif.notificationId];
@@ -1940,7 +1955,7 @@ const notificationsSlice = createSlice({
         // Aggiorna notifications normalmente solo per chat NON aperte
         const updatedNotifications = state.notifications.map(existingNotif => {
           // Se la chat è aperta, mantieni la versione esistente MA con isReadByUser = true
-          if (state.openChatIds.has(existingNotif.notificationId)) {
+          if (state.openChatIds.includes(existingNotif.notificationId)) {
             return { ...existingNotif, isReadByUser: true };
           }
           
@@ -1953,7 +1968,7 @@ const notificationsSlice = createSlice({
         newNotifications.forEach(workerNotif => {
           if (!updatedNotifications.find(n => n.notificationId === workerNotif.notificationId)) {
             // Se è una nuova notifica per una chat aperta, marcala come letta
-            if (state.openChatIds.has(workerNotif.notificationId)) {
+            if (state.openChatIds.includes(workerNotif.notificationId)) {
               workerNotif.isReadByUser = true;
             }
             updatedNotifications.push(workerNotif);
@@ -1982,28 +1997,85 @@ const notificationsSlice = createSlice({
  },
 });
 
-// Selectors
+// Base selectors (non memoizzati - accesso diretto allo state)
+const selectNotificationsState = (state) => state.notifications;
+const selectNotificationsArray = (state) => state.notifications.notifications;
+const selectOpenChatDataRaw = (state) => state.notifications.openChatData;
+const selectChatPaginationRaw = (state) => state.notifications.chatPagination;
+
+// Selectors semplici (già ottimizzati, ritornano valori primitivi)
 export const selectNotifications = (state) => state.notifications.notifications;
 export const selectUnreadCount = (state) => state.notifications.unreadCount;
 export const selectLoading = (state) => state.notifications.loading;
 export const selectSending = (state) => state.notifications.sending;
 export const selectError = (state) => state.notifications.error;
 export const selectUnreadMessages = (state) => state.notifications.unreadMessages;
-export const selectOpenChatIds = (state) => state.notifications.openChatIds;
 export const selectDbViewCreated = (state) => state.notifications.dbViewCreated;
-export const selectHighlights = (state) => state.notifications.highlights;
 export const selectLoadingHighlights = (state) => state.notifications.loadingHighlights;
 export const selectAttachmentsLoading = (state) => state.notifications.attachmentsLoading;
-export const selectNotificationAttachments = (state) => state.notifications.notificationAttachments;
-export const selectStandaloneChats = (state) => state.notifications.standaloneChats;
 
-// NUOVO: Selettore per openChatData
-export const selectOpenChatData = (state, notificationId) => 
- state.notifications.openChatData[notificationId];
+// Memoized selectors per oggetti/array complessi
+export const selectHighlights = createSelector(
+  [(state) => state.notifications.highlights],
+  (highlights) => highlights
+);
 
-// NUOVO: Selettore per verificare se una chat ha dati completi
-export const selectHasFullChatData = (state, notificationId) => 
- state.notifications.openChatData[notificationId]?.lastFullUpdate > 0;
+export const selectNotificationAttachments = createSelector(
+  [(state) => state.notifications.notificationAttachments],
+  (attachments) => attachments
+);
+
+// Memoized selector per openChatIds (convertito da Set ad array)
+export const selectOpenChatIds = createSelector(
+  [(state) => state.notifications.openChatIds],
+  (openChatIds) => openChatIds
+);
+
+// Memoized selector per standaloneChats (convertito da Set ad array)
+export const selectStandaloneChats = createSelector(
+  [(state) => state.notifications.standaloneChats],
+  (standaloneChats) => standaloneChats
+);
+
+// Memoized selector per openChatIds come Set (per lookup efficienti)
+export const selectOpenChatIdsSet = createSelector(
+  [selectOpenChatIds],
+  (openChatIds) => new Set(openChatIds)
+);
+
+// Memoized selector per standaloneChats come Set (per lookup efficienti)
+export const selectStandaloneChatsSet = createSelector(
+  [selectStandaloneChats],
+  (standaloneChats) => new Set(standaloneChats)
+);
+
+// Memoized selector per singolo openChatData
+export const selectOpenChatData = createSelector(
+  [
+    selectOpenChatDataRaw,
+    (state, notificationId) => notificationId
+  ],
+  (openChatData, notificationId) => openChatData[notificationId]
+);
+
+// Memoized selector per verificare se una chat ha dati completi
+export const selectHasFullChatData = createSelector(
+  [selectOpenChatData],
+  (chatData) => chatData?.lastFullUpdate > 0
+);
+
+// Memoized selector per chat pagination di una specifica notifica
+export const selectChatPagination = createSelector(
+  [
+    selectChatPaginationRaw,
+    (state, notificationId) => notificationId
+  ],
+  (chatPagination, notificationId) => chatPagination[notificationId] || {
+    hasMoreMessages: true,
+    isLoadingMore: false,
+    oldestMessageId: null,
+  }
+);
 
 // Check if notification is muted
 export const isNotificationMuted = (notification) => {

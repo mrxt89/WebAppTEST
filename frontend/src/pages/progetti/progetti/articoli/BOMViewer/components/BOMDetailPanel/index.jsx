@@ -2,11 +2,12 @@
 import React from "react";
 import { useBOMViewer } from "../../context/BOMViewerContext";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Layers, FileText, BarChart, Settings } from "lucide-react";
+import { Layers, FileText, BarChart, Settings, Calculator } from "lucide-react";
 import TabComposition from "./TabComposition";
 import TabSummary from "./TabSummary";
 import TabDocuments from "./TabDocuments";
-import CyclesTab from "./CyclesTab"; // Importa il nuovo componente
+import CyclesTab from "./CyclesTab";
+import TabCostingParameters from "./TabCostingParameters"; // Nuova tab parametri
 
 const BOMDetailPanel = () => {
   const { activeTab, setActiveTab, selectedNode } = useBOMViewer();
@@ -39,6 +40,13 @@ const BOMDetailPanel = () => {
                 Cicli
               </TabsTrigger>
             )}
+            {/* Tab Parametri Costificazione - Visibile quando è selezionato il livello 0 */}
+            {(!selectedNode || selectedNode.level === 0) && (
+              <TabsTrigger value="costingParams" className="flex items-center">
+                <Calculator className="h-4 w-4 mr-2" />
+                Parametri Costing
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
@@ -60,6 +68,11 @@ const BOMDetailPanel = () => {
         {/* Nuova tab per i cicli */}
         <TabsContent value="cycles" className="flex-1 p-0 m-0 overflow-auto">
           <CyclesTab />
+        </TabsContent>
+
+        {/* Nuova tab per i parametri di costificazione */}
+        <TabsContent value="costingParams" className="flex-1 p-0 m-0 overflow-auto">
+          <TabCostingParameters />
         </TabsContent>
       </Tabs>
     </div>

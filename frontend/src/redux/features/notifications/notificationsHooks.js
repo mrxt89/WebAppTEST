@@ -1,6 +1,6 @@
 // src/redux/features/notifications/notificationsHooks.js
 import { useCallback, useEffect, useState, useRef, useMemo } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector, useDispatch, shallowEqual } from "react-redux";
 import { swal } from "../../../lib/common";
 import axios from "axios";
 import { config } from "../../../config";
@@ -140,20 +140,24 @@ export const useNotifications = () => {
   const sending = useSelector(selectSending);
   const error = useSelector(selectError);
   const unreadMessages = useSelector(selectUnreadMessages);
-  const openChatIds = useSelector(selectOpenChatIds);
   const dbViewCreated = useSelector(selectDbViewCreated);
-  const highlights = useSelector(selectHighlights);
+
+  // Oggetti/array complessi - usa shallowEqual per evitare re-render inutili
+  const highlights = useSelector(selectHighlights, shallowEqual);
+  const notificationAttachments = useSelector(selectNotificationAttachments, shallowEqual);
+  const openChatIds = useSelector(selectOpenChatIds, shallowEqual);
+  const standaloneChats = useSelector(selectStandaloneChats, shallowEqual);
+
+  // Primitives - non serve shallowEqual
   const loadingHighlights = useSelector(selectLoadingHighlights);
   const attachmentsLoading = useSelector(selectAttachmentsLoading);
-  const notificationAttachments = useSelector(selectNotificationAttachments);
-  const standaloneChats = useSelector(selectStandaloneChats);
-  
-  // NUOVO: Selettore per openChatData
-  const openChatData = useSelector(state => state.notifications.openChatData);
 
-  // Memoized selectors to prevent unnecessary re-renders
-  const memoizedOpenChatIds = useMemo(() => Array.from(openChatIds), [openChatIds]);
-  const memoizedStandaloneChats = useMemo(() => Array.from(standaloneChats), [standaloneChats]);
+  // NUOVO: Selettore per openChatData con shallowEqual
+  const openChatData = useSelector(state => state.notifications.openChatData, shallowEqual);
+
+  // Non serve più Array.from() perché openChatIds e standaloneChats sono già array
+  const memoizedOpenChatIds = openChatIds;
+  const memoizedStandaloneChats = standaloneChats;
 
   // Stato locale per tracciare l'ultima volta che è stato eseguito un aggiornamento
   const [lastUpdateTime, setLastUpdateTime] = useState(0);
