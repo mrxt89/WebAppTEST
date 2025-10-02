@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -33,12 +33,15 @@ import {
   List,
   GanttChartSquare,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { swal } from "../../../lib/common";
 import ProjectEditModalWithTemplate from "./ProjectEditModalWithTemplate";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
 import TasksKanban from "./ProjectTasksKanban";
-import ProjectGanttView from "./ProjectGanttView";
+
+// Lazy load del componente Gantt pesante
+const ProjectGanttView = lazy(() => import("./ProjectGanttView"));
 import { hasAdminPermission } from "@/lib/taskPermissionsUtils";
 import ProjectTasksTableImproved from "./ProjectTasksTable";
 import TasksViewToggler from "./TasksViewToggler";
@@ -54,6 +57,16 @@ import ProjectStagesTable from "./ProjectStagesTable";
 import ProjectStagesGantt from "./ProjectStagesGantt";
 import useUsers from "../../../hooks/useUsersActions";
 import useProjectStages from "../../../hooks/useProjectStages";
+
+// Loading Spinner per Gantt View
+const GanttLoader = () => (
+  <div className="flex items-center justify-center h-full">
+    <div className="flex flex-col items-center gap-3">
+      <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+      <p className="text-sm text-gray-500">Caricamento vista Gantt...</p>
+    </div>
+  </div>
+);
 
 // Componente per la panoramica del progetto
 const ProjectOverview = ({ project }) => (
@@ -1170,21 +1183,23 @@ const handleDisableProject = async (projectId) => {
                   />
                 )}
                 {tasksViewMode === "gantt" && (
-                  <ProjectGanttView
-                    project={project}
-                    tasks={project.tasks || []}
-                    onTaskClick={handleTaskClick}
-                    onTaskUpdate={handleTaskUpdate}
-                    checkAdminPermission={checkAdminPermission}
-                    isOwnTask={isOwnTask}
-                    updateTaskSequence={updateTaskSequence}
-                    getProjectById={getProjectById}
-                    refreshProject={(callback) => loadProject(true, callback)}
-                    users={users}
-                    manageTaskDependencies={manageTaskDependencies}
-                    checkCircularDependencies={checkCircularDependencies}
-                    calculateProjectDates={calculateProjectDates}
-                  />
+                  <Suspense fallback={<GanttLoader />}>
+                    <ProjectGanttView
+                      project={project}
+                      tasks={project.tasks || []}
+                      onTaskClick={handleTaskClick}
+                      onTaskUpdate={handleTaskUpdate}
+                      checkAdminPermission={checkAdminPermission}
+                      isOwnTask={isOwnTask}
+                      updateTaskSequence={updateTaskSequence}
+                      getProjectById={getProjectById}
+                      refreshProject={(callback) => loadProject(true, callback)}
+                      users={users}
+                      manageTaskDependencies={manageTaskDependencies}
+                      checkCircularDependencies={checkCircularDependencies}
+                      calculateProjectDates={calculateProjectDates}
+                    />
+                  </Suspense>
                 )}
               </div>
             </TabsContent>

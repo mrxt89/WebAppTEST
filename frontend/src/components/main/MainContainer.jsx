@@ -1,19 +1,24 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import {
   ChevronRight,
   Menu,
+  Loader2,
 } from "lucide-react";
 import { Helmet } from "react-helmet";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import ProtectedRoute from "../ProtectedRoute";
-import AdminDashboard from "../../pages/admin/AdminDashboard";
-import ProjectManagementSplitView from "../../pages/progetti/progetti/ProjectManagementSplitView";
+
+// Lazy load dei componenti route più pesanti
+const AdminDashboard = lazy(() => import("../../pages/admin/AdminDashboard"));
+const ProjectManagementSplitView = lazy(() => import("../../pages/progetti/progetti/ProjectManagementSplitView"));
+const MyTasksPage = lazy(() => import("../../pages/progetti/attivita/MyTasksPage"));
+const BOMCosting = lazy(() => import("../../pages/progetti/progetti/articoli/BOMCosting"));
+
+// Import normali per componenti più leggeri
 import CategoriesPage from "../../pages/progetti/categorie/ProjectCategories";
 import TemplatesPage from "../../pages/progetti/templates/projectTemplates";
 import ProjectCustomers from "../../pages/progetti/clienti/ProjectCustomers";
-import MyTasksPage from "../../pages/progetti/attivita/MyTasksPage";
 import ArticlePage from "../../pages/progetti/progetti/articoli/ArticlePage";
-import BOMCosting from "../../pages/progetti/progetti/articoli/BOMCosting";
 import ChangePassword from "../../pages/user/ChangePassword";
 import UserProfile from "../../pages/user/UserProfile";
 import MainMenu from "../MainMenu";
@@ -22,6 +27,16 @@ import "../../styles/navigation-drawer.css";
 
 // Import the NotificationProvider (which is now a placeholder function)
 import { NotificationProvider } from "@/redux/features/notifications/NotificationProvider";
+
+// Componente Loading Spinner elegante
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[400px]">
+    <div className="flex flex-col items-center gap-3">
+      <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+      <p className="text-sm text-gray-500">Caricamento...</p>
+    </div>
+  </div>
+);
 
 const MainContainer = ({
   menuItems,
@@ -205,7 +220,9 @@ const MainContainer = ({
                   path="/admin/dashboard"
                   element={
                     <ProtectedRoute>
-                      <AdminDashboard onExit={navigateToPreviousLevel} />
+                      <Suspense fallback={<PageLoader />}>
+                        <AdminDashboard onExit={navigateToPreviousLevel} />
+                      </Suspense>
                     </ProtectedRoute>
                   }
                 />
@@ -213,9 +230,11 @@ const MainContainer = ({
                   path="/progetti/dashboard"
                   element={
                     <ProtectedRoute>
-                      <ProjectManagementSplitView
-                        onExit={navigateToPreviousLevel}
-                      />
+                      <Suspense fallback={<PageLoader />}>
+                        <ProjectManagementSplitView
+                          onExit={navigateToPreviousLevel}
+                        />
+                      </Suspense>
                     </ProtectedRoute>
                   }
                 />
@@ -223,7 +242,9 @@ const MainContainer = ({
                   path="/progetti/attivita"
                   element={
                     <ProtectedRoute>
-                      <MyTasksPage onExit={navigateToPreviousLevel} />
+                      <Suspense fallback={<PageLoader />}>
+                        <MyTasksPage onExit={navigateToPreviousLevel} />
+                      </Suspense>
                     </ProtectedRoute>
                   }
                 />
@@ -263,7 +284,9 @@ const MainContainer = ({
                   path="/progetti/articoli/bom-costing"
                   element={
                     <ProtectedRoute>
-                      <BOMCosting onExit={navigateToPreviousLevel} />
+                      <Suspense fallback={<PageLoader />}>
+                        <BOMCosting onExit={navigateToPreviousLevel} />
+                      </Suspense>
                     </ProtectedRoute>
                   }
                 />
