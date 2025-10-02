@@ -245,6 +245,90 @@ const batchCalculateBOMCosting = async (companyId, bomIds, options = {}) => {
     }
 };
 
+// Salva lo storico dei parametri di costificazione con ricarichi custom BOM-specific
+const saveBOMCostingHistory = async (companyId, bomId, costingData, userId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+
+        const request = pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('BOMId', sql.BigInt, bomId)
+            .input('OrderQuantity', sql.Decimal(18, 5), costingData.orderQuantity || null)
+            .input('ScrapPercentage', sql.Float, costingData.scrapPercentage || null)
+            .input('UseGranularMarkups', sql.Bit, costingData.useGranularMarkups ? 1 : 0)
+            .input('UpdateBOMRecord', sql.Bit, costingData.updateBOMRecord ? 1 : 0)
+            .input('ParametersSnapshot', sql.NVarChar(sql.MAX), costingData.parametersSnapshot || null)
+            .input('RMCost', sql.Float, costingData.rmCost || null)
+            .input('ProcessingCost', sql.Float, costingData.processingCost || null)
+            .input('TotalCost', sql.Float, costingData.totalCost || null)
+            .input('TotalPrice', sql.Float, costingData.totalPrice || null)
+            .input('CalculatedBy', sql.Int, userId)
+            .input('Notes', sql.NVarChar(sql.MAX), costingData.notes || null);
+
+        // Aggiungi ricarichi custom BOM-specific se presenti
+        if (costingData.customMarkups) {
+            const cm = costingData.customMarkups;
+            request
+                .input('CustomMarkupRM', sql.Float, cm.markupRM || null)
+                .input('CustomMarkupRMPurchase', sql.Float, cm.markupRMPurchase || null)
+                .input('CustomMarkupRMProduction', sql.Float, cm.markupRMProduction || null)
+                .input('CustomMarkupOperations', sql.Float, cm.markupOperations || null)
+                .input('CustomMarkupInternalOps', sql.Float, cm.markupInternalOps || null)
+                .input('CustomMarkupExternalOps', sql.Float, cm.markupExternalOps || null)
+                .input('CustomMarkupOverhead', sql.Float, cm.markupOverhead || null)
+                .input('CustomMarkupsJSON', sql.NVarChar(sql.MAX), cm.customMarkupsJSON || null);
+        } else {
+            // Se non ci sono ricarichi custom, passa NULL per tutti
+            request
+                .input('CustomMarkupRM', sql.Float, null)
+                .input('CustomMarkupRMPurchase', sql.Float, null)
+                .input('CustomMarkupRMProduction', sql.Float, null)
+                .input('CustomMarkupOperations', sql.Float, null)
+                .input('CustomMarkupInternalOps', sql.Float, null)
+                .input('CustomMarkupExternalOps', sql.Float, null)
+                .input('CustomMarkupOverhead', sql.Float, null)
+                .input('CustomMarkupsJSON', sql.NVarChar(sql.MAX), null);
+        }
+
+        const result = await request.execute('SP_SaveBOMCostingHistory');
+
+        return {
+            success: true,
+            message: 'Storico parametri salvato con successo',
+            data: result.recordset[0]
+        };
+    } catch (err) {
+        console.error('Error in saveBOMCostingHistory:', err);
+        throw err;
+    }
+};
+
+// Ottieni lo storico dei parametri di costificazione
+const getBOMCostingParametersHistory = async (companyId, bomId = null, top = null, orderBy = 'CostingDate DESC') => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+
+        const request = pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('OrderBy', sql.NVarChar(50), orderBy);
+
+        if (bomId !== null) {
+            request.input('BOMId', sql.BigInt, bomId);
+        }
+
+        if (top !== null) {
+            request.input('Top', sql.Int, top);
+        }
+
+        const result = await request.execute('SP_GetBOMCostingHistory');
+
+        return result.recordset;
+    } catch (err) {
+        console.error('Error in getBOMCostingParametersHistory:', err);
+        throw err;
+    }
+};
+
 // Ottieni log delle costificazioni
 const getBOMCostingLogs = async (companyId, bomId = null, logLevel = null, limit = 100) => {
     try {
@@ -712,12 +796,14 @@ module.exports = {
     updateBOMCostingParameter,
     calculateBOMCosting,
     batchCalculateBOMCosting,
+    saveBOMCostingHistory,
+    getBOMCostingParametersHistory,
+    getBOMCostingHistory,
     getBOMCostingLogs,
     getAvailableBOMs,
     exportBOMCostingResult,
     getBOMCostingDetails,
     searchBOMCostingHistory,
-    getBOMCostingHistory,
     getBOMOperationsCostBreakdown,
     testBOMCostingExample,
     getBOMVersions
