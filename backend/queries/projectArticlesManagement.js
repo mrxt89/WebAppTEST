@@ -1284,18 +1284,12 @@ const getAvailableItems = async (companyId, projectId) => {
             .input('CompanyId', sql.Int, companyId)
             .input('ProjectId', sql.Int, projectId)
             .query(`
-                SELECT i.*
-                FROM dbo.MA_ProjectArticles_Items i
-                WHERE i.CompanyId = @CompanyId 
-                AND i.Disabled = 0
-                AND NOT EXISTS (
-                    SELECT 1 
-                    FROM dbo.MA_ProjectsItems p 
-                    WHERE p.ItemId = i.Id 
-                    AND p.ProjectID = @ProjectId
-                )
-                AND ( i.stato_erp = 0 OR i.stato_erp IS NULL )
-                ORDER BY i.Item
+                 SELECT i.*
+FROM dbo.MA_ProjectArticles_Items i
+WHERE i.CompanyId = @CompanyId 
+AND i.Disabled = 0
+AND NOT EXISTS ( SELECT * FROM MA_Items WHERE CompanyId = @CompanyId AND Item = i.Item)
+ORDER BY i.Item
             `);
         
         return result.recordset;
@@ -2137,7 +2131,10 @@ const getBOMVersions = async (companyId, itemId) => {
         .input('ItemId', sql.BigInt, itemId)
         .query(`
           SELECT 
-            Id, BOM, Version, Description
+            Id, BOM, Version, Description, BOMStatus,
+            TotalCost as LastCalculatedCost,
+            TBCreated as CreatedDate,
+            TBCreated as ModifiedDate
           FROM dbo.MA_ProjectArticles_BillOfMaterials
           WHERE CompanyId = @CompanyId AND ItemId = @ItemId
           ORDER BY Version DESC
@@ -2312,7 +2309,18 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         const sourceItemCode = importData.sourceItem.Item || importData.sourceItem.BOM || '';
         const sourceItemDescription = importData.sourceItem.Description || '';
         
-
+        // Estrai le informazioni della versione BOM selezionata
+        const sourceBOMId = importData.sourceBOMId || null;
+        const sourceBOMVersion = importData.sourceBOMVersion || null;
+        
+        console.log('Import data:', {
+            sourceItemCode,
+            sourceItemDescription,
+            sourceBOMId,
+            sourceBOMVersion,
+            createNewBOM: importData.createNewBOM,
+            componentsCount: importData.components?.length || 0
+        });
         
         // IMPORTANTE: Definisci il tipo di tabella TVP
         const tvp = new sql.Table('SelectedComponentsTableType');
@@ -2351,6 +2359,14 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         request.input('SourceItemDescription', sql.NVarChar(128), sourceItemDescription);
         request.input('CreateNewBOM', sql.Bit, importData.createNewBOM ? 1 : 0);
         request.input('SelectedComponents', tvp);
+        
+        // Aggiungi i parametri per la versione BOM selezionata
+        if (sourceBOMId) {
+            request.input('SourceBOMId', sql.BigInt, sourceBOMId);
+        }
+        if (sourceBOMVersion) {
+            request.input('SourceBOMVersion', sql.Int, sourceBOMVersion);
+        }
         
         // Parametri di output
         request.output('ReturnItemId', sql.BigInt);

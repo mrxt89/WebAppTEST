@@ -243,10 +243,17 @@ const ArticleSelectionModal = ({
       
       console.log('Wizard confirm - Import data:', importData);
       
+      // Aggiungi le informazioni della versione BOM selezionata
+      const enhancedImportData = {
+        ...importData,
+        sourceBOMId: importData.selectedBOMVersion?.Id, // BOMId della versione selezionata
+        sourceBOMVersion: importData.selectedBOMVersion?.Version, // Versione selezionata
+      };
+      
       // Usa importERPItemWithSelection direttamente
       const result = await importERPItemWithSelection(
         project.ProjectID,
-        importData
+        enhancedImportData
       );
 
       console.log('Import result:', result);
