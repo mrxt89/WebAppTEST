@@ -32,7 +32,6 @@ import {
   Eye, 
   RefreshCw, 
   FileText, 
-  DollarSign, 
   Package, 
   Wrench, 
   TrendingUp, 
@@ -56,6 +55,7 @@ import { useCompany } from '@/context/CompanyContext';
 import axios from '@/lib/axios';
 import UtilityManagement from './BOMCosting/components/UtilityManagement';
 import CostTreeView from './BOMCosting/components/CostTreeView';
+import CostTreeModal from './BOMCosting/components/CostTreeModal';
 import BOMViewer from './BOMViewer';
 import {
   parseBOMCostingDetails,
@@ -90,13 +90,6 @@ const BOMCosting = ({ selectedItem }) => {
     hasPreviousPage: false
   });
   
-  // Stati per modal dettaglio costi
-  const [costDetailModal, setCostDetailModal] = useState({
-    isOpen: false,
-    type: null, // 'materials', 'operations', 'base', 'final'
-    loading: false,
-    data: null
-  });
 
   // Stato per visualizzazione albero costi
   const [showCostTree, setShowCostTree] = useState(false);
@@ -711,7 +704,119 @@ const BOMCosting = ({ selectedItem }) => {
     }
   };
 
-  // Carica i dati per l'albero dei costi
+  // Carica i dati per l'albero dei costi per una BOM specifica (usato dal pulsante Dettaglio nella tabella)
+  const loadCostTreeForBOM = async (bomId, bomData) => {
+    if (!bomId) return;
+
+    try {
+      setLoadingTree(true);
+
+      console.log('Loading cost tree for BOM:', bomId);
+
+      // Facciamo un calcolo con debug=true per ottenere i dettagli
+      const requestData = {
+        useGranularMarkups: costingOptions.useGranularMarkups,
+        updateBOMRecord: false, // Non aggiorniamo la BOM, solo visualizziamo
+        debug: true // IMPORTANTE: chiediamo i dettagli componenti
+      };
+
+      if (costingOptions.orderQuantity) {
+        requestData.orderQuantity = parseFloat(costingOptions.orderQuantity);
+      }
+
+      if (costingOptions.scrapPercentage) {
+        requestData.scrapPercentage = parseFloat(costingOptions.scrapPercentage) / 100;
+      }
+
+      console.log('Calling /bom-costing/calculate with:', requestData);
+
+      const costResponse = await axios.post(`/bom-costing/calculate/${bomId}`, requestData);
+
+      console.log('Cost response:', costResponse.data);
+
+      if (costResponse.data.success) {
+        // Carica anche la struttura BOM
+        const bomResponse = await axios.get(`/projectArticles/boms/${bomId}`, {
+          params: {
+            action: 'GET_BOM_MULTILEVEL',
+            maxLevel: 10,
+            expandPhantoms: true,
+            includeRouting: true
+          }
+        });
+
+        const bomStructure = bomResponse.data.data || bomResponse.data;
+
+        if (bomStructure && (bomStructure.components || bomStructure.routing)) {
+          const bomComponents = bomStructure.components || [];
+          const bomRouting = bomStructure.routing || [];
+          const costComponents = costResponse.data.data.components || [];
+
+          // Crea una mappa dei costi per ComponentId
+          const costMap = new Map();
+          costComponents.forEach(comp => {
+            costMap.set(comp.ComponentId?.toString(), comp);
+          });
+
+          // Arricchisci i componenti BOM con i dati di costo
+          const enrichedComponents = bomComponents.map(bomComp => {
+            const costData = costMap.get(bomComp.ComponentId?.toString());
+
+            if (costData) {
+              return {
+                ...bomComp,
+                TotalCost: costData.TotalCost || costData.CalculatedTotalCost || 0,
+                UnitCost: costData.UnitCost || 0,
+                MaterialCost: costData.MaterialCost || 0,
+                OperationCost: costData.OperationCost || 0,
+                FixedCost: costData.FixedCost || 0,
+                ScrapPercentage: costData.ScrapPercentage || 0
+              };
+            }
+
+            return bomComp;
+          });
+
+          // Aggiungi i cicli ai componenti
+          const componentsWithCycles = enrichedComponents.map(comp => {
+            const compCycles = bomRouting.filter(route =>
+              route.BOMId?.toString() === comp.BOMId?.toString() ||
+              route.ComponentId?.toString() === comp.ComponentId?.toString()
+            );
+
+            return {
+              ...comp,
+              operations: comp.operations || compCycles || []
+            };
+          });
+
+          const finalTreeData = {
+            ...costResponse.data.data,
+            components: componentsWithCycles,
+            routing: bomRouting,
+            bomCode: bomData?.ItemCode || bomData?.BOMCode,
+            bomDescription: bomData?.ItemDescription || bomData?.Description
+          };
+
+          console.log('TreeData assembled:', finalTreeData);
+
+          setTreeData(finalTreeData);
+          setShowCostTree(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading cost tree for BOM:', error);
+      swal.fire({
+        title: 'Errore',
+        text: 'Errore nel caricamento dell\'albero costi',
+        icon: 'error'
+      });
+    } finally {
+      setLoadingTree(false);
+    }
+  };
+
+  // Carica i dati per l'albero dei costi (usato dalla scheda Risultati)
   const loadCostTree = async () => {
     if (!selectedBOM || !costingResult) return;
 
@@ -1050,58 +1155,6 @@ const BOMCosting = ({ selectedItem }) => {
     loadAvailableBOMs(1, pagination.pageSize);
   };
 
-  // Funzione per aprire il modal di dettaglio costi
-  const openCostDetailModal = async (type) => {
-    if (!selectedBOM) {
-      swal.fire({
-        title: 'Attenzione',
-        text: 'Seleziona prima una BOM',
-        icon: 'warning'
-      });
-      return;
-    }
-
-    setCostDetailModal({
-      isOpen: true,
-      type,
-      loading: true,
-      data: null
-    });
-
-    try {
-      const response = await axios.get(`/bom-costing/details/${selectedBOM.Id}`);
-      
-      if (response.data.success) {
-        setCostDetailModal(prev => ({
-          ...prev,
-          loading: false,
-          data: response.data.data
-        }));
-      }
-    } catch (error) {
-      console.error('Error loading cost details:', error);
-      setCostDetailModal(prev => ({
-        ...prev,
-        loading: false,
-        data: null
-      }));
-      swal.fire({
-        title: 'Errore',
-        text: 'Errore nel caricamento del dettaglio costi',
-        icon: 'error'
-      });
-    }
-  };
-
-  // Funzione per chiudere il modal
-  const closeCostDetailModal = () => {
-    setCostDetailModal({
-      isOpen: false,
-      type: null,
-      loading: false,
-      data: null
-    });
-  };
 
   // Funzioni per cronologia costi
   const searchCostHistory = async (page = costHistory.pagination.page, pageSize = costHistory.pagination.pageSize) => {
@@ -1329,7 +1382,7 @@ const BOMCosting = ({ selectedItem }) => {
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Filtri */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
                   <Label htmlFor="searchText">Ricerca</Label>
                   <Input
@@ -1367,24 +1420,27 @@ const BOMCosting = ({ selectedItem }) => {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex flex-col justify-end">
+                  <Button onClick={handleFilterChange} disabled={loading} className="flex items-center">
+                    {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Cerca BOM
+                  </Button>
+                </div>
+                <div className="flex flex-col justify-end">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setFilters({searchText: '', bomStatus: '', nature: 'all'});
+                      handleFilterChange();
+                    }}
+                    disabled={loading}
+                  >
+                    Reset Filtri
+                  </Button>
+                </div>
               </div>
 
-              <div className="flex space-x-2">
-                <Button onClick={handleFilterChange} disabled={loading}>
-                  {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Cerca BOM
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setFilters({searchText: '', bomStatus: '', nature: 'all'});
-                    handleFilterChange();
-                  }}
-                  disabled={loading}
-                >
-                  Reset Filtri
-                </Button>
-              </div>
+
 
               {/* Opzioni di calcolo - Draggable Panel */}
               {selectedBOM && (
@@ -1487,9 +1543,9 @@ const BOMCosting = ({ selectedItem }) => {
 
               {/* Lista BOM */}
               {availableBOMs.length > 0 && (
-                <div className={selectedBOM ? "pt-4" : ""}>
+                <div className={selectedBOM ? "" : ""}>
                 <div className="space-y-4">
-                  <div className="border rounded-lg overflow-x-auto">
+                  <div className="border rounded-lg overflow-x-auto max-h-[60vh] overflow-y-auto" style={{ minWidth: '800px' }}>
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1498,14 +1554,9 @@ const BOMCosting = ({ selectedItem }) => {
                           <TableHead>Descrizione</TableHead>
                           <TableHead>Articolo</TableHead>
                           <TableHead>Natura</TableHead>
-                          <TableHead>Stato</TableHead>
                           <TableHead>Versione</TableHead>
                           <TableHead>Stato ERP</TableHead>
                           <TableHead>Costo Totale</TableHead>
-                          <TableHead>Materiali</TableHead>
-                          <TableHead>Operazioni</TableHead>
-                          <TableHead>Costi Fissi</TableHead>
-                          <TableHead>Ricarichi</TableHead>
                           <TableHead>Azioni</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1534,12 +1585,9 @@ const BOMCosting = ({ selectedItem }) => {
                             </TableCell>
                             <TableCell>
                               <Badge variant={bom.NatureDescription === 'Prodotto Finito' ? 'default' : 'bg-info-subtle'}>
-                                {bom.NatureDescription}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={bom.BOMStatus === 'ATTIVA' ? 'default' : 'bg-info-subtle'}>
-                                {bom.BOMStatus}
+                                {bom.NatureDescription === 'Prodotto Finito' ? 'PF' : 
+                                 bom.NatureDescription === 'Semilavorato' ? 'SML' : 
+                                 bom.NatureDescription === 'Acquisto' ? 'MP' : bom.NatureDescription}
                               </Badge>
                             </TableCell>
                             <TableCell>
@@ -1553,24 +1601,11 @@ const BOMCosting = ({ selectedItem }) => {
                               </Badge>
                             </TableCell>
                             <TableCell>{formatCurrency(bom.LastCalculatedCost)}</TableCell>
-                            <TableCell>{formatCurrency(bom.LastMaterialCost || 0)}</TableCell>
-                            <TableCell>{formatCurrency(bom.LastProcessingCost || 0)}</TableCell>
-                            <TableCell>{formatCurrency(bom.LastMaterialRefillCost || 0)}</TableCell>
-                            <TableCell className="font-medium text-orange-600">
-                              {formatCurrency(
-                                (bom.LastMaterialRefillCost || 0) +
-                                (bom.LastProcessingRefillCost || 0) +
-                                (bom.LastTransportRefillCost || 0) +
-                                (bom.LastWasteRefillCost || 0) +
-                                (bom.LastTotalRefillCost || 0) +
-                                (bom.LastDiscountRefillCost || 0)
-                              )}
-                            </TableCell>
                             <TableCell>
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => loadCostHistoryDetails(bom.Id)}
+                                onClick={() => loadCostTreeForBOM(bom.Id, bom)}
                               >
                                 <Eye className="h-4 w-4 mr-1" />
                                 Dettaglio
@@ -1674,13 +1709,7 @@ const BOMCosting = ({ selectedItem }) => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    if (showCostTree) {
-                      setShowCostTree(false);
-                    } else {
-                      loadCostTree();
-                    }
-                  }}
+                  onClick={() => loadCostTree()}
                   disabled={loadingTree}
                   className="flex items-center gap-2"
                 >
@@ -1689,24 +1718,23 @@ const BOMCosting = ({ selectedItem }) => {
                   ) : (
                     <TrendingUp className="h-4 w-4" />
                   )}
-                  {showCostTree ? 'Nascondi dettaglio costi' : 'Visualizza dettaglio costi'}
+                  Visualizza dettaglio costi
                 </Button>
               </div>
 
-              {/* Riepilogo Principale - nascosto quando si visualizza il dettaglio */}
-              {!showCostTree && (
+              {/* Riepilogo Principale */}
+              {(
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
-                      <DollarSign className="h-5 w-5 mr-2" />
-                      Risultato Costificazione
+                      <span className="text-lg mr-2">€</span>
+                      Risultato Costificazione - {selectedBOM?.BOMCode || 'N/A'}
                     </CardTitle>
                   </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                    <div 
-                      className="bg-blue-50 p-4 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
-                      onClick={() => openCostDetailModal('materials')}
+                    <div
+                      className="bg-blue-50 p-4 rounded-lg"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -1722,9 +1750,8 @@ const BOMCosting = ({ selectedItem }) => {
                       </div>
                     </div>
 
-                    <div 
-                      className="bg-green-50 p-4 rounded-lg cursor-pointer hover:bg-green-100 transition-colors"
-                      onClick={() => openCostDetailModal('operations')}
+                    <div
+                      className="bg-green-50 p-4 rounded-lg"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -1740,9 +1767,8 @@ const BOMCosting = ({ selectedItem }) => {
                       </div>
                     </div>
 
-                    <div 
-                      className="bg-gray-50 p-4 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-                      onClick={() => openCostDetailModal('fixed-costs')}
+                    <div
+                      className="bg-gray-50 p-4 rounded-lg"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -1761,9 +1787,8 @@ const BOMCosting = ({ selectedItem }) => {
                       </div>
                     </div>
 
-                    <div 
-                      className="bg-orange-50 p-4 rounded-lg cursor-pointer hover:bg-orange-100 transition-colors"
-                      onClick={() => openCostDetailModal('markups')}
+                    <div
+                      className="bg-orange-50 p-4 rounded-lg"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -1786,9 +1811,8 @@ const BOMCosting = ({ selectedItem }) => {
                       </div>
                     </div>
 
-                    <div 
-                      className="bg-purple-50 p-4 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors"
-                      onClick={() => openCostDetailModal('total')}
+                    <div
+                      className="bg-purple-50 p-4 rounded-lg"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -1808,11 +1832,6 @@ const BOMCosting = ({ selectedItem }) => {
 
                 </CardContent>
                 </Card>
-              )}
-
-              {/* Dettaglio costi */}
-              {showCostTree && treeData && (
-                <CostTreeView costingResult={treeData} />
               )}
 
               {/* Dettaglio Componenti (se debug abilitato) */}
@@ -1903,613 +1922,13 @@ const BOMCosting = ({ selectedItem }) => {
         </TabsContent>
       </Tabs>
 
-      {/* Modal Dettaglio Costi */}
-      {costDetailModal.isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 pt-20">
-          <div className="bg-white rounded-lg max-w-5xl w-full h-[80vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-xl font-semibold">
-                Dettaglio {costDetailModal.type === 'materials' ? 'Materiali' :
-                          costDetailModal.type === 'operations' ? 'Operazioni' :
-                          costDetailModal.type === 'fixed-costs' ? 'Costi Fissi' :
-                          costDetailModal.type === 'markups' ? 'Ricarichi' :
-                          costDetailModal.type === 'total' ? 'Totale' :
-                          costDetailModal.type === 'history' ? 'Costi Storici' : 'Costi'} 
-                {costDetailModal.type === 'history' && ' (Aggiornati)'}
-              </h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={closeCostDetailModal}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Card di navigazione per il modal */}
-            {costDetailModal.data && (
-              <div className="px-6 py-4 border-b bg-gray-50">
-                <div className="grid grid-cols-5 gap-2">
-                  <button
-                    onClick={() => setCostDetailModal(prev => ({ ...prev, type: 'materials' }))}
-                    className={`p-3 rounded-lg text-center transition-colors ${
-                      costDetailModal.type === 'materials' 
-                        ? 'bg-blue-100 text-blue-700 border-2 border-blue-300' 
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Package className="h-5 w-5 mx-auto mb-1" />
-                    <div className="text-xs font-medium">Materiali</div>
-                  </button>
-                  
-                  <button
-                    onClick={() => setCostDetailModal(prev => ({ ...prev, type: 'operations' }))}
-                    className={`p-3 rounded-lg text-center transition-colors ${
-                      costDetailModal.type === 'operations' 
-                        ? 'bg-green-100 text-green-700 border-2 border-green-300' 
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Wrench className="h-5 w-5 mx-auto mb-1" />
-                    <div className="text-xs font-medium">Operazioni</div>
-                  </button>
-                  
-                  <button
-                    onClick={() => setCostDetailModal(prev => ({ ...prev, type: 'fixed-costs' }))}
-                    className={`p-3 rounded-lg text-center transition-colors ${
-                      costDetailModal.type === 'fixed-costs' 
-                        ? 'bg-gray-100 text-gray-700 border-2 border-gray-300' 
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Settings className="h-5 w-5 mx-auto mb-1" />
-                    <div className="text-xs font-medium">Costi Fissi</div>
-                  </button>
-                  
-                  <button
-                    onClick={() => setCostDetailModal(prev => ({ ...prev, type: 'markups' }))}
-                    className={`p-3 rounded-lg text-center transition-colors ${
-                      costDetailModal.type === 'markups' 
-                        ? 'bg-orange-100 text-orange-700 border-2 border-orange-300' 
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <TrendingUp className="h-5 w-5 mx-auto mb-1" />
-                    <div className="text-xs font-medium">Ricarichi</div>
-                  </button>
-                  
-                  <button
-                    onClick={() => setCostDetailModal(prev => ({ ...prev, type: 'total' }))}
-                    className={`p-3 rounded-lg text-center transition-colors ${
-                      costDetailModal.type === 'total' 
-                        ? 'bg-purple-100 text-purple-700 border-2 border-purple-300' 
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <DollarSign className="h-5 w-5 mx-auto mb-1" />
-                    <div className="text-xs font-medium">Totale</div>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="p-6 overflow-y-auto h-[calc(80vh-200px)]">
-              {costDetailModal.loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin mr-2" />
-                  <span>Caricamento dettagli...</span>
-                </div>
-              ) : costDetailModal.data ? (
-                <div className="space-y-6">
-
-                  {/* Dettaglio Componenti (per materiali e cronologia) */}
-                  {(costDetailModal.type === 'materials' || costDetailModal.type === 'history') && costDetailModal.data.components && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Componenti e Materiali</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Linea</TableHead>
-                                <TableHead>Codice</TableHead>
-                                <TableHead>Descrizione</TableHead>
-                                <TableHead>Livello</TableHead>
-                                <TableHead>Qtà</TableHead>
-                                <TableHead>UM</TableHead>
-                                <TableHead>Costo Unit.</TableHead>
-                                <TableHead>Costo Fisso</TableHead>
-                                <TableHead>Costo Tot.</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {sortComponentsByBOMStructure(costDetailModal.data.components).map((comp, index) => (
-                                <TableRow key={`${comp.ComponentId || 'comp'}-${comp.ComponentLine || 'line'}-${comp.ItemCode || 'item'}-${index}`}>
-                                  <TableCell>{comp.ComponentLine}</TableCell>
-                                  <TableCell className="font-medium">{comp.ItemCode}</TableCell>
-                                  <TableCell>{comp.ItemDescription}</TableCell>
-                                  <TableCell>
-                                    <Badge 
-                                      variant="outline" 
-                                      className={comp.displayLevel === 1 ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}
-                                    >
-                                      L{comp.displayLevel}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>{comp.Quantity?.toFixed(2)}</TableCell>
-                                  <TableCell>{comp.UoM}</TableCell>
-                                  <TableCell>{formatCurrency(comp.UnitCost)}</TableCell>
-                                  <TableCell>{formatCurrency(comp.FixedCost)}</TableCell>
-                                  <TableCell className="font-medium">{formatCurrency(comp.CalculatedTotalCost)}</TableCell>
-                                </TableRow>
-                              ))}
-                              
-                              {/* Riga di totali per materiali */}
-                              <TableRow className="bg-gray-50 font-semibold border-t-2">
-                                <TableCell colSpan="4" className="text-right font-bold">
-                                  TOTALE
-                                </TableCell>
-                                <TableCell className="font-bold">
-                                  {costDetailModal.data.components.reduce((sum, comp) => sum + (comp.Quantity || 0), 0).toFixed(2)}
-                                </TableCell>
-                                <TableCell></TableCell>
-                                <TableCell className="font-bold">
-                                  {formatCurrency(costDetailModal.data.components.reduce((sum, comp) => sum + (comp.UnitCost || 0), 0))}
-                                </TableCell>
-                                <TableCell className="font-bold">
-                                  {formatCurrency(costDetailModal.data.components.reduce((sum, comp) => sum + (comp.FixedCost || 0), 0))}
-                                </TableCell>
-                                <TableCell className="font-bold text-green-600">
-                                  {formatCurrency(costDetailModal.data.components.reduce((sum, comp) => sum + (comp.CalculatedTotalCost || 0), 0))}
-                                </TableCell>
-                              </TableRow>
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Dettaglio Costi Storici (per cronologia) */}
-                  {costDetailModal.type === 'history' && costDetailModal.data.bomInfo && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Riepilogo Costi Aggiornati</CardTitle>
-                        <p className="text-sm text-gray-600">
-                          Costi calcolati in tempo reale senza aggiornare la BOM
-                        </p>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="bg-blue-50 p-4 rounded-lg">
-                            <div className="flex items-center">
-                              <Package className="h-8 w-8 text-blue-600" />
-                              <div className="ml-3">
-                                <p className="text-sm font-medium text-blue-600">Materiali</p>
-                                <p className="text-2xl font-bold text-blue-900">
-                                  {formatCurrency(costDetailModal.data.bomInfo.LastMaterialCost)}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="bg-green-50 p-4 rounded-lg">
-                            <div className="flex items-center">
-                              <Wrench className="h-8 w-8 text-green-600" />
-                              <div className="ml-3">
-                                <p className="text-sm font-medium text-green-600">Operazioni</p>
-                                <p className="text-2xl font-bold text-green-900">
-                                  {formatCurrency(costDetailModal.data.bomInfo.LastProcessingCost)}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="bg-purple-50 p-4 rounded-lg">
-                            <div className="flex items-center">
-                              <Calculator className="h-8 w-8 text-purple-600" />
-                              <div className="ml-3">
-                                <p className="text-sm font-medium text-purple-600">Costo Totale</p>
-                                <p className="text-2xl font-bold text-purple-900">
-                                  {formatCurrency(costDetailModal.data.bomInfo.LastCalculatedCost)}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Dettaglio Ricarichi Aggiornati */}
-                        <div className="mt-6">
-                          <h4 className="text-md font-semibold mb-4">Ricarichi Aggiornati</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div className="bg-orange-50 p-3 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-orange-600">Ricarico MP</span>
-                                <span className="text-lg font-bold text-orange-900">
-                                  {formatCurrency(costDetailModal.data.bomInfo.LastMaterialRefillCost || 0)}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="bg-yellow-50 p-3 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-yellow-600">Ricarico OPE</span>
-                                <span className="text-lg font-bold text-yellow-900">
-                                  {formatCurrency(costDetailModal.data.bomInfo.LastProcessingRefillCost || 0)}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="bg-red-50 p-3 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-red-600">Ricarico Trasporto</span>
-                                <span className="text-lg font-bold text-red-900">
-                                  {formatCurrency(costDetailModal.data.bomInfo.LastTransportRefillCost || 0)}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="bg-gray-50 p-3 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-gray-600">Ricarico Scarto</span>
-                                <span className="text-lg font-bold text-gray-900">
-                                  {formatCurrency(costDetailModal.data.bomInfo.LastWasteRefillCost || 0)}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="bg-indigo-50 p-3 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-indigo-600">Ricarico Totale</span>
-                                <span className="text-lg font-bold text-indigo-900">
-                                  {formatCurrency(costDetailModal.data.bomInfo.LastTotalRefillCost || 0)}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="bg-pink-50 p-3 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-pink-600">Ricarico Sconto</span>
-                                <span className="text-lg font-bold text-pink-900">
-                                  {formatCurrency(costDetailModal.data.bomInfo.LastDiscountRefillCost || 0)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Dettaglio Operazioni (per operazioni e cronologia) */}
-                  {(costDetailModal.type === 'operations' || costDetailModal.type === 'history') && costDetailModal.data.routing && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Operazioni e Routing</CardTitle>
-                        {costingResult && (
-                          <p className="text-sm text-gray-600 mt-1">
-                            Lotto di Produzione: <span className="font-medium">{costingResult.costing.production_lot} pz</span>
-                          </p>
-                        )}
-                      </CardHeader>
-                      <CardContent>
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Ciclo</TableHead>
-                                <TableHead>Operazione</TableHead>
-                                <TableHead>Centro di Lavoro</TableHead>
-                                <TableHead>Costo Orario</TableHead>
-                                <TableHead>Setup (h)</TableHead>
-                                <TableHead>Processing (h)</TableHead>
-                                <TableHead>Costo Setup</TableHead>
-                                <TableHead>Costo Processing</TableHead>
-                                <TableHead>Costo Tot.</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {costDetailModal.data.routing.map((rt, index) => (
-                                <TableRow key={`${rt.RoutingId || 'routing'}-${rt.CycleNumber || 'cycle'}-${rt.OperationCode || 'op'}-${index}`}>
-                                  <TableCell>{rt.CycleNumber}</TableCell>
-                                  <TableCell className="font-medium">{rt.OperationCode}</TableCell>
-                                  <TableCell>{rt.WorkCenterCode}</TableCell>
-                                  <TableCell>{formatCurrency(rt.HourlyCost)}</TableCell>
-                                  <TableCell>{rt.SetupTimeHours?.toFixed(2) || '0.00'}</TableCell>
-                                  <TableCell>{rt.ProcessingTimeHours?.toFixed(2) || '0.00'}</TableCell>
-                                  <TableCell className="italic text-gray-600">{formatCurrency(rt.SetupCost || 0)}</TableCell>
-                                  <TableCell>{formatCurrency(rt.ProcessingCost || 0)}</TableCell>
-                                  <TableCell className="font-medium">{formatCurrency(rt.ProcessingCost || 0)}</TableCell>
-                                </TableRow>
-                              ))}
-                              
-                              {/* Riga di totali per operazioni */}
-                              <TableRow className="bg-gray-50 font-semibold border-t-2">
-                                <TableCell colSpan="5" className="text-right font-bold">
-                                  TOTALE
-                                </TableCell>
-                                <TableCell className="font-bold italic text-gray-600">
-                                  {formatCurrency(costDetailModal.data.routing.reduce((sum, rt) => sum + (rt.SetupCost || 0), 0))}
-                                </TableCell>
-                                <TableCell className="font-bold">
-                                  {formatCurrency(costDetailModal.data.routing.reduce((sum, rt) => sum + (rt.ProcessingCost || 0), 0))}
-                                </TableCell>
-                                <TableCell className="font-bold text-green-600">
-                                  {formatCurrency(costDetailModal.data.routing.reduce((sum, rt) => sum + (rt.ProcessingCost || 0), 0))}
-                                </TableCell>
-                              </TableRow>
-                            </TableBody>
-                          </Table>
-                        </div>
-                        
-                        {/* Nota esplicativa */}
-                        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                          <p className="text-sm text-blue-700">
-                            <span className="font-medium">Nota:</span> I costi setup (in <em>corsivo</em>) sono costi fissi e non sono inclusi nel totale delle operazioni. 
-                            Il totale delle operazioni include solo i costi di processing (costi variabili).
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Sezione Costi Fissi */}
-                  {costDetailModal.type === 'fixed-costs' && costingResult && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Dettaglio Costi Fissi</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-purple-50 p-4 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-purple-600">Costi Fissi Totali</span>
-                                <span className="text-lg font-bold text-purple-900">
-                                  {formatCurrency(costingResult.costing.total_fixed_costs)}
-                                </span>
-                              </div>
-                              <p className="text-xs text-purple-600 mt-1">
-                                Costi fissi per l'intero lotto
-                              </p>
-                            </div>
-                            
-                            <div className="bg-purple-50 p-4 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-purple-600">Costi Fissi per Pezzo</span>
-                                <span className="text-lg font-bold text-purple-900">
-                                  {formatCurrency(costingResult.costing.fixed_costs_per_lot)}
-                                </span>
-                              </div>
-                              <p className="text-xs text-purple-600 mt-1">
-                                Costi fissi divisi per lotto di produzione
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                            <h4 className="font-medium text-gray-700 mb-2">Composizione Costi Fissi</h4>
-                            <div className="space-y-2 text-sm">
-                              <div className="flex justify-between">
-                                <span>Costi fissi componenti:</span>
-                                <span>{formatCurrency(costingResult.costing.total_fixed_costs - (costingResult.costing.fixed_costs_operations || 0))}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Costi fissi operazioni (setup):</span>
-                                <span>{formatCurrency(costingResult.costing.fixed_costs_operations || 0)}</span>
-                              </div>
-                              <div className="flex justify-between font-medium border-t pt-2">
-                                <span>Totale costi fissi:</span>
-                                <span>{formatCurrency(costingResult.costing.total_fixed_costs)}</span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                            <h4 className="font-medium text-blue-700 mb-2">Informazioni Lotto</h4>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="text-blue-600">Lotto di produzione:</span>
-                                <span className="ml-2 font-medium">{costingResult.costing.production_lot} pz</span>
-                              </div>
-                              <div>
-                                <span className="text-blue-600">Costo fisso per pezzo:</span>
-                                <span className="ml-2 font-medium">{formatCurrency(costingResult.costing.fixed_costs_per_lot)}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Sezione Ricarichi */}
-                  {costDetailModal.type === 'markups' && costingResult && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Dettaglio Ricarichi</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-blue-50 p-4 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-blue-600">Ricarico MP</span>
-                                <span className="text-lg font-bold text-blue-900">
-                                  {formatCurrency(costingResult.costing.ricarico_mp_amount)}
-                                </span>
-                              </div>
-                              <p className="text-xs text-blue-600 mt-1">
-                                {formatPercentage(costingResult.costing.ricarico_mp_pct)} sui materiali
-                              </p>
-                            </div>
-                            <div className="bg-green-50 p-4 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-green-600">Ricarico OPE</span>
-                                <span className="text-lg font-bold text-green-900">
-                                  {formatCurrency(costingResult.costing.ricarico_ope_amount)}
-                                </span>
-                              </div>
-                              <p className="text-xs text-green-600 mt-1">
-                                {formatPercentage(costingResult.costing.ricarico_ope_pct)} sulle operazioni
-                              </p>
-                            </div>
-                            <div className="bg-yellow-50 p-4 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-yellow-600">Ricarico Trasporto</span>
-                                <span className="text-lg font-bold text-yellow-900">
-                                  {formatCurrency(costingResult.costing.ricarico_trasporto_amount)}
-                                </span>
-                              </div>
-                              <p className="text-xs text-yellow-600 mt-1">
-                                {formatPercentage(costingResult.costing.ricarico_trasporto_pct)} sui costi variabili
-                              </p>
-                            </div>
-                            <div className="bg-red-50 p-4 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-red-600">Ricarico Scarto</span>
-                                <span className="text-lg font-bold text-red-900">
-                                  {formatCurrency(costingResult.costing.ricarico_scarto_amount)}
-                                </span>
-                              </div>
-                              <p className="text-xs text-red-600 mt-1">
-                                {formatPercentage(costingResult.costing.ricarico_scarto_pct)} sui costi variabili
-                              </p>
-                            </div>
-                            <div className="bg-purple-50 p-4 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-purple-600">Ricarico Totale</span>
-                                <span className="text-lg font-bold text-purple-900">
-                                  {formatCurrency(costingResult.costing.ricarico_totale_amount)}
-                                </span>
-                              </div>
-                              <p className="text-xs text-purple-600 mt-1">
-                                {formatPercentage(costingResult.costing.ricarico_totale_pct)} su (variabili + ricarichi)
-                              </p>
-                            </div>
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-gray-600">Ricarico Sconto</span>
-                                <span className="text-lg font-bold text-gray-900">
-                                  {formatCurrency(costingResult.costing.ricarico_sconto_amount)}
-                                </span>
-                              </div>
-                              <p className="text-xs text-gray-600 mt-1">
-                                {formatPercentage(costingResult.costing.ricarico_sconto_pct)} sconto finale
-                              </p>
-                            </div>
-                          </div>
-                          <div className="bg-orange-50 p-4 rounded-lg border-2 border-orange-200">
-                            <div className="flex justify-between items-center">
-                              <span className="text-lg font-semibold text-orange-600">Totale Ricarichi</span>
-                              <span className="text-2xl font-bold text-orange-900">
-                                {formatCurrency(
-                                  costingResult.costing.ricarico_mp_amount +
-                                  costingResult.costing.ricarico_ope_amount +
-                                  costingResult.costing.ricarico_trasporto_amount +
-                                  costingResult.costing.ricarico_scarto_amount +
-                                  costingResult.costing.ricarico_totale_amount +
-                                  costingResult.costing.ricarico_sconto_amount
-                                )}
-                              </span>
-                            </div>
-                            <p className="text-sm text-orange-600 mt-2">
-                              Somma di tutti i ricarichi applicati
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Sezione Totale - Vista Completa */}
-                  {costDetailModal.type === 'total' && costingResult && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Vista Completa Costificazione</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-6">
-                          {/* Riepilogo Costi Base */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="bg-blue-50 p-4 rounded-lg">
-                              <div className="flex items-center">
-                                <Package className="h-6 w-6 text-blue-600 mr-2" />
-                                <div>
-                                  <p className="text-sm font-medium text-blue-600">Materiali</p>
-                                  <p className="text-xl font-bold text-blue-900">
-                                    {formatCurrency(costingResult.costing.variable_costs_material)}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="bg-green-50 p-4 rounded-lg">
-                              <div className="flex items-center">
-                                <Wrench className="h-6 w-6 text-green-600 mr-2" />
-                                <div>
-                                  <p className="text-sm font-medium text-green-600">Operazioni</p>
-                                  <p className="text-xl font-bold text-green-900">
-                                    {formatCurrency(costingResult.costing.variable_costs_operations)}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="bg-orange-50 p-4 rounded-lg">
-                              <div className="flex items-center">
-                                <TrendingUp className="h-6 w-6 text-orange-600 mr-2" />
-                                <div>
-                                  <p className="text-sm font-medium text-orange-600">Ricarichi</p>
-                                  <p className="text-xl font-bold text-orange-900">
-                                    {formatCurrency(
-                                      costingResult.costing.ricarico_mp_amount +
-                                      costingResult.costing.ricarico_ope_amount +
-                                      costingResult.costing.ricarico_trasporto_amount +
-                                      costingResult.costing.ricarico_scarto_amount +
-                                      costingResult.costing.ricarico_totale_amount +
-                                      costingResult.costing.ricarico_sconto_amount
-                                    )}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Costi Fissi */}
-                          <div className="bg-gray-50 p-4 rounded-lg">
-                            <div className="flex justify-between items-center">
-                              <span className="text-lg font-semibold text-gray-600">Costi Fissi (su lotto)</span>
-                              <span className="text-xl font-bold text-gray-900">
-                                {formatCurrency(costingResult.costing.fixed_costs_per_lot)}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-600 mt-1">
-                              Totale costi fissi: {formatCurrency(costingResult.costing.total_fixed_costs)} 
-                              ÷ Lotto: {costingResult.costing.production_lot} pz
-                            </p>
-                          </div>
-
-                          {/* Totale Finale */}
-                          <div className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
-                            <div className="flex justify-between items-center">
-                              <span className="text-2xl font-semibold text-purple-600">Costo Totale per Pezzo</span>
-                              <span className="text-3xl font-bold text-purple-900">
-                                {formatCurrency(costingResult.costing.unit_cost_final)}
-                              </span>
-                            </div>
-                            <p className="text-sm text-purple-600 mt-2">
-                              Prezzo finale: {formatCurrency(costingResult.costing.unit_price_final)}
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <AlertTriangle className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-600">Nessun dettaglio disponibile</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal Albero Costi */}
+      <CostTreeModal
+        isOpen={showCostTree}
+        treeData={treeData}
+        loading={loadingTree}
+        onClose={() => setShowCostTree(false)}
+      />
 
       {/* Modal Dati Noti */}
       {showKnownDataModal && (
