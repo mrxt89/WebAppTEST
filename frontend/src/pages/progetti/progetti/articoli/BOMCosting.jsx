@@ -1300,18 +1300,18 @@ const BOMCosting = ({ selectedItem }) => {
             <Package className="h-4 w-4 mr-2" />
             Calcolo costi
           </TabsTrigger>
-          <TabsTrigger value="parameters">
+          {/* <TabsTrigger value="parameters">
             <Settings className="h-4 w-4 mr-2" />
             Parametri
-          </TabsTrigger>
+          </TabsTrigger> */}
           <TabsTrigger value="results" disabled={!costingResult}>
             <Calculator className="h-4 w-4 mr-2" />
             Risultati
           </TabsTrigger>
-          <TabsTrigger value="utility">
+          {/* <TabsTrigger value="utility">
             <Wrench className="h-4 w-4 mr-2" />
             Utility
-          </TabsTrigger>
+          </TabsTrigger> */}
           <TabsTrigger value="bom-viewer" disabled={!selectedBOM}>
             <ListFilter className="h-4 w-4 mr-2" />
             Distinta
@@ -1663,238 +1663,7 @@ const BOMCosting = ({ selectedItem }) => {
 
         {/* Tab Cronologia Costi - NASCOSTO PER ORA */}
 
-        {/* Tab Parametri */}
-        <TabsContent value="parameters" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Settings className="h-5 w-5 mr-2" />
-                Parametri di Costificazione
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Sottoschede per parametri */}
-              <Tabs value={activeParameterTab} onValueChange={setActiveParameterTab} className="w-full">
-                <TabsList className="w-full navbar-style-tabs">
-                  <TabsTrigger value="standard">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Parametri Standard
-                  </TabsTrigger>
-                  <TabsTrigger value="known-data">
-                    <Database className="h-4 w-4 mr-2" />
-                    Dati Noti
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Sottoscheda Parametri Standard */}
-                <TabsContent value="standard" className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium">Parametri di Costificazione</h3>
-                    <Button
-                      onClick={initializeParameters}
-                      variant="outline"
-                      size="sm"
-                      disabled={loading}
-                    >
-                      Inizializza Default
-                    </Button>
-                  </div>
-                  
-                  {parameters.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Settings className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                      <p className="text-gray-600">Nessun parametro configurato</p>
-                      <Button onClick={initializeParameters} className="mt-4">
-                        Inizializza Parametri
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {parameters
-                        .filter(param => isEssentialParameter(param.ParameterName))
-                        .map((param) => {
-                          const isPercentage = isPercentageParameter(param.ParameterName);
-                          const displayValue = convertPercentageToUI(param.ParameterValue, param.ParameterName);
-                          
-                          return (
-                            <div key={param.Id} className="flex items-center justify-between p-4 border rounded-lg">
-                              <div className="flex-1">
-                                <h4 className="font-medium">{param.ParameterName}</h4>
-                                <p className="text-sm text-gray-600">{param.Description}</p>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <div className="flex items-center space-x-1">
-                                  <Input
-                                    type="number"
-                                    step={isPercentage ? "0.01" : "0.01"}
-                                    defaultValue={displayValue}
-                                    className="w-24"
-                                    onBlur={(e) => {
-                                      if (e.target.value !== displayValue) {
-                                        updateParameter(param.Id, e.target.value, param.ParameterName);
-                                      }
-                                    }}
-                                  />
-                                  {isPercentage && (
-                                    <span className="text-sm text-gray-500">%</span>
-                                  )}
-                                </div>
-                                <Badge variant={param.IsActive ? 'default' : 'secondary'}>
-                                  {param.IsActive ? 'Attivo' : 'Inattivo'}
-                                </Badge>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* Sottoscheda Dati Noti */}
-                <TabsContent value="known-data" className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="text-lg font-medium">Dati Noti</h3>
-                      <p className="text-sm text-gray-600">Parametri e formule per calcoli automatici</p>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button
-                        onClick={openNewKnownDataModal}
-                        size="sm"
-                        className="flex items-center"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Nuovo Parametro
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {knownDataLoading ? (
-                    <div className="text-center py-8">
-                      <Loader2 className="h-8 w-8 mx-auto animate-spin mb-4" />
-                      <p className="text-gray-600">Caricamento dati noti...</p>
-                    </div>
-                  ) : knownData.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Database className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                      <p className="text-gray-600">Nessun dato noto configurato</p>
-                      <p className="text-sm text-gray-500 mb-4">
-                        I dati noti permettono di definire parametri e formule per calcoli automatici
-                      </p>
-                      <Button onClick={openNewKnownDataModal} className="flex items-center mx-auto">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Aggiungi Primo Parametro
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="mb-4 p-2 bg-blue-50 rounded text-sm">
-                        Debug: {knownData.length} dati noti trovati
-                      </div>
-                      {(() => {
-                        // Raggruppa i dati per articolo
-                        const groupedData = knownData.reduce((acc, data) => {
-                          // Usa ItemCode se disponibile, altrimenti ItemDescription (nomi dal backend)
-                          const itemKey = data.ItemCode || data.ItemDescription || 'SENZA_CODICE';
-                          const key = `${itemKey}_${data.DataType}`;
-                          if (!acc[key]) {
-                            acc[key] = {
-                              itemCode: data.ItemCode,
-                              itemDescription: data.ItemDescription,
-                              dataType: data.DataType,
-                              isActive: data.IsActive,
-                              parameters: []
-                            };
-                          }
-                          acc[key].parameters.push({
-                            id: data.Id,
-                            name: data.ParameterName,
-                            value: data.ParameterValue,
-                            unit: data.UnitOfMeasure,
-                            description: data.Description
-                          });
-                          return acc;
-                        }, {});
-
-                      
-                        return Object.values(groupedData).map((group, index) => (
-                          <div key={index} className="p-4 border rounded-lg">
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <h4 className="font-medium text-lg">
-                                    {group.itemCode || group.itemDescription || 'SENZA_CODICE'}
-                                  </h4>
-                                  <Badge variant={group.dataType === 'MATERIAL' ? 'default' : 'secondary'}>
-                                    {group.dataType}
-                                  </Badge>
-                                  <Badge variant={group.isActive ? 'default' : 'outline'}>
-                                    {group.isActive ? 'Attivo' : 'Inattivo'}
-                                  </Badge>
-                                </div>
-                                {group.itemCode && group.itemDescription && (
-                                  <p className="text-sm text-gray-600 mb-3">
-                                    <strong>Descrizione:</strong> {group.itemDescription}
-                                  </p>
-                                )}
-                                {!group.itemCode && group.itemDescription && (
-                                  <p className="text-sm text-gray-600 mb-3">
-                                    <strong>Match per descrizione:</strong> {group.itemDescription}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="flex space-x-2">
-                                <Button
-                                  onClick={() => openEditKnownDataModal(group)}
-                                  variant="outline"
-                                  size="sm"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  onClick={() => deleteKnownDataGroup(group)}
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                            
-                            {/* Tabella parametri */}
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-sm">
-                                <thead>
-                                  <tr className="border-b">
-                                    <th className="text-left py-2">Parametro</th>
-                                    <th className="text-left py-2">Valore</th>
-                                    <th className="text-left py-2">Unità</th>
-                                    <th className="text-left py-2">Descrizione</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {group.parameters.map((param, paramIndex) => (
-                                    <tr key={`${group.itemCode || group.itemDescription}-${param.id}-${paramIndex}`} className="border-b">
-                                      <td className="py-2 font-medium">{param.name}</td>
-                                      <td className="py-2">{param.value}</td>
-                                      <td className="py-2">{param.unit}</td>
-                                      <td className="py-2 text-gray-600">{param.description || '-'}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        ));
-                      })()}
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {/* Tab Parametri - NASCOSTO */}
 
         {/* Tab Risultati */}
         <TabsContent value="results" className="space-y-4">
@@ -2107,10 +1876,7 @@ const BOMCosting = ({ selectedItem }) => {
           )}
         </TabsContent>
 
-        {/* Tab Utility */}
-        <TabsContent value="utility" className="space-y-4">
-          <UtilityManagement />
-        </TabsContent>
+        {/* Tab Utility - NASCOSTO */}
 
         {/* Tab Distinta Base */}
         <TabsContent value="bom-viewer" className="flex-1 overflow-hidden m-0 border-none">
