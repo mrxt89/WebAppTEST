@@ -56,13 +56,12 @@ const BOMCostingParameters = ({
   const [globalParameters, setGlobalParameters] = useState([]);
   const [loadingParameters, setLoadingParameters] = useState(false);
   const [customMarkups, setCustomMarkups] = useState({
-    markupRM: '',
-    markupRMPurchase: '',
-    markupRMProduction: '',
-    markupOperations: '',
-    markupInternalOps: '',
-    markupExternalOps: '',
-    markupOverhead: ''
+    markupRM: '',           // RICARICO_MP
+    markupOperations: '',   // RICARICO_OPE  
+    markupExternalOps: '',  // RICARICO_TRASPORTO
+    markupInternalOps: '',  // RICARICO_SCARTO
+    markupOverhead: '',     // RICARICO_TOTALE
+    markupSconto: ''        // RICARICO_SCONTO
   });
 
   useEffect(() => {
@@ -130,12 +129,11 @@ const BOMCostingParameters = ({
         // Carica i ricarichi custom se presenti (converti da decimale a percentuale per visualizzazione: 0.07 -> 7)
         setCustomMarkups({
           markupRM: lastRecord.CustomMarkupRM ? (lastRecord.CustomMarkupRM * 100) : '',
-          markupRMPurchase: lastRecord.CustomMarkupRMPurchase ? (lastRecord.CustomMarkupRMPurchase * 100) : '',
-          markupRMProduction: lastRecord.CustomMarkupRMProduction ? (lastRecord.CustomMarkupRMProduction * 100) : '',
           markupOperations: lastRecord.CustomMarkupOperations ? (lastRecord.CustomMarkupOperations * 100) : '',
-          markupInternalOps: lastRecord.CustomMarkupInternalOps ? (lastRecord.CustomMarkupInternalOps * 100) : '',
           markupExternalOps: lastRecord.CustomMarkupExternalOps ? (lastRecord.CustomMarkupExternalOps * 100) : '',
-          markupOverhead: lastRecord.CustomMarkupOverhead ? (lastRecord.CustomMarkupOverhead * 100) : ''
+          markupInternalOps: lastRecord.CustomMarkupInternalOps ? (lastRecord.CustomMarkupInternalOps * 100) : '',
+          markupOverhead: lastRecord.CustomMarkupOverhead ? (lastRecord.CustomMarkupOverhead * 100) : '',
+          markupSconto: lastRecord.CustomMarkupSconto ? (lastRecord.CustomMarkupSconto * 100) : ''
         });
       }
     } catch (error) {
@@ -168,17 +166,15 @@ const BOMCostingParameters = ({
         updateBOMRecord: parameters.updateBOMRecord,
         notes: parameters.notes,
         // Aggiungi ricarichi custom solo se almeno uno è impostato (converti da percentuale a decimale: 7 -> 0.07)
-        customMarkups: (customMarkups.markupRM || customMarkups.markupRMPurchase ||
-                       customMarkups.markupRMProduction || customMarkups.markupOperations ||
-                       customMarkups.markupInternalOps || customMarkups.markupExternalOps ||
-                       customMarkups.markupOverhead) ? {
+        customMarkups: (customMarkups.markupRM || customMarkups.markupOperations ||
+                       customMarkups.markupExternalOps || customMarkups.markupInternalOps ||
+                       customMarkups.markupOverhead || customMarkups.markupSconto) ? {
           markupRM: customMarkups.markupRM ? parseFloat(customMarkups.markupRM) / 100 : null,
-          markupRMPurchase: customMarkups.markupRMPurchase ? parseFloat(customMarkups.markupRMPurchase) / 100 : null,
-          markupRMProduction: customMarkups.markupRMProduction ? parseFloat(customMarkups.markupRMProduction) / 100 : null,
           markupOperations: customMarkups.markupOperations ? parseFloat(customMarkups.markupOperations) / 100 : null,
-          markupInternalOps: customMarkups.markupInternalOps ? parseFloat(customMarkups.markupInternalOps) / 100 : null,
           markupExternalOps: customMarkups.markupExternalOps ? parseFloat(customMarkups.markupExternalOps) / 100 : null,
-          markupOverhead: customMarkups.markupOverhead ? parseFloat(customMarkups.markupOverhead) / 100 : null
+          markupInternalOps: customMarkups.markupInternalOps ? parseFloat(customMarkups.markupInternalOps) / 100 : null,
+          markupOverhead: customMarkups.markupOverhead ? parseFloat(customMarkups.markupOverhead) / 100 : null,
+          markupSconto: customMarkups.markupSconto ? parseFloat(customMarkups.markupSconto) / 100 : null
         } : null
       };
 
@@ -310,13 +306,13 @@ const BOMCostingParameters = ({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Ricarico Materie Prime */}
+            {/* Ricarico MP */}
             <div className="space-y-2">
               <Label htmlFor="markupRM">
-                Ricarico Materie Prime (%)
+                Ricarico MP (%)
                 <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'MARKUP_RM')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'MARKUP_RM').ParameterValue * 100)})`
+                  {globalParameters.find(p => p.ParameterName === 'RICARICO_MP')?.ParameterValue
+                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'RICARICO_MP').ParameterValue * 100)})`
                     : ''}
                 </span>
               </Label>
@@ -327,59 +323,17 @@ const BOMCostingParameters = ({
                 value={customMarkups.markupRM}
                 onChange={(e) => setCustomMarkups({...customMarkups, markupRM: e.target.value})}
                 disabled={readOnly}
-                placeholder="Es: 25 (per 25%)"
+                placeholder="Es: 15 (per 15%)"
               />
             </div>
 
-            {/* Ricarico Acquisto MP */}
-            <div className="space-y-2">
-              <Label htmlFor="markupRMPurchase">
-                Ricarico Acquisto MP (%)
-                <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'MARKUP_RM_ACQUISTO')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'MARKUP_RM_ACQUISTO').ParameterValue * 100)})`
-                    : ''}
-                </span>
-              </Label>
-              <Input
-                id="markupRMPurchase"
-                type="number"
-                step="0.01"
-                value={customMarkups.markupRMPurchase}
-                onChange={(e) => setCustomMarkups({...customMarkups, markupRMPurchase: e.target.value})}
-                disabled={readOnly}
-                placeholder="Es: 15"
-              />
-            </div>
-
-            {/* Ricarico Produzione MP */}
-            <div className="space-y-2">
-              <Label htmlFor="markupRMProduction">
-                Ricarico Produzione MP (%)
-                <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'MARKUP_RM_PRODUZIONE')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'MARKUP_RM_PRODUZIONE').ParameterValue * 100)})`
-                    : ''}
-                </span>
-              </Label>
-              <Input
-                id="markupRMProduction"
-                type="number"
-                step="0.01"
-                value={customMarkups.markupRMProduction}
-                onChange={(e) => setCustomMarkups({...customMarkups, markupRMProduction: e.target.value})}
-                disabled={readOnly}
-                placeholder="Es: 20"
-              />
-            </div>
-
-            {/* Ricarico Lavorazioni */}
+            {/* Ricarico OPE */}
             <div className="space-y-2">
               <Label htmlFor="markupOperations">
-                Ricarico Lavorazioni (%)
+                Ricarico OPE (%)
                 <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'MARKUP_LAVORAZIONI')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'MARKUP_LAVORAZIONI').ParameterValue * 100)})`
+                  {globalParameters.find(p => p.ParameterName === 'RICARICO_OPE')?.ParameterValue
+                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'RICARICO_OPE').ParameterValue * 100)})`
                     : ''}
                 </span>
               </Label>
@@ -390,38 +344,17 @@ const BOMCostingParameters = ({
                 value={customMarkups.markupOperations}
                 onChange={(e) => setCustomMarkups({...customMarkups, markupOperations: e.target.value})}
                 disabled={readOnly}
-                placeholder="Es: 35"
+                placeholder="Es: 20"
               />
             </div>
 
-            {/* Ricarico Lav. Interne */}
-            <div className="space-y-2">
-              <Label htmlFor="markupInternalOps">
-                Ricarico Lav. Interne (%)
-                <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'MARKUP_LAV_INTERNE')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'MARKUP_LAV_INTERNE').ParameterValue * 100)})`
-                    : ''}
-                </span>
-              </Label>
-              <Input
-                id="markupInternalOps"
-                type="number"
-                step="0.01"
-                value={customMarkups.markupInternalOps}
-                onChange={(e) => setCustomMarkups({...customMarkups, markupInternalOps: e.target.value})}
-                disabled={readOnly}
-                placeholder="Es: 30"
-              />
-            </div>
-
-            {/* Ricarico Lav. Esterne */}
+            {/* Ricarico Trasporto */}
             <div className="space-y-2">
               <Label htmlFor="markupExternalOps">
-                Ricarico Lav. Esterne (%)
+                Ricarico Trasporto (%)
                 <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'MARKUP_LAV_ESTERNE')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'MARKUP_LAV_ESTERNE').ParameterValue * 100)})`
+                  {globalParameters.find(p => p.ParameterName === 'RICARICO_TRASPORTO')?.ParameterValue
+                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'RICARICO_TRASPORTO').ParameterValue * 100)})`
                     : ''}
                 </span>
               </Label>
@@ -432,17 +365,38 @@ const BOMCostingParameters = ({
                 value={customMarkups.markupExternalOps}
                 onChange={(e) => setCustomMarkups({...customMarkups, markupExternalOps: e.target.value})}
                 disabled={readOnly}
-                placeholder="Es: 25"
+                placeholder="Es: 5"
               />
             </div>
 
-            {/* Ricarico Generale */}
+            {/* Ricarico Scarto */}
+            <div className="space-y-2">
+              <Label htmlFor="markupInternalOps">
+                Ricarico Scarto (%)
+                <span className="text-xs text-gray-500 ml-2">
+                  {globalParameters.find(p => p.ParameterName === 'RICARICO_SCARTO')?.ParameterValue
+                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'RICARICO_SCARTO').ParameterValue * 100)})`
+                    : ''}
+                </span>
+              </Label>
+              <Input
+                id="markupInternalOps"
+                type="number"
+                step="0.01"
+                value={customMarkups.markupInternalOps}
+                onChange={(e) => setCustomMarkups({...customMarkups, markupInternalOps: e.target.value})}
+                disabled={readOnly}
+                placeholder="Es: 10"
+              />
+            </div>
+
+            {/* Ricarico Totale */}
             <div className="space-y-2">
               <Label htmlFor="markupOverhead">
-                Ricarico Generale/Overhead (%)
+                Ricarico Totale (%)
                 <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'MARKUP_GENERALE')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'MARKUP_GENERALE').ParameterValue * 100)})`
+                  {globalParameters.find(p => p.ParameterName === 'RICARICO_TOTALE')?.ParameterValue
+                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'RICARICO_TOTALE').ParameterValue * 100)})`
                     : ''}
                 </span>
               </Label>
@@ -453,7 +407,28 @@ const BOMCostingParameters = ({
                 value={customMarkups.markupOverhead}
                 onChange={(e) => setCustomMarkups({...customMarkups, markupOverhead: e.target.value})}
                 disabled={readOnly}
-                placeholder="Es: 10"
+                placeholder="Es: 25"
+              />
+            </div>
+
+            {/* Ricarico Sconto */}
+            <div className="space-y-2">
+              <Label htmlFor="markupSconto">
+                Ricarico Sconto (%)
+                <span className="text-xs text-gray-500 ml-2">
+                  {globalParameters.find(p => p.ParameterName === 'RICARICO_SCONTO')?.ParameterValue
+                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'RICARICO_SCONTO').ParameterValue * 100)})`
+                    : ''}
+                </span>
+              </Label>
+              <Input
+                id="markupSconto"
+                type="number"
+                step="0.01"
+                value={customMarkups.markupSconto}
+                onChange={(e) => setCustomMarkups({...customMarkups, markupSconto: e.target.value})}
+                disabled={readOnly}
+                placeholder="Es: 0"
               />
             </div>
           </div>

@@ -9,5 +9,18 @@
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.next/**",
+    "**/coverage/**",
+    "**/.git/**",
+    "**/package-lock.json",
+    "**/yarn.lock",
+    "**/*.log",
+    "**/.DS_Store",
+    "**/thumbs.db"
+  ]
 }

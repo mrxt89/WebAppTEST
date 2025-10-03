@@ -535,6 +535,22 @@ const BOMCosting = ({ selectedItem }) => {
     return percentageParams.includes(parameterName);
   };
 
+  // Funzione per identificare parametri essenziali da mostrare
+  const isEssentialParameter = (parameterName) => {
+    const essentialParams = [
+      'RICARICO_MP',
+      'RICARICO_OPE', 
+      'RICARICO_TRASPORTO',
+      'RICARICO_SCARTO',
+      'RICARICO_TOTALE',
+      'RICARICO_SCONTO',
+      'COSTO_ORARIO_STANDARD',
+      'SCARTO_PERCENTUALE_DEFAULT',
+      'LOTTO_PRODUZIONE_DEFAULT'
+    ];
+    return essentialParams.includes(parameterName);
+  };
+
   // Funzione per convertire percentuale da UI a backend
   const convertPercentageToBackend = (value, parameterName) => {
     if (isPercentageParameter(parameterName)) {
@@ -1694,40 +1710,42 @@ const BOMCosting = ({ selectedItem }) => {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {parameters.map((param) => {
-                        const isPercentage = isPercentageParameter(param.ParameterName);
-                        const displayValue = convertPercentageToUI(param.ParameterValue, param.ParameterName);
-                        
-                        return (
-                          <div key={param.Id} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div className="flex-1">
-                              <h4 className="font-medium">{param.ParameterName}</h4>
-                              <p className="text-sm text-gray-600">{param.Description}</p>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="flex items-center space-x-1">
-                                <Input
-                                  type="number"
-                                  step={isPercentage ? "0.01" : "0.01"}
-                                  defaultValue={displayValue}
-                                  className="w-24"
-                                  onBlur={(e) => {
-                                    if (e.target.value !== displayValue) {
-                                      updateParameter(param.Id, e.target.value, param.ParameterName);
-                                    }
-                                  }}
-                                />
-                                {isPercentage && (
-                                  <span className="text-sm text-gray-500">%</span>
-                                )}
+                      {parameters
+                        .filter(param => isEssentialParameter(param.ParameterName))
+                        .map((param) => {
+                          const isPercentage = isPercentageParameter(param.ParameterName);
+                          const displayValue = convertPercentageToUI(param.ParameterValue, param.ParameterName);
+                          
+                          return (
+                            <div key={param.Id} className="flex items-center justify-between p-4 border rounded-lg">
+                              <div className="flex-1">
+                                <h4 className="font-medium">{param.ParameterName}</h4>
+                                <p className="text-sm text-gray-600">{param.Description}</p>
                               </div>
-                              <Badge variant={param.IsActive ? 'default' : 'secondary'}>
-                                {param.IsActive ? 'Attivo' : 'Inattivo'}
-                              </Badge>
+                              <div className="flex items-center space-x-2">
+                                <div className="flex items-center space-x-1">
+                                  <Input
+                                    type="number"
+                                    step={isPercentage ? "0.01" : "0.01"}
+                                    defaultValue={displayValue}
+                                    className="w-24"
+                                    onBlur={(e) => {
+                                      if (e.target.value !== displayValue) {
+                                        updateParameter(param.Id, e.target.value, param.ParameterName);
+                                      }
+                                    }}
+                                  />
+                                  {isPercentage && (
+                                    <span className="text-sm text-gray-500">%</span>
+                                  )}
+                                </div>
+                                <Badge variant={param.IsActive ? 'default' : 'secondary'}>
+                                  {param.IsActive ? 'Attivo' : 'Inattivo'}
+                                </Badge>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
                     </div>
                   )}
                 </TabsContent>
@@ -1882,36 +1900,39 @@ const BOMCosting = ({ selectedItem }) => {
         <TabsContent value="results" className="space-y-4">
           {costingResult && (
             <>
-              {/* Riepilogo Principale */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center">
+              {/* Pulsante Visualizza Dettaglio Costi */}
+              <div className="flex justify-start">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (showCostTree) {
+                      setShowCostTree(false);
+                    } else {
+                      loadCostTree();
+                    }
+                  }}
+                  disabled={loadingTree}
+                  className="flex items-center gap-2"
+                >
+                  {loadingTree ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <TrendingUp className="h-4 w-4" />
+                  )}
+                  {showCostTree ? 'Nascondi dettaglio costi' : 'Visualizza dettaglio costi'}
+                </Button>
+              </div>
+
+              {/* Riepilogo Principale - nascosto quando si visualizza il dettaglio */}
+              {!showCostTree && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
                       <DollarSign className="h-5 w-5 mr-2" />
                       Risultato Costificazione
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (showCostTree) {
-                          setShowCostTree(false);
-                        } else {
-                          loadCostTree();
-                        }
-                      }}
-                      disabled={loadingTree}
-                      className="flex items-center gap-2"
-                    >
-                      {loadingTree ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <TrendingUp className="h-4 w-4" />
-                      )}
-                      {showCostTree ? 'Nascondi' : 'Visualizza'} Albero Costi
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
+                    </CardTitle>
+                  </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div 
@@ -2017,9 +2038,10 @@ const BOMCosting = ({ selectedItem }) => {
 
 
                 </CardContent>
-              </Card>
+                </Card>
+              )}
 
-              {/* Albero Costificazione BOM */}
+              {/* Dettaglio costi */}
               {showCostTree && treeData && (
                 <CostTreeView costingResult={treeData} />
               )}

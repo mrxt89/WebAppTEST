@@ -68,8 +68,19 @@ const NodeIcon = ({ node, isRootNode }) => {
 // Componente per un nodo ciclo
 const CycleNode = ({ cycle, level, expanded, onToggle }) => {
   const baseIndent = 8;
-  const indentPerLevel = 24;
+  const indentPerLevel = 32; // Aumentato da 24 a 32
   const indent = level * indentPerLevel + baseIndent;
+
+  // Estrai i dati del ciclo
+  const operationName = cycle.Operation || cycle.OperationDescription || `Fase ${cycle.RtgStep || ''}`;
+  const workCenter = cycle.WorkCenter || cycle.WC || '';
+  const quantity = cycle.Qty || 1;
+  const unitCost = cycle.UnitCost || 0;
+  const fixedCost = cycle.FixedCost || 0;
+  
+  // Calcola il costo totale: (Costo Unitario × Quantità) + Costi Fissi
+  const totalCost = cycle.TotalCost || cycle.CycleCost || 
+    ((unitCost * quantity) + fixedCost);
 
   return (
     <div>
@@ -97,19 +108,42 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
         {/* Cycle icon */}
         <Factory className="h-4 w-4 text-green-600 mr-2 flex-shrink-0" />
 
-        {/* Cycle info */}
-        <div className="flex-1 flex items-center justify-between min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
+        {/* Cycle info - Layout tabellare */}
+        <div className="flex-1 flex items-center ml-2 min-w-0">
+          {/* Colonna 1: Operazione e Centro di Lavoro (60%) */}
+          <div className="flex items-center gap-2 min-w-0" style={{ width: '60%' }}>
             <span className="font-medium text-green-800 truncate">
-              {cycle.Operation || cycle.OperationDescription || `Fase ${cycle.RtgStep || ''}`}
+              {operationName}
             </span>
-            {cycle.WorkCenter && (
-              <span className="text-xs text-green-600">({cycle.WorkCenter})</span>
+            {workCenter && (
+              <span className="text-xs text-green-600">({workCenter})</span>
             )}
           </div>
-          <span className="font-semibold text-green-900 ml-2 flex-shrink-0">
-            {formatCurrency(cycle.TotalCost || cycle.CycleCost || cycle.UnitCost || 0)}
-          </span>
+
+          {/* Colonna 2: Quantità (8%) */}
+          <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: '8%' }}>
+            {quantity}
+          </div>
+
+          {/* Colonna 3: UM (5%) */}
+          <div className="text-xs text-gray-600 text-center flex-shrink-0" style={{ width: '5%' }}>
+            -
+          </div>
+
+          {/* Colonna 4: Costo Unitario (9%) */}
+          <div className="text-xs font-medium text-gray-900 text-right flex-shrink-0" style={{ width: '9%' }}>
+            {formatCurrency(unitCost)}
+          </div>
+
+          {/* Colonna 5: Costo Fisso (9%) */}
+          <div className="text-xs font-medium text-orange-700 text-right flex-shrink-0" style={{ width: '9%' }}>
+            -
+          </div>
+
+          {/* Colonna 6: Costo Totale (9%) */}
+          <div className="text-xs font-semibold text-green-900 text-right flex-shrink-0" style={{ width: '9%' }}>
+            {formatCurrency(totalCost)}
+          </div>
         </div>
       </div>
 
@@ -122,12 +156,6 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
             borderLeftColor: getLevelColor(level)
           }}
         >
-          {cycle.SetupTime !== undefined && (
-            <div className="flex justify-between">
-              <span className="text-gray-600">Tempo Setup:</span>
-              <span className="font-medium">{cycle.SetupTime} min</span>
-            </div>
-          )}
           {cycle.CycleTime !== undefined && (
             <div className="flex justify-between">
               <span className="text-gray-600">Tempo Ciclo:</span>
@@ -155,16 +183,21 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
 // Componente per un nodo componente
 const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery }) => {
   const baseIndent = 8;
-  const indentPerLevel = 24;
+  const indentPerLevel = 32; // Aumentato da 24 a 32 per migliore leggibilità
   const indent = level * indentPerLevel + baseIndent;
 
   const isRootNode = node.data.Level === 0;
   const hasChildren = node.children && node.children.length > 0;
 
   // Calcola i costi del componente
-  const totalCost = node.data.TotalCost || 0;
   const unitCost = node.data.UnitCost || 0;
+  const fixedCost = node.data.FixedCost || 0;
   const quantity = node.data.Quantity || (isRootNode ? 1 : 0);
+  
+  // Calcola il costo totale: (Costo Unitario × Quantità) + Costi Fissi
+  const totalCost = node.data.TotalCost || node.data.CalculatedTotalCost || 
+    ((unitCost * quantity) + fixedCost);
+  const uom = node.data.UoM || '';
 
   // Testo del nodo
   const nodeCode = node.data.ComponentItemCode || node.data.ItemCode || node.data.ComponentCode || '';
@@ -213,12 +246,13 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
         {/* Component icon */}
         <NodeIcon node={node} isRootNode={isRootNode} />
 
-        {/* Component info */}
-        <div className="flex-1 flex items-center justify-between ml-2 min-w-0">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
+        {/* Component info - Layout tabellare */}
+        <div className="flex-1 flex items-center ml-2 min-w-0">
+          {/* Colonna 1: Codice e Descrizione (60%) */}
+          <div className="flex items-center gap-2 min-w-0" style={{ width: '60%' }}>
             <span className={cn(
               "truncate",
-              isRootNode ? "text-purple-900" : "text-blue-900"
+              isRootNode ? "text-purple-900 font-semibold" : "text-blue-900"
             )}>
               {highlightText(nodeText)}
             </span>
@@ -235,80 +269,42 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
               </Badge>
             )}
 
-            {/* Badge natura */}
-            {node.data.ComponentNature && (
-              <Badge variant="secondary" className="flex-shrink-0 h-4 text-xs">
-                {node.data.ComponentNature === 22413312 ? 'SL' :
-                 node.data.ComponentNature === 22413313 ? 'PF' :
-                 node.data.ComponentNature === 22413314 ? 'ACQ' : 'N/A'}
-              </Badge>
+          </div>
+
+          {/* Colonna 2: Quantità e UM (8%) */}
+          <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: '8%' }}>
+            {!isRootNode && quantity > 0 ? (
+              <>{quantity.toFixed(3)}</>
+            ) : (
+              <>1</>
             )}
           </div>
 
-          {/* Costi */}
-          <div className="flex items-center gap-3 ml-2 flex-shrink-0">
-            {!isRootNode && quantity > 0 && (
-              <span className="text-xs text-gray-600">
-                {quantity.toFixed(3)} {node.data.UoM || ''}
-              </span>
-            )}
-            <span className={cn(
-              "font-semibold",
-              isRootNode ? "text-purple-900 text-base" : "text-blue-900"
-            )}>
-              {formatCurrency(totalCost)}
-            </span>
+          {/* Colonna 3: UM (5%) */}
+          <div className="text-xs text-gray-600 text-center flex-shrink-0" style={{ width: '5%' }}>
+            {uom}
+          </div>
+
+          {/* Colonna 4: Costo Unitario (9%) */}
+          <div className="text-xs font-medium text-gray-900 text-right flex-shrink-0" style={{ width: '9%' }}>
+            {formatCurrency(unitCost)}
+          </div>
+
+          {/* Colonna 5: Costo Fisso (9%) */}
+          <div className="text-xs font-medium text-orange-700 text-right flex-shrink-0" style={{ width: '9%' }}>
+            {fixedCost > 0 ? formatCurrency(fixedCost) : '-'}
+          </div>
+
+          {/* Colonna 6: Costo Totale (9%) */}
+          <div className={cn(
+            "text-xs font-semibold text-right flex-shrink-0",
+            isRootNode ? "text-purple-900 text-sm" : "text-blue-900"
+          )} style={{ width: '9%' }}>
+            {formatCurrency(totalCost)}
           </div>
         </div>
       </div>
 
-      {/* Info aggiuntive espanse */}
-      {expanded && !isRootNode && (
-        <div
-          className="py-1 px-2 bg-blue-50/50 border-l-2 text-xs"
-          style={{
-            paddingLeft: `${indent + 32}px`,
-            borderLeftColor: getLevelColor(level)
-          }}
-        >
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Costo Unit.:</span>
-              <span className="font-medium">{formatCurrency(unitCost)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Costo Tot.:</span>
-              <span className="font-medium">{formatCurrency(totalCost)}</span>
-            </div>
-            {node.data.MaterialCost !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Materiale:</span>
-                <span className="font-medium">{formatCurrency(node.data.MaterialCost)}</span>
-              </div>
-            )}
-            {node.data.OperationCost !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Operazioni:</span>
-                <span className="font-medium">{formatCurrency(node.data.OperationCost)}</span>
-              </div>
-            )}
-            {node.data.FixedCost > 0 && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Fissi:</span>
-                <span className="font-medium">{formatCurrency(node.data.FixedCost)}</span>
-              </div>
-            )}
-            {node.data.ScrapPercentage > 0 && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Scarto:</span>
-                <span className="font-medium text-orange-600">
-                  {(node.data.ScrapPercentage * 100).toFixed(1)}%
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Render children */}
       {expanded && children}
@@ -602,7 +598,7 @@ const CostTreeView = ({ costingResult }) => {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b">
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5" />
-          Albero Costificazione BOM
+          Dettaglio costi
         </CardTitle>
         <div className="flex gap-2">
           <Button
@@ -621,6 +617,7 @@ const CostTreeView = ({ costingResult }) => {
           </Button>
           <Button
             variant="ghost"
+            className="d-none"
             size="sm"
             onClick={() => setIsFullscreen(!isFullscreen)}
           >
@@ -636,7 +633,7 @@ const CostTreeView = ({ costingResult }) => {
         {/* Barra ricerca */}
         <div className="mb-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Cerca componenti o cicli..."
               className="pl-9"
@@ -691,8 +688,22 @@ const CostTreeView = ({ costingResult }) => {
           </div>
         </div>
 
+        {/* Header colonne */}
+        <div className="flex items-center text-xs font-semibold text-gray-600 pb-2 border-b sticky top-0 bg-white z-10">
+          <div className="w-8"></div> {/* Spazio per toggle */}
+          <div className="w-6"></div> {/* Spazio per icona */}
+          <div className="flex-1 flex items-center ml-2">
+            <div style={{ width: '60%' }}>Componente / Operazione</div>
+            <div style={{ width: '8%' }} className="text-right">Q.tà</div>
+            <div style={{ width: '5%' }} className="text-center">UM</div>
+            <div style={{ width: '9%' }} className="text-right">Costo Unit.</div>
+            <div style={{ width: '9%' }} className="text-right">Costi Fissi</div>
+            <div style={{ width: '9%' }} className="text-right">Costo Tot.</div>
+          </div>
+        </div>
+
         {/* Albero componenti */}
-        <div className={cn("space-y-1", isFullscreen && 'flex-1 overflow-y-auto')}>
+        <div className={cn("space-y-1 mt-2", isFullscreen && 'flex-1 overflow-y-auto')}>
           {(searchQuery.trim() ? filteredTreeData : treeData).length > 0 ? (
             (searchQuery.trim() ? filteredTreeData : treeData).map((node) => (
               <TreeNode
