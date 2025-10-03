@@ -544,4 +544,42 @@ router.get('/history', authenticateToken, async (req, res) => {
     }
 });
 
+// =============================================
+// Route: Ottieni dati multilivello BOM per albero costi
+// =============================================
+router.get('/multilevel/:bomId', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { bomId } = req.params;
+
+        const projectArticlesManagement = require('../queries/projectArticlesManagement');
+
+        const result = await projectArticlesManagement.getBOMData(
+            companyId,
+            'GET_BOM_MULTILEVEL',
+            parseInt(bomId),
+            null,
+            null,
+            {
+                maxLevel: 10,
+                includeRouting: true,
+                expandPhantoms: true
+            }
+        );
+
+        res.json({
+            success: true,
+            message: 'Dati multilivello recuperati con successo',
+            data: result
+        });
+    } catch (error) {
+        console.error('Error getting BOM multilevel data:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Errore nel recupero dei dati multilivello',
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;

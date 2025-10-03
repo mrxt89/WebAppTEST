@@ -55,13 +55,14 @@ import { swal } from '@/lib/common';
 import { useCompany } from '@/context/CompanyContext';
 import axios from '@/lib/axios';
 import UtilityManagement from './BOMCosting/components/UtilityManagement';
+import CostTreeView from './BOMCosting/components/CostTreeView';
 import BOMViewer from './BOMViewer';
-import { 
-  parseBOMCostingDetails, 
-  parseBOMNotes, 
-  formatCurrency, 
+import {
+  parseBOMCostingDetails,
+  parseBOMNotes,
+  formatCurrency,
   formatPercentage,
-  generateCostingSummary 
+  generateCostingSummary
 } from '@/lib/bomCostingUtils';
 
 /**
@@ -96,6 +97,11 @@ const BOMCosting = ({ selectedItem }) => {
     loading: false,
     data: null
   });
+
+  // Stato per visualizzazione albero costi
+  const [showCostTree, setShowCostTree] = useState(false);
+  const [treeData, setTreeData] = useState(null);
+  const [loadingTree, setLoadingTree] = useState(false);
   
   // Stato per pannello opzioni compresso
   const [isOptionsPanelCollapsed, setIsOptionsPanelCollapsed] = useState(false);
@@ -686,6 +692,275 @@ const BOMCosting = ({ selectedItem }) => {
         text: 'Errore nell\'export del risultato',
         icon: 'error'
       });
+    }
+  };
+
+  // Carica i dati per l'albero dei costi
+  const loadCostTree = async () => {
+    if (!selectedBOM || !costingResult) return;
+
+    try {
+      setLoadingTree(true);
+
+      console.log('Loading cost tree...');
+      console.log('costingResult:', costingResult);
+      console.log('Has components?', costingResult.components && costingResult.components.length > 0);
+
+      // Se abbiamo già i components dal debug, usiamo quelli
+      if (costingResult.components && costingResult.components.length > 0) {
+        console.log('Using existing components from debug mode');
+        // Carica anche la struttura BOM per avere i Path corretti
+        const bomResponse = await axios.get(`/projectArticles/boms/${selectedBOM.Id}`, {
+          params: {
+            action: 'GET_BOM_MULTILEVEL',
+            maxLevel: 10,
+            expandPhantoms: true,
+            includeRouting: true
+          }
+        });
+
+        const bomData = bomResponse.data.data || bomResponse.data;
+
+        if (bomData && (bomData.components || bomData.routing)) {
+          const bomComponents = bomData.components || [];
+          const bomRouting = bomData.routing || [];
+
+          // Crea una mappa dei costi per ComponentId
+          const costMap = new Map();
+          costingResult.components.forEach(comp => {
+            costMap.set(comp.ComponentId?.toString(), comp);
+          });
+
+          // IMPORTANTE: Usa TUTTI i componenti BOM e arricchiscili con i costi quando disponibili
+          const enrichedComponents = bomComponents.map(bomComp => {
+            const costData = costMap.get(bomComp.ComponentId?.toString());
+
+            // Se abbiamo i dati di costo, combinali con i dati BOM
+            if (costData) {
+              return {
+                ...bomComp,
+                TotalCost: costData.TotalCost || costData.CalculatedTotalCost || 0,
+                UnitCost: costData.UnitCost || 0,
+                MaterialCost: costData.MaterialCost || 0,
+                OperationCost: costData.OperationCost || 0,
+                FixedCost: costData.FixedCost || 0,
+                ScrapPercentage: costData.ScrapPercentage || 0
+              };
+            }
+
+            // Altrimenti usa solo i dati BOM (senza costi dettagliati)
+            return bomComp;
+          });
+
+          // Aggiungi i cicli ai componenti
+          const componentsWithCycles = enrichedComponents.map(comp => {
+            const compCycles = bomRouting.filter(route =>
+              route.BOMId?.toString() === comp.BOMId?.toString() ||
+              route.ComponentId?.toString() === comp.ComponentId?.toString()
+            );
+
+            return {
+              ...comp,
+              operations: comp.operations || compCycles || []
+            };
+          });
+
+          const finalTreeData = {
+            ...costingResult,
+            components: componentsWithCycles,
+            routing: bomRouting,
+            bomCode: selectedBOM.ItemCode,
+            bomDescription: selectedBOM.ItemDescription
+          };
+
+          console.log('TreeData assembled (from debug):', finalTreeData);
+          console.log('Components count:', componentsWithCycles.length);
+
+          setTreeData(finalTreeData);
+          setShowCostTree(true);
+        }
+        return;
+      }
+
+      // Altrimenti, facciamo un nuovo calcolo con debug=true per ottenere i dettagli
+      console.log('No components in costingResult, making new calculation with debug=true');
+
+      const requestData = {};
+
+      if (costingOptions.orderQuantity) {
+        requestData.orderQuantity = parseFloat(costingOptions.orderQuantity);
+      }
+
+      if (costingOptions.scrapPercentage) {
+        requestData.scrapPercentage = parseFloat(costingOptions.scrapPercentage) / 100;
+      }
+
+      requestData.useGranularMarkups = costingOptions.useGranularMarkups;
+      requestData.updateBOMRecord = false; // Non aggiorniamo la BOM, solo visualizziamo
+      requestData.debug = true; // IMPORTANTE: chiediamo i dettagli componenti
+
+      console.log('Calling /bom-costing/calculate with:', requestData);
+
+      const costResponse = await axios.post(`/bom-costing/calculate/${selectedBOM.Id}`, requestData);
+
+      console.log('Cost response:', costResponse.data);
+      console.log('Cost response components:', costResponse.data.data?.components);
+      console.log('Components is array?', Array.isArray(costResponse.data.data?.components));
+      console.log('Components length:', costResponse.data.data?.components?.length);
+
+      if (costResponse.data.success && costResponse.data.data.components) {
+        console.log('Cost response has components, proceeding...');
+        // Carica anche la struttura BOM
+        const bomResponse = await axios.get(`/projectArticles/boms/${selectedBOM.Id}`, {
+          params: {
+            action: 'GET_BOM_MULTILEVEL',
+            maxLevel: 10,
+            expandPhantoms: true,
+            includeRouting: true
+          }
+        });
+
+        console.log('BOM response received:', bomResponse.data);
+
+        // La risposta di projectArticles/boms ha una struttura diversa
+        // Non ha success/data wrapper, ma components e routing direttamente
+        const bomData = bomResponse.data.data || bomResponse.data;
+
+        if (bomData && (bomData.components || bomData.routing)) {
+          const bomComponents = bomData.components || [];
+          const bomRouting = bomData.routing || [];
+          const costComponents = costResponse.data.data.components || [];
+
+          console.log('BOM components:', bomComponents.length);
+          console.log('BOM routing:', bomRouting.length);
+          console.log('Cost components:', costComponents.length);
+
+          // Crea una mappa dei componenti BOM
+          const bomMap = new Map();
+          bomComponents.forEach(comp => {
+            bomMap.set(comp.ComponentId?.toString(), comp);
+          });
+
+          console.log('BOM map size:', bomMap.size);
+
+          // Crea una mappa dei costi per ComponentId
+          const costMap = new Map();
+          costComponents.forEach(comp => {
+            costMap.set(comp.ComponentId?.toString(), comp);
+          });
+
+          console.log('Cost map size:', costMap.size);
+
+          // IMPORTANTE: Usa TUTTI i componenti BOM (24) e arricchiscili con i costi quando disponibili
+          const enrichedComponents = bomComponents.map(bomComp => {
+            const costData = costMap.get(bomComp.ComponentId?.toString());
+
+            // Se abbiamo i dati di costo, combinali con i dati BOM
+            if (costData) {
+              return {
+                ...bomComp,
+                TotalCost: costData.TotalCost || costData.CalculatedTotalCost || 0,
+                UnitCost: costData.UnitCost || 0,
+                MaterialCost: costData.MaterialCost || 0,
+                OperationCost: costData.OperationCost || 0,
+                FixedCost: costData.FixedCost || 0,
+                ScrapPercentage: costData.ScrapPercentage || 0
+              };
+            }
+
+            // Altrimenti usa solo i dati BOM (senza costi dettagliati)
+            return bomComp;
+          });
+
+          console.log('Enriched components (all BOM components):', enrichedComponents.length);
+
+          // Aggiungi i cicli
+          const componentsWithCycles = enrichedComponents.map(comp => {
+            const compCycles = bomRouting.filter(route =>
+              route.BOMId?.toString() === comp.BOMId?.toString() ||
+              route.ComponentId?.toString() === comp.ComponentId?.toString()
+            );
+
+            return {
+              ...comp,
+              operations: comp.operations || compCycles || []
+            };
+          });
+
+          const finalTreeData = {
+            ...costResponse.data.data,
+            components: componentsWithCycles,
+            routing: bomRouting,
+            bomCode: selectedBOM.ItemCode,
+            bomDescription: selectedBOM.ItemDescription
+          };
+
+          console.log('TreeData assembled (from new calculation):', finalTreeData);
+          console.log('Components count:', componentsWithCycles.length);
+
+          setTreeData(finalTreeData);
+          setShowCostTree(true);
+          console.log('showCostTree set to true');
+        } else {
+          console.error('BOM response not successful');
+        }
+      } else {
+        console.log('No components in cost response, using BOM structure only');
+
+        // Anche se non abbiamo i dettagli di costo per componente,
+        // possiamo comunque mostrare la struttura BOM con il costo totale
+        const bomResponse = await axios.get(`/projectArticles/boms/${selectedBOM.Id}`, {
+          params: {
+            action: 'GET_BOM_MULTILEVEL',
+            maxLevel: 10,
+            expandPhantoms: true,
+            includeRouting: true
+          }
+        });
+
+        const bomData = bomResponse.data.data || bomResponse.data;
+
+        if (bomData && (bomData.components || bomData.routing)) {
+          const bomComponents = bomData.components || [];
+          const bomRouting = bomData.routing || [];
+
+          // Aggiungi i cicli ai componenti
+          const componentsWithCycles = bomComponents.map(comp => {
+            const compCycles = bomRouting.filter(route =>
+              route.BOMId?.toString() === comp.ComponentBOMId?.toString() ||
+              route.ComponentId?.toString() === comp.ComponentId?.toString()
+            );
+
+            return {
+              ...comp,
+              operations: compCycles || []
+            };
+          });
+
+          const finalTreeData = {
+            costing: costResponse.data.data.costing || {},
+            components: componentsWithCycles,
+            routing: bomRouting,
+            bomCode: selectedBOM.ItemCode,
+            bomDescription: selectedBOM.ItemDescription
+          };
+
+          console.log('TreeData assembled (BOM only):', finalTreeData);
+          console.log('Components count:', componentsWithCycles.length);
+
+          setTreeData(finalTreeData);
+          setShowCostTree(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading cost tree:', error);
+      swal.fire({
+        title: 'Errore',
+        text: 'Errore nel caricamento dell\'albero costi',
+        icon: 'error'
+      });
+    } finally {
+      setLoadingTree(false);
     }
   };
 
@@ -1610,9 +1885,31 @@ const BOMCosting = ({ selectedItem }) => {
               {/* Riepilogo Principale */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <DollarSign className="h-5 w-5 mr-2" />
-                    Risultato Costificazione
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <DollarSign className="h-5 w-5 mr-2" />
+                      Risultato Costificazione
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (showCostTree) {
+                          setShowCostTree(false);
+                        } else {
+                          loadCostTree();
+                        }
+                      }}
+                      disabled={loadingTree}
+                      className="flex items-center gap-2"
+                    >
+                      {loadingTree ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <TrendingUp className="h-4 w-4" />
+                      )}
+                      {showCostTree ? 'Nascondi' : 'Visualizza'} Albero Costi
+                    </Button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1721,6 +2018,11 @@ const BOMCosting = ({ selectedItem }) => {
 
                 </CardContent>
               </Card>
+
+              {/* Albero Costificazione BOM */}
+              {showCostTree && treeData && (
+                <CostTreeView costingResult={treeData} />
+              )}
 
               {/* Dettaglio Componenti (se debug abilitato) */}
               {costingResult.components && costingResult.components.length > 0 && (
