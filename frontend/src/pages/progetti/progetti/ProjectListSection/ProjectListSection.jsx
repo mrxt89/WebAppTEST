@@ -69,6 +69,14 @@ const ProjectListSection = ({
     return () => clearTimeout(timeoutId);
   }, [filters, fetchProjects, getUserProjectStatistics, setPinnedProjects, setStatistics]);
 
+  // Effetto per applicare filtri al primo caricamento
+  useEffect(() => {
+    if (projects.length > 0 && !loading) {
+      // Applica i filtri di default al primo caricamento
+      applyFilters(filters, fetchProjects, getUserProjectStatistics, setPinnedProjects, setStatistics);
+    }
+  }, [projects.length, loading, fetchProjects, getUserProjectStatistics, setPinnedProjects, setStatistics]);
+
   // Callback per filtrare e ordinare i progetti
   const filteredAndSortedProjects = useCallback(() => {
     return getFilteredAndSortedProjects(
