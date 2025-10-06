@@ -17,10 +17,19 @@ import {
   ShoppingCart,
   CircuitBoard,
   Factory,
-  Search
+  Search,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { formatCurrency } from '@/lib/bomCostingUtils';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
 
 // Helper per ottenere un colore in base al livello
 const getLevelColor = (level) => {
@@ -661,6 +670,242 @@ const CostTreeView = ({ costingResult }) => {
     setExpandedNodes(new Set(['root']));
   }, []);
 
+  // Esporta in Excel
+  const exportToExcel = useCallback(() => {
+    if (!costingResult) return;
+
+    // Funzione ricorsiva per appiattire l'albero in righe Excel
+    const flattenTree = (nodes, level = 0, parentPath = '') => {
+      const rows = [];
+
+      nodes.forEach((node, index) => {
+        if (node.type === 'component') {
+          const itemCode = node.data.ComponentItemCode || node.data.ItemCode || '';
+          const description = node.data.ComponentItemDescription || node.data.Description || '';
+          const quantity = node.data.Quantity || 1;
+          const uom = node.data.UoM || '';
+          const isRoot = node.data.Level === 0;
+
+          // Verifica se ha figli (componenti o cicli)
+          const hasChildren = node.children && node.children.length > 0;
+
+          // Se ha figli, mostra 0 (i costi sono nei figli esplosi)
+          // Se NON ha figli (foglia), mostra i costi reali
+          const unitCost = hasChildren ? 0 : (node.data.UnitCost || 0);
+          const fixedCost = hasChildren ? 0 : (node.data.FixedCost || 0);
+          const totalCost = hasChildren ? 0 : (node.data.CalculatedTotalCost || node.data.TotalCost || 0);
+
+          rows.push({
+            'Livello': level,
+            'Tipo': isRoot ? 'Prodotto Finito' : 'Componente',
+            'Codice': itemCode,
+            'Descrizione': description,
+            'Quantità': quantity,
+            'UM': uom,
+            'Costo Unitario (€)': unitCost,
+            'Costi Fissi (€)': fixedCost > 0 ? fixedCost : null,
+            'Costo Totale (€)': totalCost
+          });
+
+          // Aggiungi i cicli (operazioni) del componente
+          if (node.children) {
+            node.children.forEach(child => {
+              if (child.type === 'cycle') {
+                const operation = child.data.Operation || child.data.OperationDescription || '';
+                const workCenter = child.data.WorkCenter || child.data.WC || '';
+                const cycleQty = child.data.Qty || 1;
+                const cycleUnitCost = child.data.UnitCost || 0;
+                const cycleFixedCost = child.data.FixedCost || 0;
+                const cycleTotalCost = child.data.TotalCost || 0;
+
+                rows.push({
+                  'Livello': level + 1,
+                  'Tipo': 'Operazione',
+                  'Codice': `${operation} (${workCenter})`,
+                  'Descrizione': child.data.OperationDescription || '',
+                  'Quantità': cycleQty,
+                  'UM': '-',
+                  'Costo Unitario (€)': cycleUnitCost,
+                  'Costi Fissi (€)': cycleFixedCost > 0 ? cycleFixedCost : null,
+                  'Costo Totale (€)': cycleTotalCost
+                });
+              }
+            });
+
+            // Ricorsione sui componenti figli
+            const childComponents = node.children.filter(c => c.type === 'component');
+            if (childComponents.length > 0) {
+              rows.push(...flattenTree(childComponents, level + 1, `${parentPath}${itemCode}/`));
+            }
+          }
+        }
+      });
+
+      return rows;
+    };
+
+    // Genera i dati per l'Excel
+    const flatData = flattenTree(treeData);
+
+    // Aggiungi un header con informazioni riepilogative
+    const costing = costingResult.costing || {};
+    const summaryRows = [
+      {
+        'Livello': 'RIEPILOGO COSTI',
+        'Tipo': '',
+        'Codice': costingResult.bomCode || '',
+        'Descrizione': costingResult.bomDescription || '',
+        'Quantità': null,
+        'UM': '',
+        'Costo Unitario (€)': null,
+        'Costi Fissi (€)': null,
+        'Costo Totale (€)': costing.unit_cost_final || 0
+      },
+      {
+        'Livello': 'Lotto Produzione',
+        'Tipo': '',
+        'Codice': '',
+        'Descrizione': '',
+        'Quantità': costing.production_lot || 100,
+        'UM': 'PZ',
+        'Costo Unitario (€)': null,
+        'Costi Fissi (€)': null,
+        'Costo Totale (€)': null
+      },
+      {
+        'Livello': 'Materiali',
+        'Tipo': '',
+        'Codice': '',
+        'Descrizione': '',
+        'Quantità': null,
+        'UM': '',
+        'Costo Unitario (€)': null,
+        'Costi Fissi (€)': null,
+        'Costo Totale (€)': costing.variable_costs_material || 0
+      },
+      {
+        'Livello': 'Operazioni',
+        'Tipo': '',
+        'Codice': '',
+        'Descrizione': '',
+        'Quantità': null,
+        'UM': '',
+        'Costo Unitario (€)': null,
+        'Costi Fissi (€)': null,
+        'Costo Totale (€)': costing.variable_costs_operations || 0
+      },
+      {
+        'Livello': 'Fissi',
+        'Tipo': '',
+        'Codice': '',
+        'Descrizione': '',
+        'Quantità': null,
+        'UM': '',
+        'Costo Unitario (€)': null,
+        'Costi Fissi (€)': null,
+        'Costo Totale (€)': costing.fixed_costs_per_lot || 0
+      },
+      {
+        'Livello': 'Ricarichi',
+        'Tipo': '',
+        'Codice': '',
+        'Descrizione': '',
+        'Quantità': null,
+        'UM': '',
+        'Costo Unitario (€)': null,
+        'Costi Fissi (€)': null,
+        'Costo Totale (€)': (costing.ricarico_mp_amount || 0) +
+          (costing.ricarico_ope_amount || 0) +
+          (costing.ricarico_trasporto_amount || 0) +
+          (costing.ricarico_scarto_amount || 0) +
+          (costing.ricarico_totale_amount || 0) +
+          (costing.ricarico_sconto_amount || 0)
+      },
+      {}, // Riga vuota
+      {
+        'Livello': 'DETTAGLIO COMPONENTI',
+        'Tipo': '',
+        'Codice': '',
+        'Descrizione': '',
+        'Quantità': null,
+        'UM': '',
+        'Costo Unitario (€)': null,
+        'Costi Fissi (€)': null,
+        'Costo Totale (€)': null
+      },
+      {
+        'Livello': 'Livello',
+        'Tipo': 'Tipo',
+        'Codice': 'Codice',
+        'Descrizione': 'Descrizione',
+        'Quantità': 'Quantità',
+        'UM': 'UM',
+        'Costo Unitario (€)': 'Costo Unitario (€)',
+        'Costi Fissi (€)': 'Costi Fissi (€)',
+        'Costo Totale (€)': 'Costo Totale (€)'
+      }
+    ];
+
+    const allData = [...summaryRows, ...flatData];
+
+    // Crea il workbook senza header automatico
+    const worksheet = XLSX.utils.json_to_sheet(allData, { skipHeader: true });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Costificazione BOM');
+
+    // Imposta larghezza colonne
+    const colWidths = [
+      { wch: 10 },  // Livello
+      { wch: 15 },  // Tipo
+      { wch: 25 },  // Codice
+      { wch: 40 },  // Descrizione
+      { wch: 10 },  // Quantità
+      { wch: 5 },   // UM
+      { wch: 18 },  // Costo Unitario
+      { wch: 15 },  // Costi Fissi
+      { wch: 16 }   // Costo Totale
+    ];
+    worksheet['!cols'] = colWidths;
+
+    // Formatta le celle numeriche (formato italiano con zero iniziale)
+    // Le colonne numeriche sono: E (Quantità - indice 4), G (Costo Unitario - indice 6),
+    // H (Costi Fissi - indice 7), I (Costo Totale - indice 8)
+    const range = XLSX.utils.decode_range(worksheet['!ref']);
+    for (let row = range.s.r; row <= range.e.r; row++) {
+      // Formatta Quantità (colonna E, indice 4) - 3 decimali
+      const qtyCell = XLSX.utils.encode_cell({ r: row, c: 4 });
+      if (worksheet[qtyCell] && typeof worksheet[qtyCell].v === 'number') {
+        worksheet[qtyCell].z = '0.000';
+        worksheet[qtyCell].t = 'n';
+      }
+
+      // Formatta Costo Unitario (colonna G, indice 6) - fino a 3 decimali
+      const unitCostCell = XLSX.utils.encode_cell({ r: row, c: 6 });
+      if (worksheet[unitCostCell] && typeof worksheet[unitCostCell].v === 'number') {
+        worksheet[unitCostCell].z = '0.000 "€"';
+        worksheet[unitCostCell].t = 'n';
+      }
+
+      // Formatta Costi Fissi (colonna H, indice 7) - fino a 3 decimali
+      const fixedCostCell = XLSX.utils.encode_cell({ r: row, c: 7 });
+      if (worksheet[fixedCostCell] && typeof worksheet[fixedCostCell].v === 'number') {
+        worksheet[fixedCostCell].z = '0.000 "€"';
+        worksheet[fixedCostCell].t = 'n';
+      }
+
+      // Formatta Costo Totale (colonna I, indice 8) - fino a 3 decimali
+      const totalCostCell = XLSX.utils.encode_cell({ r: row, c: 8 });
+      if (worksheet[totalCostCell] && typeof worksheet[totalCostCell].v === 'number') {
+        worksheet[totalCostCell].z = '0.000 "€"';
+        worksheet[totalCostCell].t = 'n';
+      }
+    }
+
+    // Genera e scarica il file
+    const fileName = `BOM_Costing_${costingResult.bomCode || 'Export'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName, { bookType: 'xlsx', cellStyles: true });
+  }, [costingResult, treeData]);
+
   if (!costingResult) {
     return (
       <Card>
@@ -695,6 +940,27 @@ const CostTreeView = ({ costingResult }) => {
           >
             Comprimi Tutto
           </Button>
+
+          {/* Dropdown per esportazione */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Esporta
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportToExcel}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Esporta in Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Button
             variant="ghost"
             className="d-none"
