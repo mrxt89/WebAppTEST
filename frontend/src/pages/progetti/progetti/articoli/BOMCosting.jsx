@@ -777,26 +777,23 @@ const BOMCosting = ({ selectedItem }) => {
             operationCostMap.set(bomId, existing);
           });
 
-          // Mappa 2: ComponentId -> costi dei materiali (da costComponents)
-          const materialCostMap = new Map();
-          costComponents.forEach(comp => {
-            const componentId = comp.ComponentId?.toString();
-            if (!componentId) return;
-
-            materialCostMap.set(componentId, {
-              UnitCost: comp.UnitCost || 0,
-              CalculatedTotalCost: comp.CalculatedTotalCost || comp.TotalCost || 0,
-              Quantity: comp.Quantity || 0
-            });
-          });
-
           // Arricchisci i componenti BOM con i costi REALI da SP_CalculateBOMCosting
+          // Usa matching per ComponentId + Quantity per gestire componenti duplicati con quantità diverse
           const enrichedComponents = bomComponents.map(bomComp => {
             const operationData = operationCostMap.get(bomComp.BOMId?.toString());
-            const materialData = materialCostMap.get(bomComp.ComponentId?.toString());
+
+            // Cerca il componente corrispondente da SP_CalculateBOMCosting
+            // Match per ComponentId + Quantity per gestire duplicati
+            const componentId = bomComp.ComponentId?.toString();
+            const quantity = bomComp.Quantity || 0;
+
+            const materialData = costComponents.find(comp =>
+              comp.ComponentId?.toString() === componentId &&
+              Math.abs((comp.Quantity || 0) - quantity) < 0.0001 // Tolleranza per float
+            );
 
             // Costi materiali da SP_CalculateBOMCosting (non da GET_BOM_MULTILEVEL)
-            const materialCost = materialData?.CalculatedTotalCost || 0;
+            const materialCost = materialData?.CalculatedTotalCost || materialData?.TotalCost || 0;
             const operationCost = operationData?.OperationCost || 0;
 
             return {
@@ -907,26 +904,23 @@ const BOMCosting = ({ selectedItem }) => {
             operationCostMap.set(bomId, existing);
           });
 
-          // Mappa 2: ComponentId -> costi dei materiali (da costComponents)
-          const materialCostMap = new Map();
-          costComponents.forEach(comp => {
-            const componentId = comp.ComponentId?.toString();
-            if (!componentId) return;
-
-            materialCostMap.set(componentId, {
-              UnitCost: comp.UnitCost || 0,
-              CalculatedTotalCost: comp.CalculatedTotalCost || comp.TotalCost || 0,
-              Quantity: comp.Quantity || 0
-            });
-          });
-
           // Arricchisci i componenti BOM con i costi REALI da SP_CalculateBOMCosting
+          // Usa matching per ComponentId + Quantity per gestire componenti duplicati con quantità diverse
           const enrichedComponents = bomComponents.map(bomComp => {
             const operationData = operationCostMap.get(bomComp.BOMId?.toString());
-            const materialData = materialCostMap.get(bomComp.ComponentId?.toString());
+
+            // Cerca il componente corrispondente da SP_CalculateBOMCosting
+            // Match per ComponentId + Quantity per gestire duplicati
+            const componentId = bomComp.ComponentId?.toString();
+            const quantity = bomComp.Quantity || 0;
+
+            const materialData = costComponents.find(comp =>
+              comp.ComponentId?.toString() === componentId &&
+              Math.abs((comp.Quantity || 0) - quantity) < 0.0001 // Tolleranza per float
+            );
 
             // Costi materiali da SP_CalculateBOMCosting (non da GET_BOM_MULTILEVEL)
-            const materialCost = materialData?.CalculatedTotalCost || 0;
+            const materialCost = materialData?.CalculatedTotalCost || materialData?.TotalCost || 0;
             const operationCost = operationData?.OperationCost || 0;
 
             return {
