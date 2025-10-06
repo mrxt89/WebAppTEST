@@ -778,19 +778,38 @@ const BOMCosting = ({ selectedItem }) => {
           });
 
           // Arricchisci i componenti BOM con i costi REALI da SP_CalculateBOMCosting
-          // Usa matching per ComponentId + Quantity per gestire componenti duplicati con quantità diverse
+          // IMPORTANTE: Usa Path per match esatto, evitando di prendere costi dal componente sbagliato
+          // quando lo stesso ComponentId appare in rami diversi con costi diversi
           const enrichedComponents = bomComponents.map(bomComp => {
             const operationData = operationCostMap.get(bomComp.BOMId?.toString());
 
-            // Cerca il componente corrispondente da SP_CalculateBOMCosting
-            // Match per ComponentId + Quantity per gestire duplicati
+            // Cerca il componente corrispondente da SP_CalculateBOMCosting usando il Path
+            // Il Path è univoco per ogni occorrenza del componente nell'albero BOM
+            const bomCompPath = bomComp.Path;
             const componentId = bomComp.ComponentId?.toString();
             const quantity = bomComp.Quantity || 0;
 
-            const materialData = costComponents.find(comp =>
-              comp.ComponentId?.toString() === componentId &&
-              Math.abs((comp.Quantity || 0) - quantity) < 0.0001 // Tolleranza per float
+            // Primo tentativo: match esatto per Path (il modo corretto)
+            let materialData = costComponents.find(comp =>
+              comp.Path === bomCompPath
             );
+
+            // Fallback: se Path non disponibile, usa ComponentId + Quantity + ParentBOMId
+            if (!materialData) {
+              materialData = costComponents.find(comp =>
+                comp.ComponentId?.toString() === componentId &&
+                comp.ParentBOMId?.toString() === bomComp.ParentBOMId?.toString() &&
+                Math.abs((comp.Quantity || 0) - quantity) < 0.0001
+              );
+            }
+
+            // Ultimo fallback: solo ComponentId + Quantity (comportamento originale)
+            if (!materialData) {
+              materialData = costComponents.find(comp =>
+                comp.ComponentId?.toString() === componentId &&
+                Math.abs((comp.Quantity || 0) - quantity) < 0.0001
+              );
+            }
 
             // Costi materiali da SP_CalculateBOMCosting (non da GET_BOM_MULTILEVEL)
             const materialCost = materialData?.CalculatedTotalCost || materialData?.TotalCost || 0;
@@ -905,19 +924,38 @@ const BOMCosting = ({ selectedItem }) => {
           });
 
           // Arricchisci i componenti BOM con i costi REALI da SP_CalculateBOMCosting
-          // Usa matching per ComponentId + Quantity per gestire componenti duplicati con quantità diverse
+          // IMPORTANTE: Usa Path per match esatto, evitando di prendere costi dal componente sbagliato
+          // quando lo stesso ComponentId appare in rami diversi con costi diversi
           const enrichedComponents = bomComponents.map(bomComp => {
             const operationData = operationCostMap.get(bomComp.BOMId?.toString());
 
-            // Cerca il componente corrispondente da SP_CalculateBOMCosting
-            // Match per ComponentId + Quantity per gestire duplicati
+            // Cerca il componente corrispondente da SP_CalculateBOMCosting usando il Path
+            // Il Path è univoco per ogni occorrenza del componente nell'albero BOM
+            const bomCompPath = bomComp.Path;
             const componentId = bomComp.ComponentId?.toString();
             const quantity = bomComp.Quantity || 0;
 
-            const materialData = costComponents.find(comp =>
-              comp.ComponentId?.toString() === componentId &&
-              Math.abs((comp.Quantity || 0) - quantity) < 0.0001 // Tolleranza per float
+            // Primo tentativo: match esatto per Path (il modo corretto)
+            let materialData = costComponents.find(comp =>
+              comp.Path === bomCompPath
             );
+
+            // Fallback: se Path non disponibile, usa ComponentId + Quantity + ParentBOMId
+            if (!materialData) {
+              materialData = costComponents.find(comp =>
+                comp.ComponentId?.toString() === componentId &&
+                comp.ParentBOMId?.toString() === bomComp.ParentBOMId?.toString() &&
+                Math.abs((comp.Quantity || 0) - quantity) < 0.0001
+              );
+            }
+
+            // Ultimo fallback: solo ComponentId + Quantity (comportamento originale)
+            if (!materialData) {
+              materialData = costComponents.find(comp =>
+                comp.ComponentId?.toString() === componentId &&
+                Math.abs((comp.Quantity || 0) - quantity) < 0.0001
+              );
+            }
 
             // Costi materiali da SP_CalculateBOMCosting (non da GET_BOM_MULTILEVEL)
             const materialCost = materialData?.CalculatedTotalCost || materialData?.TotalCost || 0;

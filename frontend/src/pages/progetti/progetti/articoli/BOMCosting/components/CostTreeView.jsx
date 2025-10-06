@@ -415,7 +415,11 @@ const CostTreeView = ({ costingResult }) => {
 
     // Primo passaggio: crea tutti i nodi componente
     components.forEach((comp, index) => {
-      const nodeId = `component-${comp.ComponentId || index}-${comp.Level}-${index}`;
+      // USA IL PATH COME ID UNIVOCO per distinguere lo stesso componente in rami diversi
+      // Se Path non è disponibile, fallback al vecchio metodo
+      const nodeId = comp.Path
+        ? `component-path-${comp.Path}`
+        : `component-${comp.ComponentId || index}-${comp.Level}-${index}`;
 
       // IMPORTANTE: Usa i costi che arrivano direttamente dal backend SENZA ricalcolarli
       // Il backend restituisce già: UnitCost, FixedCost, TotalCost, CalculatedTotalCost
@@ -443,7 +447,9 @@ const CostTreeView = ({ costingResult }) => {
 
     // Secondo passaggio: aggiungi i cicli ai componenti (usa SOLO routing, no comp.operations per evitare duplicati)
     components.forEach((comp, index) => {
-      const nodeId = `component-${comp.ComponentId || index}-${comp.Level}-${index}`;
+      const nodeId = comp.Path
+        ? `component-path-${comp.Path}`
+        : `component-${comp.ComponentId || index}-${comp.Level}-${index}`;
       const componentNode = nodeMap[nodeId];
 
       // Aggiungi i cicli di routing per questo componente
@@ -491,7 +497,9 @@ const CostTreeView = ({ costingResult }) => {
     components.forEach((comp, index) => {
       if (comp.Level === 0) return; // Skip solo il nodo root (livello 0)
 
-      const nodeId = `component-${comp.ComponentId || index}-${comp.Level}-${index}`;
+      const nodeId = comp.Path
+        ? `component-path-${comp.Path}`
+        : `component-${comp.ComponentId || index}-${comp.Level}-${index}`;
       const currentNode = nodeMap[nodeId];
 
       if (!currentNode) return;
@@ -501,9 +509,10 @@ const CostTreeView = ({ costingResult }) => {
         const pathParts = comp.Path.split(".");
         pathParts.pop(); // Rimuovi l'ultimo elemento (nodo corrente)
         const parentPath = pathParts.join(".");
+        const parentNodeId = `component-path-${parentPath}`;
 
-        // Cerca un nodo con Path uguale al parentPath
-        const parentNode = Object.values(nodeMap).find(n => n.data.Path === parentPath);
+        // Cerca il nodo parent usando l'ID generato dal Path
+        const parentNode = nodeMap[parentNodeId];
 
         if (parentNode) {
           parentNode.children.push(currentNode);
