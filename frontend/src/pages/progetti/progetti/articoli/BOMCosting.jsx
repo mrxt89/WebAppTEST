@@ -752,29 +752,64 @@ const BOMCosting = ({ selectedItem }) => {
           const bomRouting = bomStructure.routing || [];
           const costComponents = costResponse.data.data.components || [];
 
-          // Crea una mappa dei costi per ComponentId
-          const costMap = new Map();
-          costComponents.forEach(comp => {
-            costMap.set(comp.ComponentId?.toString(), comp);
+          const costingRouting = costResponse.data.data.routing || [];
+          const productionLot = costResponse.data.data.costing?.production_lot || 100;
+
+          // Mappa 1: BOMId -> costi delle operazioni (da routing)
+          const operationCostMap = new Map();
+          costingRouting.forEach(route => {
+            const bomId = route.BOMId?.toString();
+            if (!bomId) return;
+
+            const existing = operationCostMap.get(bomId) || {
+              ProcessingCost: 0,
+              FixedCostTotal: 0,
+              OperationCost: 0
+            };
+
+            const processingCost = route.ProcessingCost || 0;
+            const setupCost = route.SetupCost || 0;
+
+            existing.ProcessingCost += processingCost;
+            existing.FixedCostTotal += setupCost;
+            existing.OperationCost += (processingCost + (setupCost / productionLot));
+
+            operationCostMap.set(bomId, existing);
           });
 
-          // Arricchisci i componenti BOM con i dati di costo
+          // Mappa 2: ComponentId -> costi dei materiali (da costComponents)
+          const materialCostMap = new Map();
+          costComponents.forEach(comp => {
+            const componentId = comp.ComponentId?.toString();
+            if (!componentId) return;
+
+            materialCostMap.set(componentId, {
+              UnitCost: comp.UnitCost || 0,
+              CalculatedTotalCost: comp.CalculatedTotalCost || comp.TotalCost || 0,
+              Quantity: comp.Quantity || 0
+            });
+          });
+
+          // Arricchisci i componenti BOM con i costi REALI da SP_CalculateBOMCosting
           const enrichedComponents = bomComponents.map(bomComp => {
-            const costData = costMap.get(bomComp.ComponentId?.toString());
+            const operationData = operationCostMap.get(bomComp.BOMId?.toString());
+            const materialData = materialCostMap.get(bomComp.ComponentId?.toString());
 
-            if (costData) {
-              return {
-                ...bomComp,
-                TotalCost: costData.TotalCost || costData.CalculatedTotalCost || 0,
-                UnitCost: costData.UnitCost || 0,
-                MaterialCost: costData.MaterialCost || 0,
-                OperationCost: costData.OperationCost || 0,
-                FixedCost: costData.FixedCost || 0,
-                ScrapPercentage: costData.ScrapPercentage || 0
-              };
-            }
+            // Costi materiali da SP_CalculateBOMCosting (non da GET_BOM_MULTILEVEL)
+            const materialCost = materialData?.CalculatedTotalCost || 0;
+            const operationCost = operationData?.OperationCost || 0;
 
-            return bomComp;
+            return {
+              ...bomComp,
+              OperationCost: operationData?.ProcessingCost || 0,
+              FixedCost: operationData ? operationData.FixedCostTotal / productionLot : 0,
+              FixedCostTotal: operationData?.FixedCostTotal || 0,
+              MaterialCost: materialCost,
+              TotalCost: materialCost + operationCost,
+              CalculatedTotalCost: materialCost + operationCost,
+              UnitCost: materialData?.UnitCost || 0,
+              Quantity: bomComp.Quantity || materialData?.Quantity || 0
+            };
           });
 
           // Aggiungi i cicli ai componenti
@@ -793,7 +828,7 @@ const BOMCosting = ({ selectedItem }) => {
           const finalTreeData = {
             ...costResponse.data.data,
             components: componentsWithCycles,
-            routing: bomRouting,
+            routing: costingRouting, // USA i dati di routing con i costi da SP_CalculateBOMCosting
             bomCode: bomData?.ItemCode || bomData?.BOMCode,
             bomDescription: bomData?.ItemDescription || bomData?.Description
           };
@@ -846,31 +881,65 @@ const BOMCosting = ({ selectedItem }) => {
           const bomComponents = bomData.components || [];
           const bomRouting = bomData.routing || [];
 
-          // Crea una mappa dei costi per ComponentId
-          const costMap = new Map();
-          costingResult.components.forEach(comp => {
-            costMap.set(comp.ComponentId?.toString(), comp);
+          const costingRouting = costingResult.routing || [];
+          const costComponents = costingResult.components || [];
+          const productionLot = costingResult.costing?.production_lot || 100;
+
+          // Mappa 1: BOMId -> costi delle operazioni (da routing)
+          const operationCostMap = new Map();
+          costingRouting.forEach(route => {
+            const bomId = route.BOMId?.toString();
+            if (!bomId) return;
+
+            const existing = operationCostMap.get(bomId) || {
+              ProcessingCost: 0,
+              FixedCostTotal: 0,
+              OperationCost: 0
+            };
+
+            const processingCost = route.ProcessingCost || 0;
+            const setupCost = route.SetupCost || 0;
+
+            existing.ProcessingCost += processingCost;
+            existing.FixedCostTotal += setupCost;
+            existing.OperationCost += (processingCost + (setupCost / productionLot));
+
+            operationCostMap.set(bomId, existing);
           });
 
-          // IMPORTANTE: Usa TUTTI i componenti BOM e arricchiscili con i costi quando disponibili
+          // Mappa 2: ComponentId -> costi dei materiali (da costComponents)
+          const materialCostMap = new Map();
+          costComponents.forEach(comp => {
+            const componentId = comp.ComponentId?.toString();
+            if (!componentId) return;
+
+            materialCostMap.set(componentId, {
+              UnitCost: comp.UnitCost || 0,
+              CalculatedTotalCost: comp.CalculatedTotalCost || comp.TotalCost || 0,
+              Quantity: comp.Quantity || 0
+            });
+          });
+
+          // Arricchisci i componenti BOM con i costi REALI da SP_CalculateBOMCosting
           const enrichedComponents = bomComponents.map(bomComp => {
-            const costData = costMap.get(bomComp.ComponentId?.toString());
+            const operationData = operationCostMap.get(bomComp.BOMId?.toString());
+            const materialData = materialCostMap.get(bomComp.ComponentId?.toString());
 
-            // Se abbiamo i dati di costo, combinali con i dati BOM
-            if (costData) {
-              return {
-                ...bomComp,
-                TotalCost: costData.TotalCost || costData.CalculatedTotalCost || 0,
-                UnitCost: costData.UnitCost || 0,
-                MaterialCost: costData.MaterialCost || 0,
-                OperationCost: costData.OperationCost || 0,
-                FixedCost: costData.FixedCost || 0,
-                ScrapPercentage: costData.ScrapPercentage || 0
-              };
-            }
+            // Costi materiali da SP_CalculateBOMCosting (non da GET_BOM_MULTILEVEL)
+            const materialCost = materialData?.CalculatedTotalCost || 0;
+            const operationCost = operationData?.OperationCost || 0;
 
-            // Altrimenti usa solo i dati BOM (senza costi dettagliati)
-            return bomComp;
+            return {
+              ...bomComp,
+              OperationCost: operationData?.ProcessingCost || 0,
+              FixedCost: operationData ? operationData.FixedCostTotal / productionLot : 0,
+              FixedCostTotal: operationData?.FixedCostTotal || 0,
+              MaterialCost: materialCost,
+              TotalCost: materialCost + operationCost,
+              CalculatedTotalCost: materialCost + operationCost,
+              UnitCost: materialData?.UnitCost || 0,
+              Quantity: bomComp.Quantity || materialData?.Quantity || 0
+            };
           });
 
           // Aggiungi i cicli ai componenti
@@ -889,7 +958,7 @@ const BOMCosting = ({ selectedItem }) => {
           const finalTreeData = {
             ...costingResult,
             components: componentsWithCycles,
-            routing: bomRouting,
+            routing: costingRouting, // USA i dati di routing con i costi da SP_CalculateBOMCosting
             bomCode: selectedBOM.ItemCode,
             bomDescription: selectedBOM.ItemDescription
           };
@@ -956,41 +1025,70 @@ const BOMCosting = ({ selectedItem }) => {
           console.log('BOM routing:', bomRouting.length);
           console.log('Cost components:', costComponents.length);
 
-          // Crea una mappa dei componenti BOM
-          const bomMap = new Map();
-          bomComponents.forEach(comp => {
-            bomMap.set(comp.ComponentId?.toString(), comp);
+          const costingRouting = costResponse.data.data.routing || [];
+          const productionLot = costResponse.data.data.costing?.production_lot || 100;
+
+          console.log('Routing data:', costingRouting.length);
+          console.log('Production lot:', productionLot);
+
+          // Mappa 1: BOMId -> costi delle operazioni (da routing)
+          const operationCostMap = new Map();
+          costingRouting.forEach(route => {
+            const bomId = route.BOMId?.toString();
+            if (!bomId) return;
+
+            const existing = operationCostMap.get(bomId) || {
+              ProcessingCost: 0,
+              FixedCostTotal: 0,
+              OperationCost: 0
+            };
+
+            const processingCost = route.ProcessingCost || 0;
+            const setupCost = route.SetupCost || 0;
+
+            existing.ProcessingCost += processingCost;
+            existing.FixedCostTotal += setupCost;
+            existing.OperationCost += (processingCost + (setupCost / productionLot));
+
+            operationCostMap.set(bomId, existing);
           });
 
-          console.log('BOM map size:', bomMap.size);
-
-          // Crea una mappa dei costi per ComponentId
-          const costMap = new Map();
+          // Mappa 2: ComponentId -> costi dei materiali (da costComponents)
+          const materialCostMap = new Map();
           costComponents.forEach(comp => {
-            costMap.set(comp.ComponentId?.toString(), comp);
+            const componentId = comp.ComponentId?.toString();
+            if (!componentId) return;
+
+            materialCostMap.set(componentId, {
+              UnitCost: comp.UnitCost || 0,
+              CalculatedTotalCost: comp.CalculatedTotalCost || comp.TotalCost || 0,
+              Quantity: comp.Quantity || 0
+            });
           });
 
-          console.log('Cost map size:', costMap.size);
+          console.log('Operation cost map size:', operationCostMap.size);
+          console.log('Material cost map size:', materialCostMap.size);
 
-          // IMPORTANTE: Usa TUTTI i componenti BOM (24) e arricchiscili con i costi quando disponibili
+          // Arricchisci i componenti BOM con i costi REALI da SP_CalculateBOMCosting
           const enrichedComponents = bomComponents.map(bomComp => {
-            const costData = costMap.get(bomComp.ComponentId?.toString());
+            const operationData = operationCostMap.get(bomComp.BOMId?.toString());
+            const materialData = materialCostMap.get(bomComp.ComponentId?.toString());
 
-            // Se abbiamo i dati di costo, combinali con i dati BOM
-            if (costData) {
-              return {
-                ...bomComp,
-                TotalCost: costData.TotalCost || costData.CalculatedTotalCost || 0,
-                UnitCost: costData.UnitCost || 0,
-                MaterialCost: costData.MaterialCost || 0,
-                OperationCost: costData.OperationCost || 0,
-                FixedCost: costData.FixedCost || 0,
-                ScrapPercentage: costData.ScrapPercentage || 0
-              };
-            }
+            // Costi materiali da SP_CalculateBOMCosting (non da GET_BOM_MULTILEVEL)
+            const materialCost = materialData?.CalculatedTotalCost || 0;
+            const operationCost = operationData?.OperationCost || 0;
 
-            // Altrimenti usa solo i dati BOM (senza costi dettagliati)
-            return bomComp;
+            return {
+              ...bomComp,
+              OperationCost: operationData?.ProcessingCost || 0,
+              FixedCost: operationData ? operationData.FixedCostTotal / productionLot : 0,
+              FixedCostTotal: operationData?.FixedCostTotal || 0,
+              MaterialCost: materialCost,
+              TotalCost: materialCost + operationCost,
+              CalculatedTotalCost: materialCost + operationCost,
+              UnitCost: materialData?.UnitCost || 0,
+              Quantity: bomComp.Quantity || materialData?.Quantity || 0
+            };
           });
 
           console.log('Enriched components (all BOM components):', enrichedComponents.length);
@@ -1011,7 +1109,7 @@ const BOMCosting = ({ selectedItem }) => {
           const finalTreeData = {
             ...costResponse.data.data,
             components: componentsWithCycles,
-            routing: bomRouting,
+            routing: costingRouting, // USA i dati di routing con i costi da SP_CalculateBOMCosting
             bomCode: selectedBOM.ItemCode,
             bomDescription: selectedBOM.ItemDescription
           };

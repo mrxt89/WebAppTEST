@@ -67,15 +67,15 @@ const ProjectListSection = ({
       applyFilters(filters, fetchProjects, getUserProjectStatistics, setPinnedProjects, setStatistics);
     }, 300);
     return () => clearTimeout(timeoutId);
-  }, [filters, fetchProjects, getUserProjectStatistics, setPinnedProjects, setStatistics]);
+  }, [filters]);
 
   // Effetto per applicare filtri al primo caricamento
   useEffect(() => {
-    if (projects.length > 0 && !loading) {
-      // Applica i filtri di default al primo caricamento
+    if (projects.length > 0 && !loading && filters === DEFAULT_FILTERS) {
+      // Applica i filtri di default al primo caricamento solo se sono ancora i filtri di default
       applyFilters(filters, fetchProjects, getUserProjectStatistics, setPinnedProjects, setStatistics);
     }
-  }, [projects.length, loading, fetchProjects, getUserProjectStatistics, setPinnedProjects, setStatistics]);
+  }, [projects.length, loading]);
 
   // Callback per filtrare e ordinare i progetti
   const filteredAndSortedProjects = useCallback(() => {
