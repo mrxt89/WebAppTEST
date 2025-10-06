@@ -6,7 +6,10 @@
       "Bash(node server.js)",
       "Bash(dir:*)",
       "Bash(findstr:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(powershell -Command \"Get-Content script.sql -Encoding Unicode | Select-Object -Index (1757..1766)\")",
+      "Bash(powershell -Command \"(Get-Content script.sql -Encoding Unicode -Raw) -match ''(?s)(-- CORREZIONE.*?ORDER BY exp\\.Line;)'' | Out-Null; if ($matches) { $matches[1] }\")",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []

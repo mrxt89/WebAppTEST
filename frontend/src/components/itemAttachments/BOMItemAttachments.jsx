@@ -542,6 +542,16 @@ function BOMItemAttachments({
         />
       )}
 
+      {/* Dialog per i dettagli */}
+      {selectedAttachment && dialogOpen && dialogType === "details" && (
+        <ItemAttachmentDetails
+          open={dialogOpen}
+          attachment={selectedAttachment}
+          onClose={handleDialogClose}
+          readOnly={readOnly}
+        />
+      )}
+
       {/* FileViewer per la preview dell'allegato */}
       {isPreviewOpen && selectedAttachment && (
         <FileViewer
