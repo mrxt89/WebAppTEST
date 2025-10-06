@@ -155,19 +155,28 @@ const calculateBOMCosting = async (companyId, bomId, options = {}) => {
         
         if (result.recordset && result.recordset.length > 0) {
             const costingResult = result.recordset[0];
-            
-            // Se è richiesto il debug, include anche il dettaglio componenti
+
+            // Se è richiesto il debug, include anche il dettaglio componenti e routing
             let componentDetails = null;
+            let routingDetails = null;
             if (debug && result.recordsets && result.recordsets.length > 1) {
+                // Recordset[0]: Costing summary (già preso sopra)
+                // Recordset[1]: Componenti con costi (ComponentId, ItemCode, UnitCost, FixedCost, TotalCost, CalculatedTotalCost)
                 componentDetails = result.recordsets[1];
+
+                // Recordset[3]: Routing con ProcessingCost e SetupCost (BOMId, Operation, ProcessingTime, ProcessingCost, SetupCost, etc.)
+                if (result.recordsets.length > 3) {
+                    routingDetails = result.recordsets[3];
+                }
             }
-            
+
             return {
                 success: true,
                 message: 'Costificazione calcolata con successo',
                 data: {
                     costing: costingResult,
                     components: componentDetails,
+                    routing: routingDetails,
                     calculation_timestamp: new Date().toISOString(),
                     version_used: version
                 }

@@ -127,6 +127,11 @@ export const applyFilters = async (
       {},
     );
 
+    // Evita chiamate multiple se i filtri sono vuoti e sono già stati applicati
+    if (Object.keys(cleanedFilters).length === 0) {
+      return;
+    }
+
     const projectsData = await fetchProjects(0, 100, cleanedFilters);
     
     if (projectsData && projectsData.items) {

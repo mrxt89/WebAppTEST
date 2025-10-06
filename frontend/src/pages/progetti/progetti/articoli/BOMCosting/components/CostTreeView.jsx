@@ -86,24 +86,16 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
     <div>
       <div
         className={cn(
-          "flex items-center py-1 px-2 rounded cursor-pointer hover:bg-green-50 transition-colors",
-          "border-l-2",
-          expanded && "bg-green-50"
+          "flex items-center py-1 px-2 rounded hover:bg-green-50 transition-colors",
+          "border-l-2"
         )}
         style={{
           paddingLeft: `${indent}px`,
           borderLeftColor: getLevelColor(level)
         }}
-        onClick={onToggle}
       >
-        {/* Toggle icon */}
-        <div className="mr-1">
-          {expanded ? (
-            <ChevronDown className="h-3 w-3 text-gray-500" />
-          ) : (
-            <ChevronRight className="h-3 w-3 text-gray-500" />
-          )}
-        </div>
+        {/* Spacer per allineamento (senza toggle icon) */}
+        <div className="w-3 mr-1" />
 
         {/* Cycle icon */}
         <Factory className="h-4 w-4 text-green-600 mr-2 flex-shrink-0" />
@@ -137,7 +129,7 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
 
           {/* Colonna 5: Costo Fisso (9%) */}
           <div className="text-xs font-medium text-orange-700 text-right flex-shrink-0" style={{ width: '9%' }}>
-            -
+            {fixedCost > 0 ? formatCurrency(fixedCost) : '-'}
           </div>
 
           {/* Colonna 6: Costo Totale (9%) */}
@@ -147,37 +139,42 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
         </div>
       </div>
 
-      {/* Dettagli ciclo espansi */}
-      {expanded && (
-        <div
-          className="py-1 px-2 bg-green-50/50 border-l-2 text-xs space-y-1"
-          style={{
-            paddingLeft: `${indent + 32}px`,
-            borderLeftColor: getLevelColor(level)
-          }}
-        >
-          {cycle.CycleTime !== undefined && (
-            <div className="flex justify-between">
-              <span className="text-gray-600">Tempo Ciclo:</span>
-              <span className="font-medium">{cycle.CycleTime} min</span>
-            </div>
-          )}
-          {cycle.HourlyCost !== undefined && (
-            <div className="flex justify-between">
-              <span className="text-gray-600">Costo Orario:</span>
-              <span className="font-medium">{formatCurrency(cycle.HourlyCost)}/h</span>
-            </div>
-          )}
-          {cycle.UnitCost !== undefined && (
-            <div className="flex justify-between font-medium">
-              <span className="text-green-700">Costo Unitario:</span>
-              <span className="text-green-900">{formatCurrency(cycle.UnitCost)}</span>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
+};
+
+// Funzione ricorsiva per calcolare il costo totale dei figli
+// Usa sempre i dati RAW (MaterialCost + OperationCost) non quelli calcolati per visualizzazione
+const calculateChildrenCost = (node) => {
+  if (!node.children || node.children.length === 0) return 0;
+
+  return node.children.reduce((sum, child) => {
+    // Se il figlio è un'operazione (cycle), aggiungi il suo costo
+    if (child.type === "cycle") {
+      return sum + (child.data.TotalCost || 0);
+    }
+
+    // Se il figlio è un componente:
+    // - Se ha figli propri → somma SOLO i costi dei suoi figli (ricorsivo)
+    // - Se NON ha figli (foglia) → usa MaterialCost + OperationCost
+    if (child.type === "component") {
+      const hasGrandChildren = child.children && child.children.length > 0;
+
+      if (hasGrandChildren) {
+        // Ha figli: somma solo i costi dei figli (i costi propri sarebbero duplicati)
+        const childrenCost = calculateChildrenCost(child);
+        return sum + childrenCost;
+      } else {
+        // Foglia: usa i dati RAW originali
+        const materialCost = child.data.MaterialCost || 0;
+        const operationCost = child.data.OperationCost || 0;
+        const childOwnCost = materialCost + operationCost;
+        return sum + childOwnCost;
+      }
+    }
+
+    return sum;
+  }, 0);
 };
 
 // Componente per un nodo componente
@@ -189,14 +186,36 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
   const isRootNode = node.data.Level === 0;
   const hasChildren = node.children && node.children.length > 0;
 
-  // Calcola i costi del componente
-  const unitCost = node.data.UnitCost || 0;
-  const fixedCost = node.data.FixedCost || 0;
-  const quantity = node.data.Quantity || (isRootNode ? 1 : 0);
-  
-  // Calcola il costo totale: (Costo Unitario × Quantità) + Costi Fissi
-  const totalCost = node.data.TotalCost || node.data.CalculatedTotalCost || 
-    ((unitCost * quantity) + fixedCost);
+  // Logica di visualizzazione dei costi:
+  // 1. Se ESPANSO e ha figli → mostra 0 (i costi sono visibili nei figli)
+  // 2. Se COMPRESSO e ha figli → mostra SOLO la somma ricorsiva dei figli
+  // 3. Se NON ha figli (foglia) → mostra il costo proprio
+
+  const ownCost = node.data.CalculatedTotalCost || node.data.TotalCost || 0;
+  const ownUnitCost = node.data.UnitCost || 0;
+  const ownFixedCost = node.data.FixedCost || 0;
+
+  let totalCost, unitCost, fixedCost;
+
+  if (hasChildren) {
+    if (expanded) {
+      // Espanso con figli → mostra 0 (i costi sono nei figli visibili)
+      totalCost = 0;
+      unitCost = 0;
+      fixedCost = 0;
+    } else {
+      // Compresso con figli → mostra SOLO la somma ricorsiva dei figli
+      totalCost = calculateChildrenCost(node);
+      unitCost = 0; // Il costo unitario non ha senso per un aggregato
+      fixedCost = 0; // I costi fissi sono già inclusi nei figli
+    }
+  } else {
+    // Foglia senza figli → mostra il costo proprio
+    totalCost = ownCost;
+    unitCost = ownUnitCost;
+    fixedCost = ownFixedCost;
+  }
+
   const uom = node.data.UoM || '';
 
   // Testo del nodo
@@ -273,8 +292,8 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
 
           {/* Colonna 2: Quantità e UM (8%) */}
           <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: '8%' }}>
-            {!isRootNode && quantity > 0 ? (
-              <>{quantity.toFixed(3)}</>
+            {!isRootNode && node.data.Quantity > 0 ? (
+              <>{node.data.Quantity.toFixed(3)}</>
             ) : (
               <>1</>
             )}
@@ -374,6 +393,12 @@ const CostTreeView = ({ costingResult }) => {
 
     const components = costingResult.components;
     const costing = costingResult.costing || {};
+    const routing = costingResult.routing || [];
+    const productionLot = costing.production_lot || 100;
+
+    // I costi sono nell'oggetto costing, non nei dati di routing
+    // I dati di routing contengono solo i tempi, non i costi
+
 
     // Mappa per tenere traccia dei nodi
     const nodeMap = {};
@@ -383,50 +408,79 @@ const CostTreeView = ({ costingResult }) => {
     components.forEach((comp, index) => {
       const nodeId = `component-${comp.ComponentId || index}-${comp.Level}-${index}`;
 
+      // IMPORTANTE: Usa i costi che arrivano direttamente dal backend SENZA ricalcolarli
+      // Il backend restituisce già: UnitCost, FixedCost, TotalCost, CalculatedTotalCost
+      // MaterialCost, OperationCost già calcolati dalla stored procedure
+
       const node = {
         id: nodeId,
         type: "component",
         level: comp.Level || 0,
         data: {
           ...comp,
-          // Assicurati che i campi importanti siano presenti
-          ComponentId: comp.ComponentId || index,
-          Level: comp.Level || 0,
-          Path: comp.Path || String(comp.ComponentId || index)
+          // Mantieni TUTTI i campi del backend inclusi i costi pre-calcolati
+          // NON sovrascrivere i costi, usa direttamente quelli del backend
         },
         children: []
       };
 
       nodeMap[nodeId] = node;
 
-      // I nodi di livello 0 o 1 sono root
-      if (comp.Level === 0 || comp.Level === 1) {
+      // Solo i nodi di livello 0 sono root
+      if (comp.Level === 0) {
         rootNodes.push(node);
       }
     });
 
-    // Secondo passaggio: aggiungi i cicli ai componenti
+    // Secondo passaggio: aggiungi i cicli ai componenti (usa SOLO routing, no comp.operations per evitare duplicati)
     components.forEach((comp, index) => {
       const nodeId = `component-${comp.ComponentId || index}-${comp.Level}-${index}`;
       const componentNode = nodeMap[nodeId];
 
-      if (comp.operations && Array.isArray(comp.operations)) {
-        comp.operations.forEach((op, opIndex) => {
-          const cycleNode = {
-            id: `cycle-${nodeId}-${opIndex}`,
-            type: "cycle",
-            level: comp.Level + 1,
-            data: op,
-            children: []
-          };
-          componentNode.children.push(cycleNode);
-        });
-      }
+      // Aggiungi i cicli di routing per questo componente
+      const componentRouting = routing.filter(route => String(route.BOMId) === String(comp.BOMId));
+
+      // Dedup per chiave (BOMId+RtgStep+Operation)
+      const seenKeys = new Set();
+      componentRouting.forEach((route, opIndex) => {
+        const key = `${route.BOMId}|${route.RtgStep}|${route.Operation}`;
+        if (seenKeys.has(key)) return;
+        seenKeys.add(key);
+
+        // IMPORTANTE: Usa i costi che arrivano dal backend nelle operazioni di routing
+        // Il backend restituisce già ProcessingCost e SetupCost calcolati
+        const processingCost = route.ProcessingCost || 0;
+        const setupCostTotal = route.SetupCost || 0; // Costo fisso totale per il lotto
+        const setupCostUnit = setupCostTotal / productionLot; // Costo fisso unitario
+        const totalCost = route.TotalCost || (processingCost + setupCostUnit);
+
+        const cycleNode = {
+          id: `cycle-${nodeId}-${opIndex}`,
+          type: "cycle",
+          level: comp.Level + 1,
+          data: {
+            ...route,
+            // Usa i costi pre-calcolati dal backend
+            UnitCost: processingCost,
+            FixedCost: setupCostUnit, // Costo fisso unitario (diviso per lotto)
+            FixedCostTotal: setupCostTotal, // Mantieni anche il totale
+            TotalCost: totalCost,
+            Operation: route.Operation,
+            OperationDescription: route.OperationDescription,
+            WorkCenter: route.WorkCenter,
+            WorkCenterDescription: route.WorkCenterDescription,
+            Qty: 1,
+            ProductionLot: productionLot
+          },
+          children: []
+        };
+        componentNode.children.push(cycleNode);
+      });
     });
 
     // Terzo passaggio: costruisci la gerarchia
     components.forEach((comp, index) => {
-      if (comp.Level <= 1) return; // Skip root nodes
+      if (comp.Level === 0) return; // Skip solo il nodo root (livello 0)
 
       const nodeId = `component-${comp.ComponentId || index}-${comp.Level}-${index}`;
       const currentNode = nodeMap[nodeId];
@@ -508,8 +562,34 @@ const CostTreeView = ({ costingResult }) => {
     };
     sortNodes(rootNodes);
 
-    console.log('CostTreeView - Built tree with', rootNodes.length, 'root nodes');
-    console.log('CostTreeView - Tree structure:', rootNodes);
+    // Log strutturati per debug rapido
+    try {
+      const compTable = components.map(c => ({
+        ComponentId: c.ComponentId,
+        BOMId: c.BOMId,
+        Level: c.Level,
+        Qty: c.Quantity,
+        UnitCost: c.UnitCost,
+        FixedCost: c.FixedCost,
+        TotalCost: c.TotalCost,
+        MaterialCost: c.MaterialCost,
+        OperationCost: c.OperationCost
+      }));
+      console.group('BOM Costing Debug');
+      console.log('BOM:', costingResult.bomCode, 'Items:', components.length, 'Routing:', routing.length);
+      console.table(compTable);
+      const routingTable = routing.map(r => ({
+        BOMId: r.BOMId,
+        ComponentId: r.ComponentId,
+        RtgStep: r.RtgStep,
+        Operation: r.Operation,
+        ProcTime_s: r.ProcessingTime,
+        SetupTime_s: r.SetupTime,
+        WC: r.WC || r.WorkCenter
+      }));
+      console.table(routingTable);
+      console.groupEnd();
+    } catch(_e) {}
 
     return rootNodes;
   }, [costingResult]);
