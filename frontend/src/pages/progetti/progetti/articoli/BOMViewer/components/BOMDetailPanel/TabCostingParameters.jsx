@@ -22,7 +22,7 @@ const TabCostingParameters = () => {
         bomId={bom.Id}
         companyId={company?.CompanyId}
         initialParameters={{}}
-        readOnly={!canEdit}
+        readOnly={false}
       />
     </div>
   );

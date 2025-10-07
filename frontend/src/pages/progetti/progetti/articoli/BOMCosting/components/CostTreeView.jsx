@@ -19,7 +19,8 @@ import {
   Factory,
   Search,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Info
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -30,6 +31,7 @@ import {
 import { formatCurrency } from '@/lib/bomCostingUtils';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import MarkupDetailModal from './MarkupDetailModal';
 
 // Helper per ottenere un colore in base al livello
 const getLevelColor = (level) => {
@@ -390,6 +392,7 @@ const CostTreeView = ({ costingResult }) => {
   const [expandedNodes, setExpandedNodes] = useState(new Set(['root']));
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showMarkupDetail, setShowMarkupDetail] = useState(false);
 
   // Costruisci l'albero dai dati di costificazione
   const treeData = useMemo(() => {
@@ -594,6 +597,7 @@ const CostTreeView = ({ costingResult }) => {
         OperationCost: c.OperationCost
       }));
       console.group('BOM Costing Debug');
+      console.log('costingResult:', costingResult);
       console.log('BOM:', costingResult.bomCode, 'Items:', components.length, 'Routing:', routing.length);
       console.table(compTable);
       const routingTable = routing.map(r => ({
@@ -928,7 +932,8 @@ const CostTreeView = ({ costingResult }) => {
   const costing = costingResult.costing || {};
 
   return (
-    <Card className={isFullscreen ? 'fixed inset-4 z-50 flex flex-col' : ''}>
+    <>
+      <Card className={isFullscreen ? 'fixed inset-4 z-50 flex flex-col' : ''}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b">
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5" />
@@ -1027,8 +1032,15 @@ const CostTreeView = ({ costingResult }) => {
                 {formatCurrency(costing.fixed_costs_per_lot || 0)}
               </div>
             </div>
-            <div className="text-center p-2 bg-orange-100 rounded">
-              <div className="text-gray-600">Ricarichi</div>
+            <div 
+              className="text-center p-2 bg-orange-100 rounded cursor-pointer hover:bg-orange-200 transition-colors"
+              onClick={() => setShowMarkupDetail(true)}
+              title="Clicca per vedere il dettaglio dei ricarichi"
+            >
+              <div className="flex items-center justify-center gap-2">
+                <div className="text-gray-600">Ricarichi</div>
+                <Info className="h-4 w-4 text-orange-600" />
+              </div>
               <div className="font-semibold text-orange-900">
                 {formatCurrency(
                   (costing.ricarico_mp_amount || 0) +
@@ -1081,6 +1093,16 @@ const CostTreeView = ({ costingResult }) => {
         </div>
       </CardContent>
     </Card>
+
+      {/* Modal Dettaglio Ricarichi */}
+      <MarkupDetailModal
+        isOpen={showMarkupDetail}
+        costingData={costingResult}
+        parameters={costingResult?.parameters || []}
+        customMarkups={costingResult?.bomInfo?.customMarkups || {}}
+        onClose={() => setShowMarkupDetail(false)}
+      />
+    </>
   );
 };
 

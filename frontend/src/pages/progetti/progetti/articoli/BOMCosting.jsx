@@ -53,8 +53,6 @@ import {
 import { swal } from '@/lib/common';
 import { useCompany } from '@/context/CompanyContext';
 import axios from '@/lib/axios';
-import UtilityManagement from './BOMCosting/components/UtilityManagement';
-import CostTreeView from './BOMCosting/components/CostTreeView';
 import CostTreeModal from './BOMCosting/components/CostTreeModal';
 import BOMViewer from './BOMViewer';
 import {
@@ -841,12 +839,43 @@ const BOMCosting = ({ selectedItem }) => {
             };
           });
 
+          // Carica i parametri di costificazione per questa BOM specifica
+          let costingParameters = [];
+          let customMarkups = {};
+          try {
+            const paramsResponse = await axios.get(`/bom-costing/parameters/${bomId}`);
+            if (paramsResponse.data.success && paramsResponse.data.data && paramsResponse.data.data.length > 0) {
+              const bomParams = paramsResponse.data.data[0];
+              costingParameters = [
+                { ParameterName: 'RICARICO_MP', ParameterValue: bomParams.RicaricoMP, Origin: bomParams.RicaricoMPOrigin },
+                { ParameterName: 'RICARICO_OPE', ParameterValue: bomParams.RicaricoOpe, Origin: bomParams.RicaricoOpeOrigin },
+                { ParameterName: 'RICARICO_TRASPORTO', ParameterValue: bomParams.RicaricoTrasporto, Origin: bomParams.RicaricoTrasportoOrigin },
+                { ParameterName: 'RICARICO_SCARTO', ParameterValue: bomParams.RicaricoScarto, Origin: bomParams.RicaricoScartoOrigin },
+                { ParameterName: 'RICARICO_TOTALE', ParameterValue: bomParams.RicaricoTot, Origin: bomParams.RicaricoTotOrigin },
+                { ParameterName: 'RICARICO_SCONTO', ParameterValue: bomParams.RicaricoSconto, Origin: bomParams.RicaricoScontoOrigin }
+              ];
+              
+              customMarkups = {
+                markupRM: bomParams.RicaricoMP,
+                markupOperations: bomParams.RicaricoOpe,
+                markupExternalOps: bomParams.RicaricoTrasporto,
+                markupInternalOps: bomParams.RicaricoScarto,
+                markupOverhead: bomParams.RicaricoTot,
+                markupSconto: bomParams.RicaricoSconto
+              };
+            }
+          } catch (error) {
+            console.error('Error loading costing parameters:', error);
+          }
+
           const finalTreeData = {
             ...costResponse.data.data,
             components: componentsWithCycles,
             routing: costingRouting, // USA i dati di routing con i costi da SP_CalculateBOMCosting
             bomCode: bomData?.ItemCode || bomData?.BOMCode,
-            bomDescription: bomData?.ItemDescription || bomData?.Description
+            bomDescription: bomData?.ItemDescription || bomData?.Description,
+            parameters: costingParameters, // Aggiungi i parametri di costificazione
+            customMarkups: customMarkups // Aggiungi i custom markups
           };
 
           console.log('TreeData assembled:', finalTreeData);
@@ -1138,12 +1167,43 @@ const BOMCosting = ({ selectedItem }) => {
             };
           });
 
+          // Carica i parametri di costificazione per questa BOM specifica
+          let costingParameters = [];
+          let customMarkups = {};
+          try {
+            const paramsResponse = await axios.get(`/bom-costing/parameters/${selectedBOM.Id}`);
+            if (paramsResponse.data.success && paramsResponse.data.data && paramsResponse.data.data.length > 0) {
+              const bomParams = paramsResponse.data.data[0];
+              costingParameters = [
+                { ParameterName: 'RICARICO_MP', ParameterValue: bomParams.RicaricoMP, Origin: bomParams.RicaricoMPOrigin },
+                { ParameterName: 'RICARICO_OPE', ParameterValue: bomParams.RicaricoOpe, Origin: bomParams.RicaricoOpeOrigin },
+                { ParameterName: 'RICARICO_TRASPORTO', ParameterValue: bomParams.RicaricoTrasporto, Origin: bomParams.RicaricoTrasportoOrigin },
+                { ParameterName: 'RICARICO_SCARTO', ParameterValue: bomParams.RicaricoScarto, Origin: bomParams.RicaricoScartoOrigin },
+                { ParameterName: 'RICARICO_TOTALE', ParameterValue: bomParams.RicaricoTot, Origin: bomParams.RicaricoTotOrigin },
+                { ParameterName: 'RICARICO_SCONTO', ParameterValue: bomParams.RicaricoSconto, Origin: bomParams.RicaricoScontoOrigin }
+              ];
+              
+              customMarkups = {
+                markupRM: bomParams.RicaricoMP,
+                markupOperations: bomParams.RicaricoOpe,
+                markupExternalOps: bomParams.RicaricoTrasporto,
+                markupInternalOps: bomParams.RicaricoScarto,
+                markupOverhead: bomParams.RicaricoTot,
+                markupSconto: bomParams.RicaricoSconto
+              };
+            }
+          } catch (error) {
+            console.error('Error loading costing parameters:', error);
+          }
+
           const finalTreeData = {
             ...costResponse.data.data,
             components: componentsWithCycles,
             routing: costingRouting, // USA i dati di routing con i costi da SP_CalculateBOMCosting
             bomCode: selectedBOM.ItemCode,
-            bomDescription: selectedBOM.ItemDescription
+            bomDescription: selectedBOM.ItemDescription,
+            parameters: costingParameters, // Aggiungi i parametri di costificazione
+            customMarkups: customMarkups // Aggiungi i custom markups
           };
 
           console.log('TreeData assembled (from new calculation):', finalTreeData);
@@ -1188,12 +1248,43 @@ const BOMCosting = ({ selectedItem }) => {
             };
           });
 
+          // Carica i parametri di costificazione per questa BOM specifica
+          let costingParameters = [];
+          let customMarkups = {};
+          try {
+            const paramsResponse = await axios.get(`/bom-costing/parameters/${selectedBOM.Id}`);
+            if (paramsResponse.data.success && paramsResponse.data.data && paramsResponse.data.data.length > 0) {
+              const bomParams = paramsResponse.data.data[0];
+              costingParameters = [
+                { ParameterName: 'RICARICO_MP', ParameterValue: bomParams.RicaricoMP, Origin: bomParams.RicaricoMPOrigin },
+                { ParameterName: 'RICARICO_OPE', ParameterValue: bomParams.RicaricoOpe, Origin: bomParams.RicaricoOpeOrigin },
+                { ParameterName: 'RICARICO_TRASPORTO', ParameterValue: bomParams.RicaricoTrasporto, Origin: bomParams.RicaricoTrasportoOrigin },
+                { ParameterName: 'RICARICO_SCARTO', ParameterValue: bomParams.RicaricoScarto, Origin: bomParams.RicaricoScartoOrigin },
+                { ParameterName: 'RICARICO_TOTALE', ParameterValue: bomParams.RicaricoTot, Origin: bomParams.RicaricoTotOrigin },
+                { ParameterName: 'RICARICO_SCONTO', ParameterValue: bomParams.RicaricoSconto, Origin: bomParams.RicaricoScontoOrigin }
+              ];
+              
+              customMarkups = {
+                markupRM: bomParams.RicaricoMP,
+                markupOperations: bomParams.RicaricoOpe,
+                markupExternalOps: bomParams.RicaricoTrasporto,
+                markupInternalOps: bomParams.RicaricoScarto,
+                markupOverhead: bomParams.RicaricoTot,
+                markupSconto: bomParams.RicaricoSconto
+              };
+            }
+          } catch (error) {
+            console.error('Error loading costing parameters:', error);
+          }
+
           const finalTreeData = {
             costing: costResponse.data.data.costing || {},
             components: componentsWithCycles,
             routing: bomRouting,
             bomCode: selectedBOM.ItemCode,
-            bomDescription: selectedBOM.ItemDescription
+            bomDescription: selectedBOM.ItemDescription,
+            parameters: costingParameters, // Aggiungi i parametri di costificazione
+            customMarkups: customMarkups // Aggiungi i custom markups
           };
 
           console.log('TreeData assembled (BOM only):', finalTreeData);
