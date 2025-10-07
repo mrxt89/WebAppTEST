@@ -27,7 +27,7 @@ const initializeBOMCostingParameters = async (companyId) => {
 };
 
 // Ottieni tutti i parametri di costificazione
-const getBOMCostingParameters = async (companyId) => {
+const getBOMCostingParametersDefault = async (companyId) => {
     try {
         let pool = await sql.connect(config.dbConfig);
         
@@ -49,7 +49,89 @@ const getBOMCostingParameters = async (companyId) => {
         
         return result.recordset;
     } catch (err) {
-        console.error('Error in getBOMCostingParameters:', err);
+        console.error('Error in getBOMCostingParametersDefault:', err);
+        throw err;
+    }
+};
+
+//
+// Ottieni i parametri di costificazione per una BOM (custom o default)
+const getLastCostingParametersByBOMId = async (companyId, bomId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        
+        const result = await pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('BOMId', sql.Int, bomId)
+            .query(`
+                -- Output
+                DECLARE @RicaricoMP FLOAT = 0
+                DECLARE @RicaricoOpe FLOAT = 0
+                DECLARE @RicaricoTrasporto FLOAT = 0
+                DECLARE @RicaricoScarto FLOAT = 0
+                DECLARE @RicaricoTot FLOAT = 0
+                DECLARE @RicaricoSconto FLOAT = 0
+                
+                DECLARE @RicaricoMPOrigin VARCHAR(50) = 'Default'
+                DECLARE @RicaricoOpeOrigin VARCHAR(50) = 'Default'
+                DECLARE @RicaricoTrasportoOrigin VARCHAR(50) = 'Default'
+                DECLARE @RicaricoScartoOrigin VARCHAR(50) = 'Default'
+                DECLARE @RicaricoTotOrigin VARCHAR(50) = 'Default'
+                DECLARE @RicaricoScontoOrigin VARCHAR(50) = 'Default'
+                -- Get values from MA_BOMCostingHistory
+                SELECT TOP(1) 
+                    @RicaricoMP = CustomMarkupRM,
+                    @RicaricoOpe = CustomMarkupOperations,
+                    @RicaricoTrasporto = CustomMarkupExternalOps,
+                    @RicaricoScarto = CustomMarkupInternalOps,
+                    @RicaricoTot = CustomMarkupOverhead,
+                    @RicaricoMPOrigin = CASE WHEN CustomMarkupRM IS NOT NULL THEN 'Custom' ELSE 'Default' END,
+                    @RicaricoOpeOrigin = CASE WHEN CustomMarkupOperations IS NOT NULL THEN 'Custom' ELSE 'Default' END,
+                    @RicaricoTrasportoOrigin = CASE WHEN CustomMarkupExternalOps IS NOT NULL THEN 'Custom' ELSE 'Default' END,
+                    @RicaricoScartoOrigin = CASE WHEN CustomMarkupInternalOps IS NOT NULL THEN 'Custom' ELSE 'Default' END,
+                    @RicaricoTotOrigin = CASE WHEN CustomMarkupOverhead IS NOT NULL THEN 'Custom' ELSE 'Default' END
+                FROM MA_BOMCostingHistory
+                WHERE CompanyId = @CompanyId
+                AND BOMId = @BOMId
+                ORDER BY TBCreated DESC
+
+                -- Fallback to MA_BOMCostingParameters if NULL or 0
+                IF ISNULL(@RicaricoMP, 0) = 0 
+                    SET @RicaricoMP = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_MP' AND IsActive = 1), 0)
+
+                IF ISNULL(@RicaricoOpe, 0) = 0 
+                    SET @RicaricoOpe = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_OPE' AND IsActive = 1), 0)
+
+                IF ISNULL(@RicaricoTrasporto, 0) = 0 
+                    SET @RicaricoTrasporto = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_TRASPORTO' AND IsActive = 1), 0)
+
+                IF ISNULL(@RicaricoScarto, 0) = 0 
+                    SET @RicaricoScarto = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_SCARTO' AND IsActive = 1), 0)
+
+                IF ISNULL(@RicaricoTot, 0) = 0 
+                    SET @RicaricoTot = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_TOTALE' AND IsActive = 1), 0)
+
+                -- Get RicaricoSconto directly from MA_BOMCostingParameters
+                SET @RicaricoSconto = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_SCONTO' AND IsActive = 1), 0)
+
+                SELECT 
+                    @RicaricoMP AS RicaricoMP,
+                    @RicaricoOpe AS RicaricoOpe,
+                    @RicaricoTrasporto AS RicaricoTrasporto,
+                    @RicaricoScarto AS RicaricoScarto,
+                    @RicaricoTot AS RicaricoTot,
+                    @RicaricoSconto AS RicaricoSconto,
+                    @RicaricoMPOrigin AS RicaricoMPOrigin,
+                    @RicaricoOpeOrigin AS RicaricoOpeOrigin,
+                    @RicaricoTrasportoOrigin AS RicaricoTrasportoOrigin,
+                    @RicaricoScartoOrigin AS RicaricoScartoOrigin,
+                    @RicaricoTotOrigin AS RicaricoTotOrigin,
+                    @RicaricoScontoOrigin AS RicaricoScontoOrigin
+            `);
+        
+        return result.recordset;
+    } catch (err) {
+        console.error('Error in getLastCostingParametersByBOMId:', err);
         throw err;
     }
 };
@@ -703,7 +785,7 @@ const getBOMCostingHistory = async (companyId, bomId = null, bomCode = null) => 
 
 module.exports = {
     initializeBOMCostingParameters,
-    getBOMCostingParameters,
+    getBOMCostingParametersDefault,
     updateBOMCostingParameter,
     calculateBOMCosting,
     batchCalculateBOMCosting,
@@ -740,7 +822,7 @@ const getBOMOperationsCostBreakdown = async (companyId, bomId, includeMultilevel
 };
 
 module.exports = {
-    getBOMCostingParameters,
+    getBOMCostingParametersDefault,
     updateBOMCostingParameter,
     calculateBOMCosting,
     batchCalculateBOMCosting,
@@ -801,7 +883,7 @@ const getBOMVersions = async (companyId, itemId) => {
 
 module.exports = {
     initializeBOMCostingParameters,
-    getBOMCostingParameters,
+    getBOMCostingParametersDefault,
     updateBOMCostingParameter,
     calculateBOMCosting,
     batchCalculateBOMCosting,
@@ -815,5 +897,6 @@ module.exports = {
     searchBOMCostingHistory,
     getBOMOperationsCostBreakdown,
     testBOMCostingExample,
-    getBOMVersions
+    getBOMVersions,
+    getLastCostingParametersByBOMId
 };

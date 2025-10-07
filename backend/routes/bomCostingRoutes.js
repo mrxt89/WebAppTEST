@@ -12,7 +12,7 @@ const bomCostingQueries = require('../queries/bomCostingManagement');
 router.get('/parameters', authenticateToken, async (req, res) => {
     try {
         const companyId = req.user.CompanyId;
-        const parameters = await bomCostingQueries.getBOMCostingParameters(companyId);
+        const parameters = await bomCostingQueries.getBOMCostingParametersDefault(companyId);
         
         res.json({
             success: true,
@@ -577,6 +577,29 @@ router.get('/multilevel/:bomId', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Errore nel recupero dei dati multilivello',
+            error: error.message
+        });
+    }
+});
+
+// GET /api/bom-costing/parameters/:bomId - Ottieni parametri di costificazione per una BOM specifica
+router.get('/parameters/:bomId', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { bomId } = req.params;
+        
+        const parameters = await bomCostingQueries.getLastCostingParametersByBOMId(companyId, parseInt(bomId));
+        
+        res.json({
+            success: true,
+            message: 'Parametri recuperati con successo',
+            data: parameters
+        });
+    } catch (error) {
+        console.error('Error getting BOM costing parameters:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Errore nel recupero dei parametri di costificazione',
             error: error.message
         });
     }

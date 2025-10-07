@@ -310,11 +310,6 @@ const BOMCostingParameters = ({
             <div className="space-y-2">
               <Label htmlFor="markupRM">
                 Ricarico MP (%)
-                <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'RICARICO_MP')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'RICARICO_MP').ParameterValue * 100)})`
-                    : ''}
-                </span>
               </Label>
               <Input
                 id="markupRM"
@@ -331,11 +326,6 @@ const BOMCostingParameters = ({
             <div className="space-y-2">
               <Label htmlFor="markupOperations">
                 Ricarico OPE (%)
-                <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'RICARICO_OPE')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'RICARICO_OPE').ParameterValue * 100)})`
-                    : ''}
-                </span>
               </Label>
               <Input
                 id="markupOperations"
@@ -352,11 +342,6 @@ const BOMCostingParameters = ({
             <div className="space-y-2">
               <Label htmlFor="markupExternalOps">
                 Ricarico Trasporto (%)
-                <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'RICARICO_TRASPORTO')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'RICARICO_TRASPORTO').ParameterValue * 100)})`
-                    : ''}
-                </span>
               </Label>
               <Input
                 id="markupExternalOps"
@@ -373,11 +358,6 @@ const BOMCostingParameters = ({
             <div className="space-y-2">
               <Label htmlFor="markupInternalOps">
                 Ricarico Scarto (%)
-                <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'RICARICO_SCARTO')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'RICARICO_SCARTO').ParameterValue * 100)})`
-                    : ''}
-                </span>
               </Label>
               <Input
                 id="markupInternalOps"
@@ -394,11 +374,6 @@ const BOMCostingParameters = ({
             <div className="space-y-2">
               <Label htmlFor="markupOverhead">
                 Ricarico Totale (%)
-                <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'RICARICO_TOTALE')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'RICARICO_TOTALE').ParameterValue * 100)})`
-                    : ''}
-                </span>
               </Label>
               <Input
                 id="markupOverhead"
@@ -415,11 +390,6 @@ const BOMCostingParameters = ({
             <div className="space-y-2">
               <Label htmlFor="markupSconto">
                 Ricarico Sconto (%)
-                <span className="text-xs text-gray-500 ml-2">
-                  {globalParameters.find(p => p.ParameterName === 'RICARICO_SCONTO')?.ParameterValue
-                    ? `(Globale: ${formatPercentage(globalParameters.find(p => p.ParameterName === 'RICARICO_SCONTO').ParameterValue * 100)})`
-                    : ''}
-                </span>
               </Label>
               <Input
                 id="markupSconto"
@@ -440,7 +410,6 @@ const BOMCostingParameters = ({
               <ul className="list-disc list-inside space-y-0.5 text-blue-800">
                 <li>Lascia vuoto per usare il ricarico globale dell'azienda</li>
                 <li>Inserisci un valore per sovrascrivere il ricarico globale per questa BOM specifica</li>
-                <li>Il valore globale è mostrato tra parentesi come riferimento</li>
               </ul>
             </div>
           </div>
