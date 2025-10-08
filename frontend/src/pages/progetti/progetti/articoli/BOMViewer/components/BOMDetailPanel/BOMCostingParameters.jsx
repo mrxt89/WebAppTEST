@@ -127,13 +127,14 @@ const BOMCostingParameters = ({
         const lastRecord = response.data.data[0];
 
         // Carica i ricarichi custom se presenti (converti da decimale a percentuale per visualizzazione: 0.07 -> 7)
+        // Distingui tra NULL (non impostato) e 0 (impostato esplicitamente a zero)
         setCustomMarkups({
-          markupRM: lastRecord.CustomMarkupRM ? (lastRecord.CustomMarkupRM * 100) : '',
-          markupOperations: lastRecord.CustomMarkupOperations ? (lastRecord.CustomMarkupOperations * 100) : '',
-          markupExternalOps: lastRecord.CustomMarkupExternalOps ? (lastRecord.CustomMarkupExternalOps * 100) : '',
-          markupInternalOps: lastRecord.CustomMarkupInternalOps ? (lastRecord.CustomMarkupInternalOps * 100) : '',
-          markupOverhead: lastRecord.CustomMarkupOverhead ? (lastRecord.CustomMarkupOverhead * 100) : '',
-          markupSconto: lastRecord.CustomMarkupSconto ? (lastRecord.CustomMarkupSconto * 100) : ''
+          markupRM: lastRecord.CustomMarkupRM !== null ? (lastRecord.CustomMarkupRM * 100).toString() : '',
+          markupOperations: lastRecord.CustomMarkupOperations !== null ? (lastRecord.CustomMarkupOperations * 100).toString() : '',
+          markupExternalOps: lastRecord.CustomMarkupExternalOps !== null ? (lastRecord.CustomMarkupExternalOps * 100).toString() : '',
+          markupInternalOps: lastRecord.CustomMarkupInternalOps !== null ? (lastRecord.CustomMarkupInternalOps * 100).toString() : '',
+          markupOverhead: lastRecord.CustomMarkupOverhead !== null ? (lastRecord.CustomMarkupOverhead * 100).toString() : '',
+          markupSconto: lastRecord.CustomMarkupSconto !== null ? (lastRecord.CustomMarkupSconto * 100).toString() : ''
         });
       }
     } catch (error) {
@@ -165,17 +166,16 @@ const BOMCostingParameters = ({
         useGranularMarkups: parameters.useGranularMarkups,
         updateBOMRecord: parameters.updateBOMRecord,
         notes: parameters.notes,
-        // Aggiungi ricarichi custom solo se almeno uno è impostato (converti da percentuale a decimale: 7 -> 0.07)
-        customMarkups: (customMarkups.markupRM || customMarkups.markupOperations ||
-                       customMarkups.markupExternalOps || customMarkups.markupInternalOps ||
-                       customMarkups.markupOverhead || customMarkups.markupSconto) ? {
-          markupRM: customMarkups.markupRM ? parseFloat(customMarkups.markupRM) / 100 : null,
-          markupOperations: customMarkups.markupOperations ? parseFloat(customMarkups.markupOperations) / 100 : null,
-          markupExternalOps: customMarkups.markupExternalOps ? parseFloat(customMarkups.markupExternalOps) / 100 : null,
-          markupInternalOps: customMarkups.markupInternalOps ? parseFloat(customMarkups.markupInternalOps) / 100 : null,
-          markupOverhead: customMarkups.markupOverhead ? parseFloat(customMarkups.markupOverhead) / 100 : null,
-          markupSconto: customMarkups.markupSconto ? parseFloat(customMarkups.markupSconto) / 100 : null
-        } : null
+        // Aggiungi ricarichi custom (converti da percentuale a decimale: 7 -> 0.07)
+        // Distingui tra vuoto (NULL = usa default azienda) e 0 (impostato esplicitamente a zero)
+        customMarkups: {
+          markupRM: customMarkups.markupRM !== '' ? parseFloat(customMarkups.markupRM) / 100 : null,
+          markupOperations: customMarkups.markupOperations !== '' ? parseFloat(customMarkups.markupOperations) / 100 : null,
+          markupExternalOps: customMarkups.markupExternalOps !== '' ? parseFloat(customMarkups.markupExternalOps) / 100 : null,
+          markupInternalOps: customMarkups.markupInternalOps !== '' ? parseFloat(customMarkups.markupInternalOps) / 100 : null,
+          markupOverhead: customMarkups.markupOverhead !== '' ? parseFloat(customMarkups.markupOverhead) / 100 : null,
+          markupSconto: customMarkups.markupSconto !== '' ? parseFloat(customMarkups.markupSconto) / 100 : null
+        }
       };
 
       const response = await axios.post('/bom-costing/history', {
@@ -408,8 +408,9 @@ const BOMCostingParameters = ({
             <div>
               <p className="font-medium text-blue-900 mb-1">Ricarichi Custom BOM</p>
               <ul className="list-disc list-inside space-y-0.5 text-blue-800">
-                <li>Lascia vuoto per usare il ricarico globale dell'azienda</li>
-                <li>Inserisci un valore per sovrascrivere il ricarico globale per questa BOM specifica</li>
+                <li><strong>Vuoto</strong> = usa il ricarico globale dell'azienda (default)</li>
+                <li><strong>0</strong> = ricarico esplicitamente impostato a zero</li>
+                <li><strong>Valore &gt; 0</strong> = ricarico personalizzato per questa BOM</li>
               </ul>
             </div>
           </div>
