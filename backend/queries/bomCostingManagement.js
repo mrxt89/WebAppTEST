@@ -64,55 +64,89 @@ const getLastCostingParametersByBOMId = async (companyId, bomId) => {
             .input('CompanyId', sql.Int, companyId)
             .input('BOMId', sql.Int, bomId)
             .query(`
-                -- Output
-                DECLARE @RicaricoMP FLOAT = 0
-                DECLARE @RicaricoOpe FLOAT = 0
-                DECLARE @RicaricoTrasporto FLOAT = 0
-                DECLARE @RicaricoScarto FLOAT = 0
-                DECLARE @RicaricoTot FLOAT = 0
-                DECLARE @RicaricoSconto FLOAT = 0
-                
-                DECLARE @RicaricoMPOrigin VARCHAR(50) = 'Default'
-                DECLARE @RicaricoOpeOrigin VARCHAR(50) = 'Default'
-                DECLARE @RicaricoTrasportoOrigin VARCHAR(50) = 'Default'
-                DECLARE @RicaricoScartoOrigin VARCHAR(50) = 'Default'
-                DECLARE @RicaricoTotOrigin VARCHAR(50) = 'Default'
-                DECLARE @RicaricoScontoOrigin VARCHAR(50) = 'Default'
-                -- Get values from MA_BOMCostingHistory
-                SELECT TOP(1) 
-                    @RicaricoMP = CustomMarkupRM,
-                    @RicaricoOpe = CustomMarkupOperations,
-                    @RicaricoTrasporto = CustomMarkupExternalOps,
-                    @RicaricoScarto = CustomMarkupInternalOps,
-                    @RicaricoTot = CustomMarkupOverhead,
-                    @RicaricoMPOrigin = CASE WHEN CustomMarkupRM IS NOT NULL THEN 'Custom' ELSE 'Default' END,
-                    @RicaricoOpeOrigin = CASE WHEN CustomMarkupOperations IS NOT NULL THEN 'Custom' ELSE 'Default' END,
-                    @RicaricoTrasportoOrigin = CASE WHEN CustomMarkupExternalOps IS NOT NULL THEN 'Custom' ELSE 'Default' END,
-                    @RicaricoScartoOrigin = CASE WHEN CustomMarkupInternalOps IS NOT NULL THEN 'Custom' ELSE 'Default' END,
-                    @RicaricoTotOrigin = CASE WHEN CustomMarkupOverhead IS NOT NULL THEN 'Custom' ELSE 'Default' END
-                FROM MA_BOMCostingHistory
-                WHERE CompanyId = @CompanyId
-                AND BOMId = @BOMId
-                ORDER BY TBCreated DESC
+                 -- Output
+                 DECLARE @RicaricoMP FLOAT = NULL
+                 DECLARE @RicaricoOpe FLOAT = NULL
+                 DECLARE @RicaricoTrasporto FLOAT = NULL
+                 DECLARE @RicaricoScarto FLOAT = NULL
+                 DECLARE @RicaricoTot FLOAT = NULL
+                 DECLARE @RicaricoSconto FLOAT = NULL
+                 
+                 DECLARE @RicaricoMPOrigin VARCHAR(50) = 'Default'
+                 DECLARE @RicaricoOpeOrigin VARCHAR(50) = 'Default'
+                 DECLARE @RicaricoTrasportoOrigin VARCHAR(50) = 'Default'
+                 DECLARE @RicaricoScartoOrigin VARCHAR(50) = 'Default'
+                 DECLARE @RicaricoTotOrigin VARCHAR(50) = 'Default'
+                 DECLARE @RicaricoScontoOrigin VARCHAR(50) = 'Default'
+                 
+                 -- Get values from MA_BOMCostingHistory
+                 SELECT TOP(1) 
+                     @RicaricoMP = CustomMarkupRM,
+                     @RicaricoOpe = CustomMarkupOperations,
+                     @RicaricoTrasporto = CustomMarkupExternalOps,
+                     @RicaricoScarto = CustomMarkupInternalOps,
+                     @RicaricoTot = CustomMarkupOverhead,
+                     @RicaricoSconto = CustomMarkupSconto,
+                     @RicaricoMPOrigin = CASE WHEN CustomMarkupRM IS NOT NULL THEN 'Custom' ELSE 'Default' END,
+                     @RicaricoOpeOrigin = CASE WHEN CustomMarkupOperations IS NOT NULL THEN 'Custom' ELSE 'Default' END,
+                     @RicaricoTrasportoOrigin = CASE WHEN CustomMarkupExternalOps IS NOT NULL THEN 'Custom' ELSE 'Default' END,
+                     @RicaricoScartoOrigin = CASE WHEN CustomMarkupInternalOps IS NOT NULL THEN 'Custom' ELSE 'Default' END,
+                     @RicaricoTotOrigin = CASE WHEN CustomMarkupOverhead IS NOT NULL THEN 'Custom' ELSE 'Default' END,
+                     @RicaricoScontoOrigin = CASE WHEN CustomMarkupSconto IS NOT NULL THEN 'Custom' ELSE 'Default' END
+                 FROM MA_BOMCostingHistory
+                 WHERE CompanyId = @CompanyId
+                 AND BOMId = @BOMId
+                 ORDER BY TBCreated DESC
 
-                -- Fallback to MA_BOMCostingParameters if NULL or 0
-                IF ISNULL(@RicaricoMP, 0) = 0 
-                    SET @RicaricoMP = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_MP' AND IsActive = 1), 0)
+                 -- Fallback to MA_BOMCostingParameters only if NULL (not zero)
+                 -- NULL = usa default azienda, 0 = ricarico esplicitamente impostato a zero
+                 IF @RicaricoMP IS NULL
+                 BEGIN
+                     SET @RicaricoMP = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_MP' AND IsActive = 1), 0)
+                     SET @RicaricoMPOrigin = 'Default'
+                 END
+                 ELSE
+                     SET @RicaricoMPOrigin = 'Custom'
 
-                IF ISNULL(@RicaricoOpe, 0) = 0 
-                    SET @RicaricoOpe = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_OPE' AND IsActive = 1), 0)
+                 IF @RicaricoOpe IS NULL
+                 BEGIN
+                     SET @RicaricoOpe = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_OPE' AND IsActive = 1), 0)
+                     SET @RicaricoOpeOrigin = 'Default'
+                 END
+                 ELSE
+                     SET @RicaricoOpeOrigin = 'Custom'
 
-                IF ISNULL(@RicaricoTrasporto, 0) = 0 
-                    SET @RicaricoTrasporto = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_TRASPORTO' AND IsActive = 1), 0)
+                 IF @RicaricoTrasporto IS NULL
+                 BEGIN
+                     SET @RicaricoTrasporto = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_TRASPORTO' AND IsActive = 1), 0)
+                     SET @RicaricoTrasportoOrigin = 'Default'
+                 END
+                 ELSE
+                     SET @RicaricoTrasportoOrigin = 'Custom'
 
-                IF ISNULL(@RicaricoScarto, 0) = 0 
-                    SET @RicaricoScarto = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_SCARTO' AND IsActive = 1), 0)
+                 IF @RicaricoScarto IS NULL
+                 BEGIN
+                     SET @RicaricoScarto = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_SCARTO' AND IsActive = 1), 0)
+                     SET @RicaricoScartoOrigin = 'Default'
+                 END
+                 ELSE
+                     SET @RicaricoScartoOrigin = 'Custom'
 
-                IF ISNULL(@RicaricoTot, 0) = 0 
-                    SET @RicaricoTot = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_TOTALE' AND IsActive = 1), 0)
+                 IF @RicaricoTot IS NULL
+                 BEGIN
+                     SET @RicaricoTot = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_TOTALE' AND IsActive = 1), 0)
+                     SET @RicaricoTotOrigin = 'Default'
+                 END
+                 ELSE
+                     SET @RicaricoTotOrigin = 'Custom'
 
-                -- Get RicaricoSconto directly from MA_BOMCostingParameters
-                SET @RicaricoSconto = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_SCONTO' AND IsActive = 1), 0)
+                 IF @RicaricoSconto IS NULL
+                 BEGIN
+                     SET @RicaricoSconto = ISNULL((SELECT TOP(1) ParameterValue FROM MA_BOMCostingParameters WHERE CompanyId = @CompanyId AND ParameterName = 'RICARICO_SCONTO' AND IsActive = 1), 0)
+                     SET @RicaricoScontoOrigin = 'Default'
+                 END
+                 ELSE
+                     SET @RicaricoScontoOrigin = 'Custom'
 
                 SELECT 
                     @RicaricoMP AS RicaricoMP,
@@ -356,17 +390,19 @@ const saveBOMCostingHistory = async (companyId, bomId, costingData, userId) => {
             .input('CalculatedBy', sql.Int, userId)
             .input('Notes', sql.NVarChar(sql.MAX), costingData.notes || null);
 
-        // Aggiungi ricarichi custom BOM-specific se presenti
+        // Aggiungi ricarichi custom BOM-specific
+        // Distingui tra NULL (usa default azienda) e 0 (impostato esplicitamente a zero)
         if (costingData.customMarkups) {
             const cm = costingData.customMarkups;
             request
-                .input('CustomMarkupRM', sql.Float, cm.markupRM || null)
-                .input('CustomMarkupRMPurchase', sql.Float, cm.markupRMPurchase || null)
-                .input('CustomMarkupRMProduction', sql.Float, cm.markupRMProduction || null)
-                .input('CustomMarkupOperations', sql.Float, cm.markupOperations || null)
-                .input('CustomMarkupInternalOps', sql.Float, cm.markupInternalOps || null)
-                .input('CustomMarkupExternalOps', sql.Float, cm.markupExternalOps || null)
-                .input('CustomMarkupOverhead', sql.Float, cm.markupOverhead || null)
+                .input('CustomMarkupRM', sql.Float, cm.markupRM !== undefined ? cm.markupRM : null)
+                .input('CustomMarkupRMPurchase', sql.Float, cm.markupRMPurchase !== undefined ? cm.markupRMPurchase : null)
+                .input('CustomMarkupRMProduction', sql.Float, cm.markupRMProduction !== undefined ? cm.markupRMProduction : null)
+                .input('CustomMarkupOperations', sql.Float, cm.markupOperations !== undefined ? cm.markupOperations : null)
+                .input('CustomMarkupInternalOps', sql.Float, cm.markupInternalOps !== undefined ? cm.markupInternalOps : null)
+                .input('CustomMarkupExternalOps', sql.Float, cm.markupExternalOps !== undefined ? cm.markupExternalOps : null)
+                .input('CustomMarkupOverhead', sql.Float, cm.markupOverhead !== undefined ? cm.markupOverhead : null)
+                .input('CustomMarkupSconto', sql.Float, cm.markupSconto !== undefined ? cm.markupSconto : null)
                 .input('CustomMarkupsJSON', sql.NVarChar(sql.MAX), cm.customMarkupsJSON || null);
         } else {
             // Se non ci sono ricarichi custom, passa NULL per tutti
@@ -378,6 +414,7 @@ const saveBOMCostingHistory = async (companyId, bomId, costingData, userId) => {
                 .input('CustomMarkupInternalOps', sql.Float, null)
                 .input('CustomMarkupExternalOps', sql.Float, null)
                 .input('CustomMarkupOverhead', sql.Float, null)
+                .input('CustomMarkupSconto', sql.Float, null)
                 .input('CustomMarkupsJSON', sql.NVarChar(sql.MAX), null);
         }
 
