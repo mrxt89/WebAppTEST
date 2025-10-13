@@ -11,7 +11,7 @@ const QuickReactions = [
   { emoji: "👍", title: "Mi piace", color: "#3b82f6" },
   { emoji: "❤️", title: "Cuore", color: "#ef4444" },
   { emoji: "😂", title: "Divertente", color: "#f59e0b" },
-  { emoji: "😮", title: "Sorpreso", color: "#8b5cf6" },
+  { emoji: "✅", title: "Fatto!", color: "#8b5cf6" },
   { emoji: "😢", title: "Triste", color: "#06b6d4" },
   { emoji: "🙏", title: "Grazie", color: "#10b981" },
   { emoji: "+", title: "Altre emoji", color: "#6b7280", isCustom: true },
@@ -25,7 +25,7 @@ const AllEmojis = {
   "Oggetti": ["🎈", "🎉", "🎊", "🎁", "🎀", "🏆", "🥇", "🥈", "🥉", "⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🎱", "🎲", "🎯", "🎪", "🎭", "🎨", "🎬", "🎤", "🎧", "🎼", "🎵", "🎶"],
   "Cibo": ["🍎", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🍈", "🍑", "🍐", "🥭", "🍍", "🥥", "🥝", "🍅", "🍆", "🥑", "🥦", "🥬", "🥒", "🌶", "🌽", "🥕", "🍔", "🍟", "🍕", "🍝", "🍜", "🍲", "🍛", "🍣", "🍱", "🍰", "🎂", "🍮", "🍭", "🍬", "🍫", "☕", "🍵", "🍺", "🍻", "🥂", "🍷"],
   "Animali": ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🐔", "🐧", "🐦", "🐤", "🦆", "🦅", "🦉", "🦇", "🐺", "🐴", "🦄", "🐝", "🦋", "🐌", "🐞", "🐜", "🦟", "🦗", "🕷", "🦂", "🐢", "🐍", "🦎", "🦖", "🦕", "🐙", "🦑", "🦐", "🦞", "🦀", "🐬", "🐳", "🐋", "🦈"],
-  "Simboli": ["⭐", "🌟", "✨", "⚡", "🔥", "🌈", "☀️", "🌤", "⛅", "🌥", "☁️", "🌧", "⛈", "🌩", "❄️", "☃️", "🌬", "💨", "💧", "💦", "☂️", "🌊", "🌴", "🌵", "🌲", "🌳", "🌿", "☘️", "🍀", "🌸", "🌺", "🌻", "🌹", "🌷", "🌼", "🌾", "💐"]
+  "Simboli": ["⭐", "🌟", "✨", "⚡", "🔥", "🌈", "☀️", "⛅", "☁️", "❄️", "☃️", "💨", "💧", "💦", "☂️", "🌊", "🌴", "🌵", "🌲", "🌳", "🌿", "☘️", "🍀", "🌸", "🌺", "🌻", "🌹", "🌷", "🌼", "🌾", "💐"]
 };
 
 const QuickReactionsPopup = ({
@@ -58,38 +58,26 @@ const QuickReactionsPopup = ({
       
       const buttonRect = button.getBoundingClientRect();
       const bubbleRect = messageBubble.getBoundingClientRect();
-      const chatContainer = popup.closest('.chat-messages-container') || popup.closest('.chat-list-container') || document.body;
+      // Trova il container della chat (priorità: chat-list-container, poi chat-window, poi body)
+      const chatContainer = popup.closest('.chat-list-container') || 
+                           popup.closest('.chat-window') || 
+                           popup.closest('[class*="chat"]') ||
+                           document.body;
       const chatRect = chatContainer.getBoundingClientRect();
       
-      let xOffset = 0;
       let yPosition = position;
-      const popupWidth = showEmojiPicker ? 350 : 280; // Larghezza approssimativa del popup
-      const margin = 10;
-      
-                    // Per tutti i messaggi: allinea al centro del container della chat
-       const chatCenter = chatRect.left + chatRect.width / 4;
-       const buttonCenter = buttonRect.left + buttonRect.width / 2;
-       xOffset = chatCenter - buttonCenter;
-       
-       // Controlla overflow orizzontale
-       const popupLeft = buttonRect.left + xOffset - popupWidth / 2;
-       if (popupLeft < chatRect.left + margin) {
-         // Il popup uscirebbe a sinistra
-         xOffset += (chatRect.left + margin) - popupLeft;
-       } else if (popupLeft + popupWidth > chatRect.right - margin) {
-         // Il popup uscirebbe a destra
-         xOffset -= (popupLeft + popupWidth) - (chatRect.right - margin);
-       }
+      const popupHeight = showEmojiPicker ? 350 : 80; // Altezza approssimativa del popup
+      const margin = 20; // Margine maggiore per evitare che tocchi i bordi
       
       // Controlla overflow verticale
-      const popupHeight = showEmojiPicker ? 350 : 80; // Altezza approssimativa del popup
       if (position === "bottom" && buttonRect.bottom + popupHeight > chatRect.bottom - margin) {
         yPosition = "top";
       } else if (position === "top" && buttonRect.top - popupHeight < chatRect.top + margin) {
         yPosition = "bottom";
       }
       
-      setAdjustedPosition({ x: xOffset, y: yPosition });
+      // Non spostare orizzontalmente - il popup rimane centrato sotto il pulsante
+      setAdjustedPosition({ x: 0, y: yPosition });
     };
     
     // Calcola immediatamente e dopo un breve delay per assicurarsi che il DOM sia pronto
@@ -171,39 +159,7 @@ const QuickReactionsPopup = ({
     
     if (reaction.isCustom) {
       setShowEmojiPicker(true);
-      // Ricalcola la posizione dopo che il popup cambia dimensione
-      setTimeout(() => {
-        if (popupRef.current) {
-          const popup = popupRef.current;
-          const button = popup.parentElement;
-          const messageContainer = button.closest('[data-message-id]');
-          const messageBubble = messageContainer?.querySelector('.message-bubble');
-          
-          if (!messageBubble) return;
-          
-          const buttonRect = button.getBoundingClientRect();
-          const bubbleRect = messageBubble.getBoundingClientRect();
-          const chatContainer = popup.closest('.chat-messages-container') || popup.closest('.chat-list-container') || document.body;
-          const chatRect = chatContainer.getBoundingClientRect();
-          
-                     const chatCenter = chatRect.left + chatRect.width / 2;
-           const buttonCenter = buttonRect.left + buttonRect.width / 2;
-           let xOffset = chatCenter - buttonCenter;
-          
-          // Controlla overflow orizzontale per il picker esteso
-          const popupWidth = 350;
-          const popupLeft = buttonRect.left + xOffset - popupWidth / 2;
-          const margin = 10;
-          
-          if (popupLeft < chatRect.left + margin) {
-            xOffset += (chatRect.left + margin) - popupLeft;
-          } else if (popupLeft + popupWidth > chatRect.right - margin) {
-            xOffset -= (popupLeft + popupWidth) - (chatRect.right - margin);
-          }
-          
-          setAdjustedPosition({ x: xOffset, y: adjustedPosition.y });
-        }
-      }, 50);
+      // Il posizionamento viene gestito automaticamente dall'useEffect sopra
     } else {
       await onReactionSelect(reaction.emoji);
       onClose();
@@ -236,16 +192,19 @@ const QuickReactionsPopup = ({
     <AnimatePresence>
       <motion.div
         ref={popupRef}
-        className="absolute z-50"
-                 style={{
-           [adjustedPosition.y === "top" ? "bottom" : "top"]: "100%",
-           left: `calc(50% + ${adjustedPosition.x}px)`,
-           transform: "translateX(-50%)",
-           marginTop: adjustedPosition.y === "top" ? "0" : "8px",
-           marginBottom: adjustedPosition.y === "top" ? "8px" : "0",
-           backgroundColor: "rgba(255, 255, 255, 0.425)",
-           borderRadius: "20px",
-         }}
+        className="absolute"
+        style={{
+          zIndex: 9999, // Z-index molto alto per stare sopra la chat
+          [adjustedPosition.y === "top" ? "bottom" : "top"]: "100%",
+          left: "20%",
+          transform: "translateX(-50%)",
+          marginTop: adjustedPosition.y === "top" ? "0" : "8px",
+          marginBottom: adjustedPosition.y === "top" ? "8px" : "0",
+          backgroundColor: "rgba(255, 255, 255, 0.95)",
+          borderRadius: "20px",
+          backdropFilter: "blur(8px)",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+        }}
         initial={{ opacity: 0, scale: 0.8, y: adjustedPosition.y === "top" ? 10 : -10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.8, y: adjustedPosition.y === "top" ? 10 : -10 }}
@@ -260,26 +219,15 @@ const QuickReactionsPopup = ({
         {/* Popup emoji picker esteso */}
         {showEmojiPicker ? (
           <div 
-            className="bg-white rounded-2xl shadow-xl p-4" 
+            className="bg-white rounded-2xl shadow-xl p-2" 
             style={{ 
               width: '350px',
               // Assicura che non esca dai bordi
-              maxWidth: 'calc(100vw - 40px)'
+              maxWidth: 'calc(100vw - 40px)',
+              zIndex: 10000, // Z-index ancora più alto per il picker esteso
+              position: 'relative',
             }}
           >
-            {/* Header con ricerca */}
-            <div className="flex items-center gap-2 mb-3">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Cerca emoji..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  autoFocus
-                />
-              </div>
               <button
                 onClick={() => {
                   setShowEmojiPicker(false);
@@ -289,7 +237,7 @@ const QuickReactionsPopup = ({
               >
                 <X className="h-4 w-4 text-gray-500" />
               </button>
-            </div>
+
             
             {/* Categorie */}
             {!searchTerm && (
@@ -332,7 +280,10 @@ const QuickReactionsPopup = ({
             className="rounded-2xl shadow-xl p-2 quick-reactions-popup"
             style={{
               // Assicura che non esca dai bordi
-              maxWidth: 'calc(100vw - 40px)'
+              maxWidth: 'calc(100vw - 40px)',
+              backgroundColor: "rgba(255, 255, 255, 0.95)",
+              backdropFilter: "blur(8px)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
             }}
           >
             <div className="flex items-center gap-2">

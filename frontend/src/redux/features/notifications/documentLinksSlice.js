@@ -114,6 +114,7 @@ export const linkDocument = createAsyncThunk(
           custSuppCode: documentType === "CustSupp" ? documentId : undefined,
           custSuppType: documentType === "CustSupp" ? 3211264 : undefined,
           bom: documentType === "BillOfMaterials" ? documentId : undefined,
+          ticketId: documentType === "Ticket" ? documentId : undefined,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -206,7 +207,6 @@ export const searchChatsByDocument = createAsyncThunk(
       if (!token) {
         return rejectWithValue("No authentication token available");
       }
-      console.log("searchChatsByDocument. parameters: ", searchType, searchValue);
 
       let url = `${config.API_BASE_URL}/chats/by-document?searchType=${encodeURIComponent(searchType)}`;
       
@@ -223,8 +223,6 @@ export const searchChatsByDocument = createAsyncThunk(
         // Per altri tipi, usa searchValue normalmente
         url += `&searchValue=${encodeURIComponent(searchValue)}`;
       }
-      
-      console.log("searchChatsByDocument. Url: ", url);
       
       const response = await axios.get(url, {
         headers: {

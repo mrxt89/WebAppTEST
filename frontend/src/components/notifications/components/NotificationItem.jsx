@@ -16,11 +16,15 @@ const NotificationItem = ({
   const messages = parseMessages(notification.messages);
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
   const categoryColor = notification.hexColor;
-  
+
   // Verifica se questa chat è stata abbandonata dall'utente
   const hasLeftChat = notification.chatLeft === 1 || notification.chatLeft === true;
   // Verifica se questa chat è stata archiviata dall'utente
   const isArchived = notification.archived === 1 || notification.archived === true;
+
+  // Conta le notifiche reazione non lette (senderId = -1)
+  const reactionNotificationsCount = messages.filter(msg => msg.senderId === -1).length;
+  const hasUnreadReactions = reactionNotificationsCount > 0;
 
   return (
     <div
@@ -145,6 +149,14 @@ const NotificationItem = ({
             id={`notification-title-${notification.notificationId}`}
           >
             {notification.title}
+            {hasUnreadReactions && (
+              <span
+                className="inline-flex items-center justify-center w-5 h-5 ml-1.5 text-xs bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full animate-pulse shadow-lg"
+                title={`${reactionNotificationsCount} ${reactionNotificationsCount === 1 ? 'nuova reazione' : 'nuove reazioni'}`}
+              >
+                ❤️
+              </span>
+            )}
             {hasLeftChat && (
               <span className="text-yellow-600 text-xs ml-1">
                 (abbandonata)

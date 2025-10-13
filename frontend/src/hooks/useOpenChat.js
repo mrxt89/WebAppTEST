@@ -35,6 +35,7 @@ import {
   refreshAttachments,
   fetchChatParticipants
 } from '@/redux/features/notifications/notificationsActions';
+import { loadMessageReactions } from '@/redux/features/notifications/messageReactionsSlice';
 import notificationService from '@/services/notifications/NotificationService';
 import { config } from '@/config';
 import axios from 'axios';
@@ -59,6 +60,9 @@ export const useOpenChat = (notificationId, options = {}) => {
   const [isLoadingInitial, setIsLoadingInitial] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
+
+  // Stato per le notifiche reazione da mostrare come toast
+  const [reactionNotifications, setReactionNotifications] = useState([]);
   
   // Stati per tracciare l'interazione utente
   const [userHasInteracted, setUserHasInteracted] = useState(false);
@@ -73,14 +77,16 @@ export const useOpenChat = (notificationId, options = {}) => {
   // CORREZIONE: Parse dei messaggi direttamente da Redux
   const messages = useMemo(() => {
     if (!chatData?.messages) {
-     
+
       return [];
     }
-    
-    const parsedMessages = Array.isArray(chatData.messages) 
-      ? chatData.messages 
+
+    const parsedMessages = Array.isArray(chatData.messages)
+      ? chatData.messages
       : JSON.parse(chatData.messages || "[]");
-    return parsedMessages;
+
+    // Filtra i messaggi con senderId = -1 (notifiche reazione - solo per sidebar)
+    return parsedMessages.filter(msg => msg.senderId !== -1);
   }, [chatData?.messages, notificationId]);
   
   // Parse dei membri
@@ -275,13 +281,33 @@ export const useOpenChat = (notificationId, options = {}) => {
   // Caricamento iniziale
   const loadInitialData = useCallback(async (forceRefresh = false) => {
     if (loadingRef.current || (!forceRefresh && hasFullData)) return;
-    
+
     loadingRef.current = true;
     setIsLoadingInitial(true);
     setError(null);
-    
+
     try {
-    
+      // Cancella le notifiche reazione per questa chat quando la apro
+      // e salva le notifiche per mostrarle come toast
+      try {
+        const clearResponse = await axios.delete(
+          `${config.API_BASE_URL}/notifications/${notificationId}/reaction-notifications`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`
+            }
+          }
+        );
+
+        // Se ci sono notifiche reazione, salvale per il toast
+        if (clearResponse.data && clearResponse.data.reactionNotifications && clearResponse.data.reactionNotifications.length > 0) {
+          setReactionNotifications(clearResponse.data.reactionNotifications);
+        }
+      } catch (clearErr) {
+        console.warn('Could not clear reaction notifications:', clearErr);
+        // Non blocchiamo il caricamento se fallisce
+      }
+
       const response = await axios.get(
         `${config.API_BASE_URL}/notifications/${notificationId}?pageSize=25&openChat=1&t=${Date.now()}`,
         {
@@ -317,6 +343,19 @@ export const useOpenChat = (notificationId, options = {}) => {
         
         // Carica allegati
         dispatch(fetchNotificationAttachments(notificationId));
+        
+        // Carica immediatamente le reazioni per tutti i messaggi
+        const messages = Array.isArray(response.data.messages) 
+          ? response.data.messages 
+          : (typeof response.data.messages === 'string' ? JSON.parse(response.data.messages || "[]") : []);
+        
+        if (messages.length > 0) {
+          const messageIds = messages.map(msg => msg.messageId).filter(id => id);
+          if (messageIds.length > 0) {
+            // Carica le reazioni in batch per tutti i messaggi
+            dispatch(loadMessageReactions(messageIds));
+          }
+        }
         
         return response.data;
       }
@@ -380,9 +419,17 @@ export const useOpenChat = (notificationId, options = {}) => {
       // Crea messaggio temporaneo per feedback immediato
       const currentUser = getCurrentUser();
       const tempMessageId = `temp_${Date.now()}`;
+      // Crea messaggio appropriato per gli allegati
+      let attachmentMessage = "";
+      if (attachments.length === 1) {
+        attachmentMessage = `Ha condiviso: ${attachments[0].name}`;
+      } else if (attachments.length > 1) {
+        attachmentMessage = `Ha condiviso ${attachments.length} allegati`;
+      }
+
       const tempMessage = {
         messageId: tempMessageId,
-        message: message.trim() || (attachments.length > 0 ? "Ha condiviso allegati" : ""),
+        message: message.trim() || attachmentMessage || "",
         senderId: currentUser?.userId || 0,
         senderName: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "Tu",
         tbCreated: new Date().toISOString(),
@@ -705,31 +752,35 @@ export const useOpenChat = (notificationId, options = {}) => {
     newMessagesStartIndex,
     unreadMessagesCount,
     lastReadMessageId: lastReadMessageIdRef.current,
-    
+
     // Stati caricamento
     isLoadingInitial,
     isLoadingMore,
     isRefreshing,
     error,
-    
+
+    // Notifiche reazione
+    reactionNotifications,
+    clearReactionNotifications: () => setReactionNotifications([]),
+
     // Funzioni principali
     loadInitialData,
     loadMore,
     refreshData,
     sendMessage,
     markAsInteracted,
-    
+
     // NUOVO: Esporta queste funzioni
     removeMessageLocally,
     updateMessageColorLocally,
     updateMessageLocally,
     // Azioni chat
     ...chatActions,
-    
+
     // Utilities
     getCurrentUser,
     isOwnMessage,
-    
+
     // Stati interazione
     userHasInteracted,
     lastInteractionTime

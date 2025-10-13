@@ -110,11 +110,34 @@ const ChatSidebar = forwardRef((props, ref) => {
 
     const handleAttachmentDownloaded = (event) => {
       const { attachmentId } = event.detail;
-      setAttachments(prev => prev.map(att => 
-        att.AttachmentID === attachmentId 
+      setAttachments(prev => prev.map(att =>
+        att.AttachmentID === attachmentId
           ? { ...att, HasBeenViewed: true, FirstViewedAt: att.FirstViewedAt || new Date().toISOString() }
           : att
       ));
+    };
+
+    const handleAttachmentDeleted = async (event) => {
+      const { attachmentId, notificationId: eventNotificationId } = event.detail;
+
+      // Aggiorna immediatamente lo stato locale
+      setAttachments(prev => prev.filter(att => att.AttachmentID !== attachmentId));
+
+      // Ricarica dal server dopo che Redux ha finito
+      if (eventNotificationId === notificationId) {
+        setTimeout(async () => {
+          await loadAttachments();
+        }, 500);
+      }
+    };
+
+    const handleAttachmentsRefreshed = async (event) => {
+      const { notificationId: eventNotificationId } = event.detail;
+
+      // Se è per questa chat, ricarica gli allegati
+      if (eventNotificationId === notificationId && activeTab === "attachments") {
+        await loadAttachments();
+      }
     };
 
     const handleDocumentLinked = async () => {
@@ -159,16 +182,20 @@ const ChatSidebar = forwardRef((props, ref) => {
 
     document.addEventListener("attachment-viewed", handleAttachmentViewed);
     document.addEventListener("attachment-downloaded", handleAttachmentDownloaded);
+    document.addEventListener("attachment-deleted", handleAttachmentDeleted);
+    document.addEventListener("attachments-refreshed", handleAttachmentsRefreshed);
     document.addEventListener("document-linked", handleDocumentLinked);
     document.addEventListener("document-unlinked", handleDocumentLinked);
     document.addEventListener("chat-message-sent", handleMessageSent);
     document.addEventListener("refresh-attachments", handleRefreshAttachments);
     document.addEventListener("attachment-uploaded", handleAttachmentUploaded);
     document.addEventListener("reload-open-chat", handleReloadChat);
-    
+
     return () => {
       document.removeEventListener("attachment-viewed", handleAttachmentViewed);
       document.removeEventListener("attachment-downloaded", handleAttachmentDownloaded);
+      document.removeEventListener("attachment-deleted", handleAttachmentDeleted);
+      document.removeEventListener("attachments-refreshed", handleAttachmentsRefreshed);
       document.removeEventListener("document-linked", handleDocumentLinked);
       document.removeEventListener("document-unlinked", handleDocumentLinked);
       document.removeEventListener("chat-message-sent", handleMessageSent);

@@ -35,7 +35,6 @@ import DOMPurify from 'dompurify';
 import PollModal from './PollModal';
 import MessageColorPicker from './MessageColorPicker';
 import MessageActionsMenu from './MessageActionsMenu';
-import MessageReactions from './MessageReactions';
 import QuickReactionsPopup from './QuickReactionsPopup';
 import { FaFlag } from 'react-icons/fa';
 import axios from 'axios';
@@ -76,6 +75,7 @@ const ChatMessage = memo(({
   const [readInfo, setReadInfo] = useState(null);
   const [loadingReadInfo, setLoadingReadInfo] = useState(false);
   const [showQuickReactions, setShowQuickReactions] = useState(false);
+  const [hoveredReaction, setHoveredReaction] = useState(null);
   
   const messageRef = useRef(null);
   const actionsRef = useRef(null);
@@ -87,7 +87,8 @@ const ChatMessage = memo(({
     notificationAttachments,
     setMessageColor,
     clearMessageColor,
-    toggleMessageReaction
+    toggleMessageReaction,
+    loadMessageReactions
   } = useNotifications();
 
   // Ottieni le reazioni dal Redux store
@@ -130,6 +131,9 @@ const ChatMessage = memo(({
         }, 600);
       }
       
+      // Ricarica immediatamente le reazioni per questo messaggio per ottenere lo stato corretto
+      await loadMessageReactions([message.messageId]);
+      
       // Emetti evento per aggiornare le reazioni
       document.dispatchEvent(
         new CustomEvent("message-reaction-updated", {
@@ -141,7 +145,7 @@ const ChatMessage = memo(({
     } finally {
       setLoadingReactions(prev => ({ ...prev, [emoji]: false }));
     }
-  }, [disabled, message.messageId, toggleMessageReaction]);
+  }, [disabled, message.messageId, toggleMessageReaction, loadMessageReactions]);
 
   const originalMessage = findOriginalMessage(message.replyToMessageId);
   
@@ -354,14 +358,29 @@ const ChatMessage = memo(({
   
   // Gestione reazioni
   const handleReaction = async (reactionType) => {
+    if (disabled) return;
+    
     try {
       setLoadingReactions(prev => ({ ...prev, [reactionType]: true }));
       
       await toggleMessageReaction(message.messageId, reactionType);
       
+      // Aggiungi effetto di feedback
+      const button = document.querySelector(`[data-message-id="${message.messageId}"] .reaction-badge`);
+      if (button) {
+        button.classList.add('reaction-feedback');
+        setTimeout(() => {
+          button.classList.remove('reaction-feedback');
+        }, 600);
+      }
+      
+      // Ricarica immediatamente le reazioni per questo messaggio per ottenere lo stato corretto
+      await loadMessageReactions([message.messageId]);
+      
+      // Emetti evento per aggiornare le reazioni
       document.dispatchEvent(
-        new CustomEvent('message-reaction-updated', {
-          detail: { messageId: message.messageId, notificationId },
+        new CustomEvent("message-reaction-updated", {
+          detail: { messageId: message.messageId }
         })
       );
 
@@ -409,9 +428,138 @@ const ChatMessage = memo(({
       });
     }
   };
-  
+
   // Ottieni allegati per questo messaggio
   const messageAttachments = notificationAttachments?.[notificationId]?.[message.messageId] || [];
+
+
+  // Gestione click su messaggio con allegato
+  const handleAttachmentMessageClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (messageAttachments.length === 1) {
+      // Se c'è un solo allegato, aprilo direttamente
+      setSelectedAttachment(messageAttachments[0]);
+    } else if (messageAttachments.length > 1) {
+      // Se ce ne sono più, mostra/nascondi la lista
+      setShowAttachments(!showAttachments);
+    } else {
+      // Fallback: se messageAttachments è vuoto, cerca nella lista completa
+      const allAttachments = notificationAttachments?.[notificationId];
+
+      if (allAttachments) {
+        // Ottieni tutti gli allegati come array piatto
+        let allAttachmentsArray = [];
+        if (Array.isArray(allAttachments)) {
+          allAttachmentsArray = allAttachments;
+        } else if (typeof allAttachments === 'object') {
+          allAttachmentsArray = Object.values(allAttachments).flat();
+        }
+
+        // Cerca per MessageID
+        let attachmentsForThisMessage = allAttachmentsArray.filter(att =>
+          att.MessageID === message.messageId
+        );
+
+        // Se non trova per MessageID, cerca per nome file nel messaggio
+        if (attachmentsForThisMessage.length === 0 && message.message) {
+          const fileNameMatch = message.message.match(/Ha condiviso:\s*(.+)/i);
+          if (fileNameMatch) {
+            const fileName = fileNameMatch[1].trim();
+            attachmentsForThisMessage = allAttachmentsArray.filter(att =>
+              att.FileName === fileName || att.FileName?.includes(fileName)
+            );
+          }
+        }
+
+        if (attachmentsForThisMessage.length === 1) {
+          setSelectedAttachment(attachmentsForThisMessage[0]);
+        } else if (attachmentsForThisMessage.length > 1) {
+          setShowAttachments(!showAttachments);
+        } else {
+          // Nessun allegato trovato - apri la sidebar allegati
+          document.dispatchEvent(new CustomEvent('open-attachments-sidebar', {
+            detail: { notificationId }
+          }));
+        }
+      } else {
+        document.dispatchEvent(new CustomEvent('open-attachments-sidebar', {
+          detail: { notificationId }
+        }));
+      }
+    }
+  };
+
+  // Funzione per renderizzare il messaggio con link cliccabile per allegati
+  const renderAttachmentMessage = () => {
+    const messageText = message.message || "";
+
+    // Pattern per "Ha condiviso: nomefile.ext" o "Ha condiviso N allegati"
+    const singleFilePattern = /Ha condiviso:\s*(.+)/i;
+    const multiFilePattern = /Ha condiviso\s+(\d+)\s+allegati/i;
+
+    const singleMatch = messageText.match(singleFilePattern);
+    const multiMatch = messageText.match(multiFilePattern);
+
+
+    if (singleMatch) {
+      // Caso: singolo file - mostra sempre il link anche se messageAttachments è vuoto
+      const fileName = singleMatch[1];
+      return (
+        <div className="flex items-center gap-2">
+          <span>Ha condiviso: </span>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAttachmentMessageClick(e);
+            }}
+            className="text-black hover:text-gray-700 hover:underline font-medium inline-flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0"
+            style={{
+              userSelect: "none",
+              WebkitUserSelect: "none",
+              MozUserSelect: "none",
+              msUserSelect: "none"
+            }}
+          >
+            <Paperclip className="h-3.5 w-3.5" />
+            {fileName}
+          </button>
+        </div>
+      );
+    } else if (multiMatch) {
+      // Caso: multipli file
+      const count = multiMatch[1];
+      return (
+        <div className="flex items-center gap-2">
+          <span>Ha condiviso </span>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAttachmentMessageClick(e);
+            }}
+            className="text-black hover:text-gray-700 hover:underline font-medium inline-flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0"
+            style={{
+              userSelect: "none",
+              WebkitUserSelect: "none",
+              MozUserSelect: "none",
+              msUserSelect: "none"
+            }}
+          >
+            <Paperclip className="h-3.5 w-3.5" />
+            {count} allegati
+          </button>
+        </div>
+      );
+    }
+
+    // Fallback: messaggio normale
+    return renderMessageText(messageText, message.usernameMention, message.isEdited);
+  };
   
   // Componente Avatar
   const MessageAvatar = ({ senderName, onClick }) => {
@@ -500,10 +648,29 @@ const ChatMessage = memo(({
   
   return (
     <>
+      {/* CSS per effetti di feedback */}
+      <style jsx>{`
+        .reaction-feedback {
+          animation: reactionPulse 0.6s ease-in-out;
+        }
+        
+        @keyframes reactionPulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.2); }
+          100% { transform: scale(1); }
+        }
+      `}</style>
+      
       {/* Messaggio */}
       <motion.div
         ref={messageRef}
         className={`flex p-2 mx-2 mb-2 relative ${(isOwnMessage || isOwnMessage == '1') ? 'justify-end' : 'justify-start'} ${isSearchResult ? 'bg-yellow-50' : ''}`}
+        style={{
+          userSelect: "text",
+          WebkitUserSelect: "text",
+          MozUserSelect: "text",
+          msUserSelect: "text"
+        }}
         initial={isNew ? { opacity: 0, y: 20 } : false}
         animate={isNew ? { opacity: 1, y: 0 } : false}
         exit={{ opacity: 0, y: -20 }}
@@ -545,8 +712,8 @@ const ChatMessage = memo(({
                </span>
              )}
              
-             {/* Icona emoji per reazioni rapide - posizionata a sinistra per messaggi inviati, a destra per messaggi ricevuti */}
-             {!disabled && !message._isTemporary && (
+             {/* Icona emoji per reazioni rapide - solo per messaggi degli altri utenti */}
+             {!disabled && !message._isTemporary && !isOwnMessage && (
                <div className={`relative ${isOwnMessage ? 'order-first' : 'order-last'}`}>
                  <button
                    className={`p-1.5 rounded-full quick-reactions-button ${
@@ -561,33 +728,25 @@ const ChatMessage = memo(({
                  >
                    <Smile className="h-4 w-4" />
                  </button>
-                 
-                                 {/* Popup reazioni rapide */}
-                <QuickReactionsPopup
-                  isOpen={showQuickReactions}
-                  onClose={() => setShowQuickReactions(false)}
-                  onReactionSelect={handleQuickReaction}
-                  position={isOwnMessage ? "top" : "bottom"}
-                  disabled={disabled}
-                  loadingReactions={loadingReactions}
-                  messageId={message.messageId}
-                  isOwnMessage={isOwnMessage}
-
-                />
                </div>
              )}
             
             <div
               className={`message-bubble relative ${(isOwnMessage || isOwnMessage == '1') ? 'sent' : 'received'}`}
-              style={
-                message.messageColor && (!isOwnMessage || isOwnMessage == '0')
+              style={{
+                userSelect: "text",
+                WebkitUserSelect: "text",
+                MozUserSelect: "text",
+                msUserSelect: "text",
+                marginBottom: (message.reactions || reactionsFromStore.length > 0) ? '20px' : '0px', // Spazio per le reazioni
+                ...(message.messageColor && (!isOwnMessage || isOwnMessage == '0')
                   ? {
                       backgroundColor: message.messageColor + "15",
                       color: getContrastTextColor(message.messageColor),
                       boxShadow: `0 2px 8px ${message.messageColor}33`,
                     }
-                  : {}
-              }
+                  : {})
+              }}
             >
               {/* Menu actions */}
               {!disabled && !message._isTemporary && (
@@ -647,32 +806,41 @@ const ChatMessage = memo(({
                 )}
               </AnimatePresence>
               
-              {/* Color picker */}
+              {/* Color picker - posizionato relativamente al bubble */}
               <AnimatePresence>
                 {showColorPicker && (
-                  <div 
-                    ref={colorPickerRef}
-                    className={`absolute z-50 ${(!isOwnMessage || isOwnMessage == '0') ? "right-10" : "left-10"} top-2`}
-                  >
-                    <MessageColorPicker
-                      messageId={message.messageId}
-                      notificationId={notificationId}
-                      onClose={() => setShowColorPicker(false)}
-                    />
-                  </div>
+                  <MessageColorPicker
+                    messageId={message.messageId}
+                    notificationId={notificationId}
+                    onClose={() => setShowColorPicker(false)}
+                    isOwnMessage={isOwnMessage}
+                  />
                 )}
               </AnimatePresence>
               
               
               {/* Contenuto messaggio */}
-              <div style={{ paddingTop: "15px", paddingBottom: "10px", fontSize: "1rem" }}>
+              <div
+                style={{
+                  paddingTop: "15px",
+                  paddingBottom: "10px",
+                  fontSize: "1rem",
+                  userSelect: "text",
+                  WebkitUserSelect: "text",
+                  MozUserSelect: "text",
+                  msUserSelect: "text"
+                }}
+              >
                 {isPollMessage ? (
-                  <PollModal 
-                    pollId={message.pollId} 
+                  <PollModal
+                    pollId={message.pollId}
                     messageId={message.messageId}
                     notificationId={notificationId}
                     currentUserId={currentUserId}
                   />
+                ) : (message.message?.includes("Ha condiviso") || message.message?.includes("ha condiviso")) ? (
+                  // Messaggio con allegato - solo il nome file è cliccabile
+                  renderAttachmentMessage()
                 ) : (
                   renderMessageText(
                     message.message,
@@ -729,50 +897,84 @@ const ChatMessage = memo(({
                 </div>
               )}
               
-              {/* Reazioni */}
-              {(message.reactions || reactionsFromStore.length > 0) ? (
+              {/* Reazioni - posizionate fuori dal bubble come WhatsApp */}
+              {(message.reactions || reactionsFromStore.length > 0) && (
                 <motion.div 
-                  className={`message-reactions flex flex-wrap gap-1 mt-1`}
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
+                  className={`absolute -bottom-1 ${
+                    (isOwnMessage || isOwnMessage == '1') 
+                      ? '-left-2 flex-row-reverse' 
+                      : '-right-2'
+                  } flex items-center gap-0.5 max-w-[120px]`}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.2 }}
+                  style={{ zIndex: 10 }}
                 >
-                  {Object.entries(groupReactionsByType(message.reactions || reactionsFromStore)).map(([reactionType, reactors]) => {
-                    const userReaction = reactors.find(r => r.UserID === currentUserId);
-                    const hasCurrentUserReacted = !!userReaction;
-                    const userNames = reactors.map(r => r.UserName).join(", ");
-                    const isLoading = loadingReactions[reactionType];
-                    
-                    return (
-                      <motion.button
-                        key={reactionType}
-                        className={`reaction-badge flex items-center rounded-full px-1.5 py-0.5 text-xs transition-all duration-200 hover:scale-105 ${
-                          hasCurrentUserReacted
-                            ? "bg-blue-100 text-blue-700 shadow-sm"
-                            : "bg-gray-100 hover:bg-gray-200 text-black"
-                        }`}
-                        onClick={() => handleReaction(reactionType)}
-                        title={userNames}
-                        disabled={disabled || isLoading}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                        ) : (
-                          <span className="mr-1">{reactionType}</span>
-                        )}
-                        <span className="reaction-count font-medium">{reactors.length}</span>
-                      </motion.button>
-                    );
-                  })}
+                  {Object.entries(groupReactionsByType(message.reactions || reactionsFromStore))
+                    .slice(0, 3) // Mostra max 3 reazioni diverse
+                    .map(([reactionType, reactors]) => {
+                      const userReaction = reactors.find(r => r.UserID === currentUserId);
+                      const hasCurrentUserReacted = !!userReaction;
+                      const userNames = reactors.map(r => r.UserName || r.UserID || 'Utente sconosciuto').join(", ");
+                      const isLoading = loadingReactions[reactionType];
+                      const showTooltip = hoveredReaction === reactionType;
+
+                      return (
+                        <motion.button
+                          key={reactionType}
+                          className={`relative group reaction-badge flex items-center rounded-full px-1 py-0.5 text-xs transition-all duration-200 hover:scale-110 ${
+                            hasCurrentUserReacted
+                              ? "bg-blue-500 text-white shadow-md"
+                              : "bg-white border border-gray-200 text-gray-700 shadow-sm hover:shadow-md"
+                          }`}
+                          onClick={() => handleReaction(reactionType)}
+                          onMouseEnter={() => setHoveredReaction(reactionType)}
+                          onMouseLeave={() => setHoveredReaction(null)}
+                          disabled={disabled || isLoading}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.95 }}
+                          style={{
+                            transform: isLoading ? 'scale(0.9)' : 'scale(1)',
+                            opacity: isLoading ? 0.7 : 1
+                          }}
+                        >
+                          {isLoading ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <>
+                              <span className="text-sm">{reactionType}</span>
+                              {reactors.length > 1 && (
+                                <span className="ml-0.5 text-xs font-medium">
+                                  {reactors.length}
+                                </span>
+                              )}
+                            </>
+                          )}
+
+                          {/* Tooltip con nomi utenti - visibile solo su hover */}
+                          {userNames && userNames.trim() && showTooltip && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 5 }}
+                              transition={{ duration: 0.15 }}
+                              className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-xl pointer-events-none whitespace-nowrap z-[9999] max-w-xs"
+                            >
+                              <div className="font-medium">{userNames}</div>
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                            </motion.div>
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  
+                  {/* Indicatore per reazioni aggiuntive */}
+                  {Object.keys(groupReactionsByType(message.reactions || reactionsFromStore)).length > 3 && (
+                    <div className="flex items-center justify-center w-5 h-5 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-600">
+                      +{Object.keys(groupReactionsByType(message.reactions || reactionsFromStore)).length - 3}
+                    </div>
+                  )}
                 </motion.div>
-              ) : (
-                <MessageReactions
-                  messageId={message.messageId}
-                  notificationId={notificationId}
-                  onReactionUpdated={() => {}}
-                />
               )}
               
               {/* Indicatore messaggio letto con click per info dettagliate */}
@@ -851,6 +1053,20 @@ const ChatMessage = memo(({
                   <Clock className="h-4 w-4 text-gray-400 animate-pulse" />
                 </div>
               )}
+              
+              {/* Popup reazioni rapide - solo per messaggi degli altri utenti */}
+              {!disabled && !message._isTemporary && !isOwnMessage && (
+                <QuickReactionsPopup
+                  isOpen={showQuickReactions}
+                  onClose={() => setShowQuickReactions(false)}
+                  onReactionSelect={handleQuickReaction}
+                  position={isOwnMessage ? "top" : "bottom"}
+                  disabled={disabled}
+                  loadingReactions={loadingReactions}
+                  messageId={message.messageId}
+                  isOwnMessage={isOwnMessage}
+                />
+              )}
             </div>
             
           </div>
@@ -869,6 +1085,7 @@ const ChatMessage = memo(({
       {selectedAttachment && (
         <FileViewer
           file={selectedAttachment}
+          isOpen={!!selectedAttachment}
           onClose={() => setSelectedAttachment(null)}
         />
       )}

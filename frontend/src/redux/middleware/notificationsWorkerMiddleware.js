@@ -243,17 +243,15 @@ const notificationsWorkerMiddleware = (store) => {
                 setTimeout(() => {
                   const currentState = store.getState();
                   const currentNotifications = currentState.notifications?.notifications || [];
-                  const openChatIds = Array.isArray(currentState.notifications?.openChatIds)
-                    ? currentState.notifications.openChatIds
-                    : [];
-
-                  const hasChanges = hasNotificationChanges(currentNotifications, newNotifications);
-
+                  const openChatIds = currentState.notifications?.openChatIds || new Set();
+                
+                const hasChanges = hasNotificationChanges(currentNotifications, newNotifications);
+                
                   if (hasChanges) {
                     store.dispatch({
                       type: "notifications/updateFromWorker",
                       payload: newNotifications.map(notif => {
-                        if (openChatIds.includes(notif.notificationId)) {
+                        if (openChatIds.has(notif.notificationId)) {
                           return {
                             ...notif,
                             messages: []
@@ -438,9 +436,7 @@ const notificationsWorkerMiddleware = (store) => {
                         return;
                       }
 
-                      const isActuallyOpen = Array.isArray(state.notifications.openChatIds)
-                        ? state.notifications.openChatIds.includes(parseInt(notificationId))
-                        : false;
+                      const isActuallyOpen = state.notifications.openChatIds.has(parseInt(notificationId));
                       
                       console.log(`[Middleware] Nuovo messaggio per chat ${notificationId}, aperta: ${isActuallyOpen}`);
 
@@ -681,20 +677,18 @@ const notificationsWorkerMiddleware = (store) => {
       // Usa setTimeout per evitare di chiamare getState durante l'esecuzione del reducer
       setTimeout(() => {
         const state = store.getState();
-        const openChatIds = Array.isArray(state.notifications?.openChatIds)
-          ? state.notifications.openChatIds
-          : [];
-
+        const openChatIds = state.notifications?.openChatIds || new Set();
+      
         // Marca come lette le notifiche delle chat aperte
         if (action.payload && Array.isArray(action.payload)) {
           action.payload = action.payload.map(notification => {
-            if (openChatIds.includes(notification.notificationId)) {
+            if (openChatIds.has(notification.notificationId)) {
               return { ...notification, isReadByUser: true };
             }
             return notification;
           });
         }
-
+        
         return next(action);
       }, 0);
     }

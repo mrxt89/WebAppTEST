@@ -1083,24 +1083,67 @@ async function addMessageReaction(messageId, userId, reactionType) {
         VALUES (@messageId, @userId, @reactionType)
       `);
     
-    const notificationResult = await pool.request()
+    // Recupera info messaggio, notifica e mittente originale
+    const messageInfoResult = await pool.request()
       .input('messageId', sql.Int, messageId)
       .query(`
-        SELECT notificationId
-        FROM AR_NotificationDetails WITH (NOLOCK)
-        WHERE messageId = @messageId
+        SELECT nd.notificationId, nd.senderId as originalSender
+        FROM AR_NotificationDetails nd WITH (NOLOCK)
+        WHERE nd.messageId = @messageId
       `);
     
     let notificationId = null;
-    if (notificationResult.recordset.length > 0) {
-      notificationId = notificationResult.recordset[0].notificationId;
+    let originalSender = null;
+
+    if (messageInfoResult.recordset.length > 0) {
+      notificationId = messageInfoResult.recordset[0].notificationId;
+      originalSender = messageInfoResult.recordset[0].originalSender;
     }
-    
+
+    // Ottieni nome dell'utente che ha reagito
+    const userResult = await pool.request()
+      .input('userId', sql.Int, userId)
+      .query(`
+        SELECT firstName + ' ' + lastName as userName
+        FROM AR_Users WITH (NOLOCK)
+        WHERE userId = @userId
+      `);
+
+    const userWhoReacted = userResult.recordset.length > 0
+      ? userResult.recordset[0].userName
+      : 'Utente';
+
+    // Crea una notifica "fantasma" che appare solo nella sidebar
+    // senderId = -1 indica che è una notifica di reazione (verrà cancellata automaticamente quando si apre la chat)
+    if (originalSender && originalSender !== userId && notificationId) {
+      try {
+        // Inserisci un messaggio speciale per notifica reazione
+        await pool.request()
+          .input('notificationId', sql.Int, notificationId)
+          .input('senderId', sql.Int, -1) // -1 = notifica reazione (flag speciale)
+          .input('receiverId', sql.Int, originalSender)
+          .input('message', sql.NVarChar(sql.MAX), `${userWhoReacted} ha reagito con ${reactionType}`)
+          .input('responseOptionId', sql.Int, 0)
+          .input('isReadByReceiver', sql.Bit, false)
+          .query(`
+            INSERT INTO AR_NotificationDetails
+            (notificationId, senderId, receiverId, message, responseOptionId, isReadByReceiver, ReceiverReadedDate, chatLeft, archived, isMuted)
+            VALUES
+            (@notificationId, @senderId, @receiverId, @message, @responseOptionId, @isReadByReceiver, GETDATE(), 0, 0, 0)
+          `);
+      } catch (notifErr) {
+        console.warn('Could not create reaction notification:', notifErr);
+        // Non lanciamo errore, la reazione è stata comunque aggiunta
+      }
+    }
+
     return {
       success: true,
       message: 'Reazione aggiunta con successo',
       action: 'added',
-      notificationId
+      notificationId,
+      originalSender,
+      userWhoReacted: userId
     };
   } catch (err) {
     console.error('Error adding/toggling message reaction:', err);
@@ -1452,7 +1495,73 @@ async function getChatParticipants(notificationId, userId) {
   }
 }
 
+// Cancella le notifiche reazione quando si apre la chat
+// Restituisce anche le notifiche che sta cancellando per mostrarle come toast
+async function clearReactionNotifications(notificationId, userId) {
+  try {
+    let pool = await sql.connect(config.dbConfig);
 
+    // Prima recupera le notifiche reazione che verranno cancellate
+    const reactionNotifs = await pool.request()
+      .input('notificationId', sql.Int, notificationId)
+      .input('userId', sql.Int, userId)
+      .query(`
+        SELECT
+          nd.messageId,
+          nd.message,
+          nd.tbCreated,
+          -- Cerca di trovare il messaggio originale a cui si riferisce la reazione
+          (
+            SELECT TOP 1 message
+            FROM AR_NotificationDetails orig
+            WHERE orig.notificationId = nd.notificationId
+              AND orig.senderId != -1
+              AND orig.senderId = @userId
+              AND orig.tbCreated <= nd.tbCreated
+            ORDER BY orig.tbCreated DESC
+          ) as originalMessage,
+          -- ID del messaggio originale per lo scroll
+          (
+            SELECT TOP 1 messageId
+            FROM AR_NotificationDetails orig
+            WHERE orig.notificationId = nd.notificationId
+              AND orig.senderId != -1
+              AND orig.senderId = @userId
+              AND orig.tbCreated <= nd.tbCreated
+            ORDER BY orig.tbCreated DESC
+          ) as originalMessageId
+        FROM AR_NotificationDetails nd
+        WHERE nd.notificationId = @notificationId
+          AND nd.receiverId = @userId
+          AND nd.senderId = -1
+        ORDER BY nd.tbCreated DESC
+      `);
+
+    // Poi cancella tutti i messaggi con senderId = -1 (notifiche reazione)
+    const result = await pool.request()
+      .input('notificationId', sql.Int, notificationId)
+      .input('userId', sql.Int, userId)
+      .query(`
+        DELETE FROM AR_NotificationDetails
+        WHERE notificationId = @notificationId
+          AND receiverId = @userId
+          AND senderId = -1
+      `);
+
+    return {
+      success: true,
+      deletedCount: result.rowsAffected[0],
+      reactionNotifications: reactionNotifs.recordset || []
+    };
+  } catch (err) {
+    console.error('Error clearing reaction notifications:', err);
+    return {
+      success: false,
+      error: err.message,
+      reactionNotifications: []
+    };
+  }
+}
 
 module.exports = {
   getNotifications,
@@ -1501,5 +1610,6 @@ module.exports = {
   getBatchPolls,
   removeUserFromChat,
   getChatParticipants,
-  getReadReceipts
+  getReadReceipts,
+  clearReactionNotifications
 };

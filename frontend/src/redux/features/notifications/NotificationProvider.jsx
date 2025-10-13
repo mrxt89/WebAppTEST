@@ -9,8 +9,8 @@ import { store } from "../../../redux/store";
  * Proper NotificationProvider that initializes and connects the notification system
  */
 export const NotificationProvider = ({ children }) => {
-  const dispatch = useDispatch();
-  const { 
+    useDispatch();
+    const { 
     initializeWorker, 
     reloadNotifications, 
     forceLoadNotifications,
