@@ -16,6 +16,8 @@ const DocumentChatList = ({
   showUnlinkButton = false,
   emptyStateConfig = {},
   maxHeight = "400px",
+  minHeight = "200px",
+  allowMultipleChats = false,
   className = ""
 }) => {
   // Configurazione stato vuoto con valori di default
@@ -91,9 +93,14 @@ const DocumentChatList = ({
 
   return (
     <div className={className}>
-      <ScrollArea 
-        className="w-full rounded-md border"
-        style={{ maxHeight }}
+      {/* Container con altezza fissa e scroll nativo */}
+      <div 
+        className="w-full rounded-md border overflow-y-auto"
+        style={{ 
+          maxHeight,
+          height: chats.length > 3 ? maxHeight : 'auto',
+          minHeight: chats.length > 0 ? minHeight : 'auto'
+        }}
       >
         <div className="divide-y divide-gray-200">
           {chats.map((chat) => (
@@ -107,7 +114,22 @@ const DocumentChatList = ({
             />
           ))}
         </div>
-      </ScrollArea>
+      </div>
+
+      {/* Pulsante Nuova Chat quando allowMultipleChats è true */}
+      {allowMultipleChats && onCreateNew && (
+        <div className="mt-3 flex justify-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCreateNew}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Nuova Chat
+          </Button>
+        </div>
+      )}
 
       {/* Avviso per chat in sola lettura */}
       {hasReadOnlyChats && (

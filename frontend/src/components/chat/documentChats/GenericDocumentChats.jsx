@@ -24,6 +24,7 @@ const GenericDocumentChats = ({
   showRefreshButton = true,
   showUnlinkButton = true,
   maxHeight = "400px",
+  minHeight = "auto",
   emptyStateConfig = {},
   onChatCreated,
   onChatUnlinked,
@@ -32,7 +33,9 @@ const GenericDocumentChats = ({
   defaultChatTitle = null,
   defaultParticipants = [],
   defaultCategoryId = 1,
-  enableAutoLink = true // Nuovo parametro per abilitare/disabilitare il collegamento automatico
+  enableAutoLink = true,
+  allowMultipleChats = false,
+  previewMessage = null
 }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -74,12 +77,14 @@ const GenericDocumentChats = ({
       documentType,
       documentId,
       documentData,
-      enableAutoLink, // Passa il flag per il collegamento automatico
+      enableAutoLink,
+      previewMessage, // Aggiungi il previewMessage
       metadata: {
         documentType,
         documentId,
         ...documentData,
-        autoLink: enableAutoLink, // Segnala che deve fare il collegamento automatico
+        autoLink: enableAutoLink,
+        previewMessage, // Aggiungi il previewMessage anche nei metadata
         onChatCreated: async (notificationId) => {
           // Il collegamento verrà gestito nel NewMessageWindow o ChatWindow
           // basandosi sul flag autoLink
@@ -108,7 +113,7 @@ const GenericDocumentChats = ({
   const content = (
     <>
       {showHeader && (
-        <CardHeader className="pb-3">
+        <CardHeader className={`pb-3 ${className}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {docTypeConfig?.icon && (
@@ -139,7 +144,7 @@ const GenericDocumentChats = ({
                 </Button>
               )}
               
-              {showCreateButton && (
+              {showCreateButton && (allowMultipleChats || chats.length === 0) && (
                 <Button 
                   size="sm" 
                   onClick={handleCreateNewChat}
@@ -168,17 +173,19 @@ const GenericDocumentChats = ({
       )}
 
       {expanded && (
-        <CardContent className={showHeader ? "pt-0" : ""}>
+        <CardContent className={`${showHeader ? "pt-0" : ""} ${className} `}>
           <DocumentChatList
             chats={chats}
             loading={loading}
             error={error}
             onChatClick={openChat}
             onChatUnlink={showUnlinkButton ? unlinkChat : undefined}
-            onCreateNew={showCreateButton ? handleCreateNewChat : undefined}
+            onCreateNew={showCreateButton && (allowMultipleChats || chats.length === 0) ? handleCreateNewChat : undefined}
             showUnlinkButton={showUnlinkButton}
             emptyStateConfig={emptyStateConfig}
             maxHeight={maxHeight}
+            minHeight={minHeight}
+            allowMultipleChats={allowMultipleChats}
           />
         </CardContent>
       )}
@@ -192,7 +199,7 @@ const GenericDocumentChats = ({
 
   // Altrimenti renderizza dentro una Card
   return (
-    <Card className={className}>
+    <Card className={`${className} chat-attachments-card`}>
       {content}
     </Card>
   );

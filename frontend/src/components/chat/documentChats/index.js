@@ -30,6 +30,7 @@ export const createDocumentChatsComponent = (moduleConfig) => {
     showUnlinkButton = true,
     emptyStateConfig = {},
     defaultCategoryId = 1,
+    className = "",
     ...otherConfig
   } = moduleConfig;
 
@@ -42,6 +43,7 @@ export const createDocumentChatsComponent = (moduleConfig) => {
       showUnlinkButton,
       emptyStateConfig,
       defaultCategoryId,
+      className,
       ...otherConfig,
       ...props
     });
@@ -106,6 +108,18 @@ export const ModulePresets = {
       description: 'Non ci sono discussioni per questo articolo',
       createButtonText: 'Inizia discussione'
     }
+  }),
+
+  // Preset per Ticket
+  TicketChats: createDocumentChatsComponent({
+    documentType: 'Ticket',
+    title: 'Chat Ticket',
+    defaultCategoryId: 2,
+    emptyStateConfig: {
+      title: 'Chat Dedicata per il ticket',
+      description: 'Configura la nuova chat per il ticket',
+      createButtonText: 'Collega chat'
+    }
   })
 };
 
@@ -116,6 +130,7 @@ export const DocumentChats = {
   
   // Metodi specifici pre-configurati
   Task: ModulePresets.TaskChats,
+  Ticket: ModulePresets.TicketChats,
   ProductionOrder: ModulePresets.ProductionOrderChats,
   SalesOrder: ModulePresets.SalesOrderChats,
   Customer: ModulePresets.CustomerChats,

@@ -27,14 +27,25 @@ class NotificationService {
     this.notifiedChatIds = new Set();
     this.dndNotifiedChatIds = new Set();
     
-    // NUOVO: Struttura per aggregare notifiche multiple per chat
+    // Struttura per aggregare notifiche multiple per chat
     this.pendingNotificationsByChat = new Map();
     this.notificationAggregationTimeout = null;
     this.NOTIFICATION_AGGREGATION_DELAY = 2000; // 2 secondi per aggregare messaggi
 
+    // Configurazione per raggruppamento Windows
+    this.windowsGroupingEnabled = this.getWindowsGroupingSetting();
+    this.notificationGroupId = 'webapp-notifications'; // ID unico per il gruppo
+    this.maxNotificationsPerGroup = 5; // Massimo numero di notifiche per gruppo
+    this.groupTimeoutMs = 10000; // Timeout per chiudere automaticamente il gruppo
+
     this.resetNotifiedChatsInterval = setInterval(() => {
       this.notifiedChatIds.clear();
     }, 60000);
+
+    // NUOVO: Intervallo per pulizia automatica notifiche raggruppate
+    this.cleanupGroupedNotificationsInterval = setInterval(() => {
+      this.cleanupOldGroupedNotifications();
+    }, 30000); // Ogni 30 secondi
 
     window.addEventListener("focus", this.handleWindowFocus);
     window.addEventListener("blur", this.handleWindowBlur);
@@ -48,6 +59,9 @@ class NotificationService {
     document.addEventListener("touchstart", this.initAudio.bind(this), {
       once: true,
     });
+
+    // Gestione eventi per raggruppamento
+    this.setupGroupingEventListeners();
 
     this.soundInitPromise = this.preloadSound();
 
@@ -65,6 +79,97 @@ class NotificationService {
       "doNotDisturbChanged",
       this.handleDndChange.bind(this),
     );
+  }
+
+  // Metodo per ottenere l'impostazione di raggruppamento Windows
+  getWindowsGroupingSetting() {
+    const setting = localStorage.getItem('windowsGroupingEnabled');
+    return setting === null ? true : setting === 'true'; // Abilitato di default
+  }
+
+  // Metodo per impostare il raggruppamento Windows
+  setWindowsGroupingSetting(enabled) {
+    localStorage.setItem('windowsGroupingEnabled', enabled.toString());
+    this.windowsGroupingEnabled = enabled;
+  }
+
+  // Setup event listeners per il raggruppamento
+  setupGroupingEventListeners() {
+    // Gestione click su notifiche raggruppate
+    document.addEventListener('notification-group-click', (event) => {
+      const { notificationIds } = event.detail;
+      if (notificationIds && notificationIds.length > 0) {
+        // Apri la prima notifica del gruppo
+        this.openNotification(notificationIds[0]);
+      }
+    });
+
+    // Gestione chiusura gruppo
+    document.addEventListener('notification-group-close', (event) => {
+      const { notificationIds } = event.detail;
+      this.closeNotificationGroup(notificationIds);
+    });
+  }
+
+  // Metodo per aprire una notifica
+  openNotification(notificationId) {
+    try {
+      window.focus();
+      
+      if (typeof window.openChatModal === "function") {
+        window.openChatModal(notificationId);
+      } else {
+        // Fallback navigazione diretta
+        window.location.href = `/chat/${notificationId}`;
+      }
+    } catch (error) {
+      console.error("Errore apertura notifica:", error);
+      window.location.href = `/chat/${notificationId}`;
+    }
+  }
+
+  // Metodo per chiudere un gruppo di notifiche
+  closeNotificationGroup(notificationIds) {
+    notificationIds.forEach(id => {
+      const existingNotification = this.activeNotifications.get(id);
+      if (existingNotification && existingNotification.notification) {
+        existingNotification.notification.close();
+        this.activeNotifications.delete(id);
+      }
+    });
+  }
+
+  /**
+   * NUOVO: Pulisci automaticamente le notifiche vecchie
+   */
+  cleanupOldGroupedNotifications() {
+    const now = Date.now();
+    const maxAge = this.groupTimeoutMs * 2; // Doppio del timeout normale
+
+    for (const [notificationId, notificationData] of this.activeNotifications.entries()) {
+      if (now - notificationData.timestamp > maxAge) {
+        if (notificationData.notification) {
+          notificationData.notification.close();
+        }
+        this.activeNotifications.delete(notificationId);
+      }
+    }
+  }
+
+  /**
+   * NUOVO: Ottieni statistiche delle notifiche raggruppate
+   */
+  getGroupedNotificationStats() {
+    const totalNotifications = this.activeNotifications.size;
+    const groupedNotifications = Array.from(this.activeNotifications.entries())
+      .filter(([id]) => id.startsWith('group-'))
+      .length;
+    
+    return {
+      total: totalNotifications,
+      grouped: groupedNotifications,
+      individual: totalNotifications - groupedNotifications
+    };
   }
 
   handleDndChange(event) {
@@ -143,7 +248,7 @@ class NotificationService {
 
   resetService() {
     this.dndNotifiedChatIds = new Set();
-    this.notifiedChatIds = new Set();
+    this.notifiedChatIds.clear();
     this.pendingNotifications = [];
     this.unreadCount = 0;
     this.resetTitle();
@@ -441,23 +546,27 @@ class NotificationService {
   }
 
   /**
-   * NUOVO: Mostra le notifiche aggregate
+   * NUOVO: Mostra le notifiche aggregate con supporto per raggruppamento Windows
    */
   showAggregatedNotifications() {
-    this.pendingNotificationsByChat.forEach((chatData, notificationId) => {
-      const messageCount = chatData.messages.length;
-      let title, body;
-
-      if (messageCount === 1) {
-        title = `Nuovo messaggio da ${chatData.senderName}`;
-        body = chatData.messages[0];
+    // NUOVO: Raggruppa le notifiche per ridurre l'invasività
+    const groupedNotifications = this.groupNotificationsForWindows();
+    
+    groupedNotifications.forEach((group, groupIndex) => {
+      if (group.length === 1) {
+        // Notifica singola
+        const chatData = group[0];
+        const messageCount = chatData.messages.length;
+        const title = messageCount === 1 
+          ? `Nuovo messaggio da ${chatData.senderName}` 
+          : `${messageCount} nuovi messaggi da ${chatData.senderName}`;
+        const body = chatData.messages[chatData.messages.length - 1];
+        
+        this.showWebNotification(title, body, chatData.notificationId, messageCount);
       } else {
-        title = `${messageCount} nuovi messaggi da ${chatData.senderName}`;
-        body = `${chatData.messages[chatData.messages.length - 1]}`;
+        // Notifica raggruppata
+        this.showGroupedNotification(group, groupIndex);
       }
-
-      // Mostra la notifica web aggregata
-      this.showWebNotification(title, body, notificationId, messageCount);
     });
 
     // Pulisci la mappa dopo aver mostrato le notifiche
@@ -465,153 +574,259 @@ class NotificationService {
   }
 
   /**
-   * Versione migliorata di showWebNotification che gestisce l'aggregazione
+   * NUOVO: Raggruppa le notifiche per Windows
    */
-/**
- * Versione migliorata di showWebNotification che gestisce l'aggregazione
- */
-showWebNotification(title, message, notificationId, messageCount = 1) {
-  console.log("NOTIFICATION DEBUG: Tentativo di mostrare notifica", {
-    title,
-    message,
-    notificationId,
-    messageCount
-  });
+  groupNotificationsForWindows() {
+    const notifications = Array.from(this.pendingNotificationsByChat.entries());
+    const groups = [];
+    let currentGroup = [];
 
-  if (!("Notification" in window)) {
-    console.warn("NotificationService: Notifiche non supportate dal browser");
-    return false;
-  }
-
-  if (Notification.permission !== "granted") {
-    console.warn("NotificationService: Permesso notifiche non concesso");
-    return false;
-  }
-
-  if (!this.webNotificationsEnabled) {
-    console.warn(
-      "NotificationService: Notifiche web disabilitate nelle impostazioni",
-    );
-    return false;
-  }
-
-  if (notificationId && this.isChatMuted(notificationId)) {
-    console.log(
-      `NotificationService: Notifica bloccata per chat silenziata: ${notificationId}`,
-    );
-    return false;
-  }
-
-  if (this.doNotDisturbEnabled) {
-    console.log(
-      "NotificationService: Modalità Non Disturbare attiva, notifica bloccata",
-    );
-    if (notificationId) {
-      this.dndNotifiedChatIds.add(notificationId);
-    }
-    return false;
-  }
-
-  try {
-    // Chiudi eventuali notifiche esistenti per la stessa chat
-    const existingNotification = this.activeNotifications.get(notificationId);
-    if (existingNotification) {
-      // Cancella solo il timer, NON chiudere la notifica
-      if (existingNotification.timerId) {
-        clearTimeout(existingNotification.timerId);
+    notifications.forEach(([notificationId, chatData]) => {
+      if (currentGroup.length >= this.maxNotificationsPerGroup) {
+        groups.push(currentGroup);
+        currentGroup = [];
       }
+      
+      currentGroup.push({
+        notificationId,
+        senderName: chatData.senderName,
+        messages: chatData.messages,
+        lastSenderId: chatData.lastSenderId
+      });
+    });
+
+    if (currentGroup.length > 0) {
+      groups.push(currentGroup);
     }
 
-    // Creazione della notifica con requireInteraction per mantenerla visibile
-    const options = {
-      body: message,
+    return groups;
+  }
+
+  /**
+   * NUOVO: Mostra una notifica raggruppata
+   */
+  showGroupedNotification(group, groupIndex) {
+    const totalMessages = group.reduce((sum, chat) => sum + chat.messages.length, 0);
+    const uniqueSenders = new Set(group.map(chat => chat.senderName));
+    
+    let title, body;
+    
+    if (uniqueSenders.size === 1) {
+      // Tutti i messaggi sono dello stesso mittente
+      const senderName = group[0].senderName;
+      title = `${totalMessages} nuovi messaggi da ${senderName}`;
+      body = `Hai ricevuto ${totalMessages} messaggi in ${group.length} chat`;
+    } else {
+      // Messaggi da mittenti diversi
+      title = `${totalMessages} nuovi messaggi`;
+      body = `Hai ricevuto messaggi da ${uniqueSenders.size} persone in ${group.length} chat`;
+    }
+
+    // Crea una notifica raggruppata con ID speciale
+    const groupNotificationId = `group-${groupIndex}-${Date.now()}`;
+    
+    const notification = new Notification(title, {
+      body: body,
       icon: "/icons/app-icon.png",
       badge: "/icons/app-icon.png",
-      tag: `chat-${notificationId}`,
-      requireInteraction: true, // IMPORTANTE: La notifica resta finché non interagita
-      silent: false, // Abilita il suono di sistema
-      renotify: true, // Permette di ri-notificare con lo stesso tag
-      vibrate: [200, 100, 200], // Vibrazione su dispositivi mobili
+      tag: groupNotificationId,
+      requireInteraction: false,
+      silent: false,
+      renotify: true,
+      vibrate: [200, 100, 200],
       data: {
-        notificationId: notificationId,
-        messageCount: messageCount,
+        groupNotificationId: groupNotificationId,
+        notificationIds: group.map(chat => chat.notificationId),
+        totalMessages: totalMessages,
         timestamp: Date.now()
       }
-    };
+    });
 
-    const notification = new Notification(title, options);
-
-    // Gestione click sulla notifica
+    // Gestione click sulla notifica raggruppata
     notification.onclick = () => {
-      console.log("Notifica cliccata per chat:", notificationId);
+      console.log("Notifica raggruppata cliccata:", groupNotificationId);
       
-      try {
-        // Focus sulla finestra
-        window.focus();
-        
-        // Prova prima con la funzione globale se disponibile
-        if (typeof window.openChatModal === "function") {
-          window.openChatModal(notificationId);
-        } else {
-          // Altrimenti importa il modulo
-          import('@/redux/features/notifications/notificationsSlice').then(module => {
-            if (module.callOpenChatModal) {
-              console.log("Apertura chat con callOpenChatModal");
-              module.callOpenChatModal(notificationId);
-            } else {
-              // Fallback navigazione diretta
-              window.location.href = `/chat/${notificationId}`;
-            }
-          }).catch(error => {
-            console.error("Errore durante import:", error);
-            window.location.href = `/chat/${notificationId}`;
-          });
-        }
-        
-      } catch (clickError) {
-        console.error("Errore durante apertura chat:", clickError);
-        window.location.href = `/chat/${notificationId}`;
+      // Apri la prima chat del gruppo
+      if (group.length > 0) {
+        this.openNotification(group[0].notificationId);
       }
       
-      // Chiudi la notifica dopo il click
       notification.close();
     };
 
-    // Gestione chiusura notifica
-    notification.onclose = () => {
-      console.log("Notifica chiusa per chat:", notificationId);
-      // Rimuovi dalla mappa delle notifiche attive
-      this.activeNotifications.delete(notificationId);
-    };
+    // Timeout per chiusura automatica
+    const timeoutId = setTimeout(() => {
+      notification.close();
+    }, this.groupTimeoutMs);
 
-    // Gestione errore notifica
-    notification.onerror = (error) => {
-      console.error("Errore notifica:", error);
-      this.activeNotifications.delete(notificationId);
-    };
-
-    // NON impostare NESSUN timeout automatico per la chiusura
-    // La notifica rimarrà visibile finché l'utente non interagisce
-    
-    // Salva riferimento alla notifica attiva SENZA timer di chiusura automatica
-    this.activeNotifications.set(notificationId, {
+    // Salva riferimento
+    this.activeNotifications.set(groupNotificationId, {
       notification,
-      timestamp: Date.now()
-      // NOTA: Nessun timerId qui! Non vogliamo chiusura automatica
+      timestamp: Date.now(),
+      timerId: timeoutId
+    });
+  }
+
+  /**
+   * Versione migliorata di showWebNotification che supporta il raggruppamento Windows
+   */
+  showWebNotification(title, message, notificationId, messageCount = 1) {
+    console.log("NOTIFICATION DEBUG: Tentativo di mostrare notifica", {
+      title,
+      message,
+      notificationId,
+      messageCount
     });
 
-    console.log(
-      `NotificationService: Notifica web mostrata con successo: ${title} (persistente)`,
-    );
-    return true;
-  } catch (error) {
-    console.error(
-      "NotificationService: Errore durante la visualizzazione della notifica:",
-      error,
-    );
-    return false;
+    if (!("Notification" in window)) {
+      console.warn("NotificationService: Notifiche non supportate dal browser");
+      return false;
+    }
+
+    if (Notification.permission !== "granted") {
+      console.warn("NotificationService: Permesso notifiche non concesso");
+      return false;
+    }
+
+    if (!this.webNotificationsEnabled) {
+      console.warn(
+        "NotificationService: Notifiche web disabilitate nelle impostazioni",
+      );
+      return false;
+    }
+
+    if (notificationId && this.isChatMuted(notificationId)) {
+      console.log(
+        `NotificationService: Notifica bloccata per chat silenziata: ${notificationId}`,
+      );
+      return false;
+    }
+
+    if (this.doNotDisturbEnabled) {
+      console.log(
+        "NotificationService: Modalità Non Disturbare attiva, notifica bloccata",
+      );
+      if (notificationId) {
+        this.dndNotifiedChatIds.add(notificationId);
+      }
+      return false;
+    }
+
+    try {
+      // Chiudi eventuali notifiche esistenti per la stessa chat
+      const existingNotification = this.activeNotifications.get(notificationId);
+      if (existingNotification) {
+        if (existingNotification.timerId) {
+          clearTimeout(existingNotification.timerId);
+        }
+      }
+
+      // Prepara le opzioni della notifica con supporto per raggruppamento
+      const options = {
+        body: message,
+        icon: "/icons/app-icon.png",
+        badge: "/icons/app-icon.png",
+        tag: `chat-${notificationId}`,
+        requireInteraction: false, // Cambiato: permette chiusura automatica per raggruppamento
+        silent: false,
+        renotify: true,
+        vibrate: [200, 100, 200],
+        data: {
+          notificationId: notificationId,
+          messageCount: messageCount,
+          timestamp: Date.now()
+        }
+      };
+
+      // NUOVO: Supporto per raggruppamento Windows
+      if (this.windowsGroupingEnabled) {
+        // Aggiungi azioni per il raggruppamento se supportate
+        if ('actions' in Notification.prototype) {
+          options.actions = [
+            {
+              action: 'open',
+              title: 'Apri Chat',
+              icon: '/icons/app-icon.png'
+            },
+            {
+              action: 'dismiss',
+              title: 'Ignora',
+              icon: '/icons/app-icon.png'
+            }
+          ];
+        }
+
+        // Aggiungi supporto per il raggruppamento nativo
+        if ('group' in Notification.prototype) {
+          options.group = this.notificationGroupId;
+        }
+      }
+
+      const notification = new Notification(title, options);
+
+      // Gestione click sulla notifica
+      notification.onclick = (event) => {
+        console.log("Notifica cliccata per chat:", notificationId);
+        
+        // NUOVO: Gestione azioni per raggruppamento
+        if (event && event.action) {
+          switch (event.action) {
+            case 'open':
+              this.openNotification(notificationId);
+              break;
+            case 'dismiss':
+              notification.close();
+              break;
+            default:
+              this.openNotification(notificationId);
+          }
+        } else {
+          // Comportamento standard
+          this.openNotification(notificationId);
+        }
+        
+        // Chiudi la notifica dopo il click
+        notification.close();
+      };
+
+      // Gestione chiusura notifica
+      notification.onclose = () => {
+        console.log("Notifica chiusa per chat:", notificationId);
+        this.activeNotifications.delete(notificationId);
+      };
+
+      // Gestione errore notifica
+      notification.onerror = (error) => {
+        console.error("Errore notifica:", error);
+        this.activeNotifications.delete(notificationId);
+      };
+
+      // NUOVO: Timeout intelligente per raggruppamento
+      const timeoutId = setTimeout(() => {
+        if (this.activeNotifications.has(notificationId)) {
+          notification.close();
+        }
+      }, this.groupTimeoutMs);
+
+      // Salva riferimento alla notifica attiva con timeout
+      this.activeNotifications.set(notificationId, {
+        notification,
+        timestamp: Date.now(),
+        timerId: timeoutId
+      });
+
+      console.log(
+        `NotificationService: Notifica web mostrata con successo: ${title} (raggruppabile)`,
+      );
+      return true;
+    } catch (error) {
+      console.error(
+        "NotificationService: Errore durante la visualizzazione della notifica:",
+        error,
+      );
+      return false;
+    }
   }
-}
 
 // IMPORTANTE: Modifica anche il metodo notifySystem per non chiudere automaticamente
 notifySystem(title, message, onClick = null) {
@@ -1022,6 +1237,12 @@ notifySystem(title, message, onClick = null) {
       this.resetNotifiedChatsInterval = null;
     }
 
+    // NUOVO: Pulisci l'intervallo per le notifiche raggruppate
+    if (this.cleanupGroupedNotificationsInterval) {
+      clearInterval(this.cleanupGroupedNotificationsInterval);
+      this.cleanupGroupedNotificationsInterval = null;
+    }
+
     if (this.notificationAggregationTimeout) {
       clearTimeout(this.notificationAggregationTimeout);
       this.notificationAggregationTimeout = null;
@@ -1045,6 +1266,7 @@ notifySystem(title, message, onClick = null) {
     });
 
     this.activeNotifications.clear();
+    this.pendingNotificationsByChat.clear();
   }
 
   // NUOVO: Metodo helper per riprodurre il suono di test

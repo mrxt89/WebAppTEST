@@ -103,6 +103,7 @@ const MessageActionsMenu = ({
           }}
           whileHover={{ scale: 1.02, x: 2 }}
           whileTap={{ scale: 0.98 }}
+          data-color-picker-trigger
         >
           <Palette className="h-4 w-4 mr-3 text-indigo-500" />
           <span>Colore</span>

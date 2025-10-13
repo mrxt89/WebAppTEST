@@ -1,6 +1,6 @@
 // src/redux/features/notifications/notificationsHooks.js
 import { useCallback, useEffect, useState, useRef, useMemo } from "react";
-import { useSelector, useDispatch, shallowEqual } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { swal } from "../../../lib/common";
 import axios from "axios";
 import { config } from "../../../config";
@@ -140,29 +140,24 @@ export const useNotifications = () => {
   const sending = useSelector(selectSending);
   const error = useSelector(selectError);
   const unreadMessages = useSelector(selectUnreadMessages);
+  const openChatIds = useSelector(selectOpenChatIds);
   const dbViewCreated = useSelector(selectDbViewCreated);
-
-  // Oggetti/array complessi - usa shallowEqual per evitare re-render inutili
-  const highlights = useSelector(selectHighlights, shallowEqual);
-  const notificationAttachments = useSelector(selectNotificationAttachments, shallowEqual);
-  const openChatIds = useSelector(selectOpenChatIds, shallowEqual);
-  const standaloneChats = useSelector(selectStandaloneChats, shallowEqual);
-
-  // Primitives - non serve shallowEqual
+  const highlights = useSelector(selectHighlights);
   const loadingHighlights = useSelector(selectLoadingHighlights);
   const attachmentsLoading = useSelector(selectAttachmentsLoading);
+  const notificationAttachments = useSelector(selectNotificationAttachments);
+  const standaloneChats = useSelector(selectStandaloneChats);
+  
+  // NUOVO: Selettore per openChatData
+  const openChatData = useSelector(state => state.notifications.openChatData);
 
-  // NUOVO: Selettore per openChatData con shallowEqual
-  const openChatData = useSelector(state => state.notifications.openChatData, shallowEqual);
+  // Memoized selectors to prevent unnecessary re-renders
+  const memoizedOpenChatIds = useMemo(() => Array.from(openChatIds), [openChatIds]);
+  const memoizedStandaloneChats = useMemo(() => Array.from(standaloneChats), [standaloneChats]);
 
-  // Non serve più Array.from() perché openChatIds e standaloneChats sono già array
-  const memoizedOpenChatIds = openChatIds;
-  const memoizedStandaloneChats = standaloneChats;
-
-  // Stato locale per tracciare l'ultima volta che è stato eseguito un aggiornamento
-  const [lastUpdateTime, setLastUpdateTime] = useState(0);
   // Ref per tenere traccia delle operazioni in corso
   const pendingUpdatesRef = useRef(new Set());
+  const lastUpdateTimeRef = useRef(0);
 
   // Inizializza lo stato delle chat in finestre separate
   useEffect(() => {
@@ -198,17 +193,17 @@ export const useNotifications = () => {
   const loadNotifications = useCallback(() => {
     const now = Date.now();
     // Evita aggiornamenti troppo frequenti (throttling)
-    if (now - lastUpdateTime < 2000 && pendingUpdatesRef.current.has("load")) {
+    if (now - lastUpdateTimeRef.current < 2000 && pendingUpdatesRef.current.has("load")) {
       return Promise.resolve(null);
     }
 
     pendingUpdatesRef.current.add("load");
-    setLastUpdateTime(now);
+    lastUpdateTimeRef.current = now;
 
     return dispatch(fetchNotifications()).finally(() => {
       pendingUpdatesRef.current.delete("load");
     });
-  }, [dispatch, lastUpdateTime]);
+  }, [dispatch]);
 
   const handleFetchChatParticipants = useCallback(
     async (notificationId) => {
@@ -1038,37 +1033,11 @@ const handleFetchAttachmentViewStats = useCallback(
           }
         }
 
-        // Determina se l'utente ha già reagito a questo tipo di reazione
-        const state = store.getState();
-        const currentReactions = state.messageReactions.reactions[numericMessageId] || [];
-        const hasCurrentUserReacted = currentReactions.some(r => 
-          r.ReactionType === reactionType && r.UserID === currentUserId
-        );
-
-        // Ottieni il nome utente corrente
-        let currentUserName = 'You';
-        if (currentUserId) {
-          const state = store.getState();
-          const openChatData = state.notifications.openChatData;
-          if (openChatData && openChatData.users) {
-            const currentUser = openChatData.users.find(u => u.userId === currentUserId);
-            if (currentUser) {
-              currentUserName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 
-                               currentUser.username || 
-                               currentUser.email || 
-                               'You';
-            }
-          }
-        }
-        
-        // Chiama il thunk con i parametri corretti come oggetto
+        // Chiama il thunk - il backend gestisce automaticamente add/remove/change
         const result = await dispatch(
-          toggleMessageReaction({ 
-            messageId: numericMessageId, 
-            reactionType: reactionType,
-            hasCurrentUserReacted,
-            currentUserId,
-            currentUserName
+          toggleMessageReaction({
+            messageId: numericMessageId,
+            reactionType: reactionType
           })
         ).unwrap();
         

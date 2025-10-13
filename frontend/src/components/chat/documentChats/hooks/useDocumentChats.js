@@ -26,37 +26,6 @@ const useDocumentChats = ({
     sendNotification
   } = useNotifications();
 
-  // Helper per swal con z-index elevato quando siamo in un portal o modal
-  const swalWithHighZIndex = useCallback((options) => {
-    return swal.fire({
-      ...options,
-      didOpen: () => {
-        // Trova il container di swal
-        const swalContainer = swal.getContainer();
-        if (swalContainer) {
-          // Controlla se siamo in un modal o portal
-          const hasModal = document.querySelector('[role="dialog"][data-state="open"]');
-          const hasPortal = document.getElementById('chat-portal-root');
-          
-          if (hasModal || hasPortal) {
-            // Imposta z-index molto alto
-            swalContainer.style.zIndex = '20000';
-            
-            // Assicurati che anche il backdrop sia sopra
-            const backdrop = swalContainer.querySelector('.swal2-backdrop');
-            if (backdrop) {
-              backdrop.style.zIndex = '19999';
-            }
-          }
-        }
-        
-        // Chiama l'eventuale didOpen originale
-        if (options.didOpen) {
-          options.didOpen();
-        }
-      }
-    });
-  }, []);
 
   // Funzione helper per costruire i parametri di collegamento documento
   const buildDocumentLinkParams = useCallback((notificationId) => {
@@ -113,6 +82,10 @@ const useDocumentChats = ({
         params.custSuppType = 3211264; // Fornitore
         break;
       
+      case 'Ticket':
+        params.ticketId = documentId;
+        break;
+      
       default:
         // Per tipi di documento personalizzati, passa tutti i dati disponibili
         Object.assign(params, documentData);
@@ -149,6 +122,10 @@ const useDocumentChats = ({
         };
       }
 
+      if (documentType === 'Ticket') {
+        searchValue = documentId.toString();
+      }
+
       const results = await searchChatsByDocument(documentType, searchValue);
       
       // Gestisci diversi formati di risposta
@@ -183,7 +160,7 @@ const useDocumentChats = ({
       );
 
       if (result) {
-        await swalWithHighZIndex({
+        await swal.fire({
           title: "Successo",
           text: "Chat collegata al documento",
           icon: "success",
@@ -199,7 +176,7 @@ const useDocumentChats = ({
       }
     } catch (err) {
       console.error("Error linking chat:", err);
-      await swalWithHighZIndex({
+      await swal.fire({
         title: "Errore",
         text: "Errore nel collegamento della chat",
         icon: "error",
@@ -211,7 +188,7 @@ const useDocumentChats = ({
     } finally {
       setLoading(false);
     }
-  }, [buildDocumentLinkParams, linkDocument, loadChats, swalWithHighZIndex]);
+  }, [buildDocumentLinkParams, linkDocument, loadChats]);
 
   // Crea una nuova chat e la collega al documento
   const createAndLinkChat = useCallback(async ({
@@ -244,7 +221,7 @@ const useDocumentChats = ({
           linkParams
         );
 
-        await swalWithHighZIndex({
+        await swal.fire({
           title: "Successo",
           text: "Chat creata e collegata al documento",
           icon: "success",
@@ -265,7 +242,7 @@ const useDocumentChats = ({
       }
     } catch (err) {
       console.error("Error creating and linking chat:", err);
-      await swalWithHighZIndex({
+      await swal.fire({
         title: "Errore",
         text: "Errore nella creazione della chat",
         icon: "error",
@@ -277,12 +254,12 @@ const useDocumentChats = ({
     } finally {
       setLoading(false);
     }
-  }, [documentType, documentId, buildDocumentLinkParams, sendNotification, linkDocument, loadChats, onChatCreated, swalWithHighZIndex]);
+  }, [documentType, documentId, buildDocumentLinkParams, sendNotification, linkDocument, loadChats, onChatCreated]);
 
   // Scollega una chat dal documento
   const unlinkChat = useCallback(async (chat) => {
     try {
-      const { value: confirm } = await swalWithHighZIndex({
+      const { value: confirm } = await swal.fire({
         title: "Conferma scollegamento",
         text: "Vuoi scollegare questa chat dal documento?",
         icon: "question",
@@ -304,7 +281,7 @@ const useDocumentChats = ({
       );
 
       if (result) {
-        await swalWithHighZIndex({
+        await swal.fire({
           title: "Successo", 
           text: "Chat scollegata dal documento",
           icon: "success",
@@ -325,7 +302,7 @@ const useDocumentChats = ({
       }
     } catch (err) {
       console.error("Error unlinking chat:", err);
-      await swalWithHighZIndex({
+      await swal.fire({
         title: "Errore",
         text: "Errore nello scollegamento della chat",
         icon: "error",
@@ -337,7 +314,7 @@ const useDocumentChats = ({
     } finally {
       setLoading(false);
     }
-  }, [unlinkDocument, loadChats, onChatUnlinked, swalWithHighZIndex]);
+  }, [unlinkDocument, loadChats, onChatUnlinked]);
 
   // Apri una chat (gestisce automaticamente sola lettura)
   const openChatHandler = useCallback(async (chat) => {
@@ -351,7 +328,7 @@ const useDocumentChats = ({
       openChat(chat.notificationId);
     } catch (err) {
       console.error("Error opening chat:", err);
-      await swalWithHighZIndex({
+      await swal.fire({
         title: "Errore",
         text: "Errore nell'apertura della chat",
         icon: "error",
@@ -360,7 +337,7 @@ const useDocumentChats = ({
         }
       });
     }
-  }, [openChat, openChatInReadOnlyMode, swalWithHighZIndex]);
+  }, [openChat, openChatInReadOnlyMode]);
 
   // Effetto per caricare automaticamente le chat
   useEffect(() => {

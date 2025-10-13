@@ -17,7 +17,6 @@ export default function useWindowManager(chatPrefix = "chat-window-") {
   // Refs for optimization and immediate access
   const windowStatesRef = useRef({});
   const maxZIndexRef = useRef(1000);
-  const snapDistance = 15; // px within which windows will snap
 
   // Update ref whenever state changes to avoid stale closures
   useEffect(() => {

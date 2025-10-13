@@ -7,7 +7,8 @@ import {
     ShoppingCart,
     Truck,
     Clipboard,
-    Tag
+    Tag,
+    Ticket
   } from "lucide-react";
   
   export const DOCUMENT_TYPES = {
@@ -74,6 +75,14 @@ import {
       color: 'gray',
       fields: ['BOM'],
       displayFormat: (doc) => `DB: ${doc.BOM}`
+    },
+    Ticket: {
+      id: 'Ticket',
+      label: 'Ticket',
+      icon: Ticket,
+      color: 'red',
+      fields: ['ticketId'],
+      displayFormat: () => `Ticket`
     }
   };
   

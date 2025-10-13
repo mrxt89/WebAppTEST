@@ -1,5 +1,6 @@
 // src/components/chat/ChatBottomBar.jsx
 import { useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   SendHorizontal,
   ThumbsUp,
@@ -19,6 +20,11 @@ import { swal } from "@/lib/common";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
 import { debounce } from "lodash";
 import "@/styles/chat-components.css";
+import {
+  saveChatDraft,
+  clearChatDraft,
+  selectChatDraft
+} from "@/redux/features/notifications/notificationsSlice";
 
 const ChatBottomBar = ({
   notificationId,
@@ -45,6 +51,10 @@ const ChatBottomBar = ({
   onRequestClose,
   openChatModal,
 }) => {
+  // NUOVO: Redux per gestire i draft
+  const dispatch = useDispatch();
+  const savedDraft = useSelector((state) => selectChatDraft(state, notificationId));
+
   const [message, setMessage] = useState("");
   const [mentionSuggestions, setMentionSuggestions] = useState([]);
   const [mentionIndex, setMentionIndex] = useState(null);
@@ -56,7 +66,7 @@ const ChatBottomBar = ({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isUpdatingContentEditable, setIsUpdatingContentEditable] = useState(false);
   const [placeholderVisible, setPlaceholderVisible] = useState(true);
-  
+
   // IMPORTANTE: Stato locale per tracciare i destinatari menzionati
   const [localReceiversList, setLocalReceiversList] = useState(receiversList || "");
 
@@ -82,6 +92,37 @@ const ChatBottomBar = ({
 
   const categoryColor = hexColor || "#3b82f6";
 
+  // NUOVO: Recupera draft salvato quando il componente si monta
+  useEffect(() => {
+    if (savedDraft && notificationId) {
+      console.log(`📝 Recuperando draft per chat ${notificationId}:`, savedDraft);
+
+      // Ripristina il messaggio
+      if (savedDraft.message) {
+        setMessage(savedDraft.message);
+        setPlaceholderVisible(false);
+
+        // Aggiorna anche il contentEditable se esiste
+        if (inputRef.current) {
+          inputRef.current.textContent = savedDraft.message;
+        }
+      }
+
+      // Ripristina gli allegati
+      if (savedDraft.attachments && savedDraft.attachments.length > 0) {
+        setAttachments(savedDraft.attachments);
+      }
+
+      // Ripristina la lista dei destinatari
+      if (savedDraft.receiversList) {
+        setLocalReceiversList(savedDraft.receiversList);
+        if (typeof updateReceiversList === "function") {
+          updateReceiversList(savedDraft.receiversList);
+        }
+      }
+    }
+  }, [notificationId]); // Esegui solo quando cambia notificationId (mount/unmount)
+
   // Sincronizza receiversList prop con stato locale - CORRETTO
   useEffect(() => {
     setLocalReceiversList(receiversList || "");
@@ -93,6 +134,33 @@ const ChatBottomBar = ({
       setLocalReceiversList(receiversList);
     }
   }, [isNewMessage, receiversList, localReceiversList]);
+
+  // NUOVO: Salva draft automaticamente mentre l'utente scrive (con debounce)
+  useEffect(() => {
+    if (!notificationId) return;
+
+    // Crea un debounced save function
+    const debouncedSave = debounce(() => {
+      // Salva solo se c'è qualcosa da salvare
+      if (message.trim() || attachments.length > 0 || localReceiversList) {
+        const draft = {
+          message: message,
+          attachments: attachments,
+          receiversList: localReceiversList
+        };
+
+        console.log(`💾 Salvando draft per chat ${notificationId}:`, draft);
+        dispatch(saveChatDraft({ notificationId, draft }));
+      }
+    }, 500); // Attendi 500ms dall'ultima modifica prima di salvare
+
+    debouncedSave();
+
+    // Cleanup
+    return () => {
+      debouncedSave.cancel();
+    };
+  }, [message, attachments, localReceiversList, notificationId, dispatch]);
 
   // Gestione drag & drop
   const handleDragEnter = useCallback((e) => {
@@ -362,9 +430,17 @@ const ChatBottomBar = ({
       document.body.appendChild(spinner);
       document.body.style.overflow = 'hidden';
   
+      // Crea un messaggio che include il nome del file se ce n'è uno solo
+      let attachmentMessage = "";
+      if (attachments.length === 1) {
+        attachmentMessage = `Ha condiviso: ${attachments[0].name}`;
+      } else if (attachments.length > 1) {
+        attachmentMessage = `Ha condiviso ${attachments.length} allegati`;
+      }
+
       const notificationData = {
         notificationId,
-        message: message.trim() || (attachments.length > 0 ? "Ha condiviso allegati" : ""),
+        message: message.trim() || attachmentMessage || "",
         responseOptionId: 3,
         eventId: 0,
         title,
@@ -383,8 +459,11 @@ const ChatBottomBar = ({
         let result;
   
         result = await sendNotificationWithAttachments(notificationData, attachments);
-  
+
         if (result && (result.success || result.notificationId)) {
+          // NUOVO: Cancella draft dopo invio riuscito
+          dispatch(clearChatDraft(notificationId));
+
           // IMPORTANTE: Reset SOLO dopo invio riuscito per chat esistenti
           if (!isNewMessage) {
             if (typeof updateReceiversList === "function") {
@@ -392,7 +471,7 @@ const ChatBottomBar = ({
             }
             setLocalReceiversList("");
           }
-          
+
           setMessage("");
           setIsUpdatingContentEditable(true);
           setAttachments([]);
@@ -566,6 +645,9 @@ const ChatBottomBar = ({
         }
 
         if (result) {
+          // NUOVO: Cancella draft dopo invio riuscito
+          dispatch(clearChatDraft(notificationId));
+
           if (typeof updateReceiversList === "function") {
             updateReceiversList("");
           }
@@ -640,6 +722,9 @@ const ChatBottomBar = ({
       }
 
       if (result) {
+        // NUOVO: Cancella draft dopo invio riuscito
+        dispatch(clearChatDraft(notificationId));
+
         if (typeof updateReceiversList === "function") {
           updateReceiversList("");
         }

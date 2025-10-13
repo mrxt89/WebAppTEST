@@ -8,6 +8,7 @@ import { debounce } from "lodash";
 import { swal } from "@/lib/common";
 import { useDispatch, useSelector } from "react-redux";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
+import ReactionToast from "./ReactionToast";
 
 // Hook personalizzato per la memorizzazione degli utenti
 const useMemoizedUsers = (initialUsers = []) => {
@@ -72,6 +73,9 @@ const ChatWindow = ({
     sendMessage,
     markAsInteracted,
     getCurrentUser,
+    // Notifiche reazione
+    reactionNotifications,
+    clearReactionNotifications,
     // Azioni chat
     togglePin,
     toggleFavorite,
@@ -121,7 +125,86 @@ const ChatWindow = ({
   const isDraggingRef = useRef(false);
   const sizeRef = useRef({ width: 900, height: 700 });
   const chatListRef = useRef(null);
-  
+  const scrollToMessageRef = useRef(null);
+
+  // Funzione per scrollare e evidenziare un messaggio
+  const scrollToMessage = useCallback(async (messageId) => {
+    if (!chatListRef.current) return;
+
+    // Funzione helper per scrollare effettivamente
+    const doScroll = () => {
+      const messageElement = document.getElementById(`message-${messageId}`);
+
+      if (messageElement) {
+        const containerRect = chatListRef.current.getBoundingClientRect();
+        const messageRect = messageElement.getBoundingClientRect();
+
+        const scrollTop =
+          messageRect.top -
+          containerRect.top +
+          chatListRef.current.scrollTop -
+          80;
+
+        chatListRef.current.scrollTo({
+          top: scrollTop,
+          behavior: "smooth",
+        });
+
+        // Evidenzia il messaggio temporaneamente
+        messageElement.classList.add("highlight-reply-target");
+        setTimeout(() => {
+          messageElement.classList.remove("highlight-reply-target");
+        }, 2000);
+
+        return true;
+      }
+      return false;
+    };
+
+    // Prova a scrollare subito
+    if (doScroll()) return;
+
+    // Se non trovato, controlla se il messaggio esiste nei dati ma non è renderizzato
+    const messageExists = messages.some(msg => msg.messageId === messageId);
+
+    if (!messageExists) {
+      // Carica tutti i messaggi fino a trovare quello che cerchiamo
+      const loadAllMessages = async () => {
+        let attempts = 0;
+        const maxAttempts = 10; // Max 10 caricamenti per evitare loop infiniti
+
+        while (attempts < maxAttempts && !hasFullData) {
+          await loadMore();
+          attempts++;
+
+          // Aspetta che i messaggi siano renderizzati
+          await new Promise(resolve => setTimeout(resolve, 300));
+
+          // Controlla se ora il messaggio esiste
+          if (doScroll()) return true;
+        }
+
+        if (hasFullData) {
+          // Ultimo tentativo dopo aver caricato tutto
+          await new Promise(resolve => setTimeout(resolve, 500));
+          return doScroll();
+        }
+
+        return false;
+      };
+
+      loadAllMessages();
+      return; // Exit early, loadAllMessages gestirà lo scroll
+    } else {
+      // Il messaggio esiste ma non è ancora renderizzato (virtualizzazione?)
+      // Aspetta un frame e riprova
+      setTimeout(() => doScroll(), 100);
+    }
+  }, [messages, hasFullData, loadMore, chatListRef]);
+
+  // Salva la funzione nel ref per accesso esterno
+  scrollToMessageRef.current = scrollToMessage;
+
   // IMPORTANTE: Usa sempre lo stato del windowManager come fonte di verità
   const windowState = windowManager?.windowStates?.[notification?.notificationId];
   
@@ -298,6 +381,17 @@ const ChatWindow = ({
       
       // Se è un elemento interattivo, non attivare la finestra
       if (isInteractiveElement) {
+        return;
+      }
+      
+      // NON attivare se l'utente sta selezionando testo
+      const selection = window.getSelection();
+      if (selection && selection.toString().length > 0) {
+        return;
+      }
+      
+      // NON attivare se l'evento è un doppio click (potrebbe essere selezione)
+      if (e.detail === 2) {
         return;
       }
     }
@@ -716,7 +810,11 @@ const ChatWindow = ({
       onClick={handleActivate}
       style={{
         backgroundColor: 'rgba(255, 255, 255, 0.75)',
-        backdropFilter: 'blur(4px)'
+        backdropFilter: 'blur(4px)',
+        userSelect: "text",
+        WebkitUserSelect: "text",
+        MozUserSelect: "text",
+        msUserSelect: "text"
       }}
     >
       <div
@@ -931,6 +1029,15 @@ const ChatWindow = ({
           {windowContent}
         </div>
       </Resizable>
+
+      {/* Toast per notifiche reazioni */}
+      {reactionNotifications && reactionNotifications.length > 0 && (
+        <ReactionToast
+          notifications={reactionNotifications}
+          onClose={clearReactionNotifications}
+          onMessageClick={scrollToMessage}
+        />
+      )}
     </div>
   );
 };

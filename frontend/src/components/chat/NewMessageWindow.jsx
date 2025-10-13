@@ -22,6 +22,7 @@ const NewMessageWindow = ({
   defaultTitle = "",
   defaultReceivers = [],
   metadata = {},
+  previewMessage = null,
 }) => {
   const {
     sendNotification,
@@ -37,13 +38,12 @@ const NewMessageWindow = ({
   const [receivers, setReceivers] = useState(defaultReceivers);
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
-  const [fetchedUsers, setFetchedUsers] = useState([]);
-  const [fetchedResponseOptions, setFetchedResponseOptions] = useState([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState(null);
   const [attachmentsLoaded, setAttachmentsLoaded] = useState(false);
   const [currentNotificationCategoryId, setCurrentNotificationCategoryId] = useState(notificationCategoryId);
+  const [previewMessageSent, setPreviewMessageSent] = useState(false);
   const chatListRef = useRef(null);
 
   // Stati per la finestra
@@ -196,6 +196,9 @@ const NewMessageWindow = ({
                   documentParams.projectId = metadata.projectId;
                 }
                 break;
+              case 'Ticket':
+                documentParams.ticketId = metadata.ticketId || metadata.documentId;
+                break;
               case 'MO':
                 documentParams.moId = metadata.moId || metadata.documentId;
                 break;
@@ -242,6 +245,28 @@ const NewMessageWindow = ({
           } catch (error) {
             console.error("Errore nel collegamento automatico del documento:", error);
             // Non bloccare il flusso se il collegamento fallisce
+          }
+        }
+
+        // Se c'è un messaggio di anteprima e non è stato ancora inviato, invialo automaticamente
+        if ((metadata?.previewMessage || previewMessage) && !previewMessageSent && newNotification.notificationId) {
+          try {
+            const previewText = metadata?.previewMessage || previewMessage;
+            
+            // Invia il messaggio di anteprima come risposta alla notifica appena creata
+            const previewNotificationData = {
+              title: newNotification.title,
+              message: previewText,
+              receiversList: updatedNotificationData.receiversList,
+              notificationCategoryId: currentNotificationCategoryId,
+              replyToMessageId: newNotification.realMessageId || newNotification.lastMessage?.messageId || newNotification.notificationId
+            };
+            
+            await sendNotification(previewNotificationData);
+            setPreviewMessageSent(true);
+          } catch (error) {
+            console.error("Errore nell'invio del messaggio di anteprima:", error);
+            // Non bloccare il flusso se il messaggio di anteprima fallisce
           }
         }
 
@@ -606,6 +631,30 @@ const NewMessageWindow = ({
                   <p className="text-center text-lg font-medium mb-2">
                     {type === "task" ? "Nuova chat per l'attività" : "Nuovo messaggio"}
                   </p>
+                  
+                  {/* Messaggio di anteprima se presente */}
+                  {(metadata?.previewMessage || previewMessage) && (
+                    <div className="w-full max-w-md mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-blue-900 mb-1">
+                            Messaggio di anteprima
+                          </p>
+                          <p className="text-sm text-blue-800">
+                            {metadata?.previewMessage || previewMessage}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   <p className="text-center text-sm max-w-md">
                     {type === "task"
                       ? "Scrivi il primo messaggio per iniziare la discussione su questa attività."

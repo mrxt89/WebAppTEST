@@ -105,32 +105,19 @@ const AttachmentsTab = ({
       });
 
       if (isConfirmed) {
-        // Aggiorna immediatamente lo stato locale PRIMA della chiamata API
-        setAttachments(prev => prev.filter(att => att.AttachmentID !== attachmentId));
-        
-        // Poi esegui l'eliminazione sul server
+        // Esegui l'eliminazione sul server (Redux già fa il refresh automaticamente)
         await deleteNotificationAttachment(attachmentId, notificationId);
-        
+
         // Emetti evento per sincronizzare altri componenti
         document.dispatchEvent(
           new CustomEvent("attachment-deleted", {
-            detail: { 
+            detail: {
               attachmentId: attachmentId,
               notificationId: notificationId
             }
           })
         );
-        
-        // Ricarica dal server per sicurezza
-        if (refreshAttachments) {
-          setTimeout(async () => {
-            const updatedAttachments = await refreshAttachments(notificationId);
-            if (updatedAttachments) {
-              setAttachments(updatedAttachments);
-            }
-          }, 300);
-        }
-        
+
         swal.fire({
           title: "Eliminato!",
           text: "L'allegato è stato eliminato.",
@@ -141,13 +128,6 @@ const AttachmentsTab = ({
       }
     } catch (error) {
       console.error("Error deleting attachment:", error);
-      // In caso di errore, ricarica la lista
-      if (refreshAttachments) {
-        const updatedAttachments = await refreshAttachments(notificationId);
-        if (updatedAttachments) {
-          setAttachments(updatedAttachments);
-        }
-      }
       swal.fire(
         "Errore",
         "Si è verificato un errore durante l'eliminazione.",

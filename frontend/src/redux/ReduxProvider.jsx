@@ -1,5 +1,5 @@
 // src/redux/ReduxProvider.jsx
-import React, { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Provider, useDispatch } from "react-redux";
 import { store } from "./store";
 import { initializeNotificationsWorker } from "./features/notifications/notificationsActions";
@@ -7,16 +7,20 @@ import { initializeNotificationsWorker } from "./features/notifications/notifica
 // Inner component to initialize tools and services after the store is available
 const ReduxInitializer = ({ children }) => {
   const dispatch = useDispatch();
+  const initialized = useRef(false);
 
   useEffect(() => {
-    // Inizializza il worker solo se non è già presente
-    if (!window.notificationWorker) {
+    // Inizializza il worker solo una volta
+    if (!initialized.current && !window.notificationWorker) {
+      initialized.current = true;
       dispatch(initializeNotificationsWorker());
     }
 
     // Clean up on unmount
     return () => {
-      dispatch({ type: "notifications/stopWorker" });
+      if (initialized.current) {
+        dispatch({ type: "notifications/stopWorker" });
+      }
     };
   }, [dispatch]);
 

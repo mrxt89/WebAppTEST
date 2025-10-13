@@ -10,6 +10,7 @@ import {
   Users,
   Clipboard,
   Link,
+  Ticket,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -33,6 +34,7 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
     { id: "BillOfMaterials", label: "Distinte base", icon: <Clipboard /> },
     { id: "Task", label: "Attività", icon: <Clipboard /> },
     { id: "Project", label: "Progetto", icon: <Clipboard /> },
+    { id: "Ticket", label: "Ticket", icon: <Ticket /> },
   ];
 
   // Reset alla chiusura

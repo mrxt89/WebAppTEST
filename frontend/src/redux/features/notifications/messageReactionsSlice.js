@@ -1,5 +1,5 @@
 // src/redux/features/notifications/messageReactionsSlice.js
-import { createSlice, createAsyncThunk, createSelector } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 import { config } from "../../../config";
 
@@ -114,7 +114,7 @@ export const loadMessageReactions = createAsyncThunk(
 
 export const toggleMessageReaction = createAsyncThunk(
   "messageReactions/toggleReaction",
-  async ({ messageId, reactionType, hasCurrentUserReacted, currentUserId, currentUserName }, { rejectWithValue, dispatch, getState }) => {
+  async ({ messageId, reactionType }, { rejectWithValue, dispatch }) => {
     try {
       if (!messageId || !reactionType) {
         return rejectWithValue("Invalid messageId or reactionType");
@@ -145,11 +145,9 @@ export const toggleMessageReaction = createAsyncThunk(
         );
       }
 
-      // Determine the HTTP method based on whether user has already reacted
-      const httpMethod = hasCurrentUserReacted ? 'delete' : 'post';
-      
-      // Call API to add/remove the reaction
-      const response = await axios[httpMethod](
+      // Il backend gestisce automaticamente add/remove/change della reazione
+      // Usa sempre POST che fa toggle automatico
+      const response = await axios.post(
         `${config.API_BASE_URL}/messages/${messageId}/reactions`,
         { reactionType },
         {
@@ -191,9 +189,6 @@ export const toggleMessageReaction = createAsyncThunk(
         reactionType,
         notificationId,
         action: response.data.action || "modified",
-        hasCurrentUserReacted,
-        currentUserId,
-        currentUserName,
       };
     } catch (error) {
       console.error("Error toggling message reaction:", error);
@@ -374,8 +369,20 @@ const messageReactionsSlice = createSlice({
       })
       .addCase(toggleMessageReaction.fulfilled, (state, action) => {
         state.loading = false;
-        // Non aggiorniamo lo stato locale qui, lasciamo che sia il backend a gestire tutto
-        // attraverso fetchNotificationById che aggiornerà le reazioni
+        const { messageId } = action.payload;
+
+        // Invalida la cache per forzare il reload delle reazioni
+        // Non facciamo aggiornamento ottimistico perché la logica del backend
+        // è complessa (può aggiungere, rimuovere o cambiare reazione)
+        delete state.cacheTimestamps[messageId];
+
+        // Rimuovi temporaneamente le reazioni per forzare un refresh completo
+        // Questo forza i componenti a ricaricare i dati aggiornati
+        if (state.reactions[messageId]) {
+          delete state.reactions[messageId];
+        }
+
+        state.lastUpdate = Date.now();
       })
       .addCase(toggleMessageReaction.rejected, (state, action) => {
         state.loading = false;
@@ -406,57 +413,26 @@ export const {
   setReactionCacheTimestamp 
 } = messageReactionsSlice.actions;
 
-// Base selectors
-const selectReactionsRaw = (state) => state.messageReactions.reactions;
-const selectVisibleMessagesArray = (state) => state.messageReactions.visibleMessages;
-const selectCacheTimestamps = (state) => state.messageReactions.cacheTimestamps;
-
-// Simple selectors (primitives)
+// Export selectors
+const EMPTY_REACTIONS_ARRAY = [];
+export const selectMessageReactions = (state, messageId) =>
+  state.messageReactions.reactions[messageId] || EMPTY_REACTIONS_ARRAY;
 export const selectReactionsLoading = (state) => state.messageReactions.loading;
 export const selectReactionsError = (state) => state.messageReactions.error;
+const EMPTY_VISIBLE_MESSAGES_SET = new Set();
+export const selectVisibleMessages = (state) => {
+  const visibleMessages = state.messageReactions.visibleMessages;
+  return visibleMessages && visibleMessages.length > 0 ? new Set(visibleMessages) : EMPTY_VISIBLE_MESSAGES_SET;
+};
+export const selectReactionCacheTimestamp = (state, messageId) => 
+  state.messageReactions.cacheTimestamps[messageId];
 export const selectLastReactionUpdate = (state) => state.messageReactions.lastUpdate;
 
-// Memoized selectors
-const EMPTY_REACTIONS_ARRAY = [];
-export const selectMessageReactions = createSelector(
-  [
-    selectReactionsRaw,
-    (state, messageId) => messageId
-  ],
-  (reactions, messageId) => reactions[messageId] || EMPTY_REACTIONS_ARRAY
-);
-
-// Memoized selector per visible messages - restituisce Set per lookup efficienti
-const EMPTY_VISIBLE_MESSAGES_SET = new Set();
-export const selectVisibleMessages = createSelector(
-  [selectVisibleMessagesArray],
-  (visibleMessages) => {
-    if (!visibleMessages || visibleMessages.length === 0) {
-      return EMPTY_VISIBLE_MESSAGES_SET;
-    }
-    return new Set(visibleMessages);
-  }
-);
-
-// Memoized selector per cache timestamp
-export const selectReactionCacheTimestamp = createSelector(
-  [
-    selectCacheTimestamps,
-    (state, messageId) => messageId
-  ],
-  (cacheTimestamps, messageId) => cacheTimestamps[messageId]
-);
-
-// Memoized helper selector per verificare se le reazioni sono scadute
-export const selectReactionsExpired = createSelector(
-  [
-    selectReactionCacheTimestamp,
-    (state, messageId, ttlSeconds = 30) => ttlSeconds
-  ],
-  (timestamp, ttlSeconds) => {
-    if (!timestamp) return true;
-    return (Date.now() - timestamp) > (ttlSeconds * 1000);
-  }
-);
+// Helper selector per verificare se le reazioni sono scadute
+export const selectReactionsExpired = (state, messageId, ttlSeconds = 30) => {
+  const timestamp = state.messageReactions.cacheTimestamps[messageId];
+  if (!timestamp) return true;
+  return (Date.now() - timestamp) > (ttlSeconds * 1000);
+};
 
 export default messageReactionsSlice.reducer;
