@@ -308,54 +308,40 @@ BEGIN
             WHERE Id = @Id AND CompanyId = @CompanyId;
             
             -- Testata
-            SELECT DISTINCT
-                routing.CompanyId,
-                routing.BOMId,
-                routing.RtgStep,
-                routing.Operation,
-                routing.Notes,
-                routing.WC,
-                routing.ProcessingTime,
-                routing.SetupTime,
-                routing.NoOfProcessingWorkers,
-                routing.NoOfSetupWorkers,
-                routing.SubId,
-                routing.Supplier,
-                routing.Qty,
-                routing.TBCreated,
-                routing.TBModified,
-                routing.TBCreatedID,
-                routing.TBModifiedID,
-                op.Description AS OperationDescription,
-                wc.Description AS WorkCenterDescription,
-                wc.Supplier AS WCSupplier,
-                cs.CompanyName AS SupplierName,
-                CASE
-                    WHEN cs.IntercompanyId IS NOT NULL THEN 'Sì'
-                    ELSE 'No'
-                END AS IsIntercompany,
-                cs.IntercompanyId AS IntercompanyTargetId,
-                targetComp.Description AS IntercompanyTargetName,
-                CASE
-                    WHEN cs.IntercompanyId IS NOT NULL AND wc.Supplier IS NOT NULL AND wc.Supplier <> '' THEN 'Sì'
-                    ELSE 'No'
-                END AS IsIntercompanySubcontracting
-            FROM dbo.MA_ProjectArticles_BOMRouting routing
-            LEFT JOIN dbo.MA_Operations op
-                ON routing.Operation = op.Operation
-                AND routing.CompanyId = op.CompanyId
-            LEFT JOIN dbo.MA_WorkCenters wc
-                ON routing.WC = wc.WC
-                AND routing.CompanyId = wc.CompanyId
-            LEFT JOIN dbo.MA_CustSupp cs
-                ON wc.Supplier = cs.CustSupp
-                AND wc.CompanyId = cs.CompanyId
-                AND cs.CustSuppType = 3211265  -- Fornitore
-            LEFT JOIN dbo.AR_Companies targetComp
-                ON cs.IntercompanyId = targetComp.CompanyId
-            WHERE routing.BOMId = @Id
-              AND routing.CompanyId = @CompanyId
-            ORDER BY routing.RtgStep;
+            SELECT 
+                bom.CompanyId,
+                bom.Id,
+                bom.BOM,
+                bom.Description,
+                bom.ItemId,
+                bom.Version,
+                bom.UoM,
+                bom.BOMStatus,
+                bom.stato_erp,
+                bom.data_sync_erp,
+                bom.ProductionLot,
+                bom.RMCost,
+                bom.ProcessingCost,
+                bom.RMRefillCost,
+                bom.ProcessingRefillCost,
+                bom.TotalCost,
+                bom.TotalPrice,
+                bom.RefillWaste,
+                bom.RefillDiscount,
+                bom.TotalRefill,
+                bom.TransportRefill,
+                bom.Details,
+                bom.Notes,
+                bom.TBCreated,
+                bom.TBCreatedId,
+                bom.MainRefBOMId,
+                item.Item AS ItemCode,
+                item.Description AS ItemDescription,
+                item.Nature AS ItemNature,
+                item.BaseUoM AS ItemUoM
+            FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+            LEFT JOIN dbo.MA_ProjectArticles_Items item ON bom.ItemId = item.Id AND bom.CompanyId = item.CompanyId
+            WHERE bom.Id = @Id AND bom.CompanyId = @CompanyId;
             
             -- NUOVA LOGICA DUALE per componenti
             INSERT INTO #TempBOMVersions (ComponentId, BOMId, Version, BOMCode, Priority)
@@ -442,33 +428,16 @@ BEGIN
                 routing.TBModifiedID,
                 op.Description AS OperationDescription,
                 wc.Description AS WorkCenterDescription,
-                wc.Supplier AS WCSupplier,
                 cs.CompanyName AS SupplierName,
-                CASE
+                CASE 
                     WHEN cs.IntercompanyId IS NOT NULL THEN 'Sì'
                     ELSE 'No'
-                END AS IsIntercompany,
-                cs.IntercompanyId AS IntercompanyTargetId,
-                targetComp.Description AS IntercompanyTargetName,
-                CASE
-                    WHEN cs.IntercompanyId IS NOT NULL AND routing.Supplier IS NOT NULL AND routing.Supplier <> '' THEN 'Sì'
-                    ELSE 'No'
-                END AS IsIntercompanySubcontracting
+                END AS IsIntercompany
             FROM dbo.MA_ProjectArticles_BOMRouting routing
-            LEFT JOIN dbo.MA_Operations op
-                ON routing.Operation = op.Operation
-                AND routing.CompanyId = op.CompanyId
-            LEFT JOIN dbo.MA_WorkCenters wc
-                ON routing.WC = wc.WC
-                AND routing.CompanyId = wc.CompanyId
-            LEFT JOIN dbo.MA_CustSupp cs
-                ON routing.Supplier = cs.CustSupp
-                AND routing.CompanyId = cs.CompanyId
-                AND cs.CustSuppType = 3211265  -- Fornitore
-            LEFT JOIN dbo.AR_Companies targetComp
-                ON cs.IntercompanyId = targetComp.CompanyId
-            WHERE routing.BOMId = @Id
-              AND routing.CompanyId = @CompanyId
+            LEFT JOIN MA_Operations op ON routing.Operation = op.Operation AND routing.CompanyId = op.CompanyId
+            LEFT JOIN MA_WorkCenters wc ON routing.WC = wc.WC AND routing.CompanyId = wc.CompanyId
+            LEFT JOIN MA_CustSupp cs ON routing.Supplier = cs.CustSupp AND routing.CompanyId = cs.CompanyId AND cs.CustSuppType = 3211265
+            WHERE routing.BOMId = @Id AND routing.CompanyId = @CompanyId
             ORDER BY routing.RtgStep;
 
             -- Versioni Distinte
@@ -478,6 +447,8 @@ BEGIN
             AND ItemId = (SELECT TOP(1) ItemId FROM MA_ProjectArticles_BillOfMaterials WHERE Id = @Id)
 
         END
+
+        
 		ELSE IF @Action = 'GET_BOM_INTERCOMPANY_SUMMARY'
         BEGIN
             -- Recupera il MainRefBOMId per la logica duale
