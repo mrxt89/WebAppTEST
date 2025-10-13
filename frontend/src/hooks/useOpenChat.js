@@ -278,8 +278,8 @@ export const useOpenChat = (notificationId, options = {}) => {
     };
   }, [chatData, messages]);
   
-  // Caricamento iniziale
   const loadInitialData = useCallback(async (forceRefresh = false) => {
+    // Evita fetch se già caricato e non forzato
     if (loadingRef.current || (!forceRefresh && hasFullData)) return;
 
     loadingRef.current = true;
@@ -287,25 +287,38 @@ export const useOpenChat = (notificationId, options = {}) => {
     setError(null);
 
     try {
-      // Cancella le notifiche reazione per questa chat quando la apro
-      // e salva le notifiche per mostrarle come toast
-      try {
-        const clearResponse = await axios.delete(
-          `${config.API_BASE_URL}/notifications/${notificationId}/reaction-notifications`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`
+      // Cancella le notifiche reazione solo se non già fatto su mount
+      if (!clearedReactionsRef.current) {
+        try {
+          console.log(`🧹 [DEBUG] Frontend: Chiamando clearReactionNotifications per chat ${notificationId}`);
+          const clearResponse = await axios.delete(
+            `${config.API_BASE_URL}/notifications/${notificationId}/reaction-notifications`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`
+              }
             }
-          }
-        );
+          );
 
-        // Se ci sono notifiche reazione, salvale per il toast
-        if (clearResponse.data && clearResponse.data.reactionNotifications && clearResponse.data.reactionNotifications.length > 0) {
-          setReactionNotifications(clearResponse.data.reactionNotifications);
+          console.log(`📋 [DEBUG] Frontend: Risposta clearReactionNotifications:`, {
+            success: clearResponse.data?.success,
+            deletedCount: clearResponse.data?.deletedCount,
+            reactionNotificationsCount: clearResponse.data?.reactionNotifications?.length || 0,
+            reactionNotifications: clearResponse.data?.reactionNotifications
+          });
+
+          if (clearResponse.data && Array.isArray(clearResponse.data.reactionNotifications) && clearResponse.data.reactionNotifications.length > 0) {
+            setReactionNotifications(clearResponse.data.reactionNotifications);
+          }
+        } catch (clearErr) {
+          console.error('❌ [DEBUG] Frontend: Errore nel clear reaction notifications:', {
+            error: clearErr.message,
+            response: clearErr.response?.data,
+            notificationId
+          });
+        } finally {
+          clearedReactionsRef.current = true;
         }
-      } catch (clearErr) {
-        console.warn('Could not clear reaction notifications:', clearErr);
-        // Non blocchiamo il caricamento se fallisce
       }
 
       const response = await axios.get(
@@ -596,17 +609,29 @@ export const useOpenChat = (notificationId, options = {}) => {
         refreshData({ force: true, playSound: false });
       }
     };
+
+    // NUOVO: Gestisce le notifiche reazione ricevute da mark-as-read
+    const handleReactionNotifications = (event) => {
+      const { notificationId: eventNotificationId, reactionNotifications } = event.detail;
+      
+      if (parseInt(eventNotificationId) === parseInt(notificationId)) {
+        console.log(`🎯 [DEBUG] Frontend: Ricevute notifiche reazione per chat ${notificationId}:`, reactionNotifications);
+        setReactionNotifications(reactionNotifications);
+      }
+    };
     
     document.addEventListener('new_message', handleNewMessage);
     document.addEventListener('open-chat-new-message', handleOpenChatNewMessage);
     //document.addEventListener('reload-open-chat', handleReloadChat);
     document.addEventListener('chat-message-sent', handleMessageSent);
+    document.addEventListener('reaction-notifications-received', handleReactionNotifications);
     
     return () => {
       document.removeEventListener('new_message', handleNewMessage);
       document.removeEventListener('open-chat-new-message', handleOpenChatNewMessage);
       //document.removeEventListener('reload-open-chat', handleReloadChat);
       document.removeEventListener('chat-message-sent', handleMessageSent);
+      document.removeEventListener('reaction-notifications-received', handleReactionNotifications);
       
       if (newMessageTimeoutRef.current) {
         clearTimeout(newMessageTimeoutRef.current);
@@ -761,7 +786,10 @@ export const useOpenChat = (notificationId, options = {}) => {
 
     // Notifiche reazione
     reactionNotifications,
-    clearReactionNotifications: () => setReactionNotifications([]),
+    clearReactionNotifications: () => {
+      console.log(`🧹 [DEBUG] Frontend: Pulendo notifiche reazione dal toast`);
+      setReactionNotifications([]);
+    },
 
     // Funzioni principali
     loadInitialData,

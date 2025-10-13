@@ -17,7 +17,6 @@ const { getNotifications
         , reopenChat
         , leaveChat
         , sendNotification
-        , createDBNotificationsView 
         , setMessageColor
         , clearMessageColor
         , filterMessages
@@ -278,8 +277,29 @@ router.post('/mark-as-read', authenticateToken, async (req, res) => {
   const { notificationId, isReadByUser } = req.body;
   const userId = req.user.UserId;
   try {
+    console.log(`📖 [DEBUG] API: mark-as-read per chat ${notificationId}, userId: ${userId}`);
+    
+    // Marca come letta
     await markNotificationAsRead(notificationId, userId, isReadByUser);
-    res.status(200).json({ success: true });
+    
+    // Se stiamo aprendo la chat (isReadByUser = true), cancella anche le notifiche reazione
+    if (isReadByUser) {
+      console.log(`🧹 [DEBUG] API: Chat aperta, cancellando notifiche reazione per ${notificationId}`);
+      const clearResult = await clearReactionNotifications(parseInt(notificationId), userId);
+      
+      console.log(`✅ [DEBUG] API: Notifiche reazione cancellate:`, {
+        success: clearResult.success,
+        deletedCount: clearResult.deletedCount,
+        reactionNotificationsCount: clearResult.reactionNotifications?.length || 0
+      });
+      
+      res.status(200).json({ 
+        success: true, 
+        reactionNotifications: clearResult.reactionNotifications || []
+      });
+    } else {
+      res.status(200).json({ success: true });
+    }
   } catch (err) {
     console.error('Error marking notification as read:', err);
     res.status(500).json({ success: false, error: 'Server error' });
@@ -350,10 +370,10 @@ router.post('/send-notification', authenticateToken, async (req, res) => {
 router.get('/DBNotificationsView', authenticateToken, async (req, res) => {
   const userId = req.user.UserId;
   try {
-    const result = await createDBNotificationsView(userId);
+    const result = await getUserNotifications(userId);
     res.json(result);
   } catch (err) {
-    console.error('Error creating DB notifications view:', err);
+    console.error('Error getting user notifications:', err);
     res.status(500).send('Internal server error');
   }
 });
@@ -1339,8 +1359,15 @@ router.post('/messages/:messageId/reactions', authenticateToken, async (req, res
     const { reactionType } = req.body;
     const userId = req.user.UserId;
     
+    console.log(`🌐 [DEBUG] API: POST /messages/${messageId}/reactions chiamata:`, {
+      messageId,
+      reactionType,
+      userId
+    });
+    
     // Validazione parametri
     if (!messageId || isNaN(parseInt(messageId))) {
+      console.log(`❌ [DEBUG] API: MessageId non valido: ${messageId}`);
       return res.status(400).json({ 
         success: false, 
         message: 'ID messaggio non valido' 
@@ -1348,6 +1375,7 @@ router.post('/messages/:messageId/reactions', authenticateToken, async (req, res
     }
     
     if (!reactionType || typeof reactionType !== 'string') {
+      console.log(`❌ [DEBUG] API: ReactionType non valido: ${reactionType}`);
       return res.status(400).json({ 
         success: false, 
         message: 'Tipo reazione è obbligatorio e deve essere una stringa' 
@@ -1380,12 +1408,24 @@ router.post('/messages/:messageId/reactions', authenticateToken, async (req, res
       console.log('Reazione aggiunta:', event.detail);
     }
     
+    console.log(`✅ [DEBUG] API: Risposta addMessageReaction:`, {
+      success: result.success,
+      action: result.action,
+      originalSender: result.originalSender,
+      userWhoReacted: result.userWhoReacted
+    });
+
     res.json({
       ...result,
       messageId: parseInt(messageId)
     });
   } catch (error) {
-    console.error('Errore nella gestione della reazione:', error);
+    console.error('❌ [DEBUG] API: Errore nella gestione della reazione:', {
+      error: error.message,
+      messageId: req.params.messageId,
+      userId: req.user?.UserId,
+      reactionType: req.body?.reactionType
+    });
     res.status(500).json({ 
       success: false, 
       message: 'Errore nell\'elaborazione della reazione',
@@ -1751,13 +1791,16 @@ router.get('/notifications/:notificationId/participants', authenticateToken, asy
   }
 });
 
-// Route per cancellare le notifiche reazione quando si apre una chat
-router.delete('/notifications/:notificationId/reaction-notifications', authenticateToken, async (req, res) => {
+// Route per cancellare le notifiche reazione quando si apre una chat (solo POST per compatibilità build)
+router.post('/notifications/:notificationId/reaction-notifications/clear', authenticateToken, async (req, res) => {
   try {
     const { notificationId } = req.params;
     const userId = req.user.UserId;
 
+    console.log(`🌐 [DEBUG] API: POST /notifications/${notificationId}/reaction-notifications/clear chiamata da userId: ${userId}`);
+
     if (!notificationId) {
+      console.log(`❌ [DEBUG] API: NotificationId mancante (POST clear)`);
       return res.status(400).json({
         success: false,
         error: 'NotificationId è obbligatorio'
@@ -1766,9 +1809,19 @@ router.delete('/notifications/:notificationId/reaction-notifications', authentic
 
     const result = await clearReactionNotifications(parseInt(notificationId), userId);
 
+    console.log(`✅ [DEBUG] API: Risposta clearReactionNotifications:`, {
+      success: result.success,
+      deletedCount: result.deletedCount,
+      reactionNotificationsCount: result.reactionNotifications?.length || 0
+    });
+
     res.json(result);
   } catch (err) {
-    console.error('Error clearing reaction notifications:', err);
+    console.error('❌ [DEBUG] API: Errore in clearReactionNotifications:', {
+      error: err.message,
+      notificationId: req.params.notificationId,
+      userId: req.user?.UserId
+    });
     res.status(500).json({
       success: false,
       error: 'Errore nella cancellazione delle notifiche reazione'
