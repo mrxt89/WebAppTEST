@@ -307,7 +307,24 @@ export const toggleReadUnread = createAsyncThunk(
         return rejectWithValue("Failed to update read status");
       }
 
-      return { notificationId, isReadByUser };
+      // Se stiamo aprendo la chat e ci sono notifiche reazione, emetti evento
+      if (isReadByUser && res.data.reactionNotifications && res.data.reactionNotifications.length > 0) {
+        console.log(`🎯 [DEBUG] Frontend: Notifiche reazione ricevute da mark-as-read:`, res.data.reactionNotifications);
+        
+        // Emetti evento per il componente chat
+        document.dispatchEvent(new CustomEvent('reaction-notifications-received', {
+          detail: {
+            notificationId,
+            reactionNotifications: res.data.reactionNotifications
+          }
+        }));
+      }
+
+      return { 
+        notificationId, 
+        isReadByUser,
+        reactionNotifications: res.data.reactionNotifications || []
+      };
     } catch (error) {
       return rejectWithValue(error.message || "Failed to toggle read status");
     }
