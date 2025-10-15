@@ -3594,7 +3594,7 @@ const getReferenceAttachments = async (referenceId, companyId) => {
         // Recupera la reference e valida che l'utente appartenga a source o target company
         const refQuery = `
             SELECT ReferenceID, SourceProjectItemId, SourceCompanyId, TargetCompanyId, 
-                   RequestNotes, ResponseNotes, CreatedAt, UpdatedAt
+                   RequestNotes, ResponseNotes
             FROM MA_ProjectArticles_References
             WHERE ReferenceID = @ReferenceId`;
         const refResult = await request.query(refQuery);
@@ -3678,9 +3678,7 @@ const getReferenceAttachments = async (referenceId, companyId) => {
                 SourceCompanyId: ref.SourceCompanyId,
                 TargetCompanyId: ref.TargetCompanyId,
                 RequestNotes: ref.RequestNotes,
-                ResponseNotes: ref.ResponseNotes,
-                CreatedAt: ref.CreatedAt,
-                UpdatedAt: ref.UpdatedAt
+                ResponseNotes: ref.ResponseNotes
             }
         };
     } catch (err) {
