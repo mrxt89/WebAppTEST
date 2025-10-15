@@ -705,7 +705,7 @@ function ItemAttachmentDetails({
                 </ListItemIcon>
                 <ListItemText
                   primary={
-                    <Typography variant="subtitle2">
+                    <Typography variant="subtitle2" component="span">
                       {share.TargetCompanyName}
                     </Typography>
                   }
@@ -715,15 +715,15 @@ function ItemAttachmentDetails({
                         sx={{ display: "flex", alignItems: "center", mt: 0.5 }}
                       >
                         {getAccessLevelIcon(share.AccessLevel)}
-                        <Typography variant="body2" sx={{ ml: 0.5 }}>
+                        <Typography variant="body2" component="span" sx={{ ml: 0.5 }}>
                           {getAccessLevelName(share.AccessLevel)}
                         </Typography>
                       </Box>
-                      <Typography variant="body2" component="div">
+                      <Typography variant="body2" component="span" sx={{ display: "block" }}>
                         Condiviso da:{" "}
                         {share.SharedByFullName || share.SharedByUsername}
                       </Typography>
-                      <Typography variant="body2" component="div">
+                      <Typography variant="body2" component="span" sx={{ display: "block" }}>
                         Data:{" "}
                         {format(new Date(share.SharedAt), "dd/MM/yyyy HH:mm", {
                           locale: it,
@@ -1045,7 +1045,7 @@ function ItemAttachmentDetails({
           sx={{ borderBottom: 1, borderColor: "divider", px: 2 }}
         >
           <Tab icon={<ViewIcon />} iconPosition="start" label="Visualizza" />
-          <Tab icon={<EditIcon />} iconPosition="start" label="Modifica" />
+          <Tab icon={<EditIcon />} iconPosition="start" label="Modifica" className="d-none" />
         </Tabs>
 
         <DialogContent
