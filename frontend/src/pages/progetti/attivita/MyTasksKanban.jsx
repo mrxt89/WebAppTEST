@@ -26,10 +26,10 @@ const TaskCard = ({
   isDragging,
   isUpdating,
   canDrag,
+  onProjectClick,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const navigate = useNavigate();
-  
+
   const priorityConfig = {
     ALTA: { 
       color: "from-red-500 to-red-600",
@@ -76,7 +76,19 @@ const TaskCard = ({
 
   const navigateToProject = (e) => {
     e.stopPropagation();
-    navigate(`/progetti/detail/${task.ProjectID}`);
+    console.log('[KANBAN] navigateToProject chiamato', {
+      taskTitle: task.Title,
+      projectID: task.ProjectID,
+      projectName: task.ProjectName,
+      hasOnProjectClick: !!onProjectClick,
+      onProjectClickType: typeof onProjectClick
+    });
+    if (onProjectClick) {
+      console.log('[KANBAN] Chiamando onProjectClick con ProjectID:', task.ProjectID);
+      onProjectClick(task.ProjectID);
+    } else {
+      console.log('[KANBAN] ERRORE: onProjectClick non definito!');
+    }
   };
 
   const priority = priorityConfig[task.Priority] || priorityConfig.BASSA;
@@ -254,6 +266,7 @@ const MyTasksKanban = ({
   onTaskUpdate,
   checkAdminPermission,
   isOwnTask,
+  onProjectClick,
 }) => {
   const [localTasks, setLocalTasks] = useState(tasks);
   const [draggedTask, setDraggedTask] = useState(null);
@@ -261,6 +274,7 @@ const MyTasksKanban = ({
   const [updatingTasks, setUpdatingTasks] = useState({});
   const dropTimeoutRef = useRef(null);
   const isUpdatingRef = useRef(false);
+  const navigate = useNavigate();
 
   const TASK_STATES = {
     "DA FARE": "DA FARE",
@@ -574,6 +588,7 @@ const MyTasksKanban = ({
                               isDragging={draggedTask?.TaskID === task.TaskID}
                               isUpdating={isTaskUpdating}
                               canDrag={canDrag && !isTaskUpdating}
+                              onProjectClick={onProjectClick || ((projectId) => navigate(`/progetti/detail/${projectId}`))}
                             />
                           );
                         })
