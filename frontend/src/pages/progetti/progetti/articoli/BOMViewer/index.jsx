@@ -1,74 +1,50 @@
-// BOMViewer/index.jsx - Aggiornato con supporto drag and drop migliorato
+// BOMViewer/index.jsx - Aggiornato con supporto drag and drop migliorato e Intercompany
 
-import React, { useRef } from "react";
-import { BOMViewerProvider } from "./context/BOMViewerContext";
+import React, { useRef, useState } from "react";
+import { BOMViewerProvider, useBOMViewer } from "./context/BOMViewerContext";
 import DndContextProvider from "./components/DndContextProvider";
 import BOMHeader from "./components/BOMHeader";
 import BOMTreeView from "./components/BOMTreeView";
 import BOMDetailPanel from "./components/BOMDetailPanel";
 import BOMReferencePanel from "./components/BOMReferencePanel";
+import IntercompanySidebar from "./components/IntercompanySidebar";
+import IntercompanySyncModal from "./components/IntercompanySyncModal";
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import "./BOMViewer.css";
 
 /**
- * BOMViewer - Componente principale per la visualizzazione e modifica delle distinte base
- * @param {Object} item - Oggetto contenente i dati dell'articolo selezionato
- * @param {Object} project - Oggetto contenente i dati del progetto
- * @param {boolean} canEdit - Flag che indica se l'utente ha i permessi di modifica
- * @param {Function} onRefresh - Callback da chiamare quando è necessario aggiornare i dati
+ * Componente interno che ha accesso al context BOMViewer
  */
-const BOMViewer = ({ item, project, canEdit = false, onRefresh }) => {
-  // Ref per tracciare l'ultimo item renderizzato e prevenire re-render inutili
-  const lastItemIdRef = useRef(null);
+const BOMViewerContent = () => {
+  const {
+    item,
+    bom,
+    getBOMIntercompanySummary,
+    syncIntercompanySharing,
+    smartRefresh,
+  } = useBOMViewer();
 
-  // Preveni il rendering se non c'è un item selezionato
-  if (!item?.Id) {
-    return (
-      <div className="flex items-center justify-center h-full p-8 text-center border rounded-md">
-        <div>
-          <h3 className="text-lg font-medium mb-2">
-            Nessun articolo selezionato
-          </h3>
-          <p className="text-gray-500">
-            Seleziona un articolo per visualizzare la distinta base
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Genera una key basata sull'ID dell'item - IMPORTANTE per forzare il reset del provider
-  // quando cambia completamente l'item
-  const providerKey = `bom-viewer-${item.Id}`;
-
-  // Aggiorna il riferimento all'ultimo item
-  lastItemIdRef.current = item.Id;
+  const [intercompanySidebarCollapsed, setIntercompanySidebarCollapsed] = useState(false);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
 
   return (
-    <BOMViewerProvider
-      key={providerKey}
-      item={item}
-      project={project}
-      canEdit={canEdit}
-      onRefresh={onRefresh}
-    >
-      <DndContextProvider>
-        {({
-          draggingOver,
-          dropTarget,
-          dropMode,
-          activeItem,
-          setDragSettings,
-        }) => (
-          <div className="flex flex-col" id="bom-viewer" style={{ height: "calc(100vh - 275px)" }}>
-            {/* Header con codice BOM, descrizione e selettore versione - COMPLETAMENTE FISSO */}
-            <div id="bom-header-section" className="flex-shrink-0 bg-white border-b shadow-sm">
-              <BOMHeader />
-            </div>
+    <DndContextProvider>
+      {({
+        draggingOver,
+        dropTarget,
+        dropMode,
+        activeItem,
+        setDragSettings,
+      }) => (
+        <div className="flex flex-col" id="bom-viewer" style={{ height: "calc(100vh - 275px)" }}>
+          {/* Header con codice BOM, descrizione e selettore versione - COMPLETAMENTE FISSO */}
+          <div id="bom-header-section" className="flex-shrink-0 bg-white border-b shadow-sm">
+            <BOMHeader />
+          </div>
 
-            {/* Area principale con 3 pannelli ridimensionabili - ALTEZZA CALCOLATA */}
-            <div id="bom-main-content" className="flex-1 min-h-0 flex">
-              <ResizablePanelGroup direction="horizontal">
+          {/* Area principale con 3 pannelli ridimensionabili + sidebar intercompany */}
+          <div id="bom-main-content" className="flex-1 min-h-0 flex">
+            <ResizablePanelGroup direction="horizontal">
                 {/* Pannello sinistro - Vista ad albero (struttura BOM) */}
                 <div className="d-grid w-25">
                   <div className="flex-col border-r" id="bom-tree-container">
@@ -118,10 +94,71 @@ const BOMViewer = ({ item, project, canEdit = false, onRefresh }) => {
                   </div>
                 </div>
               </ResizablePanelGroup>
+
+              {/* Sidebar Intercompany */}
+              <IntercompanySidebar
+                bomId={bom?.Id}
+                getBOMIntercompanySummary={getBOMIntercompanySummary}
+                onSyncClick={() => setSyncModalOpen(true)}
+                isCollapsed={intercompanySidebarCollapsed}
+                onToggleCollapse={() => setIntercompanySidebarCollapsed(!intercompanySidebarCollapsed)}
+              />
             </div>
+
+            {/* Modal Sincronizzazione Intercompany */}
+            <IntercompanySyncModal
+              open={syncModalOpen}
+              onOpenChange={setSyncModalOpen}
+              bomId={bom?.Id}
+              getBOMIntercompanySummary={getBOMIntercompanySummary}
+              syncIntercompanySharing={syncIntercompanySharing}
+              onSuccess={() => smartRefresh()}
+            />
           </div>
         )}
       </DndContextProvider>
+    );
+};
+
+/**
+ * BOMViewer - Componente wrapper esterno
+ */
+const BOMViewer = ({ item, project, canEdit = false, onRefresh }) => {
+  // Ref per tracciare l'ultimo item renderizzato e prevenire re-render inutili
+  const lastItemIdRef = useRef(null);
+
+  // Preveni il rendering se non c'è un item selezionato
+  if (!item?.Id) {
+    return (
+      <div className="flex items-center justify-center h-full p-8 text-center border rounded-md">
+        <div>
+          <h3 className="text-lg font-medium mb-2">
+            Nessun articolo selezionato
+          </h3>
+          <p className="text-gray-500">
+            Seleziona un articolo per visualizzare la distinta base
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Genera una key basata sull'ID dell'item - IMPORTANTE per forzare il reset del provider
+  // quando cambia completamente l'item
+  const providerKey = `bom-viewer-${item.Id}`;
+
+  // Aggiorna il riferimento all'ultimo item
+  lastItemIdRef.current = item.Id;
+
+  return (
+    <BOMViewerProvider
+      key={providerKey}
+      item={item}
+      project={project}
+      canEdit={canEdit}
+      onRefresh={onRefresh}
+    >
+      <BOMViewerContent />
     </BOMViewerProvider>
   );
 };

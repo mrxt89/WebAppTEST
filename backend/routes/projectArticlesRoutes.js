@@ -36,7 +36,15 @@ const {
     updateItemDetailsWithValidation,
     searchSimilarArticles,
     getArticleBOMTree,
-    getComponentAttachments
+    getComponentAttachments,
+    // Intercompany functions
+    getIntercompanyComponents,
+    syncIntercompanySharing,
+    getBOMIntercompanySummary,
+    getIntercompanyRequests,
+    approveRejectReference,
+    getReferenceAttachments,
+    updateReferenceNotes
 } = require('../queries/projectArticlesManagement');
 
 // Ottieni stati degli articoli di progetto
@@ -1138,6 +1146,192 @@ router.get('/projectArticles/component/:componentId/attachments', authenticateTo
             success: 0,
             msg: error.message || 'Errore durante il recupero degli allegati'
         });
+    }
+});
+
+// =====================================================
+// INTERCOMPANY ROUTES
+// =====================================================
+
+// 1. GET /projectArticles/boms/:id/intercompany-components - Ottieni componenti intercompany di una BOM
+router.get('/projectArticles/boms/:id/intercompany-components', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const bomId = parseInt(req.params.id);
+        const includeAttachments = req.query.includeAttachments === 'true';
+
+        if (!bomId || isNaN(bomId)) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'ID BOM non valido'
+            });
+        }
+
+        const result = await getIntercompanyComponents(bomId, companyId, includeAttachments);
+        res.json(result);
+    } catch (err) {
+        console.error('Error fetching intercompany components:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore durante il recupero dei componenti intercompany'
+        });
+    }
+});
+
+// 2. POST /projectArticles/boms/:id/sync-intercompany - Sincronizza condivisioni intercompany
+router.post('/projectArticles/boms/:id/sync-intercompany', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const userId = req.user.UserId;
+        const bomId = parseInt(req.params.id);
+        const { syncAttachments = true, autoCreateReferences = true } = req.body;
+
+        if (!bomId || isNaN(bomId)) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'ID BOM non valido'
+            });
+        }
+
+        const result = await syncIntercompanySharing(
+            bomId,
+            companyId,
+            userId,
+            syncAttachments,
+            autoCreateReferences
+        );
+
+        res.json(result);
+    } catch (err) {
+        console.error('Error syncing intercompany sharing:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore durante la sincronizzazione intercompany'
+        });
+    }
+});
+
+// 3. GET /projectArticles/boms/:id/intercompany-summary - Ottieni riepilogo intercompany per sidebar
+router.get('/projectArticles/boms/:id/intercompany-summary', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const bomId = parseInt(req.params.id);
+
+        if (!bomId || isNaN(bomId)) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'ID BOM non valido'
+            });
+        }
+
+        const result = await getBOMIntercompanySummary(bomId, companyId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error fetching BOM intercompany summary:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore durante il recupero del riepilogo intercompany'
+        });
+    }
+});
+
+// 4. GET /projectArticles/intercompany/requests - Ottieni richieste intercompany (inbox/outbox)
+router.get('/projectArticles/intercompany/requests', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const direction = req.query.direction || 'IN'; // IN, OUT, BOTH
+        const status = req.query.status || null; // PENDING, APPROVED, REJECTED, DRAFT, null
+
+        // Validazione direction
+        if (!['IN', 'OUT', 'BOTH'].includes(direction)) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Direction deve essere IN, OUT o BOTH'
+            });
+        }
+
+        const result = await getIntercompanyRequests(companyId, direction, status);
+        res.json(result);
+    } catch (err) {
+        console.error('Error fetching intercompany requests:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore durante il recupero delle richieste intercompany'
+        });
+    }
+});
+
+// 5. POST /projectArticles/intercompany/references/:id/respond - Approva o rifiuta una richiesta
+router.post('/projectArticles/intercompany/references/:id/respond', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.UserId;
+        const referenceId = parseInt(req.params.id);
+        const { action, notes = null } = req.body;
+
+        if (!referenceId || isNaN(referenceId)) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'ID reference non valido'
+            });
+        }
+
+        // Validazione action
+        if (!action || !['APPROVE', 'REJECT'].includes(action)) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Action deve essere APPROVE o REJECT'
+            });
+        }
+
+        // Valida che le note siano presenti per i rifiuti
+        if (action === 'REJECT' && (!notes || notes.trim() === '')) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Le note sono obbligatorie per i rifiuti'
+            });
+        }
+
+        const result = await approveRejectReference(referenceId, action, userId, notes);
+        res.json(result);
+    } catch (err) {
+        console.error('Error responding to intercompany request:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore durante la risposta alla richiesta intercompany'
+        });
+    }
+});
+
+// 6. GET /projectArticles/intercompany/references/:id/attachments - Allegati della reference
+router.get('/projectArticles/intercompany/references/:id/attachments', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const referenceId = parseInt(req.params.id);
+        if (!referenceId || isNaN(referenceId)) {
+            return res.status(400).json({ success: 0, msg: 'ID reference non valido' });
+        }
+        const result = await getReferenceAttachments(referenceId, companyId);
+        res.json(result);
+    } catch (err) {
+        console.error('Error fetching reference attachments:', err);
+        res.status(500).json({ success: 0, msg: err.message || 'Errore nel recupero allegati' });
+    }
+});
+
+// 7. POST /projectArticles/intercompany/references/:id/notes - Aggiorna note della reference
+router.post('/projectArticles/intercompany/references/:id/notes', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const referenceId = parseInt(req.params.id);
+        const { notes } = req.body || {};
+        if (!referenceId || isNaN(referenceId)) {
+            return res.status(400).json({ success: 0, msg: 'ID reference non valido' });
+        }
+        const result = await updateReferenceNotes(referenceId, companyId, notes);
+        res.json(result);
+    } catch (err) {
+        console.error('Error updating reference notes:', err);
+        res.status(500).json({ success: 0, msg: err.message || 'Errore aggiornamento note' });
     }
 });
 

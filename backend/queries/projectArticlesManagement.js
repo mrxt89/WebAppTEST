@@ -3251,6 +3251,491 @@ const getComponentAttachments = async (companyId, componentId, isProjectItem = t
     }
 };
 
+// =====================================================
+// INTERCOMPANY FUNCTIONS
+// =====================================================
+
+// 1. Ottiene i componenti intercompany di una BOM
+const getIntercompanyComponents = async (bomId, companyId, includeAttachments = false) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+
+        // Parametri input
+        request.input('BOMId', sql.BigInt, bomId);
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('IncludeAttachments', sql.Bit, includeAttachments);
+
+        // Parametri output
+        request.output('ErrorCode', sql.Int);
+        request.output('ErrorMessage', sql.NVarChar(4000));
+
+        // Esegui la stored procedure
+        const result = await request.execute('MA_ProjectArticles_GetIntercompanyComponents');
+
+        // Controlla errori
+        const errorCode = request.parameters.ErrorCode.value || 0;
+        if (errorCode !== 0) {
+            throw new Error(request.parameters.ErrorMessage.value || `Error code: ${errorCode}`);
+        }
+
+        // Ottieni i recordset
+        const components = result.recordsets[0] || [];
+        const attachments = includeAttachments && result.recordsets.length > 1 ? result.recordsets[1] : [];
+
+        return {
+            success: 1,
+            components: components,
+            attachments: attachments,
+            totalComponents: components.length,
+            errorCode: 0,
+            errorMessage: null
+        };
+    } catch (err) {
+        console.error('Error in getIntercompanyComponents:', err);
+        return {
+            success: 0,
+            components: [],
+            attachments: [],
+            totalComponents: 0,
+            errorCode: -1,
+            errorMessage: err.message || 'Errore nel recupero dei componenti intercompany'
+        };
+    }
+};
+
+// 2. Sincronizza le condivisioni intercompany per una BOM
+const syncIntercompanySharing = async (bomId, companyId, userId, syncAttachments = true, autoCreateReferences = true) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+
+        // Parametri input
+        request.input('BOMId', sql.BigInt, bomId);
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('UserId', sql.Int, userId);
+        request.input('SyncAttachments', sql.Bit, syncAttachments);
+        request.input('AutoCreateReferences', sql.Bit, autoCreateReferences);
+
+        // Parametri output - SOLO ErrorCode e ErrorMessage sono OUTPUT parameters
+        request.output('ErrorCode', sql.Int);
+        request.output('ErrorMessage', sql.NVarChar(4000));
+
+        // Esegui la stored procedure
+        const result = await request.execute('MA_ProjectArticles_SyncIntercompanySharing');
+
+        // La SP ritorna un recordset con i contatori (non output parameters)
+        const resultData = result.recordset && result.recordset.length > 0 ? result.recordset[0] : {};
+
+        const errorCode = resultData.ErrorCode || 0;
+        const errorMessage = resultData.ErrorMessage || '';
+        const referencesCreated = resultData.ReferencesCreated || 0;
+        const referencesUpdated = resultData.ReferencesUpdated || 0;
+        const attachmentsShared = resultData.AttachmentsShared || 0;
+
+        if (errorCode !== 0) {
+            throw new Error(errorMessage || `Error code: ${errorCode}`);
+        }
+
+        return {
+            success: 1,
+            msg: `Sincronizzazione completata: ${referencesCreated} references create, ${referencesUpdated} aggiornate, ${attachmentsShared} allegati condivisi`,
+            referencesCreated: referencesCreated,
+            referencesUpdated: referencesUpdated,
+            attachmentsShared: attachmentsShared
+        };
+    } catch (err) {
+        console.error('Error in syncIntercompanySharing:', err);
+        return {
+            success: 0,
+            msg: err.message || 'Errore durante la sincronizzazione intercompany',
+            referencesCreated: 0,
+            referencesUpdated: 0,
+            attachmentsShared: 0
+        };
+    }
+};
+
+// 3. Ottiene il riepilogo intercompany per la sidebar
+const getBOMIntercompanySummary = async (bomId, companyId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+
+        // Parametri input - ATTENZIONE: la SP usa @Id non @BOMId
+        request.input('Action', sql.NVarChar(50), 'GET_BOM_INTERCOMPANY_SUMMARY');
+        request.input('Id', sql.BigInt, bomId);  // Cambiato da BOMId a Id
+        request.input('CompanyId', sql.Int, companyId);
+
+        // Parametri output
+        request.output('ErrorCode', sql.Int);
+        request.output('ErrorMessage', sql.NVarChar(4000));
+
+        // Esegui la stored procedure
+        const result = await request.execute('MA_ProjectArticles_GetBOMDatas');
+
+        // Controlla errori
+        const errorCode = request.parameters.ErrorCode.value || 0;
+        if (errorCode !== 0) {
+            throw new Error(request.parameters.ErrorMessage.value || `Error code: ${errorCode}`);
+        }
+
+        // Ottieni i recordset
+        // Recordset 0: Dettaglio componenti
+        // Recordset 1: Summary per tipo e company
+        const rawComponents = result.recordsets[0] || [];
+        const summaryByType = result.recordsets.length > 1 ? result.recordsets[1] : [];
+
+        // Filtra solo componenti intercompany validi (TargetCompanyId > 0) e mappa Type a IntercompanyType
+        const components = rawComponents
+            .filter(comp => comp.TargetCompanyId && comp.TargetCompanyId > 0)
+            .map(comp => ({
+                ...comp,
+                IntercompanyType: comp.Type
+            }));
+
+        // Raggruppa il summary per company (aggregando acquisti e conto lavoro)
+        // Filtra solo le righe con TargetCompanyId valido
+        const summaryByCompany = [];
+        const companyMap = new Map();
+
+        summaryByType
+            .filter(row => row.TargetCompanyId && row.TargetCompanyId > 0)
+            .forEach(row => {
+                const companyId = row.TargetCompanyId;
+                if (!companyMap.has(companyId)) {
+                    companyMap.set(companyId, {
+                        TargetCompanyId: companyId,
+                        TargetCompanyName: row.TargetCompanyName,
+                        TotalComponents: 0,
+                        PurchaseComponents: 0,
+                        SubcontractingComponents: 0,
+                        Suppliers: new Set()
+                    });
+                }
+
+                const company = companyMap.get(companyId);
+                company.TotalComponents += row.ComponentCount || 0;
+
+                if (row.Type === 'ACQUISTO') {
+                    company.PurchaseComponents += row.ComponentCount || 0;
+                } else if (row.Type === 'CONTO_LAVORO') {
+                    company.SubcontractingComponents += row.ComponentCount || 0;
+                }
+            });
+
+        // Aggiungi fornitori dal dettaglio componenti
+        components.forEach(comp => {
+            if (companyMap.has(comp.TargetCompanyId) && comp.SupplierCode) {
+                companyMap.get(comp.TargetCompanyId).Suppliers.add(comp.SupplierCode);
+            }
+        });
+
+        // Converti Map in array e formatta Suppliers
+        companyMap.forEach(company => {
+            company.Suppliers = Array.from(company.Suppliers).join(', ');
+            summaryByCompany.push(company);
+        });
+
+        // Calcola totali
+        const totalIntercompanyComponents = components.length;
+        const totalTargetCompanies = summaryByCompany.length;
+
+        return {
+            success: 1,
+            summaryByCompany: summaryByCompany,
+            components: components,
+            totalIntercompanyComponents: totalIntercompanyComponents,
+            totalTargetCompanies: totalTargetCompanies
+        };
+    } catch (err) {
+        console.error('Error in getBOMIntercompanySummary:', err);
+        return {
+            success: 0,
+            summaryByCompany: [],
+            components: [],
+            totalIntercompanyComponents: 0,
+            totalTargetCompanies: 0,
+            errorMessage: err.message || 'Errore nel recupero del riepilogo intercompany'
+        };
+    }
+};
+
+// 4. Ottiene le richieste intercompany (inbox/outbox)
+const getIntercompanyRequests = async (companyId, direction = 'IN', status = null) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        let query = `
+            SELECT
+                ref.ReferenceId,
+                ref.SourceCompanyId,
+                srcComp.Description AS SourceCompanyName,
+                ref.TargetCompanyId,
+                tgtComp.Description AS TargetCompanyName,
+                -- Campi progetto non disponibili direttamente: restituiamo NULL per compatibilità UI
+                CAST(NULL AS NVARCHAR(50)) AS ProjectCode,
+                CAST(NULL AS NVARCHAR(255)) AS ProjectDescription,
+                ref.SourceProjectItemId AS ComponentId,
+                comp.Item AS ComponentCode,
+                comp.Description AS ComponentDescription,
+                ref.Status,
+                ref.RequestDate,
+                ref.ResponseDate,
+                ref.TBCreatedId AS RequestUserId,
+               
+                ref.RequestNotes AS Notes,
+                ref.ResponseNotes,
+                -- Determina tipo intercompany a partire dalla Nature della reference se presente, altrimenti dal componente
+                CASE
+                    WHEN ISNULL(ref.Nature, comp.Nature) = 22413314 THEN 'ACQUISTO'
+                    ELSE 'CONTO_LAVORO'
+                END AS IntercompanyType
+            FROM MA_ProjectArticles_References ref
+            INNER JOIN AR_Companies srcComp ON ref.SourceCompanyId = srcComp.CompanyId
+            INNER JOIN AR_Companies tgtComp ON ref.TargetCompanyId = tgtComp.CompanyId
+            LEFT JOIN MA_ProjectArticles_Items comp ON comp.Id = ref.SourceProjectItemId AND comp.CompanyId = ref.SourceCompanyId
+            WHERE 1=1
+        `;
+
+        const request = pool.request();
+        request.input('CompanyId', sql.Int, companyId);
+
+        // Filtra per direzione
+        if (direction === 'IN') {
+            query += ` AND ref.TargetCompanyId = @CompanyId`;
+        } else if (direction === 'OUT') {
+            query += ` AND ref.SourceCompanyId = @CompanyId`;
+        } else if (direction === 'BOTH') {
+            query += ` AND (ref.SourceCompanyId = @CompanyId OR ref.TargetCompanyId = @CompanyId)`;
+        }
+
+        // Filtra per stato
+        if (status && status !== 'all') {
+            query += ` AND ref.Status = @Status`;
+            request.input('Status', sql.NVarChar(20), status);
+        }
+
+        query += ` ORDER BY ref.RequestDate DESC`;
+
+        const result = await request.query(query);
+
+        return {
+            success: 1,
+            requests: result.recordset || [],
+            totalRequests: result.recordset.length
+        };
+    } catch (err) {
+        console.error('Error in getIntercompanyRequests:', err);
+        return {
+            success: 0,
+            requests: [],
+            totalRequests: 0,
+            errorMessage: err.message || 'Errore nel recupero delle richieste intercompany'
+        };
+    }
+};
+
+// 5. Approva o rifiuta una reference intercompany
+const approveRejectReference = async (referenceId, action, userId, notes = null) => {
+    try {
+        // Validazione action
+        if (action !== 'APPROVE' && action !== 'REJECT') {
+            throw new Error('Action deve essere APPROVE o REJECT');
+        }
+
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+
+        // Determina il nuovo status
+        const newStatus = action === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+
+        // Parametri
+        request.input('ReferenceId', sql.BigInt, referenceId);
+        request.input('Status', sql.NVarChar(20), newStatus);
+        request.input('ResponseNotes', sql.NVarChar(4000), notes);
+
+        // Query di update
+        const query = `
+            UPDATE MA_ProjectArticles_References
+            SET
+                Status = @Status,
+                ResponseDate = GETDATE(),
+                ResponseNotes = @ResponseNotes
+            WHERE ReferenceId = @ReferenceId
+        `;
+
+        const result = await request.query(query);
+
+        if (result.rowsAffected[0] === 0) {
+            throw new Error('Reference non trovata o già processata');
+        }
+
+        return {
+            success: 1,
+            msg: action === 'APPROVE' ? 'Richiesta approvata con successo' : 'Richiesta rifiutata'
+        };
+    } catch (err) {
+        console.error('Error in approveRejectReference:', err);
+        return {
+            success: 0,
+            msg: err.message || 'Errore durante l\'elaborazione della richiesta'
+        };
+    }
+};
+
+// 6. Allegati collegati a una reference intercompany
+const getReferenceAttachments = async (referenceId, companyId) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+        request.input('ReferenceId', sql.Int, referenceId);
+        request.input('CompanyId', sql.Int, companyId);
+
+        // Recupera la reference e valida che l'utente appartenga a source o target company
+        const refQuery = `
+            SELECT ReferenceID, SourceProjectItemId, SourceCompanyId, TargetCompanyId, 
+                   RequestNotes, ResponseNotes, CreatedAt, UpdatedAt
+            FROM MA_ProjectArticles_References
+            WHERE ReferenceID = @ReferenceId`;
+        const refResult = await request.query(refQuery);
+        const ref = refResult.recordset && refResult.recordset[0];
+        if (!ref) {
+            throw new Error('Reference non trovata');
+        }
+        if (ref.SourceCompanyId !== companyId && ref.TargetCompanyId !== companyId) {
+            throw new Error('Accesso negato alla reference');
+        }
+
+        // Query per recuperare gli allegati seguendo la logica della stored procedure MA_GetItemAttachments
+        const attachmentsQuery = `
+            SELECT 
+                att.AttachmentID,
+                att.ProjectItemId,
+                att.CompanyId AS OwnerCompanyId,
+                att.ItemCode,
+                att.FileName,
+                att.FilePath,
+                att.FileType,
+                att.FileSizeKB,
+                att.UploadedBy,
+                att.UploadedAt,
+                att.Description,
+                att.IsPublic,
+                att.StorageLocation,
+                att.IsVisible,
+                att.IsErpAttachment,
+                att.Tags,
+                u.username AS UploadedByUsername,
+                u.firstName + ' ' + u.lastName AS UploadedByFullName,
+                c.Description AS OwnerCompanyName,
+                CASE 
+                    WHEN att.CompanyId = @CompanyId THEN 'owner' 
+                    ELSE COALESCE(shar.AccessLevel, 'read') 
+                END AS AccessLevel,
+                shar.SharedAt,
+                shar.AccessLevel AS SharedAccessLevel
+            FROM MA_ItemAttachments att
+            LEFT JOIN AR_Users u ON att.UploadedBy = u.userId
+            LEFT JOIN AR_Companies c ON att.CompanyId = c.CompanyId
+            LEFT JOIN MA_ItemAttachmentSharing shar ON att.AttachmentID = shar.AttachmentID AND shar.TargetCompanyId = @CompanyId
+            WHERE att.IsVisible = 1
+            AND (
+                -- Allegati dell'azienda proprietaria
+                (att.CompanyId = @SourceCompanyId AND att.ProjectItemId = @SourceProjectItemId)
+                OR
+                -- Allegati condivisi con l'azienda corrente
+                (att.CompanyId = @SourceCompanyId AND att.ItemCode = @ComponentCode AND shar.AttachmentID IS NOT NULL)
+            )
+            ORDER BY 
+                CASE WHEN att.CompanyId = @CompanyId THEN 0 ELSE 1 END,
+                COALESCE(shar.SharedAt, att.UploadedAt) DESC`;
+
+        // Recupera il codice del componente per la ricerca per ItemCode
+        const componentRequest = pool.request();
+        componentRequest.input('SourceProjectItemId', sql.BigInt, ref.SourceProjectItemId);
+        componentRequest.input('SourceCompanyId', sql.Int, ref.SourceCompanyId);
+        
+        const componentQuery = `
+            SELECT Item FROM MA_ProjectArticles_Items 
+            WHERE Id = @SourceProjectItemId AND CompanyId = @SourceCompanyId`;
+        const componentResult = await componentRequest.query(componentQuery);
+        const componentCode = componentResult.recordset && componentResult.recordset[0]?.Item;
+
+        const attachmentsRequest = pool.request()
+            .input('SourceProjectItemId', sql.BigInt, ref.SourceProjectItemId)
+            .input('SourceCompanyId', sql.Int, ref.SourceCompanyId)
+            .input('CompanyId', sql.Int, companyId)
+            .input('ComponentCode', sql.VarChar(64), componentCode);
+
+        const attachmentsResult = await attachmentsRequest.query(attachmentsQuery);
+        
+        return {
+            success: 1,
+            attachments: attachmentsResult.recordset || [],
+            totalAttachments: attachmentsResult.recordset.length,
+            reference: {
+                ReferenceID: ref.ReferenceID,
+                SourceCompanyId: ref.SourceCompanyId,
+                TargetCompanyId: ref.TargetCompanyId,
+                RequestNotes: ref.RequestNotes,
+                ResponseNotes: ref.ResponseNotes,
+                CreatedAt: ref.CreatedAt,
+                UpdatedAt: ref.UpdatedAt
+            }
+        };
+    } catch (err) {
+        console.error('Error in getReferenceAttachments:', err);
+        return {
+            success: 0,
+            attachments: [],
+            totalAttachments: 0,
+            errorMessage: err.message || 'Errore nel recupero degli allegati della reference'
+        };
+    }
+};
+
+// 7. Aggiorna le note della reference (request/response in base alla company)
+const updateReferenceNotes = async (referenceId, companyId, notes) => {
+    try {
+        console.log('updateReferenceNotes', referenceId, companyId, notes);
+        let pool = await sql.connect(config.dbConfig);
+        const reqFetch = pool.request();
+        reqFetch.input('ReferenceId', sql.Int, referenceId);
+        const refRes = await reqFetch.query(`
+            SELECT ReferenceID, SourceCompanyId, TargetCompanyId
+            FROM MA_ProjectArticles_References
+            WHERE ReferenceID = @ReferenceId`);
+        const ref = refRes.recordset && refRes.recordset[0];
+        if (!ref) {
+            throw new Error('Reference non trovata');
+        }
+
+        const reqUpdate = pool.request();
+        reqUpdate.input('ReferenceId', sql.Int, referenceId);
+        reqUpdate.input('Notes', sql.NVarChar(sql.MAX), notes || null);
+        console.log('ref', ref);
+        let updateSql;
+        if (companyId == ref.SourceCompanyId) {
+            updateSql = `UPDATE MA_ProjectArticles_References SET RequestNotes = @Notes WHERE ReferenceID = @ReferenceId`;
+            console.log('Updating RequestNotes for company', companyId);
+        } else {
+            updateSql = `UPDATE MA_ProjectArticles_References SET ResponseNotes = @Notes WHERE ReferenceID = @ReferenceId`;
+            console.log('Updating ResponseNotes for company', companyId);
+        }
+
+        console.log('Executing SQL:', updateSql);
+        console.log('Parameters:', { ReferenceId: referenceId, Notes: notes });
+        
+        const updateResult = await reqUpdate.query(updateSql);
+        console.log('Update result rowsAffected:', updateResult.rowsAffected[0]);
+        
+        return { success: 1, msg: 'Note aggiornate' };
+    } catch (err) {
+        console.error('Error in updateReferenceNotes:', err);
+        return { success: 0, msg: err.message || 'Errore aggiornamento note' };
+    }
+};
+
 // Esporta tutte le funzioni
 module.exports = {
     addUpdateItem,
@@ -3289,5 +3774,13 @@ module.exports = {
     updateItemDetailsWithValidation,
     searchSimilarArticles,
     getArticleBOMTree,
-    getComponentAttachments
+    getComponentAttachments,
+    // Intercompany functions
+    getIntercompanyComponents,
+    syncIntercompanySharing,
+    getBOMIntercompanySummary,
+    getIntercompanyRequests,
+    approveRejectReference,
+    getReferenceAttachments,
+    updateReferenceNotes
 };

@@ -35,6 +35,8 @@ const config = {
       encrypt: false,
       enableArithAbort: true,
       trustServerCertificate: true,
+      requestTimeout: 60000, // Aumenta timeout a 60 secondi
+      connectionTimeout: 30000, // Timeout connessione 30 secondi
     },
     pool: {
       max: 10,
