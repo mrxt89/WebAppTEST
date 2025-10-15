@@ -61,8 +61,12 @@ function ItemAttachmentVersions({
   const fileInputRef = useRef(null);
 
   // Hook per le azioni sugli allegati
-  const { getAttachmentVersions, addAttachmentVersion, downloadAttachment } =
-    useItemAttachmentsActions();
+  const {
+    getAttachmentVersions,
+    addAttachmentVersion,
+    downloadAttachmentVersion,
+    restoreAttachmentVersion,
+  } = useItemAttachmentsActions();
 
   // Carica le versioni dell'allegato
   useEffect(() => {
@@ -126,7 +130,39 @@ function ItemAttachmentVersions({
 
   // Gestione download versione
   const handleDownloadVersion = (version) => {
-    downloadAttachment(version.AttachmentID, version.FileName);
+    // Usa la funzione specifica per download versioni che usa VersionID
+    if (version.VersionID) {
+      downloadAttachmentVersion(version.VersionID, version.FileName);
+    } else {
+      // Fallback per versione corrente (che non ha VersionID)
+      // In questo caso scarichiamo l'allegato principale
+      window.open(
+        `${process.env.REACT_APP_API_BASE_URL || ""}/api/item-attachments/${version.AttachmentID}/download`,
+        "_blank",
+      );
+    }
+  };
+
+  // Gestione ripristino versione
+  const handleRestoreVersion = async (version) => {
+    if (!version.VersionID || !attachment) return;
+
+    // Conferma con l'utente
+    const confirm = await window.confirm(
+      `Sei sicuro di voler ripristinare la versione ${version.VersionNumber}? La versione corrente sarà salvata nello storico.`,
+    );
+
+    if (!confirm) return;
+
+    try {
+      await restoreAttachmentVersion(attachment.AttachmentID, version.VersionID);
+
+      // Ricarica le versioni
+      const result = await getAttachmentVersions(attachment.AttachmentID);
+      setVersions(result || []);
+    } catch (error) {
+      console.error("Error restoring version:", error);
+    }
   };
 
   // Render del form per nuova versione
@@ -181,12 +217,19 @@ function ItemAttachmentVersions({
           <TextField
             label="Note sulla modifica"
             fullWidth
+            required
             value={changeNotes}
             onChange={(e) => setChangeNotes(e.target.value)}
             disabled={uploading || !selectedFile}
-            placeholder="Descrivi le modifiche in questa versione"
+            placeholder="Descrivi le modifiche in questa versione (obbligatorio)"
             multiline
             rows={2}
+            error={selectedFile && !changeNotes}
+            helperText={
+              selectedFile && !changeNotes
+                ? "Le note sono obbligatorie per nuove versioni"
+                : "Descrivi cosa è cambiato rispetto alla versione precedente"
+            }
           />
         </Grid>
 
@@ -196,7 +239,7 @@ function ItemAttachmentVersions({
             color="primary"
             startIcon={<UploadIcon />}
             onClick={handleUploadVersion}
-            disabled={uploading || !selectedFile}
+            disabled={uploading || !selectedFile || !changeNotes.trim()}
           >
             {uploading ? "Caricamento..." : "Carica versione"}
           </Button>
@@ -333,7 +376,7 @@ function ItemAttachmentVersions({
                     <Tooltip title="Ripristina questa versione">
                       <IconButton
                         edge="end"
-                        // onClick={() => handleRestoreVersion(version)}
+                        onClick={() => handleRestoreVersion(version)}
                         size="small"
                         sx={{ ml: 1 }}
                         color="primary"

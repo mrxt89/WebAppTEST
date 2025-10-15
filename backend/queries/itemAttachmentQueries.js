@@ -497,10 +497,56 @@ const getItemAttachmentsWithHierarchy = async (bomId, companyId, includeShared =
             .input('IncludeShared', sql.Bit, includeShared ? 1 : 0)
             .input('IsErpAttachment', sql.Bit, isErpAttachment)
             .execute('MA_GetItemAttachmentsWithHierarchy');
-        
+
         return result.recordset;
     } catch (err) {
         console.error('Error in getItemAttachmentsWithHierarchy:', err);
+        throw err;
+    }
+};
+
+/**
+ * Ottiene i dettagli di una versione specifica di un allegato
+ * @param {number} versionId - ID della versione
+ * @param {number} userId - ID dell'utente
+ * @param {number} companyId - ID dell'azienda
+ */
+const getItemAttachmentVersionById = async (versionId, userId, companyId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const result = await pool.request()
+            .input('VersionID', sql.Int, versionId)
+            .input('UserId', sql.Int, userId)
+            .input('CompanyId', sql.Int, companyId)
+            .execute('MA_GetItemAttachmentVersionById');
+
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in getItemAttachmentVersionById:', err);
+        throw err;
+    }
+};
+
+/**
+ * Ripristina una versione specifica di un allegato rendendola quella corrente
+ * @param {number} attachmentId - ID dell'allegato
+ * @param {number} versionId - ID della versione da ripristinare
+ * @param {number} userId - ID dell'utente
+ * @param {number} companyId - ID dell'azienda
+ */
+const restoreItemAttachmentVersion = async (attachmentId, versionId, userId, companyId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const result = await pool.request()
+            .input('AttachmentID', sql.Int, attachmentId)
+            .input('VersionID', sql.Int, versionId)
+            .input('UserId', sql.Int, userId)
+            .input('CompanyId', sql.Int, companyId)
+            .execute('MA_RestoreItemAttachmentVersion');
+
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error in restoreItemAttachmentVersion:', err);
         throw err;
     }
 };
@@ -523,5 +569,7 @@ module.exports = {
     getItemAttachmentVersions,
     addItemAttachmentVersion,
     getItemAttachmentByIdWithDetails,
-    getItemAttachmentsWithHierarchy
+    getItemAttachmentsWithHierarchy,
+    getItemAttachmentVersionById,
+    restoreItemAttachmentVersion
 };

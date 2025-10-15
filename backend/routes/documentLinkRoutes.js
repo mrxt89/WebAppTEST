@@ -48,19 +48,37 @@ router.post('/notifications/:notificationId/documents', authenticateToken, async
     const notificationId = parseInt(req.params.notificationId);
     const companyId = req.user.CompanyId;
     
+    // Console log per debug
+    console.log('=== ROUTE LINK DOCUMENT DEBUG ===');
+    console.log('notificationId:', notificationId);
+    console.log('companyId:', companyId);
+    console.log('req.body:', req.body);
+    
     // Verifica il formato della richiesta - supporta entrambi i formati possibili
     let documentType, bom, projectId, taskId, moId, saleOrdId, serialNo,
-        purchaseOrdId, saleDocId, purchaseDocId, itemCode, custSuppType, custSuppCode;
+        purchaseOrdId, saleDocId, purchaseDocId, itemCode, custSuppType, custSuppCode,
+        referenceId, componentCode, sourceCompanyId, targetCompanyId;
     
     if (req.body.documentType && typeof req.body.documentType === 'object' && req.body.documentType.documentType) {
       // Formato 1: il frontend invia tutto dentro documentType: { documentType: 'X', moId: 10, ... }
       ({ documentType, bom, projectId, taskId, moId, saleOrdId, serialNo,
-         purchaseOrdId, saleDocId, purchaseDocId, itemCode, custSuppType, custSuppCode } = req.body.documentType);
+         purchaseOrdId, saleDocId, purchaseDocId, itemCode, custSuppType, custSuppCode,
+         referenceId, componentCode, sourceCompanyId, targetCompanyId } = req.body.documentType);
     } else {
       // Formato 2: i parametri sono al primo livello nella richiesta { documentType: 'X', moId: 10, ... }
       ({ documentType, bom, projectId, taskId, moId, saleOrdId, serialNo,
-         purchaseOrdId, saleDocId, purchaseDocId, itemCode, custSuppType, custSuppCode } = req.body);
+         purchaseOrdId, saleDocId, purchaseDocId, itemCode, custSuppType, custSuppCode,
+         referenceId, componentCode, sourceCompanyId, targetCompanyId } = req.body);
     }
+    
+    console.log('Parametri estratti:', {
+      documentType,
+      referenceId,
+      componentCode,
+      sourceCompanyId,
+      targetCompanyId
+    });
+    console.log('=== FINE ROUTE DEBUG ===');
     
     // Validazione input
     if (!notificationId || !documentType) {
@@ -81,6 +99,7 @@ router.post('/notifications/:notificationId/documents', authenticateToken, async
                       || (custSuppCode && custSuppType) 
                       || taskId
                       || projectId
+                      || referenceId
                           
     if (!hasDocumentId) {
       return res.status(400).json({ 
@@ -93,7 +112,8 @@ router.post('/notifications/:notificationId/documents', authenticateToken, async
       notificationId, companyId, documentType, 
       bom, projectId, taskId, moId, saleOrdId, serialNo,
       purchaseOrdId, saleDocId, purchaseDocId, 
-      itemCode, custSuppType, custSuppCode
+      itemCode, custSuppType, custSuppCode,
+      referenceId, componentCode, sourceCompanyId, targetCompanyId
     });
     
     if (result.success) {

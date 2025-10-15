@@ -73,6 +73,7 @@ export const useOpenChat = (notificationId, options = {}) => {
   const refreshTimeoutRef = useRef(null);
   const newMessageTimeoutRef = useRef(null);
   const lastRefreshTimeRef = useRef(0);
+  const clearedReactionsRef = useRef(false);
   
   // CORREZIONE: Parse dei messaggi direttamente da Redux
   const messages = useMemo(() => {

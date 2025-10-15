@@ -86,6 +86,19 @@ const useDocumentChats = ({
         params.ticketId = documentId;
         break;
       
+      case 'IntercompanyReference':
+        params.referenceId = documentId;
+        if (documentData.componentCode) {
+          params.componentCode = documentData.componentCode;
+        }
+        if (documentData.sourceCompanyId) {
+          params.sourceCompanyId = documentData.sourceCompanyId;
+        }
+        if (documentData.targetCompanyId) {
+          params.targetCompanyId = documentData.targetCompanyId;
+        }
+        break;
+      
       default:
         // Per tipi di documento personalizzati, passa tutti i dati disponibili
         Object.assign(params, documentData);
@@ -154,10 +167,7 @@ const useDocumentChats = ({
       
       const linkParams = buildDocumentLinkParams(notificationId);
       
-      const result = await linkDocument(
-        linkParams.notificationId,
-        linkParams
-      );
+      const result = await linkDocument(linkParams);
 
       if (result) {
         await swal.fire({
@@ -216,10 +226,7 @@ const useDocumentChats = ({
         // Collega automaticamente la chat al documento
         const linkParams = buildDocumentLinkParams(result.notificationId);
         
-        await linkDocument(
-          result.notificationId,
-          linkParams
-        );
+        await linkDocument(linkParams);
 
         await swal.fire({
           title: "Successo",
