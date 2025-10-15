@@ -798,6 +798,14 @@ const MyTasksList = ({
                       className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800"
                       onClick={(e) => {
                         e.stopPropagation();
+                        console.log('[TABLE] Cliccato progetto', {
+                          taskTitle: task.Title,
+                          projectID: task.ProjectID,
+                          projectName: task.ProjectName,
+                          hasOnProjectClick: !!onProjectClick,
+                          onProjectClickType: typeof onProjectClick
+                        });
+                        console.log('[TABLE] Chiamando onProjectClick con ProjectID:', task.ProjectID);
                         onProjectClick(task.ProjectID);
                       }}
                     >

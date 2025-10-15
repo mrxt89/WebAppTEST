@@ -407,6 +407,8 @@ const MyTasksPage = () => {
 
   // Aggiungo la funzione per navigare al progetto
   const handleProjectClick = (projectId) => {
+    console.log('[MyTasksPage] handleProjectClick chiamato con projectId:', projectId);
+    console.log('[MyTasksPage] Navigando a:', `/progetti/dashboard?projectId=${projectId}&autoSelect=true`);
     navigate(`/progetti/dashboard?projectId=${projectId}&autoSelect=true`);
   };
 
@@ -649,6 +651,7 @@ const MyTasksPage = () => {
                         onTaskUpdate={handleTaskUpdate}
                         checkAdminPermission={checkAdminPermission}
                         isOwnTask={isOwnTask}
+                        onProjectClick={handleProjectClick}
                       />
                     )}
   
