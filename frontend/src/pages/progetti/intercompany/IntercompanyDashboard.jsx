@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Inbox, Send, RefreshCw, CheckCircle, XCircle, Building2, Package, Wrench, Filter, Search, Download, Eye, MoreVertical, FileText, Upload, MessageCircle } from 'lucide-react';
+import { Inbox, Send, RefreshCw, CheckCircle, XCircle, Building2, Package, Wrench, Filter, Search } from 'lucide-react';
+import IntercompanyRequestDetailsPanel from './components/IntercompanyRequestDetailsPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -10,9 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import FileViewer from '@/components/ui/fileViewer';
-import ItemAttachmentVersions from '@/components/itemAttachments/ItemAttachmentVersions';
 import useProjectArticlesActions from '@/hooks/useProjectArticlesActions';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -32,15 +30,7 @@ const IntercompanyDashboard = ({ onExit }) => {
   const [respondAction, setRespondAction] = useState(null);
   const [responseNotes, setResponseNotes] = useState('');
   const [responding, setResponding] = useState(false);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailAttachments, setDetailAttachments] = useState([]);
-  const [detailReference, setDetailReference] = useState(null);
-  const [requestNotes, setRequestNotes] = useState('');
-  const [detailResponseNotes, setDetailResponseNotes] = useState('');
-  const [selectedAttachment, setSelectedAttachment] = useState(null);
-  const [fileViewerOpen, setFileViewerOpen] = useState(false);
-  const [versionsModalOpen, setVersionsModalOpen] = useState(false);
+  const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
 
   const loadRequests = useCallback(async (direction, status) => {
     try {
@@ -113,171 +103,14 @@ const IntercompanyDashboard = ({ onExit }) => {
     setRespondModalOpen(true);
   };
 
-  const openDetail = async (request) => {
+  const openDetail = (request) => {
     setSelectedRequest(request);
-    setDetailOpen(true);
-    setDetailLoading(true);
-    try {
-      const attRes = await getReferenceAttachments(request.ReferenceId);
-      setDetailAttachments(attRes.attachments || []);
-      setDetailReference(attRes.reference || null);
-      
-      // Imposta le note in base alla reference
-      if (attRes.reference) {
-        setRequestNotes(attRes.reference.RequestNotes || '');
-        setDetailResponseNotes(attRes.reference.ResponseNotes || '');
-      } else {
-        // Fallback: usa le note dalla richiesta se la reference non è disponibile
-        setRequestNotes(request.Notes || '');
-        setDetailResponseNotes(request.ResponseNotes || '');
-      }
-    } catch (e) {
-      console.error('Error loading details:', e);
-      toast({ variant: 'destructive', title: 'Errore', description: 'Impossibile caricare i dettagli' });
-    } finally {
-      setDetailLoading(false);
-    }
+    setDetailsPanelOpen(true);
   };
 
-  const saveDetailNotes = async (noteType) => {
-    if (!selectedRequest) return;
-    
-    const notes = noteType === 'request' ? requestNotes : detailResponseNotes;
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    
-    try {
-      const res = await updateReferenceNotes(selectedRequest.ReferenceId, user.CompanyId, notes);
-      if (!res.success) throw new Error(res.msg);
-      
-      toast({ 
-        title: 'Note aggiornate', 
-        description: `${noteType === 'request' ? 'Note richiesta' : 'Note risposta'} salvate con successo` 
-      });
-      
-      // Aggiorna la reference locale se disponibile
-      if (detailReference) {
-        setDetailReference(prev => ({
-          ...prev,
-          [noteType === 'request' ? 'RequestNotes' : 'ResponseNotes']: notes
-        }));
-      }
-      
-      // refresh lista corrente per riflettere le note
-      if (activeTab === 'inbox') {
-        loadRequests('IN', statusFilter);
-      } else {
-        loadRequests('OUT', statusFilter);
-      }
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Errore', description: e.message || 'Aggiornamento note fallito' });
-    }
-  };
+  // Le funzioni per gestire dettagli, allegati e note sono ora nel panel
 
-  // Funzioni per gestire gli allegati
-  const handleViewAttachment = (attachment) => {
-    setSelectedAttachment(attachment);
-    setFileViewerOpen(true);
-  };
-
-  const handleDownloadAttachment = async (attachment) => {
-    try {
-      // Usa l'API di download esistente
-      const response = await fetch(`/api/item-attachments/${attachment.AttachmentID}/download`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Download failed');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = attachment.FileName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast({
-        title: 'Successo',
-        description: 'File scaricato con successo',
-      });
-    } catch (error) {
-      console.error('Error downloading attachment:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Errore',
-        description: 'Impossibile scaricare il file',
-      });
-    }
-  };
-
-  // Verifica se l'utente può modificare un allegato
-  const canEditAttachment = (attachment) => {
-    // L'utente può modificare solo gli allegati della propria azienda
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    return attachment.OwnerCompanyId === user.CompanyId || attachment.AccessLevel === 'owner';
-  };
-
-  // Verifica se l'utente può modificare le note di richiesta o risposta
-  const canEditNotes = (noteType) => {
-    if (!selectedRequest) return false;
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    
-    if (noteType == 'request') {
-      // Solo l'azienda che ha fatto la richiesta può modificare le RequestNotes
-      return parseInt(user.CompanyId) === parseInt(selectedRequest.SourceCompanyId);
-    } else {
-      // Solo l'azienda destinataria può modificare le ResponseNotes
-      return parseInt(user.CompanyId) === parseInt(selectedRequest.TargetCompanyId);
-    }
-  };
-
-  // Ottieni il nome dell'azienda
-  const getCompanyName = (companyId) => {
-    if (!selectedRequest) return '';
-    if (companyId === selectedRequest.SourceCompanyId) {
-      return selectedRequest.SourceCompanyName;
-    } else if (companyId === selectedRequest.TargetCompanyId) {
-      return selectedRequest.TargetCompanyName;
-    }
-    return '';
-  };
-
-  // Formatta la dimensione del file
-  const formatFileSize = (sizeKB) => {
-    if (!sizeKB) return '0 KB';
-    const size = sizeKB * 1024;
-    const units = ['B', 'KB', 'MB', 'GB'];
-    let unitIndex = 0;
-    let fileSize = size;
-    
-    while (fileSize >= 1024 && unitIndex < units.length - 1) {
-      fileSize /= 1024;
-      unitIndex++;
-    }
-    
-    return `${fileSize.toFixed(1)} ${units[unitIndex]}`;
-  };
-
-  // Gestione versioni allegato
-  const handleAttachmentVersions = (attachment) => {
-    setSelectedAttachment(attachment);
-    setVersionsModalOpen(true);
-  };
-
-  // Apri chat dell'articolo
-  const handleOpenChat = () => {
-    if (!selectedRequest) return;
-    
-    // Apri la chat dell'articolo in una nuova finestra o tab
-    const chatUrl = `/progetti/articoli/chat/${selectedRequest.ComponentCode}`;
-    window.open(chatUrl, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
-  };
+  // Le funzioni per gestire allegati, note e chat sono ora nel panel
 
   const getTypeBadge = (type) => {
     if (type === 'ACQUISTO') {
@@ -531,181 +364,24 @@ const IntercompanyDashboard = ({ onExit }) => {
         </Tabs>
       </Card>
 
-      {/* Dialog Dettagli Reference */}
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle>Dettagli richiesta</DialogTitle>
-              {selectedRequest && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleOpenChat}
-                  className="h-8"
-                >
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Chat Articolo
-                </Button>
-              )}
-            </div>
-          </DialogHeader>
-
-          {detailLoading ? (
-            <div className="flex items-center gap-2 text-gray-500">
-              <RefreshCw className="w-4 h-4 animate-spin" /> Caricamento...
-            </div>
-          ) : selectedRequest ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm text-gray-600">Componente</div>
-                  <div className="font-medium">{selectedRequest.ComponentCode}</div>
-                  <div className="text-xs text-gray-500">{selectedRequest.ComponentDescription}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-600">Stato</div>
-                  <div>{getStatusBadge(selectedRequest.Status)}</div>
-                </div>
-              </div>
-
-              <div>
-                <div className="text-sm font-medium mb-2">Allegati condivisi</div>
-                {detailAttachments.length === 0 ? (
-                  <div className="text-sm text-gray-500">Nessun allegato</div>
-                ) : (
-                  <div className="space-y-2">
-                    {detailAttachments.map((attachment) => (
-                      <div key={attachment.AttachmentID} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <FileText className="w-5 h-5 text-gray-500 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm truncate">{attachment.FileName}</div>
-                            <div className="text-xs text-gray-500">
-                              {formatFileSize(attachment.FileSizeKB)} • 
-                              {attachment.UploadedAt ? format(new Date(attachment.UploadedAt), 'dd/MM/yyyy HH:mm', { locale: it }) : '-'} • 
-                              Da {attachment.UploadedByFullName || attachment.UploadedByUsername}
-                              {attachment.OwnerCompanyName && ` (${attachment.OwnerCompanyName})`}
-                            </div>
-                            {attachment.Description && (
-                              <div className="text-xs text-gray-600 mt-1">{attachment.Description}</div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewAttachment(attachment)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDownloadAttachment(attachment)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Download className="w-4 h-4" />
-                          </Button>
-                          {canEditAttachment(attachment) && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                                  <MoreVertical className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleViewAttachment(attachment)}>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  Visualizza
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDownloadAttachment(attachment)}>
-                                  <Download className="w-4 h-4 mr-2" />
-                                  Scarica
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleAttachmentVersions(attachment)}>
-                                  <Upload className="w-4 h-4 mr-2" />
-                                  Gestisci versioni
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Sezione Note Richiesta */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm font-medium">
-                    Note Richiesta
-                    <span className="text-xs text-gray-500 ml-2">
-                      ({getCompanyName(selectedRequest?.SourceCompanyId)})
-                    </span>
-                  </div>
-                  {canEditNotes('request') && (
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => saveDetailNotes('request')}
-                      className="h-7 text-xs"
-                    >
-                      Salva
-                    </Button>
-                  )}
-                </div>
-                <Textarea 
-                  value={requestNotes} 
-                  onChange={(e) => setRequestNotes(e.target.value)} 
-                  rows={3}
-                  placeholder={canEditNotes('request') ? "Aggiungi note per la richiesta..." : "Nessuna nota di richiesta"}
-                  disabled={!canEditNotes('request')}
-                  className={!canEditNotes('request') ? 'bg-gray-50' : ''}
-                />
-              </div>
-
-              {/* Sezione Note Risposta */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm font-medium">
-                    Note Risposta
-                    <span className="text-xs text-gray-500 ml-2">
-                      ({getCompanyName(selectedRequest?.TargetCompanyId)})
-                    </span>
-                  </div>
-                  {canEditNotes('response') && (
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => saveDetailNotes('response')}
-                      className="h-7 text-xs"
-                    >
-                      Salva
-                    </Button>
-                  )}
-                </div>
-                <Textarea 
-                  value={detailResponseNotes} 
-                  onChange={(e) => setDetailResponseNotes(e.target.value)} 
-                  rows={3}
-                  placeholder={canEditNotes('response') ? "Aggiungi note per la risposta..." : "Nessuna nota di risposta"}
-                  disabled={!canEditNotes('response')}
-                  className={!canEditNotes('response') ? 'bg-gray-50' : ''}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setDetailOpen(false)}>Chiudi</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Sidebar Dettagli Richiesta */}
+      <IntercompanyRequestDetailsPanel
+        selectedRequest={selectedRequest}
+        isOpen={detailsPanelOpen}
+        onClose={() => setDetailsPanelOpen(false)}
+        onRefresh={() => {
+          if (activeTab === 'inbox') {
+            loadRequests('IN', statusFilter);
+          } else {
+            loadRequests('OUT', statusFilter);
+          }
+        }}
+        position="right"
+        defaultWidth={800}
+        minWidth={500}
+        maxWidth={1200}
+        topOffset={80}
+      />
       {/* Modal Respond */}
       <Dialog open={respondModalOpen} onOpenChange={setRespondModalOpen}>
         <DialogContent>
@@ -788,37 +464,6 @@ const IntercompanyDashboard = ({ onExit }) => {
         </DialogContent>
       </Dialog>
 
-      {/* FileViewer per visualizzare gli allegati */}
-      {fileViewerOpen && selectedAttachment && (
-        <FileViewer
-          file={{
-            AttachmentID: selectedAttachment.AttachmentID,
-            FileName: selectedAttachment.FileName,
-            FileType: selectedAttachment.FileType,
-            FilePath: selectedAttachment.FilePath,
-            ItemCode: selectedAttachment.ItemCode,
-            ProjectItemId: selectedAttachment.ProjectItemId,
-          }}
-          isOpen={fileViewerOpen}
-          onClose={() => {
-            setFileViewerOpen(false);
-            setSelectedAttachment(null);
-          }}
-        />
-      )}
-
-      {/* Modal per gestione versioni allegati */}
-      {versionsModalOpen && selectedAttachment && (
-        <ItemAttachmentVersions
-          open={versionsModalOpen}
-          attachment={selectedAttachment}
-          onClose={() => {
-            setVersionsModalOpen(false);
-            setSelectedAttachment(null);
-          }}
-          readOnly={!canEditAttachment(selectedAttachment)}
-        />
-      )}
     </div>
   );
 };

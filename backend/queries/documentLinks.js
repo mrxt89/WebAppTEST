@@ -25,8 +25,22 @@ async function linkDocumentToNotification(params) {
       notificationId, companyId, documentType, 
       bom, projectId, taskId, moId, saleOrdId, serialNo,
       purchaseOrdId, saleDocId, purchaseDocId, 
-      itemCode, custSuppType, custSuppCode
+      itemCode, custSuppType, custSuppCode,
+      referenceId, componentCode, sourceCompanyId, targetCompanyId
     } = params;
+    
+    // Console log per debug
+    console.log('=== LINK DOCUMENT TO NOTIFICATION DEBUG ===');
+    console.log('Params ricevuti:', {
+      notificationId,
+      companyId,
+      documentType,
+      referenceId,
+      componentCode,
+      sourceCompanyId,
+      targetCompanyId
+    });
+    console.log('Tutti i params:', params);
     
     const pool = await sql.connect(config.database);
     const result = await pool.request()
@@ -45,7 +59,14 @@ async function linkDocumentToNotification(params) {
       .input('ItemCode', sql.VarChar(21), itemCode || null)
       .input('CustSuppType', sql.Int, custSuppType || 0)
       .input('CustSuppCode', sql.VarChar(12), custSuppCode || null)
+      .input('ReferenceId', sql.Int, referenceId || 0)
+      .input('ComponentCode', sql.VarChar(50), componentCode || null)
+      .input('SourceCompanyId', sql.Int, sourceCompanyId || 0)
+      .input('TargetCompanyId', sql.Int, targetCompanyId || 0)
       .execute('LinkDocumentToNotification');
+    
+    console.log('Risultato stored procedure:', result.recordset);
+    console.log('=== FINE DEBUG ===');
     
     return { 
       success: true, 
@@ -53,7 +74,10 @@ async function linkDocumentToNotification(params) {
       linkId: result.recordset[0].LinkId 
     };
   } catch (error) {
+    console.error('=== ERRORE LINK DOCUMENT TO NOTIFICATION ===');
     console.error('Errore nel collegamento del documento:', error);
+    console.error('Params che hanno causato l\'errore:', params);
+    console.error('=== FINE ERRORE ===');
     return { success: false, error: error.message };
   }
 }

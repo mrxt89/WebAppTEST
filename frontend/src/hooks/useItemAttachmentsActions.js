@@ -729,6 +729,89 @@ const useItemAttachmentsActions = () => {
   );
 
   /**
+   * Download di una versione specifica di un allegato
+   * @param {number} versionId - ID della versione
+   * @param {string} fileName - Nome del file
+   * @returns {Promise<boolean>} - true se il download è riuscito
+   */
+  const downloadAttachmentVersion = useCallback(
+    async (versionId, fileName) => {
+      try {
+        setLoading(true);
+        const response = await makeRequest(
+          `${config.API_BASE_URL}/item-attachments/versions/${versionId}/download`,
+          {
+            responseType: "blob",
+          },
+        );
+
+        // Crea un URL per il blob e scatena il download
+        const url = window.URL.createObjectURL(new Blob([response]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", fileName || "version");
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        return true;
+      } catch (err) {
+        setError(err.message);
+        console.error("Error downloading attachment version:", err);
+        showError("Errore nel download della versione");
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [makeRequest],
+  );
+
+  /**
+   * Ripristina una versione specifica di un allegato
+   * @param {number} attachmentId - ID dell'allegato
+   * @param {number} versionId - ID della versione da ripristinare
+   * @returns {Promise<Object>} - Dati del ripristino
+   */
+  const restoreAttachmentVersion = useCallback(
+    async (attachmentId, versionId) => {
+      try {
+        setLoading(true);
+
+        // Ottieni prima i dettagli dell'allegato per verificare la proprietà
+        const attachment = await getItemAttachmentById(attachmentId);
+
+        // Se l'utente non appartiene alla stessa azienda proprietaria, mostra un errore
+        if (attachment && !canModifyAttachment(attachment)) {
+          showError(
+            "Non hai i permessi per ripristinare versioni di questo allegato",
+          );
+          return null;
+        }
+
+        const data = await makeRequest(
+          `${config.API_BASE_URL}/item-attachments/${attachmentId}/versions/${versionId}/restore`,
+          {
+            method: "POST",
+            body: JSON.stringify({}),
+          },
+        );
+
+        showSuccess("Versione ripristinata con successo");
+        return data?.data;
+      } catch (err) {
+        setError(err.message);
+        console.error("Error restoring attachment version:", err);
+        showError("Errore nel ripristino della versione");
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [makeRequest, canModifyAttachment, getItemAttachmentById],
+  );
+
+  /**
    * Aggiorna i metadati di un allegato
    * @param {number} attachmentId - ID dell'allegato
    * @param {Object} metadata - Metadati da aggiornare
@@ -970,6 +1053,8 @@ const useItemAttachmentsActions = () => {
     // Operazioni su versioni
     getAttachmentVersions,
     addAttachmentVersion,
+    downloadAttachmentVersion,
+    restoreAttachmentVersion,
     // Operazioni su condivisioni
     shareAttachment,
     unshareAttachment,

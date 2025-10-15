@@ -28,7 +28,9 @@ const {
     getItemAttachmentVersions,
     addItemAttachmentVersion,
     getItemAttachmentByIdWithDetails,
-    getItemAttachmentsWithHierarchy
+    getItemAttachmentsWithHierarchy,
+    getItemAttachmentVersionById,
+    restoreItemAttachmentVersion
 } = require('../queries/itemAttachmentQueries');
 
 const fileService = new FileService();
@@ -539,17 +541,17 @@ router.post('/item-attachments/:attachmentId/versions', authenticateToken, uploa
         const userId = req.user.UserId;
         const companyId = req.user.CompanyId;
         const { changeNotes } = req.body;
-        
+
         if (!req.file) {
             return res.status(400).json({ success: 0, message: 'Nessun file caricato' });
         }
-        
+
         // Ottieni l'allegato originale
         const originalAttachment = await getItemAttachmentById(attachmentId);
         if (!originalAttachment) {
             return res.status(404).json({ success: 0, message: 'Allegato non trovato' });
         }
-        
+
         // Percorso per la nuova versione
         const fileInfo = await fileService.saveFile(
             req.file,
@@ -559,7 +561,7 @@ router.post('/item-attachments/:attachmentId/versions', authenticateToken, uploa
             originalAttachment.ItemCode, // itemCode
             companyId // companyId
         );
-        
+
         // Aggiungi la nuova versione
         const result = await addItemAttachmentVersion(
             attachmentId,
@@ -570,11 +572,60 @@ router.post('/item-attachments/:attachmentId/versions', authenticateToken, uploa
             changeNotes,
             companyId
         );
-        
+
         res.json({ success: 1, data: result });
     } catch (error) {
         console.error('Error adding attachment version:', error);
         res.status(500).json({ success: 0, message: 'Errore nell\'aggiunta della versione' });
+    }
+});
+
+// Download di una versione specifica di un allegato
+router.get('/item-attachments/versions/:versionId/download', authenticateToken, async (req, res) => {
+    try {
+        const versionId = parseInt(req.params.versionId);
+        const userId = req.user.UserId;
+        const companyId = req.user.CompanyId;
+
+        console.log('Download requested for version:', versionId);
+
+        // Ottieni i dettagli della versione
+        const version = await getItemAttachmentVersionById(versionId, userId, companyId);
+
+        if (!version) {
+            return res.status(404).json({ success: 0, message: 'Versione non trovata o non accessibile' });
+        }
+
+        console.log('Version found:', version);
+
+        // Crea lo stream del file dalla versione storica
+        const fileStream = await fileService.getFileStream(version.FilePath);
+        res.setHeader('Content-Type', version.FileType || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${version.FileName}"`);
+        fileStream.pipe(res);
+    } catch (error) {
+        console.error('Error downloading version:', error);
+        res.status(500).json({ success: 0, message: 'Errore nel download della versione' });
+    }
+});
+
+// Ripristina una versione specifica di un allegato
+router.post('/item-attachments/:attachmentId/versions/:versionId/restore', authenticateToken, async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        const versionId = parseInt(req.params.versionId);
+        const userId = req.user.UserId;
+        const companyId = req.user.CompanyId;
+
+        console.log('Restore version requested:', { attachmentId, versionId, userId, companyId });
+
+        // Ripristina la versione
+        const result = await restoreItemAttachmentVersion(attachmentId, versionId, userId, companyId);
+
+        res.json({ success: 1, data: result, message: 'Versione ripristinata con successo' });
+    } catch (error) {
+        console.error('Error restoring version:', error);
+        res.status(500).json({ success: 0, message: 'Errore nel ripristino della versione', error: error.toString() });
     }
 });
 

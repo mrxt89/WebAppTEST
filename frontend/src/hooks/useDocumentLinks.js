@@ -135,6 +135,17 @@ const useDocumentLinks = () => {
         params.custSuppType = 3211264; // Fornitore
         break;
 
+      case 'IntercompanyReference':
+        if (typeof documentData === 'object') {
+          params.referenceId = documentData.referenceId || documentData.ReferenceId;
+          params.componentCode = documentData.componentCode || documentData.ComponentCode;
+          params.sourceCompanyId = documentData.sourceCompanyId || documentData.SourceCompanyId;
+          params.targetCompanyId = documentData.targetCompanyId || documentData.TargetCompanyId;
+        } else {
+          params.referenceId = documentData;
+        }
+        break;
+
       default:
         // Per tipi personalizzati, passa tutti i dati
         if (typeof documentData === 'object') {

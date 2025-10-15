@@ -86,7 +86,7 @@ export const searchDocuments = createAsyncThunk(
 export const linkDocument = createAsyncThunk(
   "documentLinks/linkDocument",
   async (
-    { notificationId, documentId, documentType},
+    { notificationId, documentId, documentType, ...additionalParams},
     { rejectWithValue, dispatch },
   ) => {
     try {
@@ -99,23 +99,33 @@ export const linkDocument = createAsyncThunk(
         return rejectWithValue("No authentication token available");
       }
 
+      // Costruisci l'oggetto di richiesta con tutti i parametri
+      const requestData = {
+        documentType,
+        projectId: documentType === "Project" ? documentId : undefined,
+        taskId: documentType === "Task" ? documentId : undefined,
+        moId: documentType === "MO" ? documentId : undefined,
+        saleOrdId: documentType === "SaleOrd" ? documentId : undefined,
+        purchaseOrdId: documentType === "PurchaseOrd" ? documentId : undefined,
+        saleDocId: documentType === "SaleDoc" ? documentId : undefined,
+        purchaseDocId: documentType === "PurchaseDoc" ? documentId : undefined,
+        itemCode: documentType === "Item" ? documentId : undefined,
+        custSuppCode: documentType === "CustSupp" ? documentId : undefined,
+        custSuppType: documentType === "CustSupp" ? 3211264 : undefined,
+        bom: documentType === "BillOfMaterials" ? documentId : undefined,
+        ticketId: documentType === "Ticket" ? documentId : undefined,
+        // Supporto per IntercompanyReference
+        referenceId: documentType === "IntercompanyReference" ? documentId : undefined,
+      };
+
+      // Aggiungi parametri aggiuntivi se forniti (per IntercompanyReference)
+      if (additionalParams) {
+        Object.assign(requestData, additionalParams);
+      }
+
       const response = await axios.post(
         `${config.API_BASE_URL}/notifications/${notificationId}/documents`,
-        {
-          documentType,
-          projectId: documentType === "Project" ? documentId : undefined,
-          taskId: documentType === "Task" ? documentId : undefined,
-          moId: documentType === "MO" ? documentId : undefined,
-          saleOrdId: documentType === "SaleOrd" ? documentId : undefined,
-          purchaseOrdId: documentType === "PurchaseOrd" ? documentId : undefined,
-          saleDocId: documentType === "SaleDoc" ? documentId : undefined,
-          purchaseDocId: documentType === "PurchaseDoc" ? documentId : undefined,
-          itemCode: documentType === "Item" ? documentId : undefined,
-          custSuppCode: documentType === "CustSupp" ? documentId : undefined,
-          custSuppType: documentType === "CustSupp" ? 3211264 : undefined,
-          bom: documentType === "BillOfMaterials" ? documentId : undefined,
-          ticketId: documentType === "Ticket" ? documentId : undefined,
-        },
+        requestData,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
