@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Inbox, Send, RefreshCw, CheckCircle, XCircle, Building2, Package, Wrench, Filter, Search, Download, Eye, MoreVertical, FileText, Upload } from 'lucide-react';
+import { Inbox, Send, RefreshCw, CheckCircle, XCircle, Building2, Package, Wrench, Filter, Search, Download, Eye, MoreVertical, FileText, Upload, MessageCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -35,7 +35,9 @@ const IntercompanyDashboard = ({ onExit }) => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailAttachments, setDetailAttachments] = useState([]);
-  const [detailNotes, setDetailNotes] = useState('');
+  const [detailReference, setDetailReference] = useState(null);
+  const [requestNotes, setRequestNotes] = useState('');
+  const [detailResponseNotes, setDetailResponseNotes] = useState('');
   const [selectedAttachment, setSelectedAttachment] = useState(null);
   const [fileViewerOpen, setFileViewerOpen] = useState(false);
   const [versionsModalOpen, setVersionsModalOpen] = useState(false);
@@ -118,7 +120,17 @@ const IntercompanyDashboard = ({ onExit }) => {
     try {
       const attRes = await getReferenceAttachments(request.ReferenceId);
       setDetailAttachments(attRes.attachments || []);
-      setDetailNotes(request.Notes || '');
+      setDetailReference(attRes.reference || null);
+      
+      // Imposta le note in base alla reference
+      if (attRes.reference) {
+        setRequestNotes(attRes.reference.RequestNotes || '');
+        setDetailResponseNotes(attRes.reference.ResponseNotes || '');
+      } else {
+        // Fallback: usa le note dalla richiesta se la reference non è disponibile
+        setRequestNotes(request.Notes || '');
+        setDetailResponseNotes(request.ResponseNotes || '');
+      }
     } catch (e) {
       console.error('Error loading details:', e);
       toast({ variant: 'destructive', title: 'Errore', description: 'Impossibile caricare i dettagli' });
@@ -127,12 +139,29 @@ const IntercompanyDashboard = ({ onExit }) => {
     }
   };
 
-  const saveDetailNotes = async () => {
+  const saveDetailNotes = async (noteType) => {
     if (!selectedRequest) return;
+    
+    const notes = noteType === 'request' ? requestNotes : detailResponseNotes;
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    
     try {
-      const res = await updateReferenceNotes(selectedRequest.ReferenceId, detailNotes);
+      const res = await updateReferenceNotes(selectedRequest.ReferenceId, user.CompanyId, notes);
       if (!res.success) throw new Error(res.msg);
-      toast({ title: 'Note aggiornate' });
+      
+      toast({ 
+        title: 'Note aggiornate', 
+        description: `${noteType === 'request' ? 'Note richiesta' : 'Note risposta'} salvate con successo` 
+      });
+      
+      // Aggiorna la reference locale se disponibile
+      if (detailReference) {
+        setDetailReference(prev => ({
+          ...prev,
+          [noteType === 'request' ? 'RequestNotes' : 'ResponseNotes']: notes
+        }));
+      }
+      
       // refresh lista corrente per riflettere le note
       if (activeTab === 'inbox') {
         loadRequests('IN', statusFilter);
@@ -194,6 +223,31 @@ const IntercompanyDashboard = ({ onExit }) => {
     return attachment.OwnerCompanyId === user.CompanyId || attachment.AccessLevel === 'owner';
   };
 
+  // Verifica se l'utente può modificare le note di richiesta o risposta
+  const canEditNotes = (noteType) => {
+    if (!selectedRequest) return false;
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    if (noteType == 'request') {
+      // Solo l'azienda che ha fatto la richiesta può modificare le RequestNotes
+      return parseInt(user.CompanyId) === parseInt(selectedRequest.SourceCompanyId);
+    } else {
+      // Solo l'azienda destinataria può modificare le ResponseNotes
+      return parseInt(user.CompanyId) === parseInt(selectedRequest.TargetCompanyId);
+    }
+  };
+
+  // Ottieni il nome dell'azienda
+  const getCompanyName = (companyId) => {
+    if (!selectedRequest) return '';
+    if (companyId === selectedRequest.SourceCompanyId) {
+      return selectedRequest.SourceCompanyName;
+    } else if (companyId === selectedRequest.TargetCompanyId) {
+      return selectedRequest.TargetCompanyName;
+    }
+    return '';
+  };
+
   // Formatta la dimensione del file
   const formatFileSize = (sizeKB) => {
     if (!sizeKB) return '0 KB';
@@ -214,6 +268,15 @@ const IntercompanyDashboard = ({ onExit }) => {
   const handleAttachmentVersions = (attachment) => {
     setSelectedAttachment(attachment);
     setVersionsModalOpen(true);
+  };
+
+  // Apri chat dell'articolo
+  const handleOpenChat = () => {
+    if (!selectedRequest) return;
+    
+    // Apri la chat dell'articolo in una nuova finestra o tab
+    const chatUrl = `/progetti/articoli/chat/${selectedRequest.ComponentCode}`;
+    window.open(chatUrl, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
   };
 
   const getTypeBadge = (type) => {
@@ -347,7 +410,7 @@ const IntercompanyDashboard = ({ onExit }) => {
                       </Button>
                     </>
                   )}
-                  <Button size="sm" variant="secondary" onClick={() => openDetail(request)} className="h-7">
+                  <Button size="sm" variant=""  onClick={() => openDetail(request)} className="bg-primary h-7">
                     Dettagli
                   </Button>
                 </div>
@@ -472,7 +535,20 @@ const IntercompanyDashboard = ({ onExit }) => {
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Dettagli richiesta</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Dettagli richiesta</DialogTitle>
+              {selectedRequest && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleOpenChat}
+                  className="h-8"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Chat Articolo
+                </Button>
+              )}
+            </div>
           </DialogHeader>
 
           {detailLoading ? (
@@ -563,16 +639,70 @@ const IntercompanyDashboard = ({ onExit }) => {
                 )}
               </div>
 
+              {/* Sezione Note Richiesta */}
               <div>
-                <div className="text-sm font-medium mb-2">Note</div>
-                <Textarea value={detailNotes} onChange={(e) => setDetailNotes(e.target.value)} rows={4} />
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-medium">
+                    Note Richiesta
+                    <span className="text-xs text-gray-500 ml-2">
+                      ({getCompanyName(selectedRequest?.SourceCompanyId)})
+                    </span>
+                  </div>
+                  {canEditNotes('request') && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => saveDetailNotes('request')}
+                      className="h-7 text-xs"
+                    >
+                      Salva
+                    </Button>
+                  )}
+                </div>
+                <Textarea 
+                  value={requestNotes} 
+                  onChange={(e) => setRequestNotes(e.target.value)} 
+                  rows={3}
+                  placeholder={canEditNotes('request') ? "Aggiungi note per la richiesta..." : "Nessuna nota di richiesta"}
+                  disabled={!canEditNotes('request')}
+                  className={!canEditNotes('request') ? 'bg-gray-50' : ''}
+                />
+              </div>
+
+              {/* Sezione Note Risposta */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-medium">
+                    Note Risposta
+                    <span className="text-xs text-gray-500 ml-2">
+                      ({getCompanyName(selectedRequest?.TargetCompanyId)})
+                    </span>
+                  </div>
+                  {canEditNotes('response') && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => saveDetailNotes('response')}
+                      className="h-7 text-xs"
+                    >
+                      Salva
+                    </Button>
+                  )}
+                </div>
+                <Textarea 
+                  value={detailResponseNotes} 
+                  onChange={(e) => setDetailResponseNotes(e.target.value)} 
+                  rows={3}
+                  placeholder={canEditNotes('response') ? "Aggiungi note per la risposta..." : "Nessuna nota di risposta"}
+                  disabled={!canEditNotes('response')}
+                  className={!canEditNotes('response') ? 'bg-gray-50' : ''}
+                />
               </div>
             </div>
           ) : null}
 
           <DialogFooter>
             <Button variant="secondary" onClick={() => setDetailOpen(false)}>Chiudi</Button>
-            <Button onClick={saveDetailNotes}>Salva Note</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

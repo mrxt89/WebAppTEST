@@ -1639,12 +1639,12 @@ const searchSimilarArticles = useCallback(
 
   // 7. Aggiorna note della reference intercompany
   const updateReferenceNotes = useCallback(
-    async (referenceId, notes) => {
+    async (referenceId, companyId, notes) => {
       const data = await makeRequest(
         `${config.API_BASE_URL}/projectArticles/intercompany/references/${referenceId}/notes`,
         {
           method: 'POST',
-          body: JSON.stringify({ notes })
+          body: JSON.stringify({ notes, companyId })
         }
       );
       return data;
