@@ -19,6 +19,7 @@ import CategoriesPage from "../../pages/progetti/categorie/ProjectCategories";
 import TemplatesPage from "../../pages/progetti/templates/projectTemplates";
 import ProjectCustomers from "../../pages/progetti/clienti/ProjectCustomers";
 import ArticlePage from "../../pages/progetti/progetti/articoli/ArticlePage";
+import IntercompanyDashboard from "../../pages/progetti/intercompany/IntercompanyDashboard";
 import ChangePassword from "../../pages/user/ChangePassword";
 import UserProfile from "../../pages/user/UserProfile";
 import MainMenu from "../MainMenu";
@@ -287,6 +288,14 @@ const MainContainer = ({
                       <Suspense fallback={<PageLoader />}>
                         <BOMCosting onExit={navigateToPreviousLevel} />
                       </Suspense>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/progetti/intercompany"
+                  element={
+                    <ProtectedRoute>
+                      <IntercompanyDashboard onExit={navigateToPreviousLevel} />
                     </ProtectedRoute>
                   }
                 />

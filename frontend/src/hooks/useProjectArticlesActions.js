@@ -1526,24 +1526,24 @@ const searchSimilarArticles = useCallback(
         rootCode: rootCode || '',
         description: description || '',
       });
-      
+
       // Aggiungi parametri opzionali
       if (excludeId) params.append('excludeId', excludeId);
       if (options.limit) params.append('limit', options.limit);
       if (options.erpOnly) params.append('erpOnly', options.erpOnly);
       if (options.tempOnly) params.append('tempOnly', options.tempOnly);
       if (options.searchTerm) params.append('searchTerm', options.searchTerm);
-      
+
       const response = await makeRequest(
         `${config.API_BASE_URL}/projectArticles/searchSimilar?${params}`,
         { method: "GET" }
       );
-      
+
       // Se la risposta è un array, ritornalo direttamente
       if (Array.isArray(response)) {
         return response;
       }
-      
+
       // Altrimenti ritorna array vuoto
       return [];
     } catch (error) {
@@ -1553,7 +1553,104 @@ const searchSimilarArticles = useCallback(
     }
   },
   [makeRequest]
-);  
+);
+
+  // =====================================================
+  // INTERCOMPANY FUNCTIONS
+  // =====================================================
+
+  // 1. Ottieni componenti intercompany di una BOM
+  const getIntercompanyComponents = useCallback(
+    async (bomId, includeAttachments = false) => {
+      const url = `${config.API_BASE_URL}/projectArticles/boms/${bomId}/intercompany-components?includeAttachments=${includeAttachments}`;
+      const data = await makeRequest(url);
+      return data || { components: [], attachments: [], totalComponents: 0 };
+    },
+    [makeRequest]
+  );
+
+  // 2. Sincronizza condivisioni intercompany
+  const syncIntercompanySharing = useCallback(
+    async (bomId, syncAttachments = true, autoCreateReferences = true) => {
+      const data = await makeRequest(
+        `${config.API_BASE_URL}/projectArticles/boms/${bomId}/sync-intercompany`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ syncAttachments, autoCreateReferences })
+        }
+      );
+      return data;
+    },
+    [makeRequest]
+  );
+
+  // 3. Ottieni riepilogo intercompany per sidebar
+  const getBOMIntercompanySummary = useCallback(
+    async (bomId) => {
+      const url = `${config.API_BASE_URL}/projectArticles/boms/${bomId}/intercompany-summary`;
+      const data = await makeRequest(url);
+      return data || {
+        summaryByCompany: [],
+        components: [],
+        totalIntercompanyComponents: 0,
+        totalTargetCompanies: 0
+      };
+    },
+    [makeRequest]
+  );
+
+  // 4. Ottieni richieste intercompany (inbox/outbox)
+  const getIntercompanyRequests = useCallback(
+    async (direction = 'IN', status = null) => {
+      const params = new URLSearchParams();
+      if (direction) params.append('direction', direction);
+      if (status) params.append('status', status);
+      const url = `${config.API_BASE_URL}/projectArticles/intercompany/requests?${params}`;
+      const data = await makeRequest(url);
+      return data || { requests: [], totalRequests: 0 };
+    },
+    [makeRequest]
+  );
+
+  // 5. Rispondi a richiesta intercompany (approva/rifiuta)
+  const respondToIntercompanyRequest = useCallback(
+    async (referenceId, action, notes = null) => {
+      const data = await makeRequest(
+        `${config.API_BASE_URL}/projectArticles/intercompany/references/${referenceId}/respond`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ action, notes })
+        }
+      );
+      return data;
+    },
+    [makeRequest]
+  );
+
+  // 6. Allegati della reference intercompany
+  const getReferenceAttachments = useCallback(
+    async (referenceId) => {
+      const url = `${config.API_BASE_URL}/projectArticles/intercompany/references/${referenceId}/attachments`;
+      const data = await makeRequest(url);
+      return data || { attachments: [] };
+    },
+    [makeRequest]
+  );
+
+  // 7. Aggiorna note della reference intercompany
+  const updateReferenceNotes = useCallback(
+    async (referenceId, notes) => {
+      const data = await makeRequest(
+        `${config.API_BASE_URL}/projectArticles/intercompany/references/${referenceId}/notes`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ notes })
+        }
+      );
+      return data;
+    },
+    [makeRequest]
+  );
 
   return {
     // Stati
@@ -1632,6 +1729,15 @@ const searchSimilarArticles = useCallback(
 
     getERPItemsPaginated,
     searchSimilarArticles,
+
+    // Intercompany functions
+    getIntercompanyComponents,
+    syncIntercompanySharing,
+    getBOMIntercompanySummary,
+    getIntercompanyRequests,
+    respondToIntercompanyRequest,
+    getReferenceAttachments,
+    updateReferenceNotes,
   };
 };
 

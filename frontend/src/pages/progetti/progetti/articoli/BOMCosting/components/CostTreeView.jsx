@@ -78,8 +78,10 @@ const NodeIcon = ({ node, isRootNode }) => {
 
 // Componente per un nodo ciclo
 const CycleNode = ({ cycle, level, expanded, onToggle }) => {
-  const baseIndent = 8;
-  const indentPerLevel = 32; // Aumentato da 24 a 32
+  // MIGLIORATO: Sistema di indentazione progressivo
+  // Calcola l'indentazione in base al livello del nodo
+  const baseIndent = 8; // Indentazione base in pixel
+  const indentPerLevel = 24; // Pixel di indentazione per ogni livello
   const indent = level * indentPerLevel + baseIndent;
 
   // Estrai i dati del ciclo
@@ -101,10 +103,25 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
           "border-l-2"
         )}
         style={{
-          paddingLeft: `${indent}px`,
-          borderLeftColor: getLevelColor(level)
+          borderLeftColor: getLevelColor(level),
+          backgroundColor: level > 0 ? `${getLevelColor(level)}05` : undefined // Colore più tenue per la card
         }}
       >
+        {/* NUOVO: Numero del livello a sinistra */}
+        {level > 0 && (
+          <div
+            className="flex items-center justify-center w-4 h-4 mr-2 text-xs font-medium rounded-full flex-shrink-0"
+            style={{
+              backgroundColor: getLevelColor(level),
+              color: 'white',
+              fontSize: '8px'
+            }}
+            title={`Livello ${level} - Ciclo`}
+          >
+            {level}
+          </div>
+        )}
+
         {/* Spacer per allineamento (senza toggle icon) */}
         <div className="w-3 mr-1" />
 
@@ -113,8 +130,14 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
 
         {/* Cycle info - Layout tabellare */}
         <div className="flex-1 flex items-center ml-2 min-w-0">
-          {/* Colonna 1: Operazione e Centro di Lavoro (60%) */}
-          <div className="flex items-center gap-2 min-w-0" style={{ width: '60%' }}>
+          {/* Colonna 1: Operazione e Centro di Lavoro (60%) - CON INDENTAZIONE */}
+          <div 
+            className="flex items-center gap-2 min-w-0" 
+            style={{ 
+              width: '60%',
+              paddingLeft: `${indent}px`
+            }}
+          >
             <span className="font-medium text-green-800 truncate">
               {operationName}
             </span>
@@ -190,8 +213,10 @@ const calculateChildrenCost = (node) => {
 
 // Componente per un nodo componente
 const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery }) => {
-  const baseIndent = 8;
-  const indentPerLevel = 32; // Aumentato da 24 a 32 per migliore leggibilità
+  // MIGLIORATO: Sistema di indentazione progressivo
+  // Calcola l'indentazione in base al livello del nodo
+  const baseIndent = 8; // Indentazione base in pixel
+  const indentPerLevel = 24; // Pixel di indentazione per ogni livello
   const indent = level * indentPerLevel + baseIndent;
 
   const isRootNode = node.data.Level === 0;
@@ -255,11 +280,26 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
           isRootNode && "bg-purple-50 hover:bg-purple-100 font-semibold"
         )}
         style={{
-          paddingLeft: `${indent}px`,
-          borderLeftColor: getLevelColor(level)
+          borderLeftColor: getLevelColor(level),
+          backgroundColor: level > 0 ? `${getLevelColor(level)}05` : undefined // Colore più tenue per la card
         }}
         onClick={onToggle}
       >
+        {/* NUOVO: Numero del livello a sinistra */}
+        {level > 0 && (
+          <div
+            className="flex items-center justify-center w-4 h-4 mr-2 text-xs font-medium rounded-full flex-shrink-0"
+            style={{
+              backgroundColor: getLevelColor(level),
+              color: 'white',
+              fontSize: '8px'
+            }}
+            title={`Livello ${level}`}
+          >
+            {level}
+          </div>
+        )}
+
         {/* Toggle icon */}
         <div className="mr-1">
           {hasChildren ? (
@@ -278,21 +318,20 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
 
         {/* Component info - Layout tabellare */}
         <div className="flex-1 flex items-center ml-2 min-w-0">
-          {/* Colonna 1: Codice e Descrizione (60%) */}
-          <div className="flex items-center gap-2 min-w-0" style={{ width: '60%' }}>
+          {/* Colonna 1: Codice e Descrizione (60%) - CON INDENTAZIONE */}
+          <div 
+            className="flex items-center gap-2 min-w-0" 
+            style={{ 
+              width: '60%',
+              paddingLeft: `${indent}px`
+            }}
+          >
             <span className={cn(
               "truncate",
               isRootNode ? "text-purple-900 font-semibold" : "text-blue-900"
             )}>
               {highlightText(nodeText)}
             </span>
-
-            {/* Badge livello */}
-            {!isRootNode && (
-              <Badge variant="outline" className="flex-shrink-0 h-4 text-xs">
-                Liv. {node.data.Level}
-              </Badge>
-            )}
             {isRootNode && (
               <Badge variant="outline" className="flex-shrink-0 h-4 text-xs bg-purple-100">
                 PF
