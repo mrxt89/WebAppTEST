@@ -13,12 +13,14 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Info,
   Package,
   ShoppingCart,
   CircuitBoard,
   AlertTriangle,
+  Building2,
 } from "lucide-react";
 
 const ComponentDetail = ({ component, editMode }) => {
@@ -27,11 +29,18 @@ const ComponentDetail = ({ component, editMode }) => {
     pendingChanges,
     setPendingChanges,
     bomComponents,
+    checkItemInGestionale,
+    getSuppliersWithIntercompanyFlag,
   } = useBOMViewer();
 
   // Aggiungiamo uno stato per monitorare il componente padre
   const [parentComponent, setParentComponent] = useState(null);
-  
+
+  // Stati per gestione fornitori Intercompany
+  const [suppliers, setSuppliers] = useState([]);
+  const [codeCheckResult, setCodeCheckResult] = useState(null);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+
   // Stato per i valori attualmente visualizzati nei campi
   const [formData, setFormData] = useState({
     // Campi BOM Component
@@ -53,6 +62,11 @@ const ComponentDetail = ({ component, editMode }) => {
     Length: component?.Length || 0,
     MediumRadius: component?.MediumRadius || 0,
     CustomerItemReference: component?.CustomerItemReference || "",
+
+    // Campi Fornitore Intercompany
+    TempSupplierId: component?.TempSupplierId || null,
+    TempIntercompanyTargetId: component?.TempIntercompanyTargetId || null,
+    TempSupplierNotes: component?.TempSupplierNotes || "",
   });
 
   // Funzione per trovare il componente padre
@@ -121,6 +135,11 @@ const ComponentDetail = ({ component, editMode }) => {
         Length: component.Length || 0,
         MediumRadius: component.MediumRadius || 0,
         CustomerItemReference: component.CustomerItemReference || "",
+
+        // Campi Fornitore Intercompany
+        TempSupplierId: component.TempSupplierId || null,
+        TempIntercompanyTargetId: component.TempIntercompanyTargetId || null,
+        TempSupplierNotes: component.TempSupplierNotes || "",
       };
 
       setFormData(newData);
@@ -155,11 +174,56 @@ const ComponentDetail = ({ component, editMode }) => {
         Length: component.Length || 0,
         MediumRadius: component.MediumRadius || 0,
         CustomerItemReference: component.CustomerItemReference || "",
+
+        // Campi Fornitore Intercompany
+        TempSupplierId: component.TempSupplierId || null,
+        TempIntercompanyTargetId: component.TempIntercompanyTargetId || null,
+        TempSupplierNotes: component.TempSupplierNotes || "",
       };
 
       setFormData(originalData);
     }
   }, [component, pendingChanges]);
+
+  // Carica fornitori quando il componente viene montato o cambia
+  useEffect(() => {
+    const loadSuppliers = async () => {
+      try {
+        setLoadingSuppliers(true);
+        // Carica SOLO i fornitori Intercompany (onlyIntercompany = true)
+        const result = await getSuppliersWithIntercompanyFlag(true);
+        if (result && result.suppliers) {
+          setSuppliers(result.suppliers);
+        }
+      } catch (error) {
+        console.error("Errore caricamento fornitori:", error);
+      } finally {
+        setLoadingSuppliers(false);
+      }
+    };
+
+    loadSuppliers();
+  }, [getSuppliersWithIntercompanyFlag]);
+
+  // Verifica se il codice del componente esiste nel gestionale
+  useEffect(() => {
+    const checkCode = async () => {
+      if (!component || !component.ComponentItemCode) {
+        setCodeCheckResult(null);
+        return;
+      }
+
+      try {
+        const result = await checkItemInGestionale(component.ComponentItemCode);
+        setCodeCheckResult(result);
+      } catch (error) {
+        console.error("Errore verifica codice:", error);
+        setCodeCheckResult(null);
+      }
+    };
+
+    checkCode();
+  }, [component?.ComponentItemCode, checkItemInGestionale]);
 
   // Gestisce il cambiamento nei campi del form
   const handleChange = (field, value) => {
@@ -193,7 +257,8 @@ const ComponentDetail = ({ component, editMode }) => {
         }
 
         // Determina se il campo appartiene ai componenti BOM o ai dettagli dell'articolo
-        const bomFields = ["ComponentType", "Quantity", "UoM", "UnitCost", "FixedCost"];
+        // IMPORTANTE: TempSupplier* vanno in bomComponentChanges perché vengono gestiti da UPDATE_COMPONENT
+        const bomFields = ["ComponentType", "Quantity", "UoM", "UnitCost", "FixedCost", "TempSupplierId", "TempIntercompanyTargetId", "TempSupplierNotes"];
         const itemFields = ["Code", "Description", "Notes", "Nature", "Diameter", "Bxh", "Depth", "Length", "MediumRadius", "CustomerItemReference"];
 
         if (bomFields.includes(field)) {
@@ -750,6 +815,126 @@ const ComponentDetail = ({ component, editMode }) => {
           </div>
         </div>
       </div>
+
+      {/* Fornitore Intercompany - Solo per articoli di Acquisto temporanei */}
+      {editMode && formData.Nature === 22413314 && component?.stato_erp !== "1" && (
+        <div className="border rounded-md p-3 bg-purple-50">
+          <h4 className="text-sm font-medium mb-2 text-purple-700 flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Fornitore Intercompany
+          </h4>
+
+          {/* Info se codice esiste nel gestionale */}
+          {codeCheckResult && codeCheckResult.exists && (
+            <Alert className="mb-3">
+              <Building2 className="h-4 w-4" />
+              <AlertDescription>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-blue-50">
+                    GESTIONALE
+                  </Badge>
+                  <span className="text-sm">
+                    Dati fornitore provengono dal gestionale (sola lettura)
+                  </span>
+                </div>
+                {codeCheckResult.supplierName && (
+                  <p className="text-xs mt-1">
+                    Fornitore: <strong>{codeCheckResult.supplierName}</strong>
+                    {codeCheckResult.isIntercompany && (
+                      <Badge variant="secondary" className="ml-2">
+                        Intercompany → {codeCheckResult.intercompanyTargetName}
+                      </Badge>
+                    )}
+                  </p>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Campi fornitore - editabili solo se codice è temporaneo */}
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="supplier" className="text-xs text-purple-700">
+                Fornitore Intercompany
+                {hasFieldChange("TempSupplierId") && (
+                  <span className="ml-1 text-amber-600">*</span>
+                )}
+              </Label>
+              <Select
+                value={formData.TempSupplierId || ""}
+                onValueChange={(value) => {
+                  const selectedSupplier = suppliers.find(s => s.SupplierId === value);
+                  handleChange("TempSupplierId", value);
+                  if (selectedSupplier) {
+                    handleChange("TempIntercompanyTargetId", selectedSupplier.IntercompanyTargetId || null);
+                  }
+                }}
+                disabled={!editMode || loadingSuppliers || (codeCheckResult && codeCheckResult.exists)}
+              >
+                <SelectTrigger
+                  id="supplier"
+                  className={cn(
+                    "bg-white h-8 text-sm",
+                    hasFieldChange("TempSupplierId") && "ring-2 ring-amber-500"
+                  )}
+                >
+                  <SelectValue placeholder={loadingSuppliers ? "Caricamento..." : "Seleziona fornitore Intercompany (opzionale)"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.length === 0 ? (
+                    <div className="p-2 text-sm text-gray-500 text-center">
+                      Nessun fornitore Intercompany disponibile
+                    </div>
+                  ) : (
+                    suppliers.map((supplier) => (
+                      <SelectItem key={supplier.SupplierId} value={supplier.SupplierId}>
+                        <div className="flex items-center gap-2">
+                          <span>{supplier.SupplierName}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            → {supplier.IntercompanyTargetName}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Info azienda Intercompany target */}
+            {formData.TempSupplierId && formData.TempIntercompanyTargetId && (
+              <div className="p-2 bg-purple-100 rounded text-xs text-purple-800">
+                <Building2 className="h-3 w-3 inline mr-1" />
+                <strong>Fornitore Intercompany:</strong> Questo componente sarà condiviso con l'azienda{" "}
+                <strong>
+                  {suppliers.find(s => s.SupplierId === formData.TempSupplierId)?.IntercompanyTargetName}
+                </strong>
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="supplierNotes" className="text-xs text-purple-700">
+                Note Fornitore
+                {hasFieldChange("TempSupplierNotes") && (
+                  <span className="ml-1 text-amber-600">*</span>
+                )}
+              </Label>
+              <Textarea
+                id="supplierNotes"
+                value={formData.TempSupplierNotes || ""}
+                onChange={(e) => handleChange("TempSupplierNotes", e.target.value)}
+                rows={2}
+                disabled={!editMode || (codeCheckResult && codeCheckResult.exists)}
+                placeholder="Note opzionali sul fornitore..."
+                className={cn(
+                  "bg-white text-sm",
+                  hasFieldChange("TempSupplierNotes") && "ring-2 ring-amber-500"
+                )}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Indicatore modifiche pendenti */}
       {editMode && pendingChanges[component.ComponentId] && (

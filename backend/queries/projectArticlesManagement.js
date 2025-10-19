@@ -303,8 +303,26 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
                 if (bomData.Notes) {
                     request.input('ComponentNotes', sql.NVarChar(sql.MAX), bomData.Notes);
                 }
+
+                // NUOVO: Parametri fornitore Intercompany per componenti temporanei
+                if (bomData.TempSupplierId !== undefined) {
+                    request.input('TempSupplierId', sql.VarChar(12), bomData.TempSupplierId);
+                }
+
+                if (bomData.TempIntercompanyTargetId !== undefined) {
+                    request.input('TempIntercompanyTargetId', sql.Int, bomData.TempIntercompanyTargetId);
+                }
+
+                if (bomData.TempSupplierNotes !== undefined) {
+                    request.input('TempSupplierNotes', sql.NVarChar(255), bomData.TempSupplierNotes);
+                }
+
+                // Flag per indicare se aggiornare i dati fornitore (solo se almeno uno è presente)
+                if (bomData.TempSupplierId !== undefined || bomData.TempIntercompanyTargetId !== undefined || bomData.TempSupplierNotes !== undefined) {
+                    request.input('UpdateSupplierData', sql.Bit, 1);
+                }
             }
-            
+
             if (action === 'UPDATE_COMPONENT' || action === 'DELETE_COMPONENT') {
                 request.input('ComponentLine', sql.Int, bomData.Line);
             }
@@ -3734,6 +3752,75 @@ const updateReferenceNotes = async (referenceId, companyId, notes) => {
     }
 };
 
+// Verifica se un codice articolo esiste nel gestionale e restituisce info fornitore/Intercompany
+const checkItemInGestionale = async (companyId, itemCode) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('ItemCode', sql.VarChar(64), itemCode);
+
+        // Parametri di output
+        request.output('Exists', sql.Bit);
+        request.output('SupplierId', sql.VarChar(12));
+        request.output('SupplierName', sql.NVarChar(255));
+        request.output('IsIntercompany', sql.Bit);
+        request.output('IntercompanyTargetId', sql.Int);
+        request.output('IntercompanyTargetName', sql.NVarChar(255));
+        request.output('ErrorCode', sql.Int);
+        request.output('ErrorMessage', sql.NVarChar(4000));
+
+        await request.execute('MA_ProjectArticles_CheckItemInGestionale');
+
+        const errorCode = request.parameters.ErrorCode.value || 0;
+        if (errorCode !== 0) {
+            throw new Error(request.parameters.ErrorMessage.value || `Error code: ${errorCode}`);
+        }
+
+        return {
+            success: 1,
+            exists: request.parameters.Exists.value,
+            supplierId: request.parameters.SupplierId.value,
+            supplierName: request.parameters.SupplierName.value,
+            isIntercompany: request.parameters.IsIntercompany.value,
+            intercompanyTargetId: request.parameters.IntercompanyTargetId.value,
+            intercompanyTargetName: request.parameters.IntercompanyTargetName.value
+        };
+    } catch (err) {
+        console.error('Error checking item in gestionale:', err);
+        throw err;
+    }
+};
+
+// Ottiene lista fornitori con flag Intercompany
+const getSuppliersWithIntercompanyFlag = async (companyId, onlyIntercompany = false) => {
+    try {
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('OnlyIntercompany', sql.Bit, onlyIntercompany);
+        request.output('ErrorCode', sql.Int);
+        request.output('ErrorMessage', sql.NVarChar(4000));
+
+        const result = await request.execute('MA_ProjectArticles_GetSuppliersWithIntercompanyFlag');
+
+        const errorCode = request.parameters.ErrorCode.value || 0;
+        if (errorCode !== 0) {
+            throw new Error(request.parameters.ErrorMessage.value || `Error code: ${errorCode}`);
+        }
+
+        return {
+            success: 1,
+            suppliers: result.recordset
+        };
+    } catch (err) {
+        console.error('Error getting suppliers with intercompany flag:', err);
+        throw err;
+    }
+};
+
 // Esporta tutte le funzioni
 module.exports = {
     addUpdateItem,
@@ -3780,5 +3867,8 @@ module.exports = {
     getIntercompanyRequests,
     approveRejectReference,
     getReferenceAttachments,
-    updateReferenceNotes
+    updateReferenceNotes,
+    // Intercompany supplier helpers
+    checkItemInGestionale,
+    getSuppliersWithIntercompanyFlag
 };

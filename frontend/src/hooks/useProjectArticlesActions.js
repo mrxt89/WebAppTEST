@@ -1652,6 +1652,41 @@ const searchSimilarArticles = useCallback(
     [makeRequest]
   );
 
+  // 8. Verifica se un codice articolo esiste nel gestionale
+  const checkItemInGestionale = useCallback(
+    async (itemCode) => {
+      try {
+        const data = await makeRequest(
+          `${config.API_BASE_URL}/projectArticles/items/check-in-gestionale/${encodeURIComponent(itemCode)}`
+        );
+        return data;
+      } catch (err) {
+        console.error("Error checking item in gestionale:", err);
+        throw err;
+      }
+    },
+    [makeRequest]
+  );
+
+  // 9. Ottieni lista fornitori con flag Intercompany
+  const getSuppliersWithIntercompanyFlag = useCallback(
+    async (onlyIntercompany = false) => {
+      try {
+        const params = new URLSearchParams();
+        params.append('onlyIntercompany', onlyIntercompany);
+
+        const data = await makeRequest(
+          `${config.API_BASE_URL}/projectArticles/suppliers/intercompany?${params}`
+        );
+        return data;
+      } catch (err) {
+        console.error("Error getting suppliers with intercompany flag:", err);
+        throw err;
+      }
+    },
+    [makeRequest]
+  );
+
   return {
     // Stati
     items,
@@ -1738,6 +1773,10 @@ const searchSimilarArticles = useCallback(
     respondToIntercompanyRequest,
     getReferenceAttachments,
     updateReferenceNotes,
+
+    // Intercompany supplier helpers
+    checkItemInGestionale,
+    getSuppliersWithIntercompanyFlag,
   };
 };
 
