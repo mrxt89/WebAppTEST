@@ -44,7 +44,10 @@ const {
     getIntercompanyRequests,
     approveRejectReference,
     getReferenceAttachments,
-    updateReferenceNotes
+    updateReferenceNotes,
+    // NEW: Intercompany supplier functions
+    checkItemInGestionale,
+    getSuppliersWithIntercompanyFlag
 } = require('../queries/projectArticlesManagement');
 
 // Ottieni stati degli articoli di progetto
@@ -1332,6 +1335,51 @@ router.post('/projectArticles/intercompany/references/:id/notes', authenticateTo
     } catch (err) {
         console.error('Error updating reference notes:', err);
         res.status(500).json({ success: 0, msg: err.message || 'Errore aggiornamento note' });
+    }
+});
+
+// =====================================================
+// NUOVI ENDPOINT PER GESTIONE FORNITORI INTERCOMPANY
+// =====================================================
+
+// 8. GET /projectArticles/items/check-in-gestionale/:itemCode - Verifica se codice esiste nel gestionale
+router.get('/projectArticles/items/check-in-gestionale/:itemCode', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { itemCode } = req.params;
+
+        if (!itemCode || itemCode.trim() === '') {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Codice articolo richiesto'
+            });
+        }
+
+        const result = await checkItemInGestionale(companyId, itemCode.trim());
+        res.json(result);
+    } catch (err) {
+        console.error('Error checking item in gestionale:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore durante la verifica del codice nel gestionale'
+        });
+    }
+});
+
+// 9. GET /projectArticles/suppliers/intercompany - Lista fornitori con flag Intercompany
+router.get('/projectArticles/suppliers/intercompany', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const onlyIntercompany = req.query.onlyIntercompany === 'true';
+
+        const result = await getSuppliersWithIntercompanyFlag(companyId, onlyIntercompany);
+        res.json(result);
+    } catch (err) {
+        console.error('Error fetching suppliers with intercompany flag:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore durante il recupero dei fornitori'
+        });
     }
 });
 

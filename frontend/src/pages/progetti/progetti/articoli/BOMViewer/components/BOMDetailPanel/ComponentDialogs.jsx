@@ -20,8 +20,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Code, Plus, Search, Replace } from "lucide-react";
+import { Code, Plus, Search, Replace, Building2, AlertCircle } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 // Componente dialog per scegliere il tipo di operazione (nuovo codice, manuale, esistente)
 export const OperationTypeDialog = ({
@@ -103,14 +105,31 @@ export const ManualCodeDialog = ({
   initialData = {},
   title = "Inserisci nuovo codice manuale",
 }) => {
+  const { checkItemInGestionale, getSuppliersWithIntercompanyFlag } = useBOMViewer();
+
   const [formData, setFormData] = useState({
     code: "",
     description: "",
     nature: "22413312", // Semilavorato di default
     uom: "PZ",
     quantity: 1,
+    supplierId: null,
+    intercompanyTargetId: null,
+    supplierNotes: "",
     ...initialData,
   });
+
+  const [suppliers, setSuppliers] = useState([]);
+  const [codeCheckResult, setCodeCheckResult] = useState(null);
+  const [loadingCheck, setLoadingCheck] = useState(false);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+
+  // Carica fornitori quando il dialog si apre
+  useEffect(() => {
+    if (open) {
+      loadSuppliers();
+    }
+  }, [open]);
 
   // Aggiorna lo stato quando cambiano i dati iniziali
   useEffect(() => {
@@ -121,6 +140,52 @@ export const ManualCodeDialog = ({
       }));
     }
   }, [initialData]);
+
+  // Carica lista fornitori
+  const loadSuppliers = async () => {
+    try {
+      setLoadingSuppliers(true);
+      // Carica SOLO i fornitori Intercompany (onlyIntercompany = true)
+      const result = await getSuppliersWithIntercompanyFlag(true);
+      if (result && result.suppliers) {
+        setSuppliers(result.suppliers);
+      }
+    } catch (error) {
+      console.error("Errore caricamento fornitori:", error);
+    } finally {
+      setLoadingSuppliers(false);
+    }
+  };
+
+  // Verifica se il codice esiste nel gestionale quando viene inserito
+  const handleCodeCheck = async (code) => {
+    if (!code || code.trim() === "") {
+      setCodeCheckResult(null);
+      return;
+    }
+
+    try {
+      setLoadingCheck(true);
+      const result = await checkItemInGestionale(code.trim());
+
+      if (result && result.exists) {
+        setCodeCheckResult(result);
+        // Se esiste nel gestionale, aggiorna i dati del fornitore automaticamente
+        setFormData((prev) => ({
+          ...prev,
+          supplierId: result.supplierId,
+          intercompanyTargetId: result.intercompanyTargetId,
+        }));
+      } else {
+        setCodeCheckResult({ exists: false });
+      }
+    } catch (error) {
+      console.error("Errore verifica codice:", error);
+      setCodeCheckResult(null);
+    } finally {
+      setLoadingCheck(false);
+    }
+  };
 
   const handleSave = () => {
     // Validazione dei campi obbligatori
@@ -150,11 +215,61 @@ export const ManualCodeDialog = ({
               <Input
                 id="manualCode"
                 value={formData.code}
-                onChange={(e) =>
-                  setFormData({ ...formData, code: e.target.value })
-                }
+                onChange={(e) => {
+                  const newCode = e.target.value;
+                  setFormData({ ...formData, code: newCode });
+                }}
+                onBlur={(e) => handleCodeCheck(e.target.value)}
                 placeholder="Inserisci un codice univoco"
               />
+              {loadingCheck && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Verifica in corso...
+                </p>
+              )}
+              {codeCheckResult && (
+                <div className="mt-2">
+                  {codeCheckResult.exists ? (
+                    <Alert>
+                      <Building2 className="h-4 w-4" />
+                      <AlertDescription>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-blue-50">
+                            GESTIONALE
+                          </Badge>
+                          <span className="text-sm">
+                            Codice esistente nel gestionale
+                          </span>
+                        </div>
+                        {codeCheckResult.supplierName && (
+                          <p className="text-xs mt-1">
+                            Fornitore: {codeCheckResult.supplierName}
+                            {codeCheckResult.isIntercompany && (
+                              <Badge variant="secondary" className="ml-2">
+                                Intercompany → {codeCheckResult.intercompanyTargetName}
+                              </Badge>
+                            )}
+                          </p>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-amber-50">
+                            TEMPORANEO
+                          </Badge>
+                          <span className="text-sm">
+                            Nuovo codice (non esiste nel gestionale)
+                          </span>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="col-span-2">
@@ -199,6 +314,59 @@ export const ManualCodeDialog = ({
                 placeholder="PZ"
               />
             </div>
+
+            {/* Campi fornitore - solo per articoli di acquisto e codici temporanei */}
+            {formData.nature === "22413314" && codeCheckResult && !codeCheckResult.exists && (
+              <>
+                <div className="col-span-2">
+                  <Label htmlFor="supplier">Fornitore Intercompany</Label>
+                  <Select
+                    value={formData.supplierId || ""}
+                    onValueChange={(value) => {
+                      const selectedSupplier = suppliers.find(s => s.SupplierId === value);
+                      setFormData({
+                        ...formData,
+                        supplierId: value,
+                        intercompanyTargetId: selectedSupplier?.IntercompanyTargetId || null,
+                      });
+                    }}
+                    disabled={loadingSuppliers}
+                  >
+                    <SelectTrigger id="supplier">
+                      <SelectValue placeholder={loadingSuppliers ? "Caricamento..." : "Seleziona fornitore Intercompany (opzionale)"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliers.length === 0 ? (
+                        <div className="p-2 text-sm text-gray-500 text-center">
+                          Nessun fornitore Intercompany disponibile
+                        </div>
+                      ) : (
+                        suppliers.map((supplier) => (
+                          <SelectItem key={supplier.SupplierId} value={supplier.SupplierId}>
+                            {supplier.SupplierName}
+                            <span className="ml-2 text-xs text-blue-600">
+                              → {supplier.IntercompanyTargetName}
+                            </span>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="col-span-2">
+                  <Label htmlFor="supplierNotes">Note Fornitore</Label>
+                  <Input
+                    id="supplierNotes"
+                    value={formData.supplierNotes}
+                    onChange={(e) =>
+                      setFormData({ ...formData, supplierNotes: e.target.value })
+                    }
+                    placeholder="Note opzionali sul fornitore"
+                  />
+                </div>
+              </>
+            )}
 
             {/* Campo quantità - mostrato se necessario per l'aggiunta */}
             {formData.showQuantity && (
