@@ -18,12 +18,14 @@ import {
   MessageCircle,
   Pin,
   PinOff,
+  Info,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -65,6 +67,7 @@ const IntercompanyRequestDetailsPanel = ({
   // Stati per animazioni e transizioni
   const [isClosing, setIsClosing] = useState(false);
   const [showContent, setShowContent] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   
   // Stati per i dati
   const [detailLoading, setDetailLoading] = useState(false);
@@ -244,6 +247,7 @@ const IntercompanyRequestDetailsPanel = ({
   if (!isOpen || !selectedRequest) return null;
 
   return (
+    <>
     <AnimatePresence>
       {showContent && (
         <motion.div
@@ -385,6 +389,24 @@ const IntercompanyRequestDetailsPanel = ({
                         <div>
                           <div className="text-sm text-gray-600">Componente</div>
                           <div className="font-medium">{selectedRequest.ComponentCode}</div>
+                          <div className="flex items-center gap-1 text-xs">
+                            {selectedRequest.TargetProjectItemCode ? (
+                              <>
+                                <span className="text-gray-500">→</span>
+                                <span className="font-medium text-green-600">{selectedRequest.TargetProjectItemCode}</span>
+                              </>
+                            ) : (
+                              <span className="text-gray-400">(codice fornitore non configurato)</span>
+                            )}
+                            <button
+                              type="button"
+                              className="text-gray-400 hover:text-gray-600"
+                              onClick={() => setShowInfoModal(true)}
+                              title="Informazioni sul codice articolo fornitore"
+                            >
+                              <Info className="w-3 h-3" />
+                            </button>
+                          </div>
                           <div className="text-xs text-gray-500">{selectedRequest.ComponentDescription}</div>
                         </div>
                         <div>
@@ -570,6 +592,66 @@ const IntercompanyRequestDetailsPanel = ({
         </motion.div>
       )}
     </AnimatePresence>
+
+    {/* Modal informativo */}
+    <Dialog open={showInfoModal} onOpenChange={setShowInfoModal}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Info className="w-5 h-5 text-blue-600" />
+            Codice Articolo Fornitore
+          </DialogTitle>
+          <DialogDescription>
+            Come funziona il collegamento tra codici articolo cliente e fornitore
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h4 className="font-medium text-sm mb-2">📋 Configurazione nel Gestionale Mago</h4>
+            <p className="text-sm text-gray-700">
+              Per collegare automaticamente i codici articolo tra cliente e fornitore, 
+              è necessario configurare il campo <strong>"Codifica presso il fornitore"</strong> 
+              nella scheda <strong>"Fornitori dell'articolo"</strong> del gestionale Mago.
+            </p>
+          </div>
+          
+          <div className="bg-green-50 p-4 rounded-lg">
+            <h4 className="font-medium text-sm mb-2">✅ Quando è configurato</h4>
+            <p className="text-sm text-gray-700">
+              Se il collegamento è configurato, vedrai il codice fornitore accanto al codice cliente 
+              con una freccia verde: <span className="text-green-600 font-mono">→ CODICE_FORNITORE</span>
+            </p>
+          </div>
+          
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h4 className="font-medium text-sm mb-2">⚠️ Quando non è configurato</h4>
+            <p className="text-sm text-gray-700">
+              Se il collegamento non è configurato, vedrai il messaggio 
+              <span className="text-gray-500 italic"> "(codice fornitore non configurato)"</span>
+            </p>
+          </div>
+          
+          <div className="bg-yellow-50 p-4 rounded-lg">
+            <h4 className="font-medium text-sm mb-2">🔧 Come configurare</h4>
+            <ol className="text-sm text-gray-700 space-y-1 list-decimal list-inside">
+              <li>Apri il gestionale Mago</li>
+              <li>Vai alla scheda dell'articolo</li>
+              <li>Apri la sezione "Fornitori dell'articolo"</li>
+              <li>Inserisci il codice fornitore nel campo "Codifica presso il fornitore"</li>
+              <li>Salva le modifiche</li>
+            </ol>
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button onClick={() => setShowInfoModal(false)} variant="outline">
+            Chiudi
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
