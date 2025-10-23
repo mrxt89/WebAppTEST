@@ -1584,6 +1584,21 @@ const searchSimilarArticles = useCallback(
     [makeRequest]
   );
 
+  // 2.1. Sincronizza componenti intercompany selezionati
+  const syncIntercompanyComponents = useCallback(
+    async (components, syncAttachments = true) => {
+      const data = await makeRequest(
+        `${config.API_BASE_URL}/projectArticles/sync-intercompany-components`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ components, syncAttachments })
+        }
+      );
+      return data;
+    },
+    [makeRequest]
+  );
+
   // 3. Ottieni riepilogo intercompany per sidebar
   const getBOMIntercompanySummary = useCallback(
     async (bomId) => {
@@ -1768,6 +1783,7 @@ const searchSimilarArticles = useCallback(
     // Intercompany functions
     getIntercompanyComponents,
     syncIntercompanySharing,
+    syncIntercompanyComponents,
     getBOMIntercompanySummary,
     getIntercompanyRequests,
     respondToIntercompanyRequest,

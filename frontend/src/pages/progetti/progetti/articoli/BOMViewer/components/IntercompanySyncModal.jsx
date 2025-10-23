@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import IntercompanyBadge from './IntercompanyBadge';
+import { config } from '@/config';
 
 const IntercompanySyncModal = ({
   open,
@@ -80,11 +80,61 @@ const IntercompanySyncModal = ({
 
     try {
       setSyncing(true);
-      const result = await syncIntercompanySharing(
-        bomId,
-        syncAttachments,
-        autoCreateReferences
-      );
+      
+      // Prepara i componenti selezionati per la nuova API
+      const componentsToSync = Array.from(selectedComponents).map(componentId => {
+        const component = components.find(comp => comp.ComponentId === componentId);
+        return {
+          ComponentId: component.ComponentId,
+          ComponentCode: component.ItemCode,
+          ComponentDescription: component.ItemDescription,
+          TargetCompanyId: component.TargetCompanyId,
+          TargetCompanyName: component.TargetCompanyName,
+          IntercompanyType: component.DataSource,
+          SupplierCode: component.TempSupplierId || component.CustSupp,
+          Nature: component.Nature,
+          ExistingReferenceId: null // Da implementare se necessario
+        };
+      });
+
+      // Debug: Log del body completo prima di inviarlo
+      const requestBody = {
+        components: componentsToSync,
+        syncAttachments: syncAttachments
+      };
+      
+      console.log('=== REQUEST BODY DEBUG ===');
+      console.log('Components to sync:', componentsToSync);
+      console.log('Sync attachments:', syncAttachments);
+      console.log('Full request body:', JSON.stringify(requestBody, null, 2));
+      console.log('========================');
+
+      // Chiama la nuova API di sincronizzazione selettiva
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${config.API_BASE_URL}/projectArticles/sync-intercompany-components`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      // Debug: Log della risposta
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      
+      const responseText = await response.text();
+      console.log('Response text:', responseText);
+      
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('JSON Parse Error:', parseError);
+        console.error('Response text that failed to parse:', responseText);
+        throw new Error(`Errore parsing JSON: ${parseError.message}. Risposta: ${responseText.substring(0, 200)}...`);
+      }
 
       if (result.success) {
         toast({
@@ -177,6 +227,36 @@ const IntercompanySyncModal = ({
             </div>
           </div>
 
+          {/* Riepilogo statistico */}
+          {components.length > 0 && (
+            <div className="bg-gray-50 p-3 rounded-lg mb-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                <div>
+                  <div className="text-lg font-semibold text-blue-600">{components.length}</div>
+                  <div className="text-xs text-gray-500">Componenti</div>
+                </div>
+                <div>
+                  <div className="text-lg font-semibold text-green-600">
+                    {Object.keys(componentsByCompany).length}
+                  </div>
+                  <div className="text-xs text-gray-500">Aziende</div>
+                </div>
+                <div>
+                  <div className="text-lg font-semibold text-orange-600">
+                    {components.filter(c => c.DataSource === 'TEMP_SUPPLIER').length}
+                  </div>
+                  <div className="text-xs text-gray-500">Temporanei</div>
+                </div>
+                <div>
+                  <div className="text-lg font-semibold text-purple-600">
+                    {components.filter(c => c.DataSource === 'CONTO_LAVORO').length}
+                  </div>
+                  <div className="text-xs text-gray-500">Conto Lavoro</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Select all */}
           <div className="flex items-center justify-between bg-blue-50 p-2 rounded">
             <div className="flex items-center gap-2">
@@ -190,7 +270,7 @@ const IntercompanySyncModal = ({
                 Seleziona tutti ({components.length})
               </label>
             </div>
-            <Badge variant="secondary">
+            <Badge variant="info">
               {selectedComponents.size} / {components.length}
             </Badge>
           </div>
@@ -204,14 +284,24 @@ const IntercompanySyncModal = ({
             </div>
           ) : (
             Object.entries(componentsByCompany).map(([companyId, { companyName, components: comps }]) => (
-              <Card key={companyId}>
+              <Card key={`company-${companyId}`}>
                 <CardHeader className="p-3 bg-gray-50">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-blue-600" />
-                    <span className="font-medium text-sm">{companyName}</span>
-                    <Badge variant="outline" className="ml-auto text-[10px]">
-                      {comps.length}
-                    </Badge>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-blue-600" />
+                      <span className="font-medium text-sm">{companyName}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px]">
+                        {comps.length} componenti
+                      </Badge>
+                      <Badge variant="info" className="text-[10px]">
+                        {comps.reduce((sum, comp) => sum + comp.CalculatedQuantity, 0).toFixed(1)} qtà
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {comps.map(comp => comp.ItemCode).join(', ')}
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -233,17 +323,30 @@ const IntercompanySyncModal = ({
                           className="bg-primary text-primary-foreground"
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{comp.ComponentCode}</span>
-                            <IntercompanyBadge
-                              type={comp.IntercompanyType}
-                              targetCompanyName={companyName}
-                              supplierCode={comp.SupplierCode}
-                              status={comp.ReferenceStatus}
-                            />
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium text-blue-700">{comp.ItemCode}</span>
+                            <Badge 
+                              variant="outline" 
+                              className="text-[10px] px-1 py-0"
+                            >
+                              {comp.NatureDescription}
+                            </Badge>
+                            <Badge 
+                              variant="info" 
+                              className="text-[10px] px-1 py-0"
+                            >
+                              {comp.DataSource === 'TEMP_SUPPLIER' ? 'Temporaneo' : 
+                               comp.DataSource === 'CONTO_LAVORO' ? 'Conto Lavoro' : 
+                               comp.DataSource === 'ACQUISTO' ? 'Acquisto' : comp.DataSource}
+                            </Badge>
                           </div>
-                          <div className="text-xs text-gray-500 truncate">
-                            {comp.ComponentDescription}
+                          <div className="text-xs text-gray-600 mb-1">
+                            {comp.ItemDescription}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-gray-500">
+                              Livello {comp.Level} • Qty: {comp.CalculatedQuantity} {comp.UoM}
+                            </span>
                           </div>
                         </div>
                       </div>

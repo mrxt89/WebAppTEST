@@ -40,6 +40,7 @@ const {
     // Intercompany functions
     getIntercompanyComponents,
     syncIntercompanySharing,
+    syncIntercompanyComponents,
     getBOMIntercompanySummary,
     getIntercompanyRequests,
     approveRejectReference,
@@ -1379,6 +1380,56 @@ router.get('/projectArticles/suppliers/intercompany', authenticateToken, async (
         res.status(500).json({
             success: 0,
             msg: err.message || 'Errore durante il recupero dei fornitori'
+        });
+    }
+});
+
+// =============================================================================
+// NUOVA ROUTE: Sincronizzazione selettiva componenti intercompany
+// =============================================================================
+router.post('/projectArticles/sync-intercompany-components', authenticateToken, async (req, res) => {
+    try {
+        const { components, syncAttachments = true } = req.body;
+        const companyId = req.user.CompanyId;
+        const userId = req.user.UserId;
+
+        // Validazione input
+        if (!components || !Array.isArray(components) || components.length === 0) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Nessun componente selezionato per la sincronizzazione'
+            });
+        }
+
+        console.log(`Syncing ${components.length} intercompany components for company ${companyId}`);
+
+        // Chiama la funzione di sincronizzazione
+        const result = await syncIntercompanyComponents(
+            components,
+            companyId,
+            userId,
+            syncAttachments
+        );
+
+        if (result.success) {
+            return res.json({
+                success: 1,
+                msg: result.message,
+                data: result.data
+            });
+        } else {
+            return res.status(400).json({
+                success: 0,
+                msg: result.message,
+                errorCode: result.errorCode
+            });
+        }
+
+    } catch (err) {
+        console.error('Error syncing intercompany components:', err);
+        return res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore durante la sincronizzazione'
         });
     }
 });

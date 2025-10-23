@@ -10,7 +10,16 @@
       "Bash(powershell -Command \"Get-Content script.sql -Encoding Unicode | Select-Object -Index (1757..1766)\")",
       "Bash(powershell -Command \"(Get-Content script.sql -Encoding Unicode -Raw) -match ''(?s)(-- CORREZIONE.*?ORDER BY exp\\.Line;)'' | Out-Null; if ($matches) { $matches[1] }\")",
       "Bash(powershell:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(docker logs webapptest-backend-1 --tail 100)",
+      "Bash(docker logs webapptest-backend-1 --tail 200)",
+      "Bash(docker exec webapptest-backend-1 grep -n \"syncIntercompanyComponents\" /usr/src/app/routes/projectArticlesRoutes.js)",
+      "Bash(docker exec webapptest-backend-1 sh -c \"grep -n ''syncIntercompanyComponents'' /usr/src/app/routes/projectArticlesRoutes.js | head -5\")",
+      "Bash(docker exec webapptest-backend-1 sh -c \"grep -n \"\"router.post.*sync-intercompany-components\"\" /usr/src/app/routes/projectArticlesRoutes.js\")",
+      "Bash(docker exec webapptest-backend-1 sh -c \"grep -n ''router.post.*sync-intercompany'' /usr/src/app/routes/projectArticlesRoutes.js\")",
+      "Bash(docker exec webapptest-backend-1 sh -c \"tail -20 /usr/src/app/routes/projectArticlesRoutes.js\")",
+      "Bash(docker exec webapptest-backend-1 sh -c \"grep -A 5 -B 5 ''Error\\|error'' /usr/src/app/logs/* 2>/dev/null | head -50 || echo ''No log files found''\")",
+      "Bash(docker logs webapptest-backend-1)"
     ],
     "deny": [],
     "ask": []
