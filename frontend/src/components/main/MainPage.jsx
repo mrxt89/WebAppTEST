@@ -118,16 +118,20 @@ const MainPage = () => {
       .then((module) => {
         window.notificationService = module.default;
 
-        if (window.notificationService) {
+        if (window.notificationService && typeof window.notificationService.initAudio === 'function') {
           const initAudioOnce = () => {
-            window.notificationService.initAudio().then((success) => {
-              if (success) {
-                notificationServiceInitialized.current = true;
-                document.removeEventListener("click", initAudioOnce);
-                document.removeEventListener("keydown", initAudioOnce);
-                document.removeEventListener("touchstart", initAudioOnce);
-              }
-            });
+            if (window.notificationService && typeof window.notificationService.initAudio === 'function') {
+              window.notificationService.initAudio().then((success) => {
+                if (success) {
+                  notificationServiceInitialized.current = true;
+                  document.removeEventListener("click", initAudioOnce);
+                  document.removeEventListener("keydown", initAudioOnce);
+                  document.removeEventListener("touchstart", initAudioOnce);
+                }
+              }).catch((error) => {
+                console.error("Errore nell'inizializzazione audio:", error);
+              });
+            }
           };
 
           document.addEventListener("click", initAudioOnce, { once: false });
@@ -858,24 +862,32 @@ const openChatModal = async (notificationId) => {
     );
     setCurrentLevelItems(filteredItems);
   
+    // Se pageComponent è NULL ma c'è pageRoute → Apri in nuova finestra (es: wiki, link esterni)
+    if (!item.pageComponent && item.pageRoute) {
+      // Apri in nuova finestra/tab
+      window.open(item.pageRoute, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // Navigate normale per pagine con componente
     if (item.pageComponent) {
       // Costruisci l'URL con i parametri se presenti nello state
       let route = item.pageRoute;
       const params = new URLSearchParams();
-      
+
       if (state.projectId) {
         params.append('projectId', state.projectId);
         params.append('autoSelect', 'true');
       }
-      
+
       if (state.openTaskId) {
         params.append('openTaskId', state.openTaskId);
       }
-      
+
       if (params.toString()) {
         route = `${route}?${params.toString()}`;
       }
-      
+
       navigate(route, {
         state: {
           ...state,

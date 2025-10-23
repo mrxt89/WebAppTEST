@@ -9,8 +9,10 @@ import { WikiProvider } from "./components/wiki/WikiContext";
 import Login from "./components/Login";
 import Register from "./pages/user/Register";
 import MainPage from "./components/main/MainPage";
+import Documentazione from "./pages/Documentazione";
 import ProtectedRoute from "./components/ProtectedRoute";
 import StandaloneChat from "./pages/StandaloneChat";
+import StandaloneWiki from "./pages/StandaloneWiki";
 import ReduxProvider from "./redux/ReduxProvider";
 import LocalAgentMonitor from '@/components/LocalAgentMonitor';
 
@@ -34,6 +36,26 @@ const App = () => {
                         <WikiProvider>
                           <StandaloneChat />
                         </WikiProvider>
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Route per Wiki.js standalone */}
+                  <Route
+                    path="/wiki-standalone"
+                    element={
+                      <ProtectedRoute>
+                        <StandaloneWiki />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Route per la documentazione Wiki (deprecata - usa /wiki-standalone) */}
+                  <Route
+                    path="/documentazione"
+                    element={
+                      <ProtectedRoute>
+                        <Documentazione />
                       </ProtectedRoute>
                     }
                   />

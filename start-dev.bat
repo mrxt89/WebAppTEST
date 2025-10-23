@@ -68,8 +68,9 @@ echo - Rimozione container non utilizzati...
 docker container prune -f
 echo - Rimozione immagini non utilizzate...
 docker image prune -a -f
-echo - Pulizia cache del sistema...
-docker system prune -f --volumes
+echo - Pulizia cache del sistema (PRESERVANDO i volumi Wiki)...
+docker system prune -f
+echo   NOTA: I volumi wiki-data e wiki-config sono preservati
 
 echo.
 echo Ricostruzione immagini...
@@ -85,7 +86,9 @@ echo Frontend: https://localhost:5173 (HTTPS)
 echo Frontend: http://localhost:5174 (HTTP - solo per compatibilità)
 echo Backend:  https://localhost:3443 (HTTPS)
 echo Backend:  http://localhost:3001 (HTTP - solo per compatibilità)
-echo Database: WebAppTEST
+echo Wiki.js:  http://localhost:3002 (accesso diretto)
+echo Wiki.js:  https://localhost/wiki (via nginx)
+echo Database: WebAppTEST + WikiJS
 echo.
 echo NOTA: Al primo accesso ai servizi HTTPS, potresti dover accettare il certificato
 echo       autofirmato nel tuo browser.

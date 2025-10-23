@@ -128,6 +128,59 @@ services:
       - app-network-dev
     restart: unless-stopped
 
+  # Wiki.js - Sistema di documentazione
+  wiki:
+    image: ghcr.io/requarks/wiki:2
+    container_name: webapptest-wiki
+    restart: unless-stopped
+    ports:
+      - "3002:3000"  # Porta HTTP per accesso diretto in dev
+    environment:
+      # Database MSSQL
+      - DB_TYPE=mssql
+      - "DB_HOST=host.docker.internal\\ARCHASERVER"
+      - DB_PORT=1433
+      - DB_USER=sa
+      - DB_PASS=Kacu938861
+      - DB_NAME=WikiJS
+      - DB_SSL=false
+
+      # SSL disabilitato (gestito da nginx)
+      - SSL_ACTIVE=false
+
+      # High-Availability disabilitato in dev
+      - HA_ACTIVE=false
+
+      # Logging
+      - LOG_LEVEL=info
+    volumes:
+      - wiki-data:/wiki/data
+      - wiki-config:/wiki/config
+    networks:
+      - app-network-dev
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
 networks:
   app-network-dev:
     driver: bridge
+
+volumes:
+  wiki-data:
+    driver: local
+  wiki-config:
+    driver: local

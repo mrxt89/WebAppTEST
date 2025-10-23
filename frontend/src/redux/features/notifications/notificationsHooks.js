@@ -152,8 +152,15 @@ export const useNotifications = () => {
   const openChatData = useSelector(state => state.notifications.openChatData);
 
   // Memoized selectors to prevent unnecessary re-renders
-  const memoizedOpenChatIds = useMemo(() => Array.from(openChatIds), [openChatIds]);
-  const memoizedStandaloneChats = useMemo(() => Array.from(standaloneChats), [standaloneChats]);
+  const memoizedOpenChatIds = useMemo(() => {
+    if (!openChatIds || openChatIds.size === 0) return [];
+    return Array.from(openChatIds).sort((a, b) => a - b);
+  }, [openChatIds]);
+  
+  const memoizedStandaloneChats = useMemo(() => {
+    if (!standaloneChats || standaloneChats.size === 0) return [];
+    return Array.from(standaloneChats).sort((a, b) => a - b);
+  }, [standaloneChats]);
 
   // Ref per tenere traccia delle operazioni in corso
   const pendingUpdatesRef = useRef(new Set());
