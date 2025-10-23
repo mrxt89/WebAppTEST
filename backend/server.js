@@ -487,7 +487,8 @@ app.get('/api/menu', authenticateToken, async (req, res) => {
       T2.pageLevel,
       T2.pageRoute,
       T2.pageComponent,
-      T2.sequence
+      T2.sequence,
+      T2.wikiSlug
     FROM AR_GroupMembers T0
     JOIN AR_GroupPages T1 ON T0.groupId = T1.groupId
     JOIN AR_Pages T2 ON T2.pageId = T1.pageId

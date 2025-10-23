@@ -22,6 +22,7 @@ import { useDispatch } from "react-redux";
 import { fetchNotificationAttachments } from "@/redux/features/notifications/notificationsActions";
 import { registerOpenChatModal, initChatPagination, setOpenChatData  } from "@/redux/features/notifications/notificationsSlice";
 import { WikiProvider, WikiHelper } from "../wiki";
+import WikiDocLink from "../wiki/WikiDocLink";
 
 const MainPage = () => {
   const dispatch = useDispatch();
@@ -88,6 +89,7 @@ const MainPage = () => {
   const [isPageComponent, setIsPageComponent] = useState(false);
   const [pageTitle, setPageTitle] = useState("");
   const [currentLevelItems, setCurrentLevelItems] = useState([]);
+  const [currentWikiSlug, setCurrentWikiSlug] = useState(null);
   const [openChats, setOpenChats] = useState([]);
   const [minimizedChats, setMinimizedChats] = useState([]);
   const [windowManagerMenuOpen, setWindowManagerMenuOpen] = useState(false);
@@ -856,12 +858,13 @@ const openChatModal = async (notificationId) => {
     setBreadcrumb(newBreadcrumb);
     setPageTitle(item.pageName);
     setIsPageComponent(!!item.pageComponent);
-  
+    setCurrentWikiSlug(item.wikiSlug || null);
+
     const filteredItems = menuItems.filter(
       (menuItem) => menuItem.pageParent === item.pageId,
     );
     setCurrentLevelItems(filteredItems);
-  
+
     // Se pageComponent è NULL ma c'è pageRoute → Apri in nuova finestra (es: wiki, link esterni)
     if (!item.pageComponent && item.pageRoute) {
       // Apri in nuova finestra/tab
@@ -1014,6 +1017,7 @@ useEffect(() => {
     setBreadcrumb(newBreadcrumb);
     setPageTitle(lastItem.pageName);
     setIsPageComponent(!!lastItem.pageComponent);
+    setCurrentWikiSlug(lastItem.wikiSlug || null);
     setCurrentLevelItems(
       menuItems.filter((item) => item.pageParent === lastItem.pageId),
     );
@@ -1027,6 +1031,7 @@ useEffect(() => {
     setCurrentLevelItems(menuItems.filter((item) => item.pageParent === null));
     setPageTitle("WebApp");
     setIsPageComponent(false);
+    setCurrentWikiSlug(null);
     navigate("/");
   };
 
@@ -1165,6 +1170,7 @@ useEffect(() => {
           pageTitle={pageTitle}
           navigateToPreviousLevel={navigateToPreviousLevel}
           currentLevelItems={currentLevelItems}
+          currentWikiSlug={currentWikiSlug}
         >
           {Array.isArray(openChats) && openChats.length > 0 ? (
             openChats.map((chat) => {

@@ -4,6 +4,7 @@
     "API_BASE_HTTP_URL": "http://localhost:3001/api",
     "FRONTEND_URL": "https://localhost:5173",
     "FRONTEND_HTTP_URL": "http://localhost:5174",
+    "WIKI_URL": "http://localhost:3002",
     "SWEET_ALERT_COLORS": {
       "cancelButtonColor": "rgb(155, 33, 33)",
       "confirmButtonColor": "rgb(30, 97, 155)",
@@ -16,6 +17,7 @@
     "API_BASE_HTTP_URL": "http://localhost:3000/api",
     "FRONTEND_URL": "https://localhost",
     "FRONTEND_HTTP_URL": "http://localhost",
+    "WIKI_URL": "http://localhost:3002",
     "SWEET_ALERT_COLORS": {
       "cancelButtonColor": "rgb(155, 33, 33)",
       "confirmButtonColor": "rgb(30, 97, 155)",

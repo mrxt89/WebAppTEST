@@ -44,6 +44,10 @@ export const WS_URL = USE_HTTPS
   ? `wss://${HOST_IP}:${API_HTTPS_PORT}`
   : `ws://${HOST_IP}:${API_HTTP_PORT}`;
 
+// Configurazione Wiki
+export const WIKI_PORT = parseInt(import.meta.env.VITE_WIKI_PORT || "3002");
+export const WIKI_URL = `http://${HOST_IP}:${WIKI_PORT}`;
+
 // Log configurazione
 console.log("Host configuration loaded:");
 console.log("- Host IP:", HOST_IP);
@@ -51,6 +55,7 @@ console.log("- Host Domain:", HOST_DOMAIN);
 console.log("- HTTPS Enabled:", USE_HTTPS);
 console.log("- API URL:", API_BASE_URL);
 console.log("- Frontend URL:", FRONTEND_URL);
+console.log("- Wiki URL:", WIKI_URL);
 
 // Funzioni helper
 export function getUrl(path, useHttps = USE_HTTPS) {
@@ -89,6 +94,8 @@ export default {
   FRONTEND_HTTP_URL,
   FRONTEND_HTTPS_URL,
   WS_URL,
+  WIKI_PORT,
+  WIKI_URL,
   getUrl,
   getApiUrl,
   getFrontendUrl,

@@ -25,6 +25,7 @@ import UserProfile from "../../pages/user/UserProfile";
 import Documentazione from "../../pages/Documentazione";
 import MainMenu from "../MainMenu";
 import NavigationDrawer from "../navigation/NavigationDrawer";
+import WikiDocLink from "../wiki/WikiDocLink";
 import "../../styles/navigation-drawer.css";
 
 // Import the NotificationProvider (which is now a placeholder function)
@@ -50,6 +51,7 @@ const MainContainer = ({
   pageTitle,
   navigateToPreviousLevel,
   currentLevelItems,
+  currentWikiSlug,
   children, // Aggiungo il supporto per i children
 }) => {
     useNavigate();
@@ -131,16 +133,22 @@ const MainContainer = ({
               <h6 className="colorSecondary m-auto mx-2 fs-5">Menu</h6>
             </button>
             <div className="text-center font-medium fs-5 mx-4">{pageTitle}</div>
-            {/* Icona per aprire il navigation drawer */}
-              <Menu 
-                className="w-5 h-5 relative z-10 text-black mr-5" 
+            <div className="flex items-center gap-2">
+              {/* Icona documentazione wiki */}
+              <WikiDocLink
+                wikiSlug={currentWikiSlug}
+                size="small"
+                tooltip="Apri documentazione di questa pagina"
+              />
+              {/* Icona per aprire il navigation drawer */}
+              <Menu
+                className="w-5 h-5 relative z-10 text-black mr-5"
                 ref={drawerTriggerRef}
                 onClick={toggleDrawer}
                 title="Apri menu di navigazione"
                 aria-label="Apri menu di navigazione"
               />
-              
-             
+            </div>
           </div>
         ) : (
           <div className="breadcrumb-container">
@@ -171,21 +179,23 @@ const MainContainer = ({
                   </li>
                 </React.Fragment>
               ))}
-              {/* Icona menu anche nel breadcrumb normale, all'estrema destra */}
+              {/* Icona documentazione wiki e menu, all'estrema destra */}
               {breadcrumb.length > 0 && (
-                <li className="ml-auto mr-3">
-                 
-                  
-                    <Menu 
-                     ref={drawerTriggerRef}
-                     onClick={toggleDrawer}
-                     title="Apri menu di navigazione"
-                     aria-label="Apri menu di navigazione"
-                      className="w-4 h-4 relative z-10 text-black mr-5" 
-                    
-                    />
-                    
-                
+                <li className="ml-auto mr-3 flex items-center gap-2">
+                  {/* Icona documentazione wiki */}
+                  <WikiDocLink
+                    wikiSlug={currentWikiSlug}
+                    size="small"
+                    tooltip="Apri documentazione di questa pagina"
+                  />
+                  {/* Icona menu navigazione */}
+                  <Menu
+                    ref={drawerTriggerRef}
+                    onClick={toggleDrawer}
+                    title="Apri menu di navigazione"
+                    aria-label="Apri menu di navigazione"
+                    className="w-4 h-4 relative z-10 text-black mr-5"
+                  />
                 </li>
               )}
             </ol>
