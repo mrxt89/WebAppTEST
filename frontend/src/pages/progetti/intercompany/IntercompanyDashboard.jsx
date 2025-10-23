@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Inbox, Send, RefreshCw, CheckCircle, XCircle, Building2, Package, Wrench, Filter, Search } from 'lucide-react';
+import { Inbox, Send, RefreshCw, CheckCircle, XCircle, Building2, Package, Wrench, Filter, Search, Info } from 'lucide-react';
 import IntercompanyRequestDetailsPanel from './components/IntercompanyRequestDetailsPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import useProjectArticlesActions from '@/hooks/useProjectArticlesActions';
@@ -31,6 +31,7 @@ const IntercompanyDashboard = ({ onExit }) => {
   const [responseNotes, setResponseNotes] = useState('');
   const [responding, setResponding] = useState(false);
   const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   const loadRequests = useCallback(async (direction, status) => {
     try {
@@ -198,7 +199,6 @@ const IntercompanyDashboard = ({ onExit }) => {
           <TableRow>
             <TableHead>Componente</TableHead>
             <TableHead>Tipo</TableHead>
-            <TableHead>Progetto</TableHead>
             <TableHead>{direction === 'IN' ? 'Da Company' : 'A Company'}</TableHead>
             <TableHead>Stato</TableHead>
             <TableHead>Data</TableHead>
@@ -210,15 +210,29 @@ const IntercompanyDashboard = ({ onExit }) => {
             <TableRow key={request.ReferenceId}>
               <TableCell>
                 <div className="font-medium">{request.ComponentCode}</div>
+                <div className="flex items-center gap-1 text-xs">
+                  {request.TargetProjectItemCode ? (
+                    <>
+                      <span className="text-gray-500">→</span>
+                      <span className="font-medium text-green-600">{request.TargetProjectItemCode}</span>
+                    </>
+                  ) : (
+                    <span className="text-gray-400">(codice fornitore non configurato)</span>
+                  )}
+                  <button
+                    type="button"
+                    className="text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowInfoModal(true)}
+                    title="Informazioni sul codice articolo fornitore"
+                  >
+                    <Info className="w-3 h-3" />
+                  </button>
+                </div>
                 <div className="text-xs text-gray-500 truncate max-w-[200px]">
                   {request.ComponentDescription}
                 </div>
               </TableCell>
               <TableCell>{getTypeBadge(request.IntercompanyType)}</TableCell>
-              <TableCell>
-                <div className="font-medium text-sm">{request.ProjectCode}</div>
-                <div className="text-xs text-gray-500">{request.ProjectDescription}</div>
-              </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1 text-sm">
                   <Building2 className="w-3 h-3" />
@@ -243,7 +257,7 @@ const IntercompanyDashboard = ({ onExit }) => {
                       </Button>
                     </>
                   )}
-                  <Button size="sm" variant=""  onClick={() => openDetail(request)} className="bg-primary h-7">
+                  <Button size="sm" variant="outline"  onClick={() => openDetail(request)} className="h-7">
                     Dettagli
                   </Button>
                 </div>
@@ -399,10 +413,6 @@ const IntercompanyDashboard = ({ onExit }) => {
                   <span className="font-medium">{selectedRequest.ComponentCode}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Progetto:</span>
-                  <span className="font-medium">{selectedRequest.ProjectCode}</span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Company:</span>
                   <span className="font-medium">{selectedRequest.SourceCompanyName}</span>
                 </div>
@@ -459,6 +469,65 @@ const IntercompanyDashboard = ({ onExit }) => {
                   )}
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal informativo */}
+      <Dialog open={showInfoModal} onOpenChange={setShowInfoModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="w-5 h-5 text-blue-600" />
+              Codice Articolo Fornitore
+            </DialogTitle>
+            <DialogDescription>
+              Come funziona il collegamento tra codici articolo cliente e fornitore
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h4 className="font-medium text-sm mb-2">📋 Configurazione nel Gestionale Mago</h4>
+              <p className="text-sm text-gray-700">
+                Per collegare automaticamente i codici articolo tra cliente e fornitore, 
+                è necessario configurare il campo <strong>"Codifica presso il fornitore"</strong> 
+                nella scheda <strong>"Fornitori dell'articolo"</strong> del gestionale Mago.
+              </p>
+            </div>
+            
+            <div className="bg-green-50 p-4 rounded-lg">
+              <h4 className="font-medium text-sm mb-2">✅ Quando è configurato</h4>
+              <p className="text-sm text-gray-700">
+                Se il collegamento è configurato, vedrai il codice fornitore accanto al codice cliente 
+                con una freccia verde: <span className="text-green-600 font-mono">→ CODICE_FORNITORE</span>
+              </p>
+            </div>
+            
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium text-sm mb-2">⚠️ Quando non è configurato</h4>
+              <p className="text-sm text-gray-700">
+                Se il collegamento non è configurato, vedrai il messaggio 
+                <span className="text-gray-500 italic"> "(codice fornitore non configurato)"</span>
+              </p>
+            </div>
+            
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <h4 className="font-medium text-sm mb-2">🔧 Come configurare</h4>
+              <ol className="text-sm text-gray-700 space-y-1 list-decimal list-inside">
+                <li>Apri il gestionale Mago</li>
+                <li>Vai alla scheda dell'articolo</li>
+                <li>Apri la sezione "Fornitori dell'articolo"</li>
+                <li>Inserisci il codice fornitore nel campo "Codifica presso il fornitore"</li>
+                <li>Salva le modifiche</li>
+              </ol>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button onClick={() => setShowInfoModal(false)} variant="outline">
+              Chiudi
             </Button>
           </DialogFooter>
         </DialogContent>
