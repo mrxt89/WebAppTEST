@@ -108,19 +108,24 @@ const notificationsWorkerMiddleware = (store) => {
 
   // MODIFICA: Funzione migliorata per aggiornare le chat aperte nel worker
   const updateWorkerOpenChats = () => {
-    if (worker && isWorkerInitialized) {
+    if (worker && isWorkerInitialized && !worker.terminated) {
       // Usa setTimeout per evitare di chiamare getState durante l'esecuzione del reducer
       setTimeout(() => {
-        const state = store.getState();
-        const openChatIds = Array.from(state.notifications?.openChatIds || []);
-      
-      
-        worker.postMessage({
-          type: "update_open_chats",
-          data: {
-            openChatIds: openChatIds
+        try {
+          const state = store.getState();
+          const openChatIds = Array.from(state.notifications?.openChatIds || []);
+        
+          if (worker && !worker.terminated) {
+            worker.postMessage({
+              type: "update_open_chats",
+              data: {
+                openChatIds: openChatIds
+              }
+            });
           }
-        });
+        } catch (error) {
+          console.error("Errore nell'aggiornamento delle chat aperte:", error);
+        }
       }, 0);
     }
   };
@@ -251,7 +256,7 @@ const notificationsWorkerMiddleware = (store) => {
                     store.dispatch({
                       type: "notifications/updateFromWorker",
                       payload: newNotifications.map(notif => {
-                        if (openChatIds.has(notif.notificationId)) {
+                        if (openChatIds && (openChatIds.has ? openChatIds.has(notif.notificationId) : openChatIds.includes(notif.notificationId))) {
                           return {
                             ...notif,
                             messages: []
@@ -436,7 +441,10 @@ const notificationsWorkerMiddleware = (store) => {
                         return;
                       }
 
-                      const isActuallyOpen = state.notifications.openChatIds.has(parseInt(notificationId));
+                      const isActuallyOpen = state.notifications.openChatIds && 
+                        (state.notifications.openChatIds.has ? 
+                          state.notifications.openChatIds.has(parseInt(notificationId)) : 
+                          state.notifications.openChatIds.includes(parseInt(notificationId)));
                       
                       console.log(`[Middleware] Nuovo messaggio per chat ${notificationId}, aperta: ${isActuallyOpen}`);
 
@@ -682,7 +690,7 @@ const notificationsWorkerMiddleware = (store) => {
         // Marca come lette le notifiche delle chat aperte
         if (action.payload && Array.isArray(action.payload)) {
           action.payload = action.payload.map(notification => {
-            if (openChatIds.has(notification.notificationId)) {
+            if (openChatIds && (openChatIds.has ? openChatIds.has(notification.notificationId) : openChatIds.includes(notification.notificationId))) {
               return { ...notification, isReadByUser: true };
             }
             return notification;

@@ -22,6 +22,7 @@ import ArticlePage from "../../pages/progetti/progetti/articoli/ArticlePage";
 import IntercompanyDashboard from "../../pages/progetti/intercompany/IntercompanyDashboard";
 import ChangePassword from "../../pages/user/ChangePassword";
 import UserProfile from "../../pages/user/UserProfile";
+import Documentazione from "../../pages/Documentazione";
 import MainMenu from "../MainMenu";
 import NavigationDrawer from "../navigation/NavigationDrawer";
 import "../../styles/navigation-drawer.css";
@@ -296,6 +297,14 @@ const MainContainer = ({
                   element={
                     <ProtectedRoute>
                       <IntercompanyDashboard onExit={navigateToPreviousLevel} />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/documentazione"
+                  element={
+                    <ProtectedRoute>
+                      <Documentazione onExit={navigateToPreviousLevel} />
                     </ProtectedRoute>
                   }
                 />
