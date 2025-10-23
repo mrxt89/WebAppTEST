@@ -8,6 +8,7 @@ const authenticateToken = require('../authenticateToken');
 const fs = require('fs').promises;
 const { simpleParser } = require('mailparser');
 const { getEmailWorkerPool } = require('../workers/emailWorker');
+const MsgReader = require('@kenjiuno/msgreader').default;
 
 const {
     getProjectIdByTaskId,
@@ -636,41 +637,123 @@ router.get('/email-preview/:attachmentId', authenticateToken, async (req, res) =
         
         // Per file piccoli usa il metodo standard nel thread principale
         console.log('Using main thread for small email');
-        
+
+        // Determina il tipo di file dall'estensione
+        const isMsgFile = attachment.FileName.toLowerCase().endsWith('.msg');
+
         const emailFile = await fs.readFile(filePath);
-        
-        // Parsing con opzioni ottimizzate
-        const parsed = await simpleParser(emailFile, {
-            skipHtmlToText: false,
-            skipTextContent: false,
-            skipImageLinks: true,
-            streamAttachments: true,
-            // Limiti per evitare memory issues
-            maxHeaderLength: 1000000, // 1MB per headers
-            strictlyMime: false
-        });
-        
-        clearTimeout(timeoutHandle);
-        
-        // Costruisci risposta
-        const response = {
-            from: parsed.from?.text || '',
-            to: parsed.to?.text || '',
-            cc: parsed.cc?.text || '',
-            subject: parsed.subject || '',
-            date: parsed.date || new Date(),
-            textBody: parsed.text || '',
-            htmlBody: parsed.html || '',
-            attachments: (parsed.attachments || []).map(att => ({
-                filename: att.filename,
-                contentType: att.contentType,
-                size: att.size
-            })),
-            fileSizeMB: fileSizeMB,
-            processingMethod: 'main',
-            processingTimeMs: Date.now() - startTime
-        };
-        
+
+        let response;
+
+        if (isMsgFile) {
+            // ===== PARSING FILE .MSG (Outlook) =====
+            console.log('Parsing .msg file with msgreader in main thread');
+
+            try {
+                const msgReader = new MsgReader(emailFile);
+                const fileData = msgReader.getFileData();
+
+                // Estrai gli allegati e crea mappa CID → Base64
+                const attachments = [];
+                const cidMap = new Map();
+
+                if (fileData.attachments && fileData.attachments.length > 0) {
+                    for (const att of fileData.attachments) {
+                        const attData = msgReader.getAttachment(att);
+                        const content = attData && attData.content ? attData.content : null;
+                        const filename = att.fileName || att.name || 'allegato';
+
+                        attachments.push({
+                            filename: filename,
+                            contentType: att.mimeType || att.contentType || 'application/octet-stream',
+                            size: content ? content.length : 0,
+                            contentBase64: content ? content.toString('base64') : null
+                        });
+
+                        // Mappa CID per immagini embedded
+                        if (content && filename.match(/\.(png|jpg|jpeg|gif|bmp|webp)$/i)) {
+                            const cid = filename;
+                            const mimeType = att.mimeType || 'image/png';
+                            const base64 = content.toString('base64');
+                            cidMap.set(cid, `data:${mimeType};base64,${base64}`);
+                        }
+                    }
+                }
+
+                // Converti CID → Base64 nell'HTML
+                let htmlBody = fileData.bodyHtml || '';
+                if (htmlBody && cidMap.size > 0) {
+                    cidMap.forEach((dataUrl, cid) => {
+                        // Sostituisci cid:filename
+                        htmlBody = htmlBody.replace(new RegExp(`cid:${cid}`, 'gi'), dataUrl);
+                        // Sostituisci anche src="filename" (caso alternativo)
+                        htmlBody = htmlBody.replace(new RegExp(`src="${cid}"`, 'gi'), `src="${dataUrl}"`);
+                    });
+                }
+
+                clearTimeout(timeoutHandle);
+
+                // Costruisci la risposta
+                response = {
+                    from: fileData.senderName || fileData.senderEmail || '',
+                    to: (fileData.recipients || []).map(r => r.name || r.email).join(', ') || '',
+                    cc: (fileData.cc || []).map(r => r.name || r.email).join(', ') || '',
+                    subject: fileData.subject || '',
+                    date: fileData.creationTime || fileData.lastModificationTime || new Date(),
+                    textBody: fileData.body || '',
+                    htmlBody: htmlBody,
+                    attachments: attachments,
+                    fileSizeMB: fileSizeMB,
+                    processingMethod: 'main',
+                    processingTimeMs: Date.now() - startTime
+                };
+
+            } catch (msgError) {
+                clearTimeout(timeoutHandle);
+                console.error('Error parsing .msg file:', msgError);
+                return res.status(500).json({
+                    error: 'Failed to parse MSG file',
+                    details: process.env.NODE_ENV === 'development' ? msgError.message : 'Internal error'
+                });
+            }
+
+        } else {
+            // ===== PARSING FILE .EML (Standard RFC822) =====
+            console.log('Parsing .eml file with mailparser in main thread');
+
+            // Parsing con opzioni ottimizzate
+            const parsed = await simpleParser(emailFile, {
+                skipHtmlToText: false,
+                skipTextContent: false,
+                skipImageLinks: true,
+                streamAttachments: true,
+                // Limiti per evitare memory issues
+                maxHeaderLength: 1000000, // 1MB per headers
+                strictlyMime: false
+            });
+
+            clearTimeout(timeoutHandle);
+
+            // Costruisci risposta
+            response = {
+                from: parsed.from?.text || '',
+                to: parsed.to?.text || '',
+                cc: parsed.cc?.text || '',
+                subject: parsed.subject || '',
+                date: parsed.date || new Date(),
+                textBody: parsed.text || '',
+                htmlBody: parsed.html || '',
+                attachments: (parsed.attachments || []).map(att => ({
+                    filename: att.filename,
+                    contentType: att.contentType,
+                    size: att.size
+                })),
+                fileSizeMB: fileSizeMB,
+                processingMethod: 'main',
+                processingTimeMs: Date.now() - startTime
+            };
+        }
+
         res.json(response);
         
     } catch (error) {
@@ -1118,6 +1201,65 @@ router.post('/projects/:projectId/attachments/:attachmentId/version', authentica
 
 
 
+
+// Scarica allegato embedded da email .msg
+router.get('/email-preview/:attachmentId/embedded/:index', authenticateToken, async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        const embeddedIndex = parseInt(req.params.index);
+
+        const attachment = await getAttachmentById(attachmentId);
+        if (!attachment) {
+            return res.status(404).json({ error: 'Attachment not found' });
+        }
+
+        // Verifica che sia un file email
+        if (!attachment.FileName.toLowerCase().endsWith('.msg')) {
+            return res.status(400).json({ error: 'Not a MSG file' });
+        }
+
+        const filePath = path.join(fileService.baseUploadPath, attachment.FilePath);
+
+        try {
+            await fs.access(filePath);
+        } catch (err) {
+            return res.status(404).json({ error: 'Email file not found' });
+        }
+
+        // Leggi e parsa il file .msg
+        const emailFile = await fs.readFile(filePath);
+        const msgReader = new MsgReader(emailFile);
+        const fileData = msgReader.getFileData();
+
+        if (!fileData.attachments || embeddedIndex >= fileData.attachments.length || embeddedIndex < 0) {
+            return res.status(404).json({ error: 'Embedded attachment not found' });
+        }
+
+        // Estrai l'allegato specifico
+        const att = fileData.attachments[embeddedIndex];
+        const attData = msgReader.getAttachment(att);
+
+        if (!attData || !attData.content) {
+            return res.status(404).json({ error: 'Attachment content not found' });
+        }
+
+        const filename = att.fileName || att.name || `allegato_${embeddedIndex}`;
+        const contentType = att.mimeType || att.contentType || 'application/octet-stream';
+
+        // Invia il file
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', attData.content.length);
+        res.send(attData.content);
+
+    } catch (error) {
+        console.error('Error downloading embedded attachment:', error);
+        res.status(500).json({
+            error: 'Failed to download attachment',
+            details: process.env.NODE_ENV === 'development' ? error.message : 'Internal error'
+        });
+    }
+});
 
 module.exports = router;
 

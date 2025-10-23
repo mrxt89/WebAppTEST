@@ -3821,6 +3821,64 @@ const getSuppliersWithIntercompanyFlag = async (companyId, onlyIntercompany = fa
     }
 };
 
+// =============================================================================
+// NUOVA FUNZIONE: Sincronizzazione selettiva componenti intercompany
+// =============================================================================
+const syncIntercompanyComponents = async (components, companyId, userId = null, syncAttachments = true) => {
+    try {
+        console.log('=== SYNC INTERCOMPANY COMPONENTS FUNCTION ===');
+        console.log('Input parameters:', { components, companyId, userId, syncAttachments });
+        
+        let pool = await sql.connect(config.dbConfig);
+        const request = pool.request();
+
+        // Parametri input
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('UserId', sql.Int, userId);
+        request.input('Components', sql.NVarChar(sql.MAX), JSON.stringify(components));
+        request.input('SyncAttachments', sql.Bit, syncAttachments);
+
+        // Parametri output
+        request.output('ErrorCode', sql.Int);
+        request.output('ErrorMessage', sql.NVarChar(4000));
+
+        console.log('Executing stored procedure: MA_ProjectArticles_SyncIntercompanyComponents');
+        
+        // Esegui la stored procedure
+        const result = await request.execute('MA_ProjectArticles_SyncIntercompanyComponents');
+        
+        console.log('Stored procedure executed successfully');
+        console.log('Result recordsets:', result.recordsets);
+        console.log('Output parameters:', {
+            ErrorCode: request.parameters.ErrorCode.value,
+            ErrorMessage: request.parameters.ErrorMessage.value
+        });
+
+        // Controlla errori
+        const errorCode = request.parameters.ErrorCode.value || 0;
+        if (errorCode !== 0) {
+            throw new Error(request.parameters.ErrorMessage.value || `Error code: ${errorCode}`);
+        }
+
+        // Restituisci il risultato
+        return {
+            success: true,
+            errorCode: errorCode,
+            message: request.parameters.ErrorMessage.value,
+            data: result.recordsets[0] || {}
+        };
+
+    } catch (error) {
+        console.error('Errore durante sincronizzazione componenti intercompany:', error);
+        return {
+            success: false,
+            errorCode: -1,
+            message: error.message,
+            data: null
+        };
+    }
+};
+
 // Esporta tutte le funzioni
 module.exports = {
     addUpdateItem,
@@ -3870,5 +3928,7 @@ module.exports = {
     updateReferenceNotes,
     // Intercompany supplier helpers
     checkItemInGestionale,
-    getSuppliersWithIntercompanyFlag
+    getSuppliersWithIntercompanyFlag,
+    // Nuova funzione per sincronizzazione selettiva
+    syncIntercompanyComponents
 };
