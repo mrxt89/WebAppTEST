@@ -17,8 +17,9 @@ echo - Rimozione container non utilizzati...
 docker container prune -f
 echo - Rimozione immagini non utilizzate...
 docker image prune -a -f
-echo - Pulizia cache del sistema...
-docker system prune -f --volumes
+echo - Pulizia cache del sistema (PRESERVANDO i volumi Wiki)...
+docker system prune -f
+echo   NOTA: I volumi wiki-data-prod e wiki-config-prod sono preservati
 
 echo.
 echo Backup dei volumi di produzione...
@@ -107,6 +108,8 @@ echo Frontend HTTPS: https://192.168.42.122
 echo Frontend (alt): https://erpsrvdoc01
 echo Backend HTTP:   http://192.168.42.122:3000
 echo Backend HTTPS:  https://192.168.42.122:3443
+echo Wiki.js diretto: http://192.168.42.122:3002
+echo Wiki.js nginx:   https://192.168.42.122/wiki (si apre da menu Documentazione)
 echo Database: WebApp (192.168.42.117)
 echo Storage:  \\192.168.42.121\crite\GestDoc2\WebApp
 echo.

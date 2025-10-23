@@ -11,6 +11,9 @@ export const config = {
   // Sovrascrive API_BASE_URL solo se definito esplicitamente in .env o config.json
   API_BASE_URL: import.meta.env.VITE_API_URL || hostConfig.API_BASE_URL,
 
+  // Sovrascrive WIKI_URL solo se definito esplicitamente in .env o config.json
+  WIKI_URL: import.meta.env.VITE_WIKI_URL || envConfig.WIKI_URL || hostConfig.WIKI_URL,
+
   // Configurazione SweetAlert dai file di configurazione
   SWEET_ALERT_COLORS: envConfig.SWEET_ALERT_COLORS,
 };
@@ -20,3 +23,4 @@ console.log("Application config loaded:");
 console.log("Environment:", env);
 console.log("API URL:", config.API_BASE_URL);
 console.log("Frontend URL:", config.FRONTEND_URL);
+console.log("Wiki URL:", config.WIKI_URL);

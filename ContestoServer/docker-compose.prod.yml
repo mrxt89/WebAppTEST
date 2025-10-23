@@ -117,9 +117,50 @@ services:
       retries: 3
       start_period: 20s
 
+  wiki-prod:
+    image: ghcr.io/requarks/wiki:2
+    container_name: webapptest-wiki-prod
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      - DB_TYPE=mssql
+      - DB_HOST=192.168.42.117
+      - DB_PORT=1433
+      - DB_USER=rosset
+      - DB_PASS=OraetLabora25-!
+      - DB_NAME=WikiJS
+      - DB_SSL=false
+      - SSL_ACTIVE=false
+      - HA_ACTIVE=false
+    volumes:
+      - wiki-data-prod:/wiki/data
+      - wiki-config-prod:/wiki/config
+    networks:
+      - app-network-prod
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 512M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
 networks:
   app-network-prod:
     driver: bridge
     ipam:
       config:
         - subnet: 172.20.0.0/16
+
+volumes:
+  wiki-data-prod:
+  wiki-config-prod:
