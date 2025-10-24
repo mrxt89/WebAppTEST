@@ -10,6 +10,7 @@ import UsersTab from "./tabs/UsersTab";
 import GroupsTab from "./tabs/GroupsTab";
 import PagesTab from "./tabs/PagesTab";
 import NotificationsTab from "./tabs/NotificationsTab";
+import WikiDocumentationTab from "./tabs/WikiDocumentationTab";
 
 // Dialog components
 import {
@@ -159,6 +160,9 @@ const AdminDashboard = () => {
                 <TabsTrigger value="notificationsChannel">
                   Notifiche
                 </TabsTrigger>
+                <TabsTrigger value="wikiDocs">
+                  Wiki
+                </TabsTrigger>
               </TabsList>
             </div>
             <div className="flex items-center justify-center gap-4 w-full">
@@ -238,6 +242,13 @@ const AdminDashboard = () => {
               removeUserFromChannel={removeUserFromChannel}
               refreshData={() => refreshData("notificationsChannel")}
               handleOpenChat={handleOpenChat}
+            />
+          </TabsContent>
+
+          {/* Wiki Documentation Tab */}
+          <TabsContent value="wikiDocs">
+            <WikiDocumentationTab
+              pages={pages}
             />
           </TabsContent>
         </Tabs>
