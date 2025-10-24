@@ -138,8 +138,8 @@ const Header = ({
 
             {/* Agent Status Badge */}
             <AgentStatusBadge />
-            
-            {/* Wiki Button */}
+
+            {/* Wiki Button (old system) */}
             <WikiButton />
 
             {/* Notifications Section */}

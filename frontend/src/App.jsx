@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { UserSettingsProvider } from "./context/UserSettingsContext";
 import { CompanyProvider } from "./context/CompanyContext";
+import { WikiDocsProvider } from "./context/WikiDocsContext";
 import { Provider } from "react-redux";
 import { store } from "./redux/store";
 import { WikiProvider } from "./components/wiki/WikiContext";
@@ -67,7 +68,9 @@ const App = () => {
                       <ProtectedRoute>
                         <CompanyProvider>
                           <WikiProvider>
-                            <MainPage />
+                            <WikiDocsProvider>
+                              <MainPage />
+                            </WikiDocsProvider>
                           </WikiProvider>
                         </CompanyProvider>
                       </ProtectedRoute>
