@@ -223,7 +223,7 @@ const IntercompanyRequestDetailsPanel = ({
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      'PENDING': { variant: 'secondary', label: 'In Attesa' },
+      'PENDING': { variant: 'warning', label: 'In Attesa' },
       'APPROVED': { variant: 'default', label: 'Approvata' },
       'REJECTED': { variant: 'destructive', label: 'Rifiutata' },
     };

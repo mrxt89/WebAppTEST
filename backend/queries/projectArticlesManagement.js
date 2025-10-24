@@ -960,12 +960,12 @@ const getItemById = async (companyId, itemId) => {
 };
 
 // Nuova funzione: ottenere distinte base dal gestionale Mago
-const getERPBOMs = async (companyId, searchText = '') => {
+const getERPBOMs = async (companyId, searchText = '', pagination = { page: 1, pageSize: 50 }) => {
     try {
         let pool = await sql.connect(config.dbConfig);
         
         // Query corretta per recuperare le distinte dal gestionale Mago
-        // includendo ItemId e BOMId se già presenti nelle tabelle di progetto
+        // includendo ItemId, BOMId e Nature se già presenti nelle tabelle di progetto
         let query = `
             SELECT 
                 T0.BOM, 
@@ -973,13 +973,16 @@ const getERPBOMs = async (companyId, searchText = '') => {
                 T0.UoM,
                 T0.CreationDate,
                 T1.Id AS ItemId,
-                T2.Id AS BOMId
+                T2.Id AS BOMId,
+                T3.Nature
             FROM 
                 dbo.MA_BillOfMaterials T0
             LEFT JOIN 
                 MA_ProjectArticles_Items T1 ON T1.Item = T0.BOM AND T1.CompanyId = T0.CompanyId
             LEFT JOIN 
                 MA_ProjectArticles_BillOfMaterials T2 ON T2.ItemId = T1.Id
+            LEFT JOIN 
+                dbo.MA_Items T3 ON T3.Item = T0.BOM AND T3.CompanyId = T0.CompanyId
             WHERE 
                 T0.CompanyId = @CompanyId
                 AND T0.Disabled = 0
@@ -990,8 +993,11 @@ const getERPBOMs = async (companyId, searchText = '') => {
             query += ` AND (T0.BOM LIKE @SearchText OR T0.Description LIKE @SearchText)`;
         }
         
-        // Ordina per BOM e limita i risultati
-        query += ` ORDER BY T0.BOM OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY`;
+        // Calcola l'offset per la paginazione
+        const offset = (pagination.page - 1) * pagination.pageSize;
+        
+        // Ordina per BOM e applica la paginazione
+        query += ` ORDER BY T0.BOM OFFSET ${offset} ROWS FETCH NEXT ${pagination.pageSize} ROWS ONLY`;
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId);
@@ -1000,6 +1006,29 @@ const getERPBOMs = async (companyId, searchText = '') => {
             request.input('SearchText', sql.VarChar(100), `%${searchText}%`);
         }
         
+        // Prima eseguiamo la query di conteggio per il totale
+        let countQuery = `
+            SELECT COUNT(*) AS TotalCount
+            FROM dbo.MA_BillOfMaterials T0
+            WHERE T0.CompanyId = @CompanyId
+            AND T0.Disabled = 0
+        `;
+        
+        if (searchText) {
+            countQuery += ` AND (T0.BOM LIKE @SearchText OR T0.Description LIKE @SearchText)`;
+        }
+        
+        const countRequest = pool.request()
+            .input('CompanyId', sql.Int, companyId);
+        
+        if (searchText) {
+            countRequest.input('SearchText', sql.VarChar(100), `%${searchText}%`);
+        }
+        
+        const countResult = await countRequest.query(countQuery);
+        const totalItems = countResult.recordset[0].TotalCount;
+        
+        // Ora eseguiamo la query dei dati
         const result = await request.query(query);
         
         // Per ogni distinta, ottieni anche i componenti
@@ -1040,7 +1069,18 @@ const getERPBOMs = async (companyId, searchText = '') => {
             })
         );
         
-        return bomsWithComponents;
+        // Calcola la paginazione
+        const totalPages = Math.ceil(totalItems / pagination.pageSize);
+        
+        return {
+            items: bomsWithComponents,
+            pagination: {
+                currentPage: pagination.page,
+                pageSize: pagination.pageSize,
+                totalItems,
+                totalPages
+            }
+        };
     } catch (err) {
         console.error('Error in getERPBOMs:', err);
         throw err;
@@ -1048,7 +1088,7 @@ const getERPBOMs = async (companyId, searchText = '') => {
 };
 
 // Nuova funzione: ottenere distinte base di riferimento
-const getReferenceBOMs = async (companyId, filters = {}, pagination = { page: 1, pageSize: 10 }) => {
+const getReferenceBOMs = async (companyId, filters = {}, pagination = { page: 1, pageSize: 50 }) => {
     try {
         let pool = await sql.connect(config.dbConfig);
         
@@ -3658,11 +3698,11 @@ const getReferenceAttachments = async (referenceId, companyId) => {
             LEFT JOIN MA_ItemAttachmentSharing shar ON att.AttachmentID = shar.AttachmentID AND shar.TargetCompanyId = @CompanyId
             WHERE att.IsVisible = 1
             AND (
-                -- Allegati dell'azienda proprietaria
+                -- Allegati dell'azienda proprietaria (source company) - funziona per entrambe le company
                 (att.CompanyId = @SourceCompanyId AND att.ProjectItemId = @SourceProjectItemId)
                 OR
-                -- Allegati condivisi con l'azienda corrente
-                (att.CompanyId = @SourceCompanyId AND att.ItemCode = @ComponentCode AND shar.AttachmentID IS NOT NULL)
+                -- Allegati condivisi con l'azienda corrente (solo per target company)
+                (att.CompanyId = @SourceCompanyId AND att.ItemCode = @ComponentCode AND shar.AttachmentID IS NOT NULL AND @CompanyId != @SourceCompanyId)
             )
             ORDER BY 
                 CASE WHEN att.CompanyId = @CompanyId THEN 0 ELSE 1 END,
@@ -3684,6 +3724,17 @@ const getReferenceAttachments = async (referenceId, companyId) => {
             .input('SourceCompanyId', sql.Int, ref.SourceCompanyId)
             .input('CompanyId', sql.Int, companyId)
             .input('ComponentCode', sql.VarChar(64), componentCode);
+
+        // Debug log
+        console.log('getReferenceAttachments Debug:', {
+            referenceId,
+            companyId,
+            sourceCompanyId: ref.SourceCompanyId,
+            targetCompanyId: ref.TargetCompanyId,
+            sourceProjectItemId: ref.SourceProjectItemId,
+            componentCode,
+            isSourceCompany: companyId === ref.SourceCompanyId
+        });
 
         const attachmentsResult = await attachmentsRequest.query(attachmentsQuery);
         

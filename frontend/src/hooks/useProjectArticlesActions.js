@@ -531,13 +531,15 @@ const useProjectArticlesActions = () => {
 
   // NUOVO: Ottieni distinte dal gestionale ERP (Mago)
   const getERPBOMs = useCallback(
-    async (search = "") => {
+    async (search = "", page = 1, pageSize = 50) => {
       try {
         setLoading(true);
         let url = `${config.API_BASE_URL}/projectArticles/erp-boms`;
 
         // Aggiungi parametri di query
         const params = new URLSearchParams();
+        params.append("page", page);
+        params.append("pageSize", pageSize);
 
         if (search) params.append("search", search);
 
@@ -550,7 +552,10 @@ const useProjectArticlesActions = () => {
       } catch (err) {
         setError(err.message);
         console.error("Error fetching ERP BOMs:", err);
-        return [];
+        return {
+          items: [],
+          pagination: { currentPage: 1, totalPages: 1, totalItems: 0 },
+        };
       } finally {
         setLoading(false);
       }

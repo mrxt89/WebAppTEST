@@ -138,7 +138,7 @@ const IntercompanyDashboard = ({ onExit }) => {
       DRAFT: { variant: 'outline', icon: RefreshCw, text: 'Bozza' },
     };
 
-    const config = variants[status] || { variant: 'secondary', icon: RefreshCw, text: status };
+    const config = variants[status] || { variant: '', icon: RefreshCw, text: status };
     const Icon = config.icon;
 
     return (
@@ -343,7 +343,7 @@ const IntercompanyDashboard = ({ onExit }) => {
               {/* Filtri */}
               <div className="flex gap-2">
                 <div className="relative w-64">
-                  <Search className="absolute left-2 top-2.5 w-4 h-4 text-gray-400" />
+                  <Search className="absolute right-2 top-2.5 w-4 h-4 text-gray-400" />
                   <Input
                     placeholder="Cerca..."
                     value={searchQuery}
