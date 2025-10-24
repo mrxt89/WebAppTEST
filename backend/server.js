@@ -153,6 +153,7 @@ const healthRoutes = require('./routes/healthRoutes');
 const bomCostingRoutes = require('./routes/bomCostingRoutes');
 const utilityManagementRoutes = require('./routes/utilityManagementRoutes');
 const knownDataRoutes = require('./routes/knownDataRoutes');
+const wikiRoutes = require('./routes/wikiRoutes');
 
 const app = express();
 
@@ -249,6 +250,7 @@ app.use('/api', healthRoutes);
 app.use('/api/bom-costing', bomCostingRoutes);
 app.use('/api/utility', utilityManagementRoutes);
 app.use('/api/known-data', knownDataRoutes);
+app.use('/api/wiki', wikiRoutes);
 
 // Endpoint per servire i file uploadati
 app.get('/api/uploads/*', (req, res) => {

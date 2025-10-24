@@ -38,7 +38,7 @@ const IntercompanyChatModal = ({
   // Inizializza il titolo basato sulla richiesta
   useEffect(() => {
     if (selectedRequest && isOpen) {
-      const chatTitle = `Chat Intercompany - ${selectedRequest.ComponentCode}`;
+      const chatTitle = `Componente intercompany - ${selectedRequest.ComponentCode}`;
       setTitle(chatTitle);
       setMessage('');
       setSelectedUsers([]);
@@ -240,7 +240,7 @@ const IntercompanyChatModal = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageCircle className="w-5 h-5" />
-            Nuova Chat Intercompany
+            Nuova Chat Componente Intercompany
           </DialogTitle>
         </DialogHeader>
 

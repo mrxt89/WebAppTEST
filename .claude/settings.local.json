@@ -19,7 +19,8 @@
       "Bash(docker exec webapptest-backend-1 sh -c \"grep -n ''router.post.*sync-intercompany'' /usr/src/app/routes/projectArticlesRoutes.js\")",
       "Bash(docker exec webapptest-backend-1 sh -c \"tail -20 /usr/src/app/routes/projectArticlesRoutes.js\")",
       "Bash(docker exec webapptest-backend-1 sh -c \"grep -A 5 -B 5 ''Error\\|error'' /usr/src/app/logs/* 2>/dev/null | head -50 || echo ''No log files found''\")",
-      "Bash(docker logs webapptest-backend-1)"
+      "Bash(docker logs webapptest-backend-1)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

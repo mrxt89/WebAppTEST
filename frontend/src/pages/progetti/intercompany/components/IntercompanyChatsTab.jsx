@@ -23,8 +23,8 @@ const IntercompanyChatsTab = ({ selectedRequest, onRefresh }) => {
 
   // Titolo di default per nuove chat
   const defaultChatTitle = selectedRequest 
-    ? `Chat Intercompany - ${selectedRequest.ComponentCode}`
-    : 'Nuova chat intercompany';
+    ? `Componente intercompany - ${selectedRequest.ComponentCode}`
+    : 'Nuova chat componente intercompany';
 
   // Se non abbiamo i dati necessari, mostra un placeholder
   if (!selectedRequest?.ReferenceId) {

@@ -5,6 +5,12 @@ import { Package, Circle, ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { getNatureDescription } from "../../helpers/bomHelpers";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const DraggableItem = ({ item, expanded = false, onToggle }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -62,7 +68,24 @@ const DraggableItem = ({ item, expanded = false, onToggle }) => {
   // Get nature from item data
   const itemNature = item.data.Nature || item.data.ComponentNature || 0;
   const badgeVariant = getBadgeVariant(itemNature);
-  const natureDescription = getNatureDescription(itemNature);
+
+  // Funzione per ottenere l'acronimo della natura
+  const getNatureAcronym = (nature) => {
+    const natureCode = typeof nature === "string" ? parseInt(nature, 10) : nature;
+    
+    switch (natureCode) {
+      case 22413312: // Semilavorato
+        return "SL";
+      case 22413313: // Prodotto Finito
+        return "PF";
+      case 22413314: // Acquisto
+        return "AC";
+      default:
+        return "?";
+    }
+  };
+  
+  const natureAcronym = getNatureAcronym(itemNature);
 
   return (
     <div>
@@ -79,31 +102,41 @@ const DraggableItem = ({ item, expanded = false, onToggle }) => {
         {toggleIcon}
         {itemIcon}
         <div className="ml-2 flex-1 min-w-0">
-          <div className="flex items-center">
-            <div className="truncate text-sm flex-1">
-              {item.data.BOM || item.data.Item || item.data.ItemCode || "Item"}
-            </div>
+          <div className="flex items-center gap-2">
+            {/* Display badge for nature with tooltip - moved to the left */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs min-w-[24px] text-center flex-shrink-0",
+                      badgeVariant === "blue" &&
+                        "bg-blue-50 text-blue-700 border-blue-200",
+                      badgeVariant === "green" &&
+                        "bg-green-50 text-green-700 border-green-200",
+                      badgeVariant === "yellow" &&
+                        "bg-yellow-50 text-yellow-700 border-yellow-200",
+                    )}
+                  >
+                    {natureAcronym}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{getNatureDescription(itemNature)}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
-            {/* Display badge for nature */}
-            <Badge
-              variant="outline"
-              className={cn(
-                "ml-2 text-xs",
-                badgeVariant === "blue" &&
-                  "bg-blue-50 text-blue-700 border-blue-200",
-                badgeVariant === "green" &&
-                  "bg-green-50 text-green-700 border-green-200",
-                badgeVariant === "yellow" &&
-                  "bg-yellow-50 text-yellow-700 border-yellow-200",
-              )}
-            >
-              {natureDescription}
-            </Badge>
+            {/* Item code - now has more space */}
+            <div className="truncate text-sm font-medium flex-1">
+              {item.data.BOM || item.data.Item || item.data.ItemCode || item.data.Component || "Item"}
+            </div>
           </div>
 
           {/* Show additional info if available */}
           {(item.data.Description || item.data.ComponentDescription) && (
-            <div className="text-xs text-gray-500 truncate">
+            <div className="text-xs text-gray-500 truncate mt-1">
               {item.data.Description || item.data.ComponentDescription}
             </div>
           )}

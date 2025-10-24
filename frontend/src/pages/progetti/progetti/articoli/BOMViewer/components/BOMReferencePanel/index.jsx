@@ -70,25 +70,6 @@ const BOMReferencePanel = ({ activeItem = null, setDragSettings = null }) => {
     <div className="h-full flex flex-col" id="bom-reference-panel">
       {/* Opzioni comuni a tutte le tab, rinnovate con tooltip e indicazioni per il drag & drop */}
       <div className="border-b p-2 space-y-2 bg-gray-50">
-        <div className="flex flex-col space-y-1">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium">Opzioni Drag & Drop</h3>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <InfoIcon className="h-4 w-4 text-gray-400" />
-                </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-xs">
-                  <p className="text-xs">
-                    Queste opzioni controllano il comportamento quando trascini
-                    un componente dalla lista di riferimento sulla struttura
-                    della distinta base.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        </div>
         <div className="flex items-center space-x-2">
           <Checkbox
             id="createTempComponent"

@@ -49,7 +49,7 @@ const BOMViewerContent = () => {
                 <div className="d-grid w-25">
                   <div className="flex-col border-r" id="bom-tree-container">
                     {/* Header del pannello albero - FISSO */}
-                    <div id="bom-tree-header" className="flex-shrink-0 p-3 border-b bg-gray-50">
+                    <div id="bom-tree-header" className="flex-shrink-0 p-1 border-b bg-gray-50">
                       <h3 className="text-sm font-medium text-gray-700">Struttura BOM</h3>
                     </div>
                     {/* Contenuto albero - SCROLLABILE INDIPENDENTE */}
@@ -67,7 +67,7 @@ const BOMViewerContent = () => {
                 <div className="d-grid w-50">
                   <div className="flex flex-col border-r" id="bom-detail-container">
                     {/* Header del pannello dettagli - FISSO */}
-                    <div id="bom-detail-header" className="flex-shrink-0 p-3 border-b bg-gray-50">
+                    <div id="bom-detail-header" className="flex-shrink-0 p-1 border-b bg-gray-50">
                       <h3 className="text-sm font-medium text-gray-700">Dettagli Componente</h3>
                     </div>
                     {/* Contenuto dettagli - SCROLLABILE INDIPENDENTE */}
@@ -81,7 +81,7 @@ const BOMViewerContent = () => {
                 <div className="d-grid w-25">
                   <div className="flex flex-col" id="bom-reference-container">
                     {/* Header del pannello riferimento - FISSO */}
-                    <div id="bom-reference-header" className="flex-shrink-0 p-3 border-b bg-gray-50">
+                    <div id="bom-reference-header" className="flex-shrink-0 p-1 border-b bg-gray-50">
                       <h3 className="text-sm font-medium text-gray-700">BOM di Riferimento</h3>
                     </div>
                     {/* Contenuto riferimento - SCROLLABILE INDIPENDENTE */}

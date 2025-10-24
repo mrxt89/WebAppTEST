@@ -69,7 +69,7 @@ const IntercompanySidebar = ({
           <ChevronRight className="w-4 h-4 rotate-180" />
         </Button>
         {summary && summary.totalIntercompanyComponents > 0 && (
-          <Badge variant="secondary" className="text-[10px] px-1">
+          <Badge variant="destructive" className="text-[10px] px-1">
             {summary.totalIntercompanyComponents}
           </Badge>
         )}

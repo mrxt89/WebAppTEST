@@ -344,7 +344,13 @@ router.get('/projectArticles/erp-boms', authenticateToken, async (req, res) => {
         const companyId = req.user.CompanyId;
         const search = req.query.search || '';
         
-        const result = await getERPBOMs(companyId, search);
+        // Parametri di paginazione
+        const pagination = {
+            page: parseInt(req.query.page) || 1,
+            pageSize: parseInt(req.query.pageSize) || 50
+        };
+        
+        const result = await getERPBOMs(companyId, search, pagination);
         res.json(result);
     } catch (err) {
         console.error(`Error fetching ERP BOMs:`, err);
@@ -368,7 +374,7 @@ router.get('/projectArticles/reference-boms', authenticateToken, async (req, res
         // Parametri di paginazione
         const pagination = {
             page: parseInt(req.query.page) || 1,
-            pageSize: parseInt(req.query.pageSize) || 10
+            pageSize: parseInt(req.query.pageSize) || 50
         };
         
         const result = await getReferenceBOMs(companyId, filters, pagination);
