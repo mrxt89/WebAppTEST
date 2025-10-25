@@ -4,7 +4,7 @@ const config = require('../config');
 // Gestione articoli di progetto
 const addUpdateItem = async (action, companyId, itemData, userId, projectId = null, sourceItemId = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Parametri obbligatori
@@ -86,7 +86,7 @@ const addUpdateItem = async (action, companyId, itemData, userId, projectId = nu
 // Gestione distinte base
 const addUpdateBOM = async (action, companyId, bomData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // DEBUG: Verifica se la BOM esiste per ADD_COMPONENT
@@ -459,7 +459,7 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
 
 const getBOMData = async (action, companyId, id, itemId = null, version = null, options = {}) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Parametri obbligatori
@@ -554,7 +554,7 @@ const getBOMData = async (action, companyId, id, itemId = null, version = null, 
 // Gestione riferimenti intercompany
 const manageReferences = async (action, referenceData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Parametri obbligatori
@@ -647,7 +647,7 @@ const manageReferences = async (action, referenceData, userId) => {
 // Ottieni stati degli articoli di progetto
 const getItemStatuses = async () => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .query('SELECT Id, StatusCode, Description, Note FROM MA_ProjectsItemsStatus');
         return result.recordset;
@@ -660,7 +660,7 @@ const getItemStatuses = async () => {
 // Recupera articoli di progetto con paginazione e filtri
 const getPaginatedItems = async (companyId, page = 0, pageSize = 50, filters = {}) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Get total count first
         let countQuery = `
@@ -843,7 +843,7 @@ const getPaginatedItems = async (companyId, page = 0, pageSize = 50, filters = {
 // Ottieni dettagli di un articolo di progetto
 const getItemById = async (companyId, itemId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
 
         if (!itemId) {
             console.error('getItemById: Missing itemId parameter');
@@ -962,7 +962,7 @@ const getItemById = async (companyId, itemId) => {
 // Nuova funzione: ottenere distinte base dal gestionale Mago
 const getERPBOMs = async (companyId, searchText = '', pagination = { page: 1, pageSize: 50 }) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Query corretta per recuperare le distinte dal gestionale Mago
         // includendo ItemId, BOMId e Nature se già presenti nelle tabelle di progetto
@@ -1090,7 +1090,7 @@ const getERPBOMs = async (companyId, searchText = '', pagination = { page: 1, pa
 // Nuova funzione: ottenere distinte base di riferimento
 const getReferenceBOMs = async (companyId, filters = {}, pagination = { page: 1, pageSize: 50 }) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Calcola l'offset per la paginazione
         const offset = (pagination.page - 1) * pagination.pageSize;
@@ -1262,7 +1262,7 @@ const getReferenceBOMs = async (companyId, filters = {}, pagination = { page: 1,
 // Nuova implementazione della funzione reorderBOMComponents
 const reorderBOMComponents = async (companyId, bomId, components, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Inizia una transazione
         const transaction = new sql.Transaction(pool);
@@ -1336,7 +1336,7 @@ const reorderBOMComponents = async (companyId, bomId, components, userId) => {
 // Ottiene gli articoli temporanei disponibili (non già associati al progetto specificato)
 const getAvailableItems = async (companyId, projectId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -1360,7 +1360,7 @@ ORDER BY i.Item
 // Ottiene gli articoli dal gestionale
 const getERPItems = async (companyId, search = '') => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Query di base per articoli dal gestionale
         let query = `
@@ -1401,7 +1401,7 @@ const getERPItems = async (companyId, search = '') => {
 // Importa un articolo dal gestionale come articolo temporaneo e lo associa al progetto
 const importERPItem = async (companyId, userId, projectId, erpItem, importBOM = false, processMultilevelBOM = true, maxLevels = 10) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Verifica che l'articolo esista nel gestionale
         const erpItemResult = await pool.request()
@@ -1497,7 +1497,7 @@ const importERPItem = async (companyId, userId, projectId, erpItem, importBOM = 
 // Associa un articolo temporaneo esistente a un progetto
 const linkItemToProject = async (companyId, projectId, itemId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Verifica che l'articolo esista
         const itemResult = await pool.request()
@@ -1768,7 +1768,7 @@ const copyBOMFromItem = async (companyId, targetItemId, sourceItemId = null, sou
 // Sostituisci un componente con un componente esistente
 const replaceComponent = async (companyId, bomId, componentLine, newComponentId, newComponentCode, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
         
         // Imposta un timeout più lungo per la stored procedure
@@ -1847,7 +1847,7 @@ const replaceComponent = async (companyId, bomId, componentLine, newComponentId,
 // Sostituisci un componente con un nuovo componente temporaneo
 const replaceWithNewComponent = async (companyId, bomId, componentLine, newComponentData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
         
         // Parametri richiesti
@@ -1921,7 +1921,7 @@ const replaceWithNewComponent = async (companyId, bomId, componentLine, newCompo
 // Elimina un articolo dal progetto (rimuove solo l'associazione)
 const unlinkItemFromProject = async (companyId, projectId, itemId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Verifica se l'associazione esiste
         const checkResult = await pool.request()
@@ -1961,7 +1961,7 @@ const unlinkItemFromProject = async (companyId, projectId, itemId) => {
 // Disabilita un articolo temporaneo (lo marca come eliminato)
 const disableTemporaryItem = async (companyId, itemId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Verifica che l'articolo esista
         const checkResult = await pool.request()
@@ -2019,7 +2019,7 @@ const disableTemporaryItem = async (companyId, itemId) => {
 // Controlla se un articolo può essere disabilitato
 const canDisableItem = async (companyId, itemId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Verifica che l'articolo esista
         const itemResult = await pool.request()
@@ -2098,7 +2098,7 @@ const canDisableItem = async (companyId, itemId) => {
 // Ottieni centri di lavoro
 const getWorkCenters = async (companyId) => {
     try {
-      let pool = await sql.connect(config.dbConfig);
+      let pool = await sql.connect(config.database);
       
       const result = await pool.request()
         .input('CompanyId', sql.Int, companyId)
@@ -2128,7 +2128,7 @@ const getWorkCenters = async (companyId) => {
 // Ottieni operazioni
 const getOperations = async (companyId) => {
     try {
-      let pool = await sql.connect(config.dbConfig);
+      let pool = await sql.connect(config.database);
       
       const result = await pool.request()
         .input('CompanyId', sql.Int, companyId)
@@ -2153,7 +2153,7 @@ const getOperations = async (companyId) => {
 // Ottieni fornitori
 const getSuppliers = async (companyId) => {
     try {
-      let pool = await sql.connect(config.dbConfig);
+      let pool = await sql.connect(config.database);
       
       const result = await pool.request()
         .input('CompanyId', sql.Int, companyId)
@@ -2182,7 +2182,7 @@ const getSuppliers = async (companyId) => {
   // Ottiene tutte le versioni di una distinta base per un articolo
 const getBOMVersions = async (companyId, itemId) => {
     try {
-      let pool = await sql.connect(config.dbConfig);
+      let pool = await sql.connect(config.database);
       
       const result = await pool.request()
         .input('CompanyId', sql.Int, companyId)
@@ -2208,7 +2208,7 @@ const getBOMVersions = async (companyId, itemId) => {
   // Riordinamento in batch dei cicli di una distinta
 const reorderBOMRoutings = async (companyId, bomId, cycles, userId) => {
     try {
-      let pool = await sql.connect(config.dbConfig);
+      let pool = await sql.connect(config.database);
       
       // Inizia una transazione
       const transaction = new sql.Transaction(pool);
@@ -2277,7 +2277,7 @@ const reorderBOMRoutings = async (companyId, bomId, cycles, userId) => {
 // funzione per ottenere le unità di misura
 const getUnitsOfMeasure = async () => {
     try {
-      let pool = await sql.connect(config.dbConfig);
+      let pool = await sql.connect(config.database);
       
       const result = await pool.request()
         .query(`
@@ -2298,7 +2298,7 @@ const getUnitsOfMeasure = async () => {
   // funzione per aggiornare i dettagli dell'articolo
 const updateItemDetails = async (itemId, itemData) => {
     try {
-      let pool = await sql.connect(config.dbConfig);
+      let pool = await sql.connect(config.database);
       const request = pool.request();
       
       // Parametri obbligatori
@@ -2358,7 +2358,7 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
     let pool;
     
     try {
-        pool = await sql.connect(config.dbConfig);
+        pool = await sql.connect(config.database);
         
         // NON usare transazioni esterne - la stored procedure gestisce le proprie transazioni
         const request = pool.request();
@@ -2575,7 +2575,7 @@ async function completeImportResult(pool, companyId, itemId, bomId, importedComp
 // Ottieni la struttura BOM multilivello per un articolo ERP
 const getERPBOMStructure = async (companyId, itemCode) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Query ricorsiva per ottenere la struttura completa della distinta dall'ERP
         const query = `
@@ -2675,7 +2675,7 @@ const getERPBOMStructure = async (companyId, itemCode) => {
 // Verifica se un articolo ERP ha una distinta base
 const checkERPItemHasBOM = async (companyId, itemCode) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -2698,7 +2698,7 @@ const checkERPItemHasBOM = async (companyId, itemCode) => {
 // Ottiene gli articoli dal gestionale con paginazione
 const getERPItemsPaginated = async (companyId, page = 0, pageSize = 50, search = '') => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Query per il conteggio totale
         let countQuery = `
@@ -2765,7 +2765,7 @@ const getERPItemsPaginated = async (companyId, page = 0, pageSize = 50, search =
 // Valida l'unicità del codice articolo
 const validateItemCode = async (companyId, itemCode, excludeItemId = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
         
         // Parametri di input
@@ -2804,7 +2804,7 @@ const validateItemCode = async (companyId, itemCode, excludeItemId = null) => {
 // Verifica se un codice articolo è già utilizzato
 const checkItemCodeExists = async (companyId, itemCode, excludeItemId = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Query per verificare esistenza in MA_ProjectArticles_Items
         let query = `
@@ -2863,7 +2863,7 @@ const checkItemCodeExists = async (companyId, itemCode, excludeItemId = null) =>
 
 const updateItemDetailsWithValidation = async (itemId, itemData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Variabile per memorizzare il risultato della validazione
         let validationResult = null;
@@ -2971,7 +2971,7 @@ const updateItemDetailsWithValidation = async (itemId, itemData) => {
  */
 const searchSimilarArticles = async (companyId, rootCode = '', description = '', excludeId = null, limit = 10, erpOnly = false, tempOnly = false) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Set parameters
@@ -3007,7 +3007,7 @@ const searchSimilarArticles = async (companyId, rootCode = '', description = '',
 // Ottiene la struttura BOM ad albero per l'espansione nella lista articoli
 const getArticleBOMTree = async (companyId, itemId, maxLevel = 3, includeAttachments = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Parametri per la stored procedure esistente
@@ -3101,7 +3101,7 @@ const loadAttachmentsForComponents = async (pool, companyId, components) => {
 // Funzione di fallback per ottenere la struttura BOM
 const getArticleBOMTreeFallback = async (companyId, itemId, maxLevel = 3, includeAttachments = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Query semplificata per ottenere solo i componenti di primo livello
         const query = `
@@ -3265,7 +3265,7 @@ const organizeBOMTreeData = (recordsets) => {
 // Ottiene gli allegati per un componente specifico
 const getComponentAttachments = async (companyId, componentId, isProjectItem = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         let query = `
             SELECT 
@@ -3316,7 +3316,7 @@ const getComponentAttachments = async (companyId, componentId, isProjectItem = t
 // 1. Ottiene i componenti intercompany di una BOM
 const getIntercompanyComponents = async (bomId, companyId, includeAttachments = false) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Parametri input
@@ -3365,7 +3365,7 @@ const getIntercompanyComponents = async (bomId, companyId, includeAttachments = 
 // 2. Sincronizza le condivisioni intercompany per una BOM
 const syncIntercompanySharing = async (bomId, companyId, userId, syncAttachments = true, autoCreateReferences = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Parametri input
@@ -3417,7 +3417,7 @@ const syncIntercompanySharing = async (bomId, companyId, userId, syncAttachments
 // 3. Ottiene il riepilogo intercompany per la sidebar
 const getBOMIntercompanySummary = async (bomId, companyId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Parametri input - ATTENZIONE: la SP usa @Id non @BOMId
@@ -3522,7 +3522,7 @@ const getBOMIntercompanySummary = async (bomId, companyId) => {
 // 4. Ottiene le richieste intercompany (inbox/outbox)
 const getIntercompanyRequests = async (companyId, direction = 'IN', status = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         let query = `
             SELECT
                 ref.ReferenceId,
@@ -3601,7 +3601,7 @@ const approveRejectReference = async (referenceId, action, userId, notes = null)
             throw new Error('Action deve essere APPROVE o REJECT');
         }
 
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Determina il nuovo status
@@ -3644,7 +3644,7 @@ const approveRejectReference = async (referenceId, action, userId, notes = null)
 // 6. Allegati collegati a una reference intercompany
 const getReferenceAttachments = async (referenceId, companyId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
         request.input('ReferenceId', sql.Int, referenceId);
         request.input('CompanyId', sql.Int, companyId);
@@ -3765,7 +3765,7 @@ const getReferenceAttachments = async (referenceId, companyId) => {
 const updateReferenceNotes = async (referenceId, companyId, notes) => {
     try {
         console.log('updateReferenceNotes', referenceId, companyId, notes);
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const reqFetch = pool.request();
         reqFetch.input('ReferenceId', sql.Int, referenceId);
         const refRes = await reqFetch.query(`
@@ -3806,7 +3806,7 @@ const updateReferenceNotes = async (referenceId, companyId, notes) => {
 // Verifica se un codice articolo esiste nel gestionale e restituisce info fornitore/Intercompany
 const checkItemInGestionale = async (companyId, itemCode) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         request.input('CompanyId', sql.Int, companyId);
@@ -3847,7 +3847,7 @@ const checkItemInGestionale = async (companyId, itemCode) => {
 // Ottiene lista fornitori con flag Intercompany
 const getSuppliersWithIntercompanyFlag = async (companyId, onlyIntercompany = false) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         request.input('CompanyId', sql.Int, companyId);
@@ -3880,7 +3880,7 @@ const syncIntercompanyComponents = async (components, companyId, userId = null, 
         console.log('=== SYNC INTERCOMPANY COMPONENTS FUNCTION ===');
         console.log('Input parameters:', { components, companyId, userId, syncAttachments });
         
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Parametri input

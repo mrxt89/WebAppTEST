@@ -8,7 +8,7 @@ const SUPPLIER_TYPE = 3211265;
 // Get paginated customers/suppliers
 const getPaginatedCustSupp = async (page = 0, pageSize = 50, filters = {}, sort = {}) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     // Build where clause based on filters
     let whereConditions = [];
@@ -108,7 +108,7 @@ const getAllCustSupp = async (userId) => {
         ORDER BY CompanyName;
     `;
 
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('UserId', sql.Int, userId)
       .query(query);
@@ -130,7 +130,7 @@ const getAllCustSupp = async (userId) => {
 // Get countries data
 const getCountriesData = async () => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .query(`
                 SELECT  * FROM MA_Countries (NOLOCK)
@@ -145,7 +145,7 @@ const getCountriesData = async () => {
 // Get single customer/supplier by ID
 const getCustSuppById = async (CustSupp) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('CustSupp', sql.Int, CustSupp)
       .query(`
@@ -194,7 +194,7 @@ const getCustSuppById = async (CustSupp) => {
 // Add or Update multiple customers/suppliers
 const updateCustSupp = async (CustSupp, custSuppData, userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
 
     // Convert IsCustomer and IsSupplier flags to CustSuppType enum
     if ('IsCustomer' in custSuppData || 'IsSupplier' in custSuppData) {
@@ -391,7 +391,7 @@ const updateCustSupp = async (CustSupp, custSuppData, userId) => {
 // Toggle disable status
 const toggleDisableCustSupp = async (CustSupp, userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('CustSupp', sql.Int, CustSupp)
       .input('UserId', sql.Int, userId)
@@ -413,7 +413,7 @@ const toggleDisableCustSupp = async (CustSupp, userId) => {
 // Aggiornamento / Inserimento di clienti e fornitori in blocco
 const addUpdateCustSuppsBulk = async (custSupps, userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const transaction = new sql.Transaction(pool);
     
     try {

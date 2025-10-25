@@ -13,7 +13,7 @@ const config = require('../config');
 // Ottieni tutti i centri di lavoro
 const getWorkCenters = async (companyId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -54,7 +54,7 @@ const getWorkCenters = async (companyId) => {
 // Ottieni un centro di lavoro specifico
 const getWorkCenter = async (companyId, originalId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -87,7 +87,7 @@ const getWorkCenter = async (companyId, originalId) => {
 // Aggiorna solo i costi di un centro di lavoro
 const updateWorkCenterCosts = async (companyId, originalId, workCenterData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const {
             hourlyCost,
@@ -138,7 +138,7 @@ const updateWorkCenterCosts = async (companyId, originalId, workCenterData, user
 // Elimina un centro di lavoro
 const deleteWorkCenter = async (companyId, originalId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('OriginalId', sql.BigInt, originalId)
@@ -159,7 +159,7 @@ const deleteWorkCenter = async (companyId, originalId) => {
 // Verifica se un codice centro di lavoro esiste già
 const checkWorkCenterCodeExists = async (companyId, code, excludeOriginalId = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -183,7 +183,7 @@ const checkWorkCenterCodeExists = async (companyId, code, excludeOriginalId = nu
 // Ottieni tutte le operazioni
 const getOperations = async (companyId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -240,7 +240,7 @@ const getOperations = async (companyId) => {
 // Ottieni un'operazione specifica
 const getOperation = async (companyId, originalId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -281,7 +281,7 @@ const getOperation = async (companyId, originalId) => {
 // Aggiorna solo i costi di un'operazione
 const updateOperationCosts = async (companyId, originalId, operationData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const {
             unitCost,
@@ -352,7 +352,7 @@ const updateOperationCosts = async (companyId, originalId, operationData, userId
 // Elimina un'operazione
 const deleteOperation = async (companyId, originalId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('OriginalId', sql.BigInt, originalId)
@@ -373,7 +373,7 @@ const deleteOperation = async (companyId, originalId) => {
 // Verifica se un codice operazione esiste già
 const checkOperationCodeExists = async (companyId, code, excludeOriginalId = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -393,7 +393,7 @@ const checkOperationCodeExists = async (companyId, code, excludeOriginalId = nul
 // Toggle stato attivo/inattivo di un'operazione
 const toggleOperationActive = async (companyId, originalId, active, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -440,7 +440,7 @@ const toggleOperationActive = async (companyId, originalId, active, userId) => {
 // Ottieni statistiche per dashboard
 const getUtilityStats = async (companyId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)

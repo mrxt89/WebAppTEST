@@ -4,7 +4,7 @@ const { get } = require('../routes/notificationsRoutes');
 
 async function getNotifications() {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let result = await pool.request().execute('GetNotifications');
     return result.recordset;
   } catch (err) {
@@ -31,7 +31,7 @@ async function getUserNotificationsPaginated(userId, options = {}) {
   } = options;
 
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let request = pool.request()
       .input('userId', sql.Int, userId)
       .input('PageNumber', sql.Int, pageNumber)
@@ -74,7 +74,7 @@ async function getUserNotificationsPaginated(userId, options = {}) {
 
 async function getUserNotifications(userId, searchText = null) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let request = pool.request()
       .input('userId', sql.Int, userId)
       .input('notificationId', sql.Int, 0)
@@ -109,7 +109,7 @@ async function getUserNotifications(userId, searchText = null) {
 
 async function getNotificationById(userId, notificationId, isOpenChat = true, pageSize = null, lastMessageId = null, searchText = null) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let request = pool.request()
       .input('userId', sql.Int, userId)
       .input('notificationId', sql.Int, notificationId)
@@ -199,7 +199,7 @@ async function searchInNotifications(userId, searchText, notificationId = null, 
 
 async function getNotificationResponseOptions() {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let result = await pool.request()
       .query(`
 SELECT DISTINCT 
@@ -228,7 +228,7 @@ ON T1.id = T0.defaultResponseOptionId
 
 async function markNotificationAsReceived(notificationId, userId, messageId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .input('userId', sql.Int, userId)
@@ -248,7 +248,7 @@ async function markNotificationAsReceived(notificationId, userId, messageId) {
 
 async function markNotificationAsRead(notificationId, userId, isReadByUser) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .input('userId', sql.Int, userId)
@@ -280,7 +280,7 @@ async function markNotificationAsRead(notificationId, userId, isReadByUser) {
 
 async function togglePinned(notificationId, userId, pinned) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .input('userId', sql.Int, userId)
@@ -299,7 +299,7 @@ async function togglePinned(notificationId, userId, pinned) {
 
 async function toggleFavorite(notificationId, userId, favorite) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .input('userId', sql.Int, userId)
@@ -318,7 +318,7 @@ async function toggleFavorite(notificationId, userId, favorite) {
 
 async function closeChat(notificationId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .input('userId', sql.Int, userId)
@@ -350,7 +350,7 @@ async function closeChat(notificationId, userId) {
 
 async function reopenChat(notificationId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .input('userId', sql.Int, userId)
@@ -381,7 +381,7 @@ async function reopenChat(notificationId, userId) {
 async function sendNotification(data) {
   const { notificationId, message, responseOptionId, eventId, title, notificationCategoryId, receiversList, userId, replyToMessageId, pollId } = data;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const cleanMessage = message.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
     let request = pool.request()
     .input('userId', sql.Int, userId)
@@ -518,7 +518,7 @@ async function setMessageColor(messageId, userId, color) {
       throw new Error('Formato colore non valido. Deve essere in formato #RRGGBB');
     }
 
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('messageId', sql.Int, messageId)
       .input('userId', sql.Int, userId)
@@ -539,7 +539,7 @@ async function setMessageColor(messageId, userId, color) {
 
 async function clearMessageColor(messageId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('messageId', sql.Int, messageId)
       .input('userId', sql.Int, userId)
@@ -563,7 +563,7 @@ async function filterMessages(notificationId, userId, color, searchText) {
       throw new Error('NotificationId è obbligatorio');
     }
     
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let query = `
       SELECT nd.messageId, nd.message, nd.messageColor, nd.tbCreated, 
              u.firstName + ' ' + u.lastName AS senderName,
@@ -608,7 +608,7 @@ async function filterMessages(notificationId, userId, color, searchText) {
 
 async function addConversationHighlight(notificationId, userId, highlightText, isAutoGenerated = false) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('NotificationID', sql.Int, notificationId)
       .input('UserID', sql.Int, userId)
@@ -625,7 +625,7 @@ async function addConversationHighlight(notificationId, userId, highlightText, i
 
 async function removeConversationHighlight(highlightId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('HighlightID', sql.Int, highlightId)
       .input('UserID', sql.Int, userId)
@@ -640,7 +640,7 @@ async function removeConversationHighlight(highlightId, userId) {
 
 async function getConversationHighlights(notificationId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('NotificationID', sql.Int, notificationId)
       .input('UserID', sql.Int, userId)
@@ -655,7 +655,7 @@ async function getConversationHighlights(notificationId, userId) {
 
 async function generateConversationSummary(notificationId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('NotificationID', sql.Int, notificationId)
       .input('UserID', sql.Int, userId)
@@ -670,7 +670,7 @@ async function generateConversationSummary(notificationId, userId) {
 
 async function leaveChat(notificationId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .input('userId', sql.Int, userId)
@@ -691,7 +691,7 @@ async function createPoll(notificationId, messageId, question, options, allowMul
 
     const optionsJson = JSON.stringify(options);
     
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('NotificationID', sql.Int, notificationId)
       .input('MessageID', sql.Int, messageId)
@@ -711,7 +711,7 @@ async function createPoll(notificationId, messageId, question, options, allowMul
 
 async function votePoll(optionId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('OptionID', sql.Int, optionId)
       .input('UserID', sql.Int, userId)
@@ -726,7 +726,7 @@ async function votePoll(optionId, userId) {
 
 async function getPoll(pollId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('PollID', sql.Int, pollId)
       .input('UserID', sql.Int, userId)
@@ -741,7 +741,7 @@ async function getPoll(pollId, userId) {
 
 async function getNotificationPolls(notificationId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('NotificationID', sql.Int, notificationId)
       .input('UserID', sql.Int, userId)
@@ -756,7 +756,7 @@ async function getNotificationPolls(notificationId, userId) {
 
 async function closePoll(pollId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('PollID', sql.Int, pollId)
       .input('UserID', sql.Int, userId)
@@ -771,7 +771,7 @@ async function closePoll(pollId, userId) {
 
 async function archiveChat(notificationId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .input('userId', sql.Int, userId)
@@ -791,7 +791,7 @@ async function archiveChat(notificationId, userId) {
 
 async function unarchiveChat(notificationId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .input('userId', sql.Int, userId)
@@ -811,7 +811,7 @@ async function unarchiveChat(notificationId, userId) {
 
 async function updateChatTitle(notificationId, userId, title) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     await pool.request()
       .input('notificationId', sql.Int, notificationId)
@@ -835,7 +835,7 @@ async function updateChatTitle(notificationId, userId, title) {
 
 async function editMessage(messageId, userId, newMessage) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('messageId', sql.Int, messageId)
       .input('userId', sql.Int, userId)
@@ -851,7 +851,7 @@ async function editMessage(messageId, userId, newMessage) {
 
 async function getMessageVersionHistory(messageId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('messageId', sql.Int, messageId)
       .input('userId', sql.Int, userId)
@@ -873,7 +873,7 @@ async function getMessageVersionHistory(messageId, userId) {
 
 async function toggleMuteChat(notificationId, userId, isMuted, expiryDate = null) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .input('userId', sql.Int, userId)
@@ -899,7 +899,7 @@ async function toggleMuteChat(notificationId, userId, isMuted, expiryDate = null
 
 async function toggleDoNotDisturb(userId, enabled) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('userId', sql.Int, userId)
       .input('enabled', sql.Bit, enabled)
@@ -922,7 +922,7 @@ async function toggleDoNotDisturb(userId, enabled) {
 
 async function getDoNotDisturbStatus(userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('userId', sql.Int, userId)
       .query(`
@@ -945,7 +945,7 @@ async function getDoNotDisturbStatus(userId) {
 
 async function getRelatedMessageIds(messageId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     const messageInfoResult = await pool.request()
       .input('messageId', sql.Int, messageId)
@@ -993,7 +993,7 @@ async function getMessageReactions(messageId) {
       return [];
     }
     
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     let query = `
       SELECT mr.ReactionID, mr.MessageID, mr.UserID, mr.ReactionType, mr.CreatedDate,
@@ -1022,7 +1022,7 @@ async function addMessageReaction(messageId, userId, reactionType) {
     
     const relatedMessageIds = await getRelatedMessageIds(messageId);
     
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     let existingReactionQuery = `
       SELECT ReactionID, MessageID, ReactionType
@@ -1153,7 +1153,7 @@ async function addMessageReaction(messageId, userId, reactionType) {
 
 async function getReactionInfo(reactionId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('reactionId', sql.Int, reactionId)
       .query(`
@@ -1186,7 +1186,7 @@ async function getReactionInfo(reactionId) {
 
 async function removeMessageReaction(reactionId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     const checkResult = await pool.request()
       .input('reactionId', sql.Int, reactionId)
@@ -1232,7 +1232,7 @@ async function removeMessageReaction(reactionId, userId) {
 
 async function getNotificationIdForMessage(messageId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('messageId', sql.Int, messageId)
       .query(`
@@ -1256,7 +1256,7 @@ async function deleteMessage(messageId, userId) {
     
     const relatedMessageIds = await getRelatedMessageIds(messageId);
     
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     const checkOwnershipResult = await pool.request()
       .input('messageId', sql.Int, messageId)
@@ -1315,7 +1315,7 @@ async function getBatchReactions(messageIds, userId) {
     
     const reactionsMap = {};
     
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     const messageIdsString = messageIdsToProcess.join(',');
     
@@ -1390,7 +1390,7 @@ JOIN	(SELECT	m.messageId,
 
 async function getReadReceipts(messageId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('messageId', sql.Int, messageId)
       .input('userId', sql.Int, userId)
@@ -1449,7 +1449,7 @@ async function getBatchPolls(notificationId, messageIds, userId) {
 
 async function removeUserFromChat(notificationId, adminUserId, userToRemoveId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .input('adminUserId', sql.Int, adminUserId)
@@ -1465,7 +1465,7 @@ async function removeUserFromChat(notificationId, adminUserId, userToRemoveId) {
 
 async function getChatParticipants(notificationId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('notificationId', sql.Int, notificationId)
       .query(`
@@ -1499,7 +1499,7 @@ async function getChatParticipants(notificationId, userId) {
 // Restituisce anche le notifiche che sta cancellando per mostrarle come toast
 async function clearReactionNotifications(notificationId, userId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
 
     // Prima recupera le notifiche reazione che verranno cancellate
     const reactionNotifs = await pool.request()

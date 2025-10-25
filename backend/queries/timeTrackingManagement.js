@@ -10,7 +10,7 @@ const ExcelJS = require('exceljs');
  */
 const getUserTimeWeekly = async (userId, weekStartDate) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     const request = pool.request()
       .input('UserID', sql.Int, userId)
@@ -244,7 +244,7 @@ const generateExcelReport = async (reportData, user, timeBucket, period) => {
  */
 const getUserAvailableTasks = async (userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     // Calcola la settimana corrente
     const today = new Date();
@@ -316,7 +316,7 @@ const getUserAvailableTasks = async (userId) => {
  */
 const manageTimeEntry = async (action, entryId = null, entryData = null, createdBy) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     const request = pool.request()
       .input('Action', sql.VarChar(10), action)
@@ -356,7 +356,7 @@ const manageTimeEntry = async (action, entryId = null, entryData = null, created
  */
 const getProjectTimeSummary = async (projectId, userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     // Prima verifica che l'utente abbia accesso a questo progetto
     const permissionCheck = await pool.request()
@@ -402,7 +402,7 @@ const getProjectTimeSummary = async (projectId, userId) => {
  */
 const getTaskTimeSummary = async (taskId, userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     // Prima verifica che l'utente abbia accesso a questa attività
     const permissionCheck = await pool.request()
@@ -468,7 +468,7 @@ const getUserTimeReport = async (userId, timeBucket = 'month', options = {}) => 
       includeProjectDetails = true
     } = options;
 
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     const request = pool.request()
       .input('UserID', sql.Int, userId)
@@ -591,7 +591,7 @@ const exportTimeReport = async (userId, timeBucket = 'month', period = null, for
     });
     
     // Ottieni i dettagli dell'utente
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const userResult = await pool.request()
       .input('UserID', sql.Int, userId)
       .query('SELECT username, firstName, lastName, email FROM AR_Users WHERE userId = @UserID');

@@ -97,8 +97,7 @@ const config = {
   },
 };
 
-// Alias per compatibilità con i file esistenti
-config.dbConfig = config.database;
+// Alias rimosso - tutti i file ora usano config.database
 
 console.log('\n=== CONFIG.JS LOADED ===');
 console.log('NODE_ENV:', process.env.NODE_ENV);

@@ -8,7 +8,7 @@ const config = require("../config");
  */
 async function getPageComponents(pageId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool
       .request()
       .input("pageId", sql.Int, pageId)
@@ -82,7 +82,7 @@ async function getPageComponents(pageId) {
  */
 async function getComponentByKey(pageId, componentKey) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool
       .request()
       .input("pageId", sql.Int, pageId)
@@ -116,7 +116,7 @@ async function getComponentByKey(pageId, componentKey) {
  */
 async function getAllComponents() {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request().query(`
       SELECT
         c.componentId,
@@ -150,7 +150,7 @@ async function getAllComponents() {
  */
 async function createComponent(component) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool
       .request()
       .input("pageId", sql.Int, component.pageId)
@@ -216,7 +216,7 @@ async function createComponent(component) {
  */
 async function updateComponent(componentId, component) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool
       .request()
       .input("componentId", sql.Int, componentId)
@@ -270,7 +270,7 @@ async function updateComponent(componentId, component) {
  */
 async function deleteComponent(componentId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool
       .request()
       .input("componentId", sql.Int, componentId)
@@ -293,7 +293,7 @@ async function deleteComponent(componentId) {
  */
 async function getAvailableParents(pageId, excludeComponentId = null) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const request = pool
       .request()
       .input("pageId", sql.Int, pageId);
@@ -344,7 +344,7 @@ async function getAvailableParents(pageId, excludeComponentId = null) {
  */
 async function resolveWikiUrl(pageId, componentKey = null) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
 
     if (componentKey) {
       // Cerca il componente specifico

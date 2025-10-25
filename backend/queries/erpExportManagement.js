@@ -11,7 +11,7 @@ const config = require('../config');
  */
 const exportItemToERP = async (companyId, itemId, userId, autoSync = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         request.input('CompanyId', sql.Int, companyId);
@@ -46,7 +46,7 @@ const exportItemToERP = async (companyId, itemId, userId, autoSync = true) => {
  */
 const exportBOMToERP = async (companyId, bomId, version, userId, checkRecursive = true, autoSync = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         request.input('CompanyId', sql.Int, companyId);
@@ -81,7 +81,7 @@ const exportBOMToERP = async (companyId, bomId, version, userId, checkRecursive 
  */
 const exportItemsBatch = async (companyId, itemIds, userId, autoSync = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const results = [];
         let successCount = 0;
@@ -137,7 +137,7 @@ const exportItemsBatch = async (companyId, itemIds, userId, autoSync = true) => 
  */
 const exportBOMsBatch = async (companyId, boms, userId, checkRecursive = true, autoSync = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const results = [];
         let successCount = 0;
@@ -199,7 +199,7 @@ const exportBOMsBatch = async (companyId, boms, userId, checkRecursive = true, a
  */
 const getExportLog = async (companyId, filters = {}) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         request.input('CompanyId', sql.Int, companyId);
@@ -226,7 +226,7 @@ const getExportLog = async (companyId, filters = {}) => {
  */
 const checkItemExportability = async (companyId, itemId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Check if item exists and has required data
         const checkQuery = `
@@ -282,7 +282,7 @@ const checkItemExportability = async (companyId, itemId) => {
  */
 const checkBOMExportability = async (companyId, bomId, version) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Check if BOM exists
         const bomCheckQuery = `
@@ -379,7 +379,7 @@ const checkBOMExportability = async (companyId, bomId, version) => {
  */
 const getBOMComponentsStatus = async (companyId, bomId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const query = `
             SELECT 
@@ -422,7 +422,7 @@ const getBOMComponentsStatus = async (companyId, bomId) => {
  */
 const getExportStatistics = async (companyId, period = 'all') => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         let dateFilter = '';
         const today = new Date();
@@ -489,7 +489,7 @@ const getExportStatistics = async (companyId, period = 'all') => {
  */
 const syncItemsFromERP = async (companyId, itemCode, userId, onlyExported = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         request.input('CompanyId', sql.Int, companyId);
@@ -522,7 +522,7 @@ const syncItemsFromERP = async (companyId, itemCode, userId, onlyExported = true
  */
 const syncBOMsFromERP = async (companyId, bomCode, version, userId, onlyExported = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         request.input('CompanyId', sql.Int, companyId);
@@ -556,7 +556,7 @@ const syncBOMsFromERP = async (companyId, bomCode, version, userId, onlyExported
  */
 const syncAllFromERP = async (companyId, userId, syncItems = true, syncBOMs = true, onlyExported = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         request.input('CompanyId', sql.Int, companyId);

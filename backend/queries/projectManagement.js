@@ -4,7 +4,7 @@ const config = require('../config');
 // Nuova funzione: Ottieni stati progetto
 const getProjectStatuses = async () => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .execute('MA_GetProjectStatuses');
         return result.recordset;
@@ -19,7 +19,7 @@ const getPaginatedProjects = async (page = 0, pageSize = 100, filters = {}, user
     try {
         console.log('Filters received:', filters); // DEBUG
         
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request()
             .input('Page', sql.Int, page)
             .input('PageSize', sql.Int, pageSize)
@@ -112,7 +112,7 @@ const getPaginatedProjects = async (page = 0, pageSize = 100, filters = {}, user
 // Ottieni dettagli progetto con task e membri
 const getProjectById = async (projectId, userId, includeDisabled = false) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ProjectID', sql.Int, projectId)
             .input('UserId', sql.Int, userId)
@@ -135,7 +135,7 @@ const getProjectById = async (projectId, userId, includeDisabled = false) => {
 // Nuova funzione per disabilitare/riabilitare task
 const toggleTaskDisabled = async (taskId, userId, disable = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TaskID', sql.Int, taskId)
             .input('UserID', sql.Int, userId)
@@ -152,7 +152,7 @@ const toggleTaskDisabled = async (taskId, userId, disable = true) => {
 // Crea o aggiorna progetto
 const addUpdateProject = async (projectData, userId, companyId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Mapping dei campi con i tipi SQL
@@ -193,7 +193,7 @@ const addUpdateProject = async (projectData, userId, companyId) => {
 // Aggiorna membri del progetto
 const updateProjectMembers = async (projectId, userId, members) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ProjectID', sql.Int, projectId)
             .input('UserId', sql.Int, userId)
@@ -211,7 +211,7 @@ const updateProjectMembers = async (projectId, userId, members) => {
 // Modifica la funzione esistente per gestire il nuovo parametro
 const addUpdateProjectTask = async (taskData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Mappatura dei parametri con controlli di tipo
@@ -241,7 +241,7 @@ const addUpdateProjectTask = async (taskData, userId) => {
 // Aggiorna stato task
 const updateTaskStatus = async (taskId, status, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TaskID', sql.Int, taskId)
             .input('Status', sql.VarChar, status)
@@ -258,7 +258,7 @@ const updateTaskStatus = async (taskId, status, userId) => {
 // Aggiungi commento
 const addTaskComment = async (commentData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TaskID', sql.Int, commentData.TaskId)
             .input('UserID', sql.Int, commentData.UserId)
@@ -275,7 +275,7 @@ const addTaskComment = async (commentData) => {
 // Aggiungi allegato
 const addTaskAttachment = async (attachmentData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TaskID', sql.Int, attachmentData.TaskID)
             .input('FileName', sql.NVarChar, attachmentData.FileName)
@@ -295,7 +295,7 @@ const addTaskAttachment = async (attachmentData) => {
 // Ottieni statistiche progetto per utente
 const getUserProjectStatistics = async (userId, filters = {}) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request()
             .input('UserId', sql.Int, userId);
 
@@ -365,7 +365,7 @@ const getUserProjectStatistics = async (userId, filters = {}) => {
 
 const manageTaskCosts = async (action, taskId, userId, costData, lineId = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request()
             .input('Action', sql.VarChar(10), action)
             .input('TaskID', sql.Int, taskId)
@@ -391,7 +391,7 @@ const manageTaskCosts = async (action, taskId, userId, costData, lineId = null) 
 
 const getUnitsOfMeasure = async () => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .query(`
                 SELECT BaseUoM, Description, Symbol, Notes
@@ -407,7 +407,7 @@ const getUnitsOfMeasure = async () => {
 
 const getCostCategories = async () => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .query(`
                 SELECT CategoryID, Description, UoM, Name
@@ -424,7 +424,7 @@ const getCostCategories = async () => {
 // Ottieni cronologia task aggiornata con tutti i log
 const getTaskHistory = async (taskId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TaskID', sql.Int, taskId)
             .execute('MA_GetTaskHistory');
@@ -439,7 +439,7 @@ const getTaskHistory = async (taskId) => {
 // Ottieni log dei costi di un task
 const getTaskCostsLog = async (taskId, startDate = null, endDate = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request()
             .input('TaskID', sql.Int, taskId)
             .input('StartDate', sql.DateTime, startDate)
@@ -456,7 +456,7 @@ const getTaskCostsLog = async (taskId, startDate = null, endDate = null) => {
 // Ottieni log delle dipendenze di un task
 const getTaskDependenciesLog = async (taskId, startDate = null, endDate = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request()
             .input('TaskID', sql.Int, taskId)
             .input('StartDate', sql.DateTime, startDate)
@@ -472,7 +472,7 @@ const getTaskDependenciesLog = async (taskId, startDate = null, endDate = null) 
 
 const updateTaskSequence = async (taskId, projectId, newSequence) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TaskID', sql.Int, taskId)
             .input('ProjectID', sql.Int, projectId)
@@ -489,7 +489,7 @@ const updateTaskSequence = async (taskId, projectId, newSequence) => {
 // funzione getUserTasks che chiama la stored procedure : MA_GetUserTasks
 const getUserTasks = async (userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('UserId', sql.Int, userId)
             .execute('MA_GetUserTasks');
@@ -504,7 +504,7 @@ const getUserTasks = async (userId) => {
 // Aggiorna il ruolo di un membro del progetto
 const updateProjectMemberRole = async (memberId, role, userId) => {
     try {
-      let pool = await sql.connect(config.dbConfig);
+      let pool = await sql.connect(config.database);
       const result = await pool.request()
         .input('ProjectMemberID', sql.Int, memberId)
         .input('Role', sql.VarChar(20), role)
@@ -528,7 +528,7 @@ const updateProjectMemberRole = async (memberId, role, userId) => {
 // Ottieni progetti di cui l'utente è membro
 const getUserMemberProjects = async (userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('UserId', sql.Int, userId)
       .query(`
@@ -561,7 +561,7 @@ ORDER BY p.Name
 
 const getUserMemberProjectsPaginated = async (userId, page = 0, pageSize = 20, filters = {}) => {
     try {
-      let pool = await sql.connect(config.dbConfig);
+      let pool = await sql.connect(config.database);
       const offset = page * pageSize;
       
       // Costruisci la query con filtri
@@ -652,7 +652,7 @@ const getUserMemberProjectsPaginated = async (userId, page = 0, pageSize = 20, f
   // Gestisce le dipendenze dei task
 const manageTaskDependencies = async (taskId, dependencies, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TaskID', sql.Int, taskId)
             .input('Dependencies', sql.NVarChar(sql.MAX), JSON.stringify(dependencies))
@@ -669,7 +669,7 @@ const manageTaskDependencies = async (taskId, dependencies, userId) => {
 // Verifica dipendenze circolari
 const checkCircularDependencies = async (taskId, predecessorTaskId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TaskID', sql.Int, taskId)
             .input('PredecessorTaskID', sql.Int, predecessorTaskId)
@@ -685,7 +685,7 @@ const checkCircularDependencies = async (taskId, predecessorTaskId) => {
 // Calcola le date basate sulle dipendenze
 const calculateTaskDates = async (projectId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ProjectID', sql.Int, projectId)
             .execute('MA_CalculateTaskDates');
@@ -700,7 +700,7 @@ const calculateTaskDates = async (projectId) => {
 // Gestisce i pin delle attività
 const manageTaskPin = async (taskId, userId, action, newOrder = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request()
             .input('TaskID', sql.Int, taskId)
             .input('UserID', sql.Int, userId)
@@ -717,7 +717,7 @@ const manageTaskPin = async (taskId, userId, action, newOrder = null) => {
 
 const toggleProjectLock = async (projectId, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ProjectID', sql.Int, projectId)
             .input('UserId', sql.Int, userId)
@@ -733,7 +733,7 @@ const toggleProjectLock = async (projectId, userId) => {
 // Gestisce i pin dei progetti
 const manageProjectPin = async (projectId, userId, action, newOrder = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request()
             .input('ProjectID', sql.Int, projectId)
             .input('UserID', sql.Int, userId)
@@ -752,7 +752,7 @@ const manageProjectPin = async (projectId, userId, action, newOrder = null) => {
 // Gestione Stage
 const addUpdateProjectStage = async (stageData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request()
             .input('StageID', sql.Int, stageData.StageID || null)
             .input('ProjectID', sql.Int, stageData.ProjectID)
@@ -775,7 +775,7 @@ const addUpdateProjectStage = async (stageData, userId) => {
 // Ottieni stage del progetto
 const getProjectStages = async (projectId, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ProjectID', sql.Int, projectId)
             .input('UserId', sql.Int, userId)
@@ -794,7 +794,7 @@ const getProjectStages = async (projectId, userId) => {
 // Assegna task a stage
 const assignTaskToStage = async (taskId, stageId, taskSequenceInStage, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TaskID', sql.Int, taskId)
             .input('StageID', sql.Int, stageId || null)
@@ -812,7 +812,7 @@ const assignTaskToStage = async (taskId, stageId, taskSequenceInStage, userId) =
 // Gestione checklist
 const addUpdateStageChecklist = async (checklistData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ChecklistID', sql.Int, checklistData.ChecklistID || null)
             .input('StageID', sql.Int, checklistData.StageID)
@@ -833,7 +833,7 @@ const addUpdateStageChecklist = async (checklistData, userId) => {
 // Aggiorna stato checklist
 const updateChecklistItem = async (checklistId, isChecked, checkNotes, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ChecklistID', sql.Int, checklistId)
             .input('IsChecked', sql.Bit, isChecked)
@@ -851,7 +851,7 @@ const updateChecklistItem = async (checklistId, isChecked, checkNotes, userId) =
 // Approva/Rifiuta Gate
 const approveRejectStageGate = async (stageId, action, notes, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('StageID', sql.Int, stageId)
             .input('Action', sql.VarChar(20), action) // APPROVED, REJECTED, REOPENED
@@ -869,7 +869,7 @@ const approveRejectStageGate = async (stageId, action, notes, userId) => {
 // Elimina stage
 const deleteProjectStage = async (stageId, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('StageID', sql.Int, stageId)
             .input('UserId', sql.Int, userId)
@@ -885,7 +885,7 @@ const deleteProjectStage = async (stageId, userId) => {
 // Riordina stages
 const reorderProjectStages = async (projectId, stageOrders, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ProjectID', sql.Int, projectId)
             .input('StageOrders', sql.NVarChar(sql.MAX), JSON.stringify(stageOrders))
@@ -902,7 +902,7 @@ const reorderProjectStages = async (projectId, stageOrders, userId) => {
 // Template stages
 const getStageTemplates = async (templateId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TemplateID', sql.Int, templateId)
             .execute('MA_GetStageTemplates');
@@ -916,7 +916,7 @@ const getStageTemplates = async (templateId) => {
 
 const addUpdateStageTemplate = async (stageTemplateData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request()
             .input('StageTemplateID', sql.Int, stageTemplateData.StageTemplateID || null)
             .input('TemplateID', sql.Int, stageTemplateData.TemplateID)

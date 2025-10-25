@@ -10,7 +10,7 @@ router.get('/groups', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.UserId;
         
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('UserId', sql.Int, userId)
             .query(`
@@ -36,7 +36,7 @@ router.get('/groups/:id/members', authenticateToken, async (req, res) => {
     try {
         const groupId = req.params.id;
         
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('GroupId', sql.Int, groupId)
             .query(`

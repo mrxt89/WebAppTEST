@@ -10,7 +10,7 @@ const config = require('../config');
  */
 const getAllKnownData = async (companyId, dataType = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         let query = `
             SELECT 
@@ -81,7 +81,7 @@ const getAllKnownData = async (companyId, dataType = null) => {
  */
 const getKnownDataForItem = async (companyId, itemCode, dataType) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -111,7 +111,7 @@ const getKnownDataForItem = async (companyId, itemCode, dataType) => {
  */
 const createKnownDataParameter = async (companyId, parameterData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -148,7 +148,7 @@ const createKnownDataParameter = async (companyId, parameterData, userId) => {
  */
 const updateKnownDataParameter = async (companyId, parameterId, parameterData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -186,7 +186,7 @@ const updateKnownDataParameter = async (companyId, parameterId, parameterData, u
  */
 const deleteKnownDataParameter = async (companyId, parameterId, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -225,7 +225,7 @@ const deleteKnownDataParameter = async (companyId, parameterId, userId) => {
  */
 const deleteKnownDataParametersByItem = async (companyId, itemCode, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -255,7 +255,7 @@ const deleteKnownDataParametersByItem = async (companyId, itemCode, userId) => {
  */
 const createFormula = async (companyId, formulaData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -292,7 +292,7 @@ const createFormula = async (companyId, formulaData, userId) => {
  */
 const updateFormula = async (companyId, formulaId, formulaData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -330,7 +330,7 @@ const updateFormula = async (companyId, formulaId, formulaData, userId) => {
  */
 const deleteFormula = async (companyId, formulaId, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -360,7 +360,7 @@ const deleteFormula = async (companyId, formulaId, userId) => {
  */
 const createMatchingRule = async (companyId, ruleData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -396,7 +396,7 @@ const createMatchingRule = async (companyId, ruleData, userId) => {
  */
 const updateMatchingRule = async (companyId, ruleId, ruleData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -433,7 +433,7 @@ const updateMatchingRule = async (companyId, ruleId, ruleData, userId) => {
  */
 const deleteMatchingRule = async (companyId, ruleId, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -463,7 +463,7 @@ const deleteMatchingRule = async (companyId, ruleId, userId) => {
  */
 const testKnownDataCalculation = async (companyId, testData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)

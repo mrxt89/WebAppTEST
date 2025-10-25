@@ -27,7 +27,7 @@ async function getAllGroups(CompanyId) {
     AND T0.CompanyId = @CompanyId
   `;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let result = await pool.request()
       .input('CompanyId', sql.Int, CompanyId)
       .query(query);
@@ -58,7 +58,7 @@ async function getAllUsers(CompanyId) {
     WHERE T0.CompanyId = @CompanyId
   `;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let result = await pool.request()
       .input('CompanyId', sql.Int, CompanyId)
       .query(query);
@@ -77,7 +77,7 @@ async function updateGroup(groupId, data) {
     WHERE groupId = @groupId
   `;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('groupName', sql.NVarChar, groupName)
       .input('description', sql.NVarChar, description)
@@ -92,7 +92,7 @@ async function updateGroup(groupId, data) {
 
 async function assignUserToGroup(userId, groupId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('userId', sql.Int, userId)
       .input('groupId', sql.Int, groupId)
@@ -105,7 +105,7 @@ async function assignUserToGroup(userId, groupId) {
 
 async function removeUserFromGroup(userId, groupId) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('userId', sql.Int, userId)
       .input('groupId', sql.Int, groupId)
@@ -126,7 +126,7 @@ async function addGroup(data) {
     VALUES (@groupName, @description, 0, @companyId)
   `;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('groupName', sql.NVarChar, groupName)
       .input('description', sql.NVarChar, description)
@@ -174,7 +174,7 @@ async function getAllPages(userId) {
     ORDER BY T0.pageLevel, T0.sequence, T0.pageName
     `;
     
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let result = await pool.request()
       .input('userId', sql.Int, userId)
       .query(query);
@@ -204,7 +204,7 @@ async function getAllPages(userId) {
 
 async function enableDisablePage(pageId, disabled) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     if (disabled) {
       // Per disabilitare: aggiorniamo la pagina selezionata e tutte le pagine figlie verso il basso
@@ -281,7 +281,7 @@ async function enableDisablePage(pageId, disabled) {
 async function toggleInheritPermissions(pageId, inheritPermissions) {
   const query = `UPDATE AR_Pages SET inheritPermissions = @inheritPermissions WHERE pageId = @pageId`;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('inheritPermissions', sql.Bit, inheritPermissions)
       .input('pageId', sql.Int, pageId)
@@ -295,7 +295,7 @@ async function toggleInheritPermissions(pageId, inheritPermissions) {
 
 async function assignGroupToPage(pageId, groupId, applyToChildren = false) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     // Aggiungi il gruppo alla pagina principale
     await pool.request()
@@ -345,7 +345,7 @@ async function assignGroupToPage(pageId, groupId, applyToChildren = false) {
 
 async function removeGroupFromPage(pageId, groupId, applyToChildren = false) {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     // Rimuovi il gruppo dalla pagina principale
     await pool.request()
@@ -414,7 +414,7 @@ SELECT T0.*
 FROM	AR_NotificationCategory (NOLOCK) T0
 WHERE	T0.CompanyId = @CompanyId OR T0.intercompany = 1
     `;
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let result = await pool.request()
       .input('userId', sql.Int, userId)
       .query(query);
@@ -435,7 +435,7 @@ async function addNotificationChannel(data, userId) {
     VALUES (@name, @description, @hexColor, @defaultResponseOptionId, @defaultTitle, @menuType, @CompanyId, @intercompany)
   `;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('name', sql.NVarChar, name || '')
       .input('description', sql.NVarChar, description || '')
@@ -468,7 +468,7 @@ async function updateNotificationChannel(data) {
     WHERE notificationCategoryId = @notificationCategoryId
   `;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('notificationCategoryId', sql.Int, notificationCategoryId)
       .input('name', sql.NVarChar, name || '')
@@ -492,7 +492,7 @@ async function addUserToChannel(userId, notificationCategoryId) {
     VALUES (@notificationCategoryId, @userId)
   `;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('notificationCategoryId', sql.Int, notificationCategoryId)
       .input('userId', sql.Int, userId)
@@ -510,7 +510,7 @@ async function removeUserFromChannel(userId, notificationCategoryId) {
     WHERE notificationCategoryId = @notificationCategoryId AND userId = @userId
   `;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('notificationCategoryId', sql.Int, notificationCategoryId)
       .input('userId', sql.Int, userId)

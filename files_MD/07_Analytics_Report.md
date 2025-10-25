@@ -1,32 +1,94 @@
-# Analytics e Report
+# 📊 Analytics e Report
 
-## Panoramica
-La sezione **Analytics e Report** ti permette di analizzare le performance dei progetti, monitorare i costi, tracciare l'avanzamento e generare report dettagliati. È essenziale per il controllo di gestione e l'ottimizzazione dei processi.
+> **In questa guida imparerai a:**
+> - Analizzare le performance dei tuoi progetti con dashboard interattive
+> - Monitorare costi, tempi e avanzamento in tempo reale
+> - Generare report professionali da condividere con il team
+> - Comprendere KPI e metriche per prendere decisioni informate
 
-## Accesso alla Sezione
-- Dalla **Dashboard Progetti**, seleziona un progetto
-- Vai alla **scheda "Analytics"** nel pannello dettagli progetto
-- La sezione si carica automaticamente con i dati del progetto
+---
 
-## Interfaccia Principale
+## 📋 Panoramica
+
+La sezione **Analytics e Report** è il tuo centro di controllo per:
+
+✅ **Monitorare** le performance dei progetti in tempo reale
+✅ **Analizzare** costi, tempi e risorse impiegate
+✅ **Tracciare** l'avanzamento con grafici chiari e intuitivi
+✅ **Generare** report dettagliati esportabili (CSV/PDF)
+✅ **Identificare** problemi e colli di bottiglia prima che diventino critici
+
+**Perfetto per**: Responsabili di progetto, Manager, Controller, Team Leader
+
+**Livello**: Intermedio | **Tempo di lettura**: ~18 minuti
+
+---
+
+## 🚪 Come Accedere alla Sezione Analytics
+
+**Passo-passo:**
+
+1. **Apri** la Dashboard Progetti dal menu principale
+2. **Seleziona** il progetto che vuoi analizzare cliccandoci sopra
+3. **Clicca** sulla scheda **"Analytics"** nel pannello dettagli (in alto)
+4. **Attendi** il caricamento dei dati (vedrai un indicatore di caricamento)
+
+> **💡 Consiglio**: Puoi anche marcare il progetto come "Preferito" per accedervi più velocemente!
+
+**Cosa vedrai sullo schermo:**
+- Una dashboard con grafici colorati
+- Tab per diverse tipologie di analisi (Costi, Avanzamento, Tempi)
+- Pulsanti per aggiornare i dati ed esportare report
+
+---
+
+## 🖥️ Interfaccia Principale - Cosa Vedi Sullo Schermo
 
 ### Layout Dashboard Analytics
-La schermata è organizzata in:
 
-**Barra Superiore**
-- **Titolo**: "Dashboard di Analisi"
-- **Tasto "Aggiorna"**: Ricarica tutti i dati
-- **Tasto "Esporta CSV"**: Scarica report in formato CSV
+La dashboard è organizzata in **3 aree principali**:
 
-**Tab di Navigazione**
-- **Tab "Costi"**: Analisi dei costi del progetto
-- **Tab "Avanzamento"**: Monitoraggio progresso attività
-- **Tab "Tempi"**: Analisi temporale e timeline
+#### **1️⃣ Barra Superiore** (Header)
+Qui trovi i controlli principali:
 
-**Area Contenuto**
-- **Grafici interattivi** per ogni tipo di analisi
-- **Tabelle dettagliate** con dati numerici
-- **Indicatori KPI** per performance rapide
+| Elemento | Funzione | Come si presenta |
+|----------|----------|------------------|
+| **📊 Titolo** | Mostra "Dashboard di Analisi - [Nome Progetto]" | Testo grande in alto |
+| **🔄 Tasto "Aggiorna"** | Ricarica tutti i dati più recenti | Icona circolare frecce |
+| **📥 Tasto "Esporta CSV"** | Scarica i dati in un file Excel | Pulsante blu "Esporta" |
+
+> **💡 Quando aggiornare**: Clicca "Aggiorna" se hai modificato attività, costi o ore e vuoi vedere i dati aggiornati.
+
+---
+
+#### **2️⃣ Tab di Navigazione** (Schede)
+Tre tab principali per accedere a diversi tipi di analisi:
+
+| Tab | Icona | Cosa analizza | Quando usarlo |
+|-----|-------|---------------|---------------|
+| **💰 Costi** | Simbolo euro/dollaro | Budget, spese, margini | Per controllare il budget di progetto |
+| **📈 Avanzamento** | Grafico crescente | Progresso attività, stati, completamento | Per vedere a che punto siamo |
+| **⏰ Tempi** | Orologio | Ore lavorate, timeline, durata | Per monitorare le scadenze |
+
+**Come funziona**: Clicca su un tab per vedere i dati specifici. Il tab attivo diventa **blu** o **evidenziato**.
+
+---
+
+#### **3️⃣ Area Contenuto** (Grafici e Dati)
+Qui vengono mostrati i dati analitici veri e propri:
+
+**📊 Grafici Interattivi**
+- **Grafici a torta**: Per vedere percentuali e distribuzioni
+- **Grafici a barre**: Per confrontare valori tra categorie
+- **Grafici a linee**: Per vedere l'evoluzione nel tempo
+- **KPI Cards**: Riquadri colorati con numeri chiave
+
+**📋 Tabelle Dettagliate**
+- Liste ordinate con tutti i dati numerici
+- Colonne ordinabili (clicca sull'intestazione)
+- Righe evidenziate per valori importanti
+
+> **💡 Interazione**: Passa il mouse sopra i grafici per vedere i dettagli di ogni punto!
 
 ## Analisi Costi
 

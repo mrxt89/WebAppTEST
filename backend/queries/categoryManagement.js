@@ -5,7 +5,7 @@ const config = require('../config');
 // Get all categories with details
 const getCategories = async (userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         // ESEGUE LA PROCEDURA MA_GetProjectCategories PASSANDO L'ID DELL'UTENTE
         const result = await pool.request()
             .input('UserId', sql.Int, userId)
@@ -26,7 +26,7 @@ const getCategories = async (userId) => {
 // Add or update category
 const addUpdateCategory = async (categoryData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ProjectCategoryId', sql.Int, categoryData.ProjectCategoryId)
             .input('Description', sql.NVarChar(sql.MAX), categoryData.Description)
@@ -44,7 +44,7 @@ const addUpdateCategory = async (categoryData) => {
 // Add or update category detail
 const addUpdateCategoryDetail = async (detailData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ProjectCategoryId', sql.Int, detailData.ProjectCategoryId)
             .input('Line', sql.Int, detailData.Line)
@@ -61,7 +61,7 @@ const addUpdateCategoryDetail = async (detailData) => {
 // Toggle category status
 const toggleCategoryStatus = async (categoryId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ProjectCategoryId', sql.Int, categoryId)
             .query(`
@@ -81,7 +81,7 @@ const toggleCategoryStatus = async (categoryId) => {
 // Toggle subcategory status
 const toggleSubcategoryStatus = async (categoryId, line) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ProjectCategoryId', sql.Int, categoryId)
             .input('Line', sql.Int, line)
