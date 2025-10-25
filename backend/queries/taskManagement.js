@@ -29,7 +29,7 @@ const getUserTasksWithFilters = async (
   includeDisabled = false  // Nuovo parametro
 ) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     const result = await pool.request()
       .input('UserID', sql.Int, userId)

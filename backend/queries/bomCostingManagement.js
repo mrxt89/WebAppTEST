@@ -9,7 +9,7 @@ const config = require('../config');
 // Inizializza i parametri di costificazione per una company
 const initializeBOMCostingParameters = async (companyId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -29,7 +29,7 @@ const initializeBOMCostingParameters = async (companyId) => {
 // Ottieni tutti i parametri di costificazione
 const getBOMCostingParametersDefault = async (companyId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -58,7 +58,7 @@ const getBOMCostingParametersDefault = async (companyId) => {
 // Ottieni i parametri di costificazione per una BOM (custom o default)
 const getLastCostingParametersByBOMId = async (companyId, bomId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -173,7 +173,7 @@ const getLastCostingParametersByBOMId = async (companyId, bomId) => {
 // Aggiorna parametri di costificazione
 const updateBOMCostingParameter = async (companyId, parameterId, parameterValue, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -216,7 +216,7 @@ const updateBOMCostingParameter = async (companyId, parameterId, parameterValue,
 // Calcola la costificazione di una BOM
 const calculateBOMCosting = async (companyId, bomId, options = {}) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const {
             orderQuantity = null,
@@ -319,7 +319,7 @@ const calculateBOMCosting = async (companyId, bomId, options = {}) => {
 // Calcola costificazione per multiple BOM
 const batchCalculateBOMCosting = async (companyId, bomIds, options = {}) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const {
             orderQuantity = null,
@@ -373,7 +373,7 @@ const batchCalculateBOMCosting = async (companyId, bomIds, options = {}) => {
 // Salva lo storico dei parametri di costificazione con ricarichi custom BOM-specific
 const saveBOMCostingHistory = async (companyId, bomId, costingData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
 
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -434,7 +434,7 @@ const saveBOMCostingHistory = async (companyId, bomId, costingData, userId) => {
 // Ottieni lo storico dei parametri di costificazione
 const getBOMCostingParametersHistory = async (companyId, bomId = null, top = null, orderBy = 'CostingDate DESC') => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
 
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -460,7 +460,7 @@ const getBOMCostingParametersHistory = async (companyId, bomId = null, top = nul
 // Ottieni log delle costificazioni
 const getBOMCostingLogs = async (companyId, bomId = null, logLevel = null, limit = 100) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         let query = `
             SELECT TOP(@Limit)
@@ -506,7 +506,7 @@ const getBOMCostingLogs = async (companyId, bomId = null, logLevel = null, limit
 // Ottieni lista BOM disponibili per costificazione con paginazione
 const getAvailableBOMs = async (companyId, filters = {}, pagination = {}) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Parametri di paginazione con default
         const page = parseInt(pagination.page) || 1;
@@ -682,7 +682,7 @@ const exportBOMCostingResult = async (companyId, bomId, format = 'json') => {
 // Ottieni dettaglio costi per una BOM
 const getBOMCostingDetails = async (companyId, bomId, options = {}) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const {
             calculationId = null,
@@ -743,7 +743,7 @@ const getBOMCostingDetails = async (companyId, bomId, options = {}) => {
 // Cerca BOM con costi già calcolati
 const searchBOMCostingHistory = async (companyId, searchText = null, pagination = {}) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const page = parseInt(pagination.page) || 1;
         const pageSize = parseInt(pagination.pageSize) || 50;
@@ -786,7 +786,7 @@ const searchBOMCostingHistory = async (companyId, searchText = null, pagination 
 // Ottieni dettaglio costi storici per una BOM
 const getBOMCostingHistory = async (companyId, bomId = null, bomCode = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId);
@@ -839,7 +839,7 @@ module.exports = {
 // =============================================
 const getBOMOperationsCostBreakdown = async (companyId, bomId, includeMultilevel = true) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request()
             .input('CompanyId', sql.Int, companyId)
             .input('BOMId', sql.BigInt, bomId)
@@ -875,7 +875,7 @@ module.exports = {
 // Test calcolo con esempio fornito
 const testBOMCostingExample = async (companyId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -895,7 +895,7 @@ const testBOMCostingExample = async (companyId) => {
 // Ottieni tutte le versioni di una BOM per un articolo
 const getBOMVersions = async (companyId, itemId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)

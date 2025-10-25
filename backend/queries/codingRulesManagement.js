@@ -12,7 +12,7 @@ const config = require('../config');
  */
 const getCodingHierarchy = async (companyId, categoryId = null, macroFamilyId = null, familyId = null, typeId = null) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         request.input('CompanyId', sql.Int, companyId);
@@ -41,7 +41,7 @@ const getCodingHierarchy = async (companyId, categoryId = null, macroFamilyId = 
  */
 const getNextSequential = async (companyId, macroFamilyCode, familyCode, typeCode, aliasCode) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         request.input('CompanyId', sql.Int, companyId);
@@ -68,7 +68,7 @@ const getNextSequential = async (companyId, macroFamilyCode, familyCode, typeCod
  */
 const validateCode = async (companyId, itemCode) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
 
         request.input('CompanyId', sql.Int, companyId);
@@ -133,7 +133,7 @@ const validateCode = async (companyId, itemCode) => {
  */
 const applyBatchRecoding = async (companyId, userId, items) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
 
         
@@ -279,7 +279,7 @@ const applyBatchRecoding = async (companyId, userId, items) => {
 // Funzione alternativa che non usa stored procedure
 const applyBatchRecodingAlternative = async (companyId, userId, items) => {
     
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const transaction = new sql.Transaction(pool);
     
     let successCount = 0;
@@ -508,7 +508,7 @@ const applyBatchRecodingAlternative = async (companyId, userId, items) => {
  */
 const getCodingConfig = async (companyId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         const result = await pool.request()
             .input('CompanyId', sql.Int, companyId)
@@ -591,7 +591,7 @@ const buildCompleteCode = (macroFamilyCode, familyCode, typeCode, aliasCode, mea
  */
 const getCodesPreview = async (companyId, items) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Get configuration
         const config = await getCodingConfig(companyId);
@@ -663,7 +663,7 @@ const getCodesPreview = async (companyId, items) => {
  */
 const logRecodingHistory = async (companyId, userId, items) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Prepare bulk insert
         const table = new sql.Table('MA_CodingRules_History');
@@ -722,7 +722,7 @@ const logRecodingHistory = async (companyId, userId, items) => {
  */
 const getRecodingHistory = async (companyId, filters = {}) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         let query = `
             SELECT 
@@ -827,7 +827,7 @@ const searchSimilarForRecoding = async (companyId, rootCode, description, exclud
  */
 const createCategory = async (companyId, categoryData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
         
         request.input('CompanyId', sql.Int, companyId);
@@ -864,7 +864,7 @@ const createCategory = async (companyId, categoryData) => {
  */
 const createMacroFamily = async (companyId, macroFamilyData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
         
         request.input('CompanyId', sql.Int, companyId);
@@ -901,7 +901,7 @@ const createMacroFamily = async (companyId, macroFamilyData) => {
  */
 const createFamily = async (companyId, familyData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
         
         request.input('CompanyId', sql.Int, companyId);
@@ -938,7 +938,7 @@ const createFamily = async (companyId, familyData) => {
  */
 const createType = async (companyId, typeData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
         
         request.input('CompanyId', sql.Int, companyId);
@@ -975,7 +975,7 @@ const createType = async (companyId, typeData) => {
  */
 const createAlias = async (companyId, aliasData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const request = pool.request();
         
         request.input('CompanyId', sql.Int, companyId);

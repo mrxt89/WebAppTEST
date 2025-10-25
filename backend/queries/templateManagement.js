@@ -5,7 +5,7 @@ const config = require('../config');
 // Get all templates with details
 const getTemplates = async (userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('UserId', sql.Int, userId)
             .query(`
@@ -69,7 +69,7 @@ const getTemplates = async (userId) => {
 // Ottieni template filtrati per categoria e sottocategoria
 const getFilteredTemplates = async (userId, categoryId = null, detailLine = null) => {
     try {
-      let pool = await sql.connect(config.dbConfig);
+      let pool = await sql.connect(config.database);
       let query = `
         SELECT 
             t.TemplateID,
@@ -119,7 +119,7 @@ const getFilteredTemplates = async (userId, categoryId = null, detailLine = null
 // Add or update template
 const addUpdateTemplate = async (templateData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TemplateID', sql.Int, templateData.TemplateID || null)
             .input('Description', sql.NVarChar(sql.MAX), templateData.Description)
@@ -141,7 +141,7 @@ const addUpdateTemplate = async (templateData) => {
 // Add or update template detail
 const addUpdateTemplateDetail = async (detailData) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TemplateDetailID', sql.Int, detailData.TemplateDetailID || null)
             .input('TemplateID', sql.Int, detailData.TemplateID)
@@ -165,7 +165,7 @@ const addUpdateTemplateDetail = async (detailData) => {
 // Toggle template status
 const toggleTemplateStatus = async (templateId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TemplateID', sql.Int, templateId)
             .query(`
@@ -185,7 +185,7 @@ const toggleTemplateStatus = async (templateId) => {
 // Delete template detail
 const deleteTemplateDetail = async (templateDetailId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         
         // Prima verifica se questo dettaglio è referenziato come predecessore
         const checkResult = await pool.request()
@@ -224,7 +224,7 @@ const deleteTemplateDetail = async (templateDetailId) => {
 // Get stage templates
 const getStageTemplates = async (templateId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TemplateID', sql.Int, templateId)
             .execute('MA_GetStageTemplates');
@@ -239,7 +239,7 @@ const getStageTemplates = async (templateId) => {
 // Add/Update stage template
 const addUpdateStageTemplate = async (stageData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('StageTemplateID', sql.Int, stageData.StageTemplateID || null)
             .input('TemplateID', sql.Int, stageData.TemplateID)
@@ -262,7 +262,7 @@ const addUpdateStageTemplate = async (stageData, userId) => {
 // Delete stage template
 const deleteStageTemplate = async (stageTemplateId, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('StageTemplateID', sql.Int, stageTemplateId)
             .input('UserId', sql.Int, userId)
@@ -278,7 +278,7 @@ const deleteStageTemplate = async (stageTemplateId, userId) => {
 // Reorder stage templates
 const reorderStageTemplates = async (templateId, stageOrders, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TemplateID', sql.Int, templateId)
             .input('StageOrders', sql.NVarChar(sql.MAX), JSON.stringify(stageOrders))
@@ -295,7 +295,7 @@ const reorderStageTemplates = async (templateId, stageOrders, userId) => {
 // Add/Update stage checklist template
 const addUpdateStageChecklistTemplate = async (checklistData, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ChecklistTemplateID', sql.Int, checklistData.ChecklistTemplateID || null)
             .input('StageTemplateID', sql.Int, checklistData.StageTemplateID)
@@ -316,7 +316,7 @@ const addUpdateStageChecklistTemplate = async (checklistData, userId) => {
 // Delete checklist template
 const deleteStageChecklistTemplate = async (checklistTemplateId, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('ChecklistTemplateID', sql.Int, checklistTemplateId)
             .input('UserId', sql.Int, userId)
@@ -332,7 +332,7 @@ const deleteStageChecklistTemplate = async (checklistTemplateId, userId) => {
 // Assign task template to stage
 const assignTaskTemplateToStage = async (templateDetailId, stageTemplateId, taskSequenceInStage, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TemplateDetailID', sql.Int, templateDetailId)
             .input('StageTemplateID', sql.Int, stageTemplateId || null)
@@ -350,7 +350,7 @@ const assignTaskTemplateToStage = async (templateDetailId, stageTemplateId, task
 // Toggle template use stages
 const toggleTemplateUseStages = async (templateId, useStages, userId) => {
     try {
-        let pool = await sql.connect(config.dbConfig);
+        let pool = await sql.connect(config.database);
         const result = await pool.request()
             .input('TemplateID', sql.Int, templateId)
             .input('UseStages', sql.Bit, useStages)

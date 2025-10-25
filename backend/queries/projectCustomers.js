@@ -8,7 +8,7 @@ const SUPPLIER_TYPE = 3211265;
 // Get paginated project customers
 const getPaginatedProjectCustomers = async (page = 0, pageSize = 50, filters = {}, sort = {}) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     // Build where clause based on filters
     let whereConditions = [];
@@ -88,7 +88,7 @@ const getAllProjectCustomers = async (userId) => {
       ORDER BY CompanyName;
     `;
 
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('UserId', sql.Int, userId)
       .query(query);
@@ -110,7 +110,7 @@ const getAllProjectCustomers = async (userId) => {
 // Get single project customer by ID
 const getProjectCustomerById = async (Id, userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('Id', sql.Int, Id)
       .input('UserId', sql.Int, userId)
@@ -144,7 +144,7 @@ const getProjectCustomerById = async (Id, userId) => {
 // Add or Update a project customer
 const updateProjectCustomer = async (Id, customerData, userId, companyId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
 
     if (!Id) {
       // INSERT - Nuovo cliente prospect
@@ -294,7 +294,7 @@ const updateProjectCustomer = async (Id, customerData, userId, companyId) => {
 // Toggle disable status
 const toggleDisableProjectCustomer = async (Id, userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     await pool.request()
       .input('Id', sql.Int, Id)
       .input('UserId', sql.Int, userId)
@@ -315,7 +315,7 @@ const toggleDisableProjectCustomer = async (Id, userId) => {
 // Link project customer to ERP CustSupp
 const linkToERPCustomer = async (Id, erpCustSupp, userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     // Prima, otteniamo i dati del cliente ERP
     const erpCustomerResult = await pool.request()
@@ -383,7 +383,7 @@ const linkToERPCustomer = async (Id, erpCustSupp, userId) => {
 // Get ERP customers for linking
 const getERPCustomers = async (searchText, userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('SearchText', sql.VarChar(128), `%${searchText || ''}%`)
       .input('UserId', sql.Int, userId)
@@ -409,7 +409,7 @@ const getERPCustomers = async (searchText, userId) => {
 // Aggiornamento / Inserimento di clienti in blocco
 const addUpdateProjectCustomersBulk = async (customers, userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const transaction = new sql.Transaction(pool);
     
     try {
@@ -538,7 +538,7 @@ const addUpdateProjectCustomersBulk = async (customers, userId) => {
  */
 const importERPCustomerAsProspect = async (erpCustSupp, userId) => {
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const transaction = new sql.Transaction(pool);
     
     try {

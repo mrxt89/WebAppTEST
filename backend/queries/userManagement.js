@@ -5,7 +5,7 @@ const config = require('../config');
 async function getUserById(userId) {
   try {
     console.log(`[USER_MANAGEMENT] Getting user by ID: ${userId}`);
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let result = await pool.request()
       .input('userId', sql.Int, userId)
       .query('SELECT * FROM AR_Users WHERE userId = @userId');
@@ -51,7 +51,7 @@ FOR JSON PATH
 
   `;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let result = await pool.request()
       .input('userId', sql.Int, userId)
       .query(query);
@@ -69,7 +69,7 @@ async function toggleUserStatus(userId, userDisabled) {
   console.log(`[USER_MANAGEMENT] Toggling user status: ${userId} -> ${userDisabled ? 'disabled' : 'enabled'}`);
   const query = 'UPDATE AR_Users SET userDisabled = @userDisabled WHERE userId = @userId';
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('userId', sql.Int, userId)
       .input('userDisabled', sql.Bit, userDisabled)
@@ -88,7 +88,7 @@ async function changePassword(userId, currentPassword, newPassword) {
   console.log(`[USER_MANAGEMENT] Changing password for user: ${userId}`);
   const query = 'SELECT * FROM AR_Users WHERE userId = @userId';
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let result = await pool.request()
       .input('userId', sql.Int, userId)
       .query(query);
@@ -117,7 +117,7 @@ async function resetPassword(userId, newPassword) {
   try {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     const query = 'UPDATE AR_Users SET password = @password, salt = \'10\' WHERE userId = @userId';
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('password', sql.NVarChar, hashedPassword)
       .input('userId', sql.Int, userId)
@@ -140,7 +140,7 @@ async function updateUser(data) {
     WHERE userId = @userId
   `;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('email', sql.VarChar, email)
       .input('firstName', sql.VarChar, firstName)
@@ -172,7 +172,7 @@ async function addUser(data) {
   // Ottieni il CompanyId dell'utente che sta eseguendo l'operazione come default
   let defaultCompanyId = 0;
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const companyResult = await pool.request()
       .input('userId', sql.Int, userId)
       .query('SELECT CompanyId FROM AR_Users WHERE userId = @userId');
@@ -209,7 +209,7 @@ async function addUser(data) {
   `;
   
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     const result = await pool.request()
       .input('username', sql.VarChar, username)
       .query(queryCheckUsername);
@@ -262,7 +262,7 @@ async function addUser(data) {
 async function getUserCompanies(userId) {
   console.log(`[USER_MANAGEMENT] Getting companies for user: ${userId}`);
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let result = await pool.request()
       .input('userId', sql.Int, userId)
       .query(`
@@ -284,7 +284,7 @@ async function getUserCompanies(userId) {
 async function getAllCompanies() {
   console.log(`[USER_MANAGEMENT] Getting all active companies`);
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let result = await pool.request()
       .query(`
         SELECT CompanyId, CompanyCode, Description, Email, IsActive
@@ -304,7 +304,7 @@ async function getAllCompanies() {
 async function assignUserToCompany(userId, companyId) {
   console.log(`[USER_MANAGEMENT] Assigning user ${userId} to company ${companyId}`);
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     // Verifica se l'associazione esiste già
     const checkResult = await pool.request()
@@ -341,7 +341,7 @@ async function assignUserToCompany(userId, companyId) {
 async function removeUserFromCompany(userId, companyId) {
   console.log(`[USER_MANAGEMENT] Removing user ${userId} from company ${companyId}`);
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     // Conta quante associazioni ha l'utente
     const countResult = await pool.request()
@@ -379,7 +379,7 @@ async function removeUserFromCompany(userId, companyId) {
 async function updateUserPrimaryCompany(userId, companyId) {
   console.log(`[USER_MANAGEMENT] Updating primary company for user ${userId} to ${companyId}`);
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     
     // Verifica se l'utente è associato all'azienda
     const checkResult = await pool.request()
@@ -419,7 +419,7 @@ async function updateUserPrimaryCompany(userId, companyId) {
 async function getUserCompaniesByUsername(username) {
   console.log(`[USER_MANAGEMENT] Getting companies for username: ${username}`);
   try {
-    let pool = await sql.connect(config.dbConfig);
+    let pool = await sql.connect(config.database);
     let result = await pool.request()
       .input('username', sql.VarChar, username)
       .query(`
