@@ -3530,17 +3530,25 @@ const getIntercompanyRequests = async (companyId, direction = 'IN', status = nul
                 srcComp.Description AS SourceCompanyName,
                 ref.TargetCompanyId,
                 tgtComp.Description AS TargetCompanyName,
-                -- Campi progetto non disponibili direttamente: restituiamo NULL per compatibilità UI
-                CAST(NULL AS NVARCHAR(50)) AS ProjectCode,
-                CAST(NULL AS NVARCHAR(255)) AS ProjectDescription,
+                -- Informazioni progetto sorgente
+                ref.SourceProjectId,
+                srcProj.Name AS SourceProjectName,
+                srcProj.Description AS SourceProjectDescription,
+                -- Informazioni progetto target
+                ref.TargetProjectId,
+                tgtProj.Name AS TargetProjectName,
+                tgtProj.Description AS TargetProjectDescription,
+                -- Informazioni componente
                 ref.SourceProjectItemId AS ComponentId,
                 comp.Item AS ComponentCode,
                 comp.Description AS ComponentDescription,
+                -- Codice articolo target (può essere temporaneo IC_TEMP_* o definitivo)
+                ref.TargetProjectItemCode,
+                -- Stato e date
                 ref.Status,
                 ref.RequestDate,
                 ref.ResponseDate,
                 ref.TBCreatedId AS RequestUserId,
-               
                 ref.RequestNotes AS Notes,
                 ref.ResponseNotes,
                 -- Determina tipo intercompany a partire dalla Nature della reference se presente, altrimenti dal componente
@@ -3552,6 +3560,8 @@ const getIntercompanyRequests = async (companyId, direction = 'IN', status = nul
             INNER JOIN AR_Companies srcComp ON ref.SourceCompanyId = srcComp.CompanyId
             INNER JOIN AR_Companies tgtComp ON ref.TargetCompanyId = tgtComp.CompanyId
             LEFT JOIN MA_ProjectArticles_Items comp ON comp.Id = ref.SourceProjectItemId AND comp.CompanyId = ref.SourceCompanyId
+            LEFT JOIN MA_Projects srcProj ON ref.SourceProjectId = srcProj.ProjectID AND srcProj.CompanyId = ref.SourceCompanyId
+            LEFT JOIN MA_Projects tgtProj ON ref.TargetProjectId = tgtProj.ProjectID AND tgtProj.CompanyId = ref.TargetCompanyId
             WHERE 1=1
         `;
 
@@ -3875,16 +3885,17 @@ const getSuppliersWithIntercompanyFlag = async (companyId, onlyIntercompany = fa
 // =============================================================================
 // NUOVA FUNZIONE: Sincronizzazione selettiva componenti intercompany
 // =============================================================================
-const syncIntercompanyComponents = async (components, companyId, userId = null, syncAttachments = true) => {
+const syncIntercompanyComponents = async (components, companyId, projectId, userId = null, syncAttachments = true) => {
     try {
         console.log('=== SYNC INTERCOMPANY COMPONENTS FUNCTION ===');
-        console.log('Input parameters:', { components, companyId, userId, syncAttachments });
+        console.log('Input parameters:', { components, companyId, projectId, userId, syncAttachments });
         
         let pool = await sql.connect(config.database);
         const request = pool.request();
 
         // Parametri input
         request.input('CompanyId', sql.Int, companyId);
+        request.input('ProjectId', sql.Int, projectId);  // NUOVO PARAMETRO
         request.input('UserId', sql.Int, userId);
         request.input('Components', sql.NVarChar(sql.MAX), JSON.stringify(components));
         request.input('SyncAttachments', sql.Bit, syncAttachments);
@@ -3926,6 +3937,319 @@ const syncIntercompanyComponents = async (components, companyId, userId = null, 
             errorCode: -1,
             message: error.message,
             data: null
+        };
+    }
+};
+
+// =============================================================================
+// NUOVE FUNZIONI INTERCOMPANY PER GESTIONE PROGETTI
+// =============================================================================
+
+// 1. Approva reference con creazione progetto target
+const approveIntercompanyReferenceWithProject = async (
+    referenceId,
+    userId,
+    responseNotes = null,
+    targetItemCode = null,
+    createTemporaryIfMissing = true
+) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+
+        // Parametri input
+        request.input('ReferenceID', sql.Int, referenceId);
+        request.input('UserId', sql.Int, userId);
+        request.input('ResponseNotes', sql.NVarChar(sql.MAX), responseNotes);
+        request.input('TargetItemCode', sql.VarChar(64), targetItemCode);
+        request.input('CreateTemporaryIfMissing', sql.Bit, createTemporaryIfMissing);
+
+        // Parametri output
+        request.output('TargetProjectId', sql.Int);
+        request.output('TargetItemId', sql.BigInt);
+        request.output('ErrorCode', sql.Int);
+        request.output('ErrorMessage', sql.NVarChar(4000));
+
+        console.log('Executing MA_ApproveIntercompanyReference with params:', {
+            referenceId,
+            userId,
+            targetItemCode,
+            createTemporaryIfMissing
+        });
+
+        // Esegui la stored procedure
+        const result = await request.execute('MA_ApproveIntercompanyReference');
+
+        // Recupera i parametri di output
+        const errorCode = request.parameters.ErrorCode.value || 0;
+        const errorMessage = request.parameters.ErrorMessage.value || '';
+        const targetProjectId = request.parameters.TargetProjectId.value;
+        const targetItemId = request.parameters.TargetItemId.value;
+
+        console.log('MA_ApproveIntercompanyReference result:', {
+            errorCode,
+            errorMessage,
+            targetProjectId,
+            targetItemId
+        });
+
+        // ⚠️ Verifica critica: se targetProjectId è null ma errorCode è 0, c'è un problema
+        if (errorCode === 0 && targetProjectId === null) {
+            console.error('⚠️ WARNING: SP returned errorCode=0 but targetProjectId is NULL!');
+            console.error('This usually means the SP exited early without setting output parameters correctly.');
+            throw new Error('Errore interno: la stored procedure non ha restituito il targetProjectId. ' +
+                          'Verifica che SourceProjectId sia popolato nella reference.');
+        }
+
+        if (errorCode !== 0) {
+            throw new Error(errorMessage || `Errore SP (code: ${errorCode})`);
+        }
+
+        return {
+            success: 1,
+            msg: errorMessage || 'Richiesta approvata con successo',
+            targetProjectId: targetProjectId,
+            targetItemId: targetItemId,
+            targetItemCode: targetItemCode
+        };
+    } catch (err) {
+        console.error('Error in approveIntercompanyReferenceWithProject:', err);
+        return {
+            success: 0,
+            msg: err.message || 'Errore durante l\'approvazione della richiesta',
+            targetProjectId: null,
+            targetItemId: null,
+            targetItemCode: null
+        };
+    }
+};
+
+// 2. Recupera articoli temporanei intercompany
+const getTemporaryIntercompanyItems = async (companyId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+
+        request.input('CompanyId', sql.Int, companyId);
+
+        const query = `
+            SELECT
+                i.Id,
+                i.Item AS TemporaryCode,
+                i.Description,
+                i.DescriptionExtension,
+                i.CompanyId,
+                c.Description AS CompanyName,
+                i.TBCreated AS CreatedDate,
+                i.TBCreatedId AS CreatedBy,
+                u.username AS CreatedByUsername,
+                i.Notes,
+                (SELECT COUNT(DISTINCT ProjectID)
+                 FROM MA_ProjectsItems
+                 WHERE ItemId = i.Id AND CompanyId = i.CompanyId) AS ProjectsCount,
+                (SELECT COUNT(*)
+                 FROM MA_ProjectArticles_References
+                 WHERE TargetProjectItemId = i.Id
+                   AND TargetCompanyId = i.CompanyId
+                   AND Status = 'ACCEPTED') AS ReferencesCount
+            FROM MA_ProjectArticles_Items i
+            JOIN AR_Companies c ON i.CompanyId = c.CompanyId
+            LEFT JOIN AR_Users u ON i.TBCreatedId = u.userId
+            WHERE i.CompanyId = @CompanyId
+              AND i.Item LIKE 'IC_TEMP_%'
+              AND i.Disabled = 0
+            ORDER BY i.TBCreated DESC
+        `;
+
+        const result = await request.query(query);
+
+        return {
+            success: 1,
+            items: result.recordset || [],
+            totalItems: result.recordset ? result.recordset.length : 0
+        };
+    } catch (err) {
+        console.error('Error in getTemporaryIntercompanyItems:', err);
+        return {
+            success: 0,
+            items: [],
+            totalItems: 0,
+            msg: err.message || 'Errore nel recupero degli articoli temporanei'
+        };
+    }
+};
+
+// 3. Sostituisci articolo temporaneo con definitivo
+const replaceTemporaryItem = async (temporaryItemId, definitiveItemCode, companyId, userId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+
+        // Trova l'articolo definitivo
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('DefinitiveItemCode', sql.VarChar(64), definitiveItemCode);
+
+        const findItemQuery = `
+            SELECT Id, Item, Description
+            FROM MA_ProjectArticles_Items
+            WHERE CompanyId = @CompanyId AND Item = @DefinitiveItemCode
+        `;
+
+        const findResult = await request.query(findItemQuery);
+
+        if (!findResult.recordset || findResult.recordset.length === 0) {
+            throw new Error(`Articolo definitivo ${definitiveItemCode} non trovato`);
+        }
+
+        const definitiveItemId = findResult.recordset[0].Id;
+
+        // Inizia transazione
+        const transaction = pool.transaction();
+        await transaction.begin();
+
+        try {
+            // 1. Aggiorna le references
+            const updateReferencesQuery = `
+                UPDATE MA_ProjectArticles_References
+                SET
+                    TargetProjectItemId = @DefinitiveItemId,
+                    TargetProjectItemCode = @DefinitiveItemCode,
+                    TBModified = GETDATE(),
+                    TBModifiedId = @UserId
+                WHERE TargetProjectItemId = @TemporaryItemId
+                  AND TargetCompanyId = @CompanyId
+            `;
+
+            const reqRefs = transaction.request();
+            reqRefs.input('DefinitiveItemId', sql.BigInt, definitiveItemId);
+            reqRefs.input('DefinitiveItemCode', sql.VarChar(64), definitiveItemCode);
+            reqRefs.input('UserId', sql.Int, userId);
+            reqRefs.input('TemporaryItemId', sql.BigInt, temporaryItemId);
+            reqRefs.input('CompanyId', sql.Int, companyId);
+            await reqRefs.query(updateReferencesQuery);
+
+            // 2. Aggiorna le associazioni progetti-articoli
+            const updateProjectItemsQuery = `
+                UPDATE MA_ProjectsItems
+                SET ItemId = @DefinitiveItemId
+                WHERE ItemId = @TemporaryItemId AND CompanyId = @CompanyId
+            `;
+
+            const reqProj = transaction.request();
+            reqProj.input('DefinitiveItemId', sql.BigInt, definitiveItemId);
+            reqProj.input('TemporaryItemId', sql.BigInt, temporaryItemId);
+            reqProj.input('CompanyId', sql.Int, companyId);
+            await reqProj.query(updateProjectItemsQuery);
+
+            // 3. Disabilita l'articolo temporaneo
+            const disableItemQuery = `
+                UPDATE MA_ProjectArticles_Items
+                SET
+                    Disabled = 1,
+                    TBModified = GETDATE(),
+                    TBModifiedId = @UserId,
+                    Notes = CONCAT(ISNULL(Notes, ''), ' [SOSTITUITO CON: ', @DefinitiveItemCode, ' il ', CONVERT(VARCHAR, GETDATE(), 120), ']')
+                WHERE Id = @TemporaryItemId AND CompanyId = @CompanyId
+            `;
+
+            const reqDisable = transaction.request();
+            reqDisable.input('UserId', sql.Int, userId);
+            reqDisable.input('DefinitiveItemCode', sql.VarChar(64), definitiveItemCode);
+            reqDisable.input('TemporaryItemId', sql.BigInt, temporaryItemId);
+            reqDisable.input('CompanyId', sql.Int, companyId);
+            await reqDisable.query(disableItemQuery);
+
+            await transaction.commit();
+
+            return {
+                success: 1,
+                msg: `Articolo temporaneo sostituito con ${definitiveItemCode}`,
+                definitiveItemId: definitiveItemId,
+                definitiveItemCode: definitiveItemCode
+            };
+        } catch (err) {
+            await transaction.rollback();
+            throw err;
+        }
+    } catch (err) {
+        console.error('Error in replaceTemporaryItem:', err);
+        return {
+            success: 0,
+            msg: err.message || 'Errore durante la sostituzione dell\'articolo temporaneo'
+        };
+    }
+};
+
+// 4. Recupera dettagli reference con progetti
+const getReferenceWithProjects = async (referenceId, companyId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+
+        request.input('ReferenceId', sql.Int, referenceId);
+        request.input('CompanyId', sql.Int, companyId);
+
+        const query = `
+            SELECT
+                r.ReferenceID,
+                r.SourceProjectItemId,
+                r.SourceCompanyId,
+                r.SourceProjectId,
+                r.TargetProjectItemId,
+                r.TargetCompanyId,
+                r.TargetProjectId,
+                r.Nature,
+                r.Status,
+                r.RequestDate,
+                r.ResponseDate,
+                r.RequestNotes,
+                r.ResponseNotes,
+                r.Priority,
+                r.DueDate,
+                r.TargetProjectItemCode,
+                srcItem.Item AS SourceItemCode,
+                srcItem.Description AS SourceItemDescription,
+                tgtItem.Item AS TargetItemCode,
+                tgtItem.Description AS TargetItemDescription,
+                srcComp.Description AS SourceCompanyName,
+                tgtComp.Description AS TargetCompanyName,
+                srcProj.Name AS SourceProjectName,
+                srcProj.Description AS SourceProjectDescription,
+                srcProj.Status AS SourceProjectStatus,
+                tgtProj.Name AS TargetProjectName,
+                tgtProj.Description AS TargetProjectDescription,
+                tgtProj.Status AS TargetProjectStatus,
+                u.username AS CreatedByUsername,
+                u.firstName + ' ' + u.lastName AS CreatedByFullName,
+                CASE WHEN tgtItem.Item LIKE 'IC_TEMP_%' THEN 1 ELSE 0 END AS IsTemporaryCode
+            FROM MA_ProjectArticles_References r
+            LEFT JOIN MA_ProjectArticles_Items srcItem ON r.SourceProjectItemId = srcItem.Id AND r.SourceCompanyId = srcItem.CompanyId
+            LEFT JOIN MA_ProjectArticles_Items tgtItem ON r.TargetProjectItemId = tgtItem.Id AND r.TargetCompanyId = tgtItem.CompanyId
+            LEFT JOIN AR_Companies srcComp ON r.SourceCompanyId = srcComp.CompanyId
+            LEFT JOIN AR_Companies tgtComp ON r.TargetCompanyId = tgtComp.CompanyId
+            LEFT JOIN MA_Projects srcProj ON r.SourceProjectId = srcProj.ProjectID AND r.SourceCompanyId = srcProj.CompanyId
+            LEFT JOIN MA_Projects tgtProj ON r.TargetProjectId = tgtProj.ProjectID AND r.TargetCompanyId = tgtProj.CompanyId
+            LEFT JOIN AR_Users u ON r.TBCreatedId = u.userId
+            WHERE r.ReferenceID = @ReferenceId
+              AND (r.SourceCompanyId = @CompanyId OR r.TargetCompanyId = @CompanyId)
+        `;
+
+        const result = await request.query(query);
+
+        if (!result.recordset || result.recordset.length === 0) {
+            throw new Error('Reference non trovata o accesso negato');
+        }
+
+        return {
+            success: 1,
+            reference: result.recordset[0]
+        };
+    } catch (err) {
+        console.error('Error in getReferenceWithProjects:', err);
+        return {
+            success: 0,
+            reference: null,
+            msg: err.message || 'Errore nel recupero della reference'
         };
     }
 };
@@ -3981,5 +4305,10 @@ module.exports = {
     checkItemInGestionale,
     getSuppliersWithIntercompanyFlag,
     // Nuova funzione per sincronizzazione selettiva
-    syncIntercompanyComponents
+    syncIntercompanyComponents,
+    // NUOVE FUNZIONI INTERCOMPANY CON PROGETTI
+    approveIntercompanyReferenceWithProject,
+    getTemporaryIntercompanyItems,
+    replaceTemporaryItem,
+    getReferenceWithProjects
 };

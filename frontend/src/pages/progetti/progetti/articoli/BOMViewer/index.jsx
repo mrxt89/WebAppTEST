@@ -19,6 +19,7 @@ const BOMViewerContent = () => {
   const {
     item,
     bom,
+    project,
     getBOMIntercompanySummary,
     syncIntercompanySharing,
     smartRefresh,
@@ -110,6 +111,7 @@ const BOMViewerContent = () => {
               open={syncModalOpen}
               onOpenChange={setSyncModalOpen}
               bomId={bom?.Id}
+              projectId={project?.ProjectID}
               getBOMIntercompanySummary={getBOMIntercompanySummary}
               syncIntercompanySharing={syncIntercompanySharing}
               onSuccess={() => smartRefresh()}

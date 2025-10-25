@@ -1591,12 +1591,12 @@ const searchSimilarArticles = useCallback(
 
   // 2.1. Sincronizza componenti intercompany selezionati
   const syncIntercompanyComponents = useCallback(
-    async (components, syncAttachments = true) => {
+    async (components, projectId, syncAttachments = true) => {
       const data = await makeRequest(
         `${config.API_BASE_URL}/projectArticles/sync-intercompany-components`,
         {
           method: 'POST',
-          body: JSON.stringify({ components, syncAttachments })
+          body: JSON.stringify({ components, projectId, syncAttachments })
         }
       );
       return data;
@@ -1634,12 +1634,12 @@ const searchSimilarArticles = useCallback(
 
   // 5. Rispondi a richiesta intercompany (approva/rifiuta)
   const respondToIntercompanyRequest = useCallback(
-    async (referenceId, action, notes = null) => {
+    async (referenceId, action, notes = null, targetItemCode = null, createTemporaryIfMissing = true) => {
       const data = await makeRequest(
         `${config.API_BASE_URL}/projectArticles/intercompany/references/${referenceId}/respond`,
         {
           method: 'POST',
-          body: JSON.stringify({ action, notes })
+          body: JSON.stringify({ action, notes, targetItemCode, createTemporaryIfMissing })
         }
       );
       return data;
@@ -1703,6 +1703,43 @@ const searchSimilarArticles = useCallback(
         console.error("Error getting suppliers with intercompany flag:", err);
         throw err;
       }
+    },
+    [makeRequest]
+  );
+
+  // =============================================================================
+  // NUOVE FUNZIONI INTERCOMPANY CON GESTIONE PROGETTI
+  // =============================================================================
+
+  // Recupera articoli temporanei Intercompany
+  const getTemporaryIntercompanyItems = useCallback(
+    async () => {
+      const url = `${config.API_BASE_URL}/projectArticles/intercompany/temporary-items`;
+      const data = await makeRequest(url);
+      return data || { items: [], totalItems: 0 };
+    },
+    [makeRequest]
+  );
+
+  // Sostituisci articolo temporaneo con definitivo
+  const replaceTemporaryItem = useCallback(
+    async (temporaryItemId, definitiveItemCode) => {
+      const url = `${config.API_BASE_URL}/projectArticles/intercompany/temporary-items/${temporaryItemId}/replace`;
+      const data = await makeRequest(url, {
+        method: 'POST',
+        body: JSON.stringify({ definitiveItemCode })
+      });
+      return data;
+    },
+    [makeRequest]
+  );
+
+  // Recupera dettagli reference con progetti
+  const getReferenceWithProjects = useCallback(
+    async (referenceId) => {
+      const url = `${config.API_BASE_URL}/projectArticles/intercompany/references/${referenceId}/details`;
+      const data = await makeRequest(url);
+      return data || { reference: null };
     },
     [makeRequest]
   );
@@ -1798,6 +1835,11 @@ const searchSimilarArticles = useCallback(
     // Intercompany supplier helpers
     checkItemInGestionale,
     getSuppliersWithIntercompanyFlag,
+
+    // NUOVE FUNZIONI INTERCOMPANY CON PROGETTI
+    getTemporaryIntercompanyItems,
+    replaceTemporaryItem,
+    getReferenceWithProjects,
   };
 };
 

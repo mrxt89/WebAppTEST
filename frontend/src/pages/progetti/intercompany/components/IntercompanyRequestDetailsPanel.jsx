@@ -79,7 +79,7 @@ const IntercompanyRequestDetailsPanel = ({
   const [fileViewerOpen, setFileViewerOpen] = useState(false);
   const [versionsModalOpen, setVersionsModalOpen] = useState(false);
 
-  const { getReferenceAttachments, updateReferenceNotes } = useProjectArticlesActions();
+  const { getReferenceAttachments, updateReferenceNotes, getReferenceWithProjects } = useProjectArticlesActions();
   const { toast } = useToast();
 
   // Carica i dettagli quando si apre il panel
@@ -88,14 +88,19 @@ const IntercompanyRequestDetailsPanel = ({
 
     try {
       setDetailLoading(true);
+
+      // Carica riferimenti con informazioni progetti
+      const refRes = await getReferenceWithProjects(selectedRequest.ReferenceId);
+      setDetailReference(refRes.reference || null);
+
+      // Carica anche gli allegati
       const attRes = await getReferenceAttachments(selectedRequest.ReferenceId);
       setDetailAttachments(attRes.attachments || []);
-      setDetailReference(attRes.reference || null);
-      
+
       // Imposta le note in base alla reference
-      if (attRes.reference) {
-        setRequestNotes(attRes.reference.RequestNotes || '');
-        setDetailResponseNotes(attRes.reference.ResponseNotes || '');
+      if (refRes.reference) {
+        setRequestNotes(refRes.reference.RequestNotes || '');
+        setDetailResponseNotes(refRes.reference.ResponseNotes || '');
       } else {
         // Fallback: usa le note dalla richiesta se la reference non è disponibile
         setRequestNotes(selectedRequest.Notes || '');
@@ -107,7 +112,7 @@ const IntercompanyRequestDetailsPanel = ({
     } finally {
       setDetailLoading(false);
     }
-  }, [selectedRequest, getReferenceAttachments, toast]);
+  }, [selectedRequest, getReferenceAttachments, getReferenceWithProjects, toast]);
 
   // Carica i dettagli quando cambia la richiesta selezionata
   useEffect(() => {
@@ -393,7 +398,12 @@ const IntercompanyRequestDetailsPanel = ({
                             {selectedRequest.TargetProjectItemCode ? (
                               <>
                                 <span className="text-gray-500">→</span>
-                                <span className="font-medium text-green-600">{selectedRequest.TargetProjectItemCode}</span>
+                                <span className={`font-medium ${selectedRequest.TargetProjectItemCode?.startsWith('IC_TEMP_') ? 'text-amber-600' : 'text-green-600'}`}>
+                                  {selectedRequest.TargetProjectItemCode}
+                                </span>
+                                {selectedRequest.TargetProjectItemCode?.startsWith('IC_TEMP_') && (
+                                  <Badge variant="warning" className="text-[10px] px-1 py-0">TEMP</Badge>
+                                )}
                               </>
                             ) : (
                               <span className="text-gray-400">(codice fornitore non configurato)</span>
@@ -414,6 +424,53 @@ const IntercompanyRequestDetailsPanel = ({
                           <div>{getStatusBadge(selectedRequest.Status)}</div>
                         </div>
                       </div>
+
+                      {/* Warning per codici temporanei */}
+                      {detailReference?.TargetProjectItemCode?.startsWith('IC_TEMP_') && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                          <div className="flex items-start gap-2">
+                            <Package className="w-4 h-4 text-amber-600 mt-0.5" />
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-amber-900">Codice Articolo Temporaneo</div>
+                              <div className="text-xs text-amber-700 mt-1">
+                                Questo articolo è stato creato con un codice temporaneo.
+                                Sostituiscilo con il codice definitivo dalla sezione "Articoli Temporanei" nella Dashboard Intercompany.
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Informazioni Progetti */}
+                      {(detailReference?.SourceProjectId || detailReference?.TargetProjectId) && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-3">
+                          <div className="text-sm font-medium text-blue-900">Informazioni Progetti</div>
+
+                          {detailReference?.SourceProjectId && (
+                            <div className="space-y-1">
+                              <div className="text-xs text-blue-700 font-medium">Progetto Sorgente</div>
+                              <div className="text-sm text-blue-900">
+                                {detailReference.SourceProjectName || `Progetto ID: ${detailReference.SourceProjectId}`}
+                              </div>
+                              {detailReference.SourceProjectDescription && (
+                                <div className="text-xs text-blue-600">{detailReference.SourceProjectDescription}</div>
+                              )}
+                            </div>
+                          )}
+
+                          {detailReference?.TargetProjectId && (
+                            <div className="space-y-1 border-t border-blue-200 pt-2">
+                              <div className="text-xs text-blue-700 font-medium">Progetto Target</div>
+                              <div className="text-sm text-blue-900">
+                                {detailReference.TargetProjectName || `Progetto ID: ${detailReference.TargetProjectId}`}
+                              </div>
+                              {detailReference.TargetProjectDescription && (
+                                <div className="text-xs text-blue-600">{detailReference.TargetProjectDescription}</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Sezione Note Richiesta */}
                       <div>
