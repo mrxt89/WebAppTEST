@@ -48,7 +48,12 @@ const {
     updateReferenceNotes,
     // NEW: Intercompany supplier functions
     checkItemInGestionale,
-    getSuppliersWithIntercompanyFlag
+    getSuppliersWithIntercompanyFlag,
+    // NEW: Intercompany with projects
+    approveIntercompanyReferenceWithProject,
+    getTemporaryIntercompanyItems,
+    replaceTemporaryItem,
+    getReferenceWithProjects
 } = require('../queries/projectArticlesManagement');
 
 // Ottieni stati degli articoli di progetto
@@ -1276,7 +1281,7 @@ router.post('/projectArticles/intercompany/references/:id/respond', authenticate
     try {
         const userId = req.user.UserId;
         const referenceId = parseInt(req.params.id);
-        const { action, notes = null } = req.body;
+        const { action, notes = null, targetItemCode = null, createTemporaryIfMissing = true } = req.body;
 
         if (!referenceId || isNaN(referenceId)) {
             return res.status(400).json({
@@ -1301,7 +1306,20 @@ router.post('/projectArticles/intercompany/references/:id/respond', authenticate
             });
         }
 
-        const result = await approveRejectReference(referenceId, action, userId, notes);
+        // Se è un'approvazione, usa la nuova funzione con gestione progetti
+        let result;
+        if (action === 'APPROVE') {
+            result = await approveIntercompanyReferenceWithProject(
+                referenceId,
+                userId,
+                notes,
+                targetItemCode,
+                createTemporaryIfMissing
+            );
+        } else {
+            // Per i rifiuti usa la funzione vecchia (semplice UPDATE)
+            result = await approveRejectReference(referenceId, action, userId, notes);
+        }
         res.json(result);
     } catch (err) {
         console.error('Error responding to intercompany request:', err);
@@ -1395,7 +1413,7 @@ router.get('/projectArticles/suppliers/intercompany', authenticateToken, async (
 // =============================================================================
 router.post('/projectArticles/sync-intercompany-components', authenticateToken, async (req, res) => {
     try {
-        const { components, syncAttachments = true } = req.body;
+        const { components, projectId, syncAttachments = true } = req.body;
         const companyId = req.user.CompanyId;
         const userId = req.user.UserId;
 
@@ -1407,12 +1425,20 @@ router.post('/projectArticles/sync-intercompany-components', authenticateToken, 
             });
         }
 
-        console.log(`Syncing ${components.length} intercompany components for company ${companyId}`);
+        if (!projectId || isNaN(projectId)) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'ProjectId richiesto per la sincronizzazione'
+            });
+        }
+
+        console.log(`Syncing ${components.length} intercompany components for company ${companyId}, project ${projectId}`);
 
         // Chiama la funzione di sincronizzazione
         const result = await syncIntercompanyComponents(
             components,
             companyId,
+            projectId,  // NUOVO PARAMETRO
             userId,
             syncAttachments
         );
@@ -1436,6 +1462,91 @@ router.post('/projectArticles/sync-intercompany-components', authenticateToken, 
         return res.status(500).json({
             success: 0,
             msg: err.message || 'Errore durante la sincronizzazione'
+        });
+    }
+});
+
+// =============================================================================
+// NUOVE ROUTES INTERCOMPANY CON GESTIONE PROGETTI
+// =============================================================================
+
+// GET /projectArticles/intercompany/temporary-items - Recupera articoli temporanei
+router.get('/projectArticles/intercompany/temporary-items', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+
+        const result = await getTemporaryIntercompanyItems(companyId);
+
+        res.json(result);
+    } catch (err) {
+        console.error('Error fetching temporary intercompany items:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nel recupero degli articoli temporanei'
+        });
+    }
+});
+
+// POST /projectArticles/intercompany/temporary-items/:id/replace - Sostituisci articolo temporaneo
+router.post('/projectArticles/intercompany/temporary-items/:id/replace', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const userId = req.user.UserId;
+        const temporaryItemId = parseInt(req.params.id);
+        const { definitiveItemCode } = req.body;
+
+        if (!temporaryItemId || isNaN(temporaryItemId)) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'ID articolo temporaneo non valido'
+            });
+        }
+
+        if (!definitiveItemCode || definitiveItemCode.trim() === '') {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Codice articolo definitivo richiesto'
+            });
+        }
+
+        const result = await replaceTemporaryItem(
+            temporaryItemId,
+            definitiveItemCode,
+            companyId,
+            userId
+        );
+
+        res.json(result);
+    } catch (err) {
+        console.error('Error replacing temporary item:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore durante la sostituzione dell\'articolo temporaneo'
+        });
+    }
+});
+
+// GET /projectArticles/intercompany/references/:id/details - Dettagli reference con progetti
+router.get('/projectArticles/intercompany/references/:id/details', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const referenceId = parseInt(req.params.id);
+
+        if (!referenceId || isNaN(referenceId)) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'ID reference non valido'
+            });
+        }
+
+        const result = await getReferenceWithProjects(referenceId, companyId);
+
+        res.json(result);
+    } catch (err) {
+        console.error('Error fetching reference details:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nel recupero dei dettagli della reference'
         });
     }
 });

@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Inbox, Send, RefreshCw, CheckCircle, XCircle, Building2, Package, Wrench, Filter, Search, Info } from 'lucide-react';
 import IntercompanyRequestDetailsPanel from './components/IntercompanyRequestDetailsPanel';
+import { ItemCodeDialog } from './components/ItemCodeDialog';
+import { TemporaryItemsPanel } from './components/TemporaryItemsPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,7 +18,7 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 
 const IntercompanyDashboard = ({ onExit }) => {
-  const { getIntercompanyRequests, respondToIntercompanyRequest, getReferenceAttachments, updateReferenceNotes } = useProjectArticlesActions();
+  const { getIntercompanyRequests, respondToIntercompanyRequest, getReferenceAttachments, updateReferenceNotes, getTemporaryIntercompanyItems, replaceTemporaryItem } = useProjectArticlesActions();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('inbox');
@@ -32,6 +34,14 @@ const IntercompanyDashboard = ({ onExit }) => {
   const [responding, setResponding] = useState(false);
   const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+
+  // Temporary items state
+  const [temporaryItems, setTemporaryItems] = useState([]);
+  const [loadingTemporaryItems, setLoadingTemporaryItems] = useState(false);
+
+  // ItemCodeDialog state
+  const [itemCodeDialogOpen, setItemCodeDialogOpen] = useState(false);
+  const [itemCodeDialogData, setItemCodeDialogData] = useState(null);
 
   const loadRequests = useCallback(async (direction, status) => {
     try {
@@ -54,13 +64,32 @@ const IntercompanyDashboard = ({ onExit }) => {
     }
   }, [getIntercompanyRequests, toast]);
 
+  const loadTemporaryItems = useCallback(async () => {
+    try {
+      setLoadingTemporaryItems(true);
+      const result = await getTemporaryIntercompanyItems();
+      setTemporaryItems(result.items || []);
+    } catch (error) {
+      console.error('Error loading temporary items:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Errore',
+        description: 'Impossibile caricare gli articoli temporanei',
+      });
+    } finally {
+      setLoadingTemporaryItems(false);
+    }
+  }, [getTemporaryIntercompanyItems, toast]);
+
   useEffect(() => {
     if (activeTab === 'inbox') {
       loadRequests('IN', statusFilter);
-    } else {
+    } else if (activeTab === 'outbox') {
       loadRequests('OUT', statusFilter);
+    } else if (activeTab === 'temporary') {
+      loadTemporaryItems();
     }
-  }, [activeTab, statusFilter, loadRequests]);
+  }, [activeTab, statusFilter, loadRequests, loadTemporaryItems]);
 
   const handleRespond = async () => {
     if (!selectedRequest) return;
@@ -101,12 +130,88 @@ const IntercompanyDashboard = ({ onExit }) => {
     setSelectedRequest(request);
     setRespondAction(action);
     setResponseNotes('');
-    setRespondModalOpen(true);
+
+    if (action === 'APPROVE') {
+      // Per l'approvazione, mostra ItemCodeDialog
+      setItemCodeDialogData({
+        SourceItemCode: request.ComponentCode,
+        SourceItemDescription: request.ComponentDescription,
+        SourceCompanyName: request.SourceCompanyName,
+      });
+      setItemCodeDialogOpen(true);
+    } else {
+      // Per il rifiuto, mostra il dialog normale
+      setRespondModalOpen(true);
+    }
   };
 
   const openDetail = (request) => {
     setSelectedRequest(request);
     setDetailsPanelOpen(true);
+  };
+
+  const handleApproveWithItemCode = async (targetItemCode, notes) => {
+    if (!selectedRequest) return;
+
+    try {
+      setResponding(true);
+      const result = await respondToIntercompanyRequest(
+        selectedRequest.ReferenceId,
+        'APPROVE',
+        notes || null,
+        targetItemCode || null,
+        targetItemCode === null // createTemporaryIfMissing = true se targetItemCode è null
+      );
+
+      if (result.success) {
+        toast({
+          title: 'Richiesta approvata',
+          description: result.msg,
+        });
+        loadRequests('IN', statusFilter);
+        // Ricarica anche gli articoli temporanei se è stato creato un codice temporaneo
+        if (!targetItemCode) {
+          loadTemporaryItems();
+        }
+        setItemCodeDialogOpen(false);
+        setSelectedRequest(null);
+        setItemCodeDialogData(null);
+      } else {
+        throw new Error(result.msg);
+      }
+    } catch (error) {
+      console.error('Error approving request:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Errore',
+        description: error.message || 'Errore durante l\'approvazione della richiesta',
+      });
+    } finally {
+      setResponding(false);
+    }
+  };
+
+  const handleReplaceTemporaryItem = async (itemId, definitiveItemCode) => {
+    try {
+      const result = await replaceTemporaryItem(itemId, definitiveItemCode);
+      if (result.success) {
+        toast({
+          title: 'Articolo sostituito',
+          description: result.msg,
+        });
+        loadTemporaryItems();
+        loadRequests('IN', statusFilter); // Ricarica anche le richieste
+      } else {
+        throw new Error(result.msg);
+      }
+    } catch (error) {
+      console.error('Error replacing temporary item:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Errore',
+        description: error.message || 'Errore durante la sostituzione dell\'articolo',
+      });
+    }
   };
 
   // Le funzioni per gestire dettagli, allegati e note sono ora nel panel
@@ -338,6 +443,15 @@ const IntercompanyDashboard = ({ onExit }) => {
                   <Send className="w-4 h-4 mr-2" />
                   Outbox
                 </TabsTrigger>
+                <TabsTrigger value="temporary" className="relative">
+                  <Package className="w-4 h-4 mr-2" />
+                  Articoli Temporanei
+                  {temporaryItems.length > 0 && (
+                    <Badge variant="warning" className="ml-2 text-[10px] px-1">
+                      {temporaryItems.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
               </TabsList>
 
               {/* Filtri */}
@@ -374,6 +488,15 @@ const IntercompanyDashboard = ({ onExit }) => {
 
           <TabsContent value="outbox" className="m-0">
             {renderRequestTable(filteredRequests, 'OUT')}
+          </TabsContent>
+
+          <TabsContent value="temporary" className="m-0 p-6">
+            <TemporaryItemsPanel
+              items={temporaryItems}
+              onReplace={handleReplaceTemporaryItem}
+              onRefresh={loadTemporaryItems}
+              loading={loadingTemporaryItems}
+            />
           </TabsContent>
         </Tabs>
       </Card>
@@ -532,6 +655,18 @@ const IntercompanyDashboard = ({ onExit }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ItemCodeDialog per approvazione con scelta codice */}
+      <ItemCodeDialog
+        open={itemCodeDialogOpen}
+        onClose={() => {
+          setItemCodeDialogOpen(false);
+          setSelectedRequest(null);
+          setItemCodeDialogData(null);
+        }}
+        onConfirm={handleApproveWithItemCode}
+        referenceData={itemCodeDialogData}
+      />
 
     </div>
   );

@@ -19,6 +19,7 @@ const IntercompanySyncModal = ({
   open,
   onOpenChange,
   bomId,
+  projectId,
   getBOMIntercompanySummary,
   syncIntercompanySharing,
   onSuccess,
@@ -79,9 +80,18 @@ const IntercompanySyncModal = ({
       return;
     }
 
+    if (!projectId || projectId <= 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Errore',
+        description: 'ProjectId richiesto per la sincronizzazione',
+      });
+      return;
+    }
+
     try {
       setSyncing(true);
-      
+
       // Prepara i componenti selezionati per la nuova API
       const componentsToSync = Array.from(selectedComponents).map(componentId => {
         const component = components.find(comp => comp.ComponentId === componentId);
@@ -101,6 +111,7 @@ const IntercompanySyncModal = ({
       // Debug: Log del body completo prima di inviarlo
       const requestBody = {
         components: componentsToSync,
+        projectId: projectId,
         syncAttachments: syncAttachments
       };
       
