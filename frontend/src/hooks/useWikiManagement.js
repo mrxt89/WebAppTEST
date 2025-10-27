@@ -155,6 +155,33 @@ const useWikiManagement = () => {
     }
   }, [fetchComponentsByPage]);
 
+  /**
+   * Carica tutte le pagine wiki dal database WikiJS
+   */
+  const fetchWikiPages = useCallback(async () => {
+    try {
+      const response = await axiosInstance.get(`/wiki/pages`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching wiki pages:", error);
+      toast.error("Errore nel caricamento delle pagine wiki");
+      return [];
+    }
+  }, []);
+
+  /**
+   * Ottiene il path di una pagina wiki dato il suo ID
+   */
+  const getWikiPagePath = useCallback(async (wikiPageId) => {
+    try {
+      const response = await axiosInstance.get(`/wiki/pages/${wikiPageId}/path`);
+      return response.data;
+    } catch (error) {
+      console.error("Error getting wiki page path:", error);
+      return null;
+    }
+  }, []);
+
   return {
     // State
     components,
@@ -169,6 +196,8 @@ const useWikiManagement = () => {
     deleteComponent,
     resolveWikiUrl,
     refreshComponents,
+    fetchWikiPages,
+    getWikiPagePath,
   };
 };
 

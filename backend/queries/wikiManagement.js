@@ -23,13 +23,14 @@ async function getPageComponents(pageId) {
             c.componentName,
             c.componentDescription,
             c.wikiSlug,
+            c.wikiPageId,
             c.sequence,
             c.iconName,
             c.isActive,
             0 as level,
             CAST(c.sequence AS VARCHAR(MAX)) as sortPath
           FROM AR_Pages_Components c
-          WHERE c.pageId = @pageId AND c.parentComponentId IS NULL
+          WHERE c.pageId = @pageId AND c.parentComponentId IS NULL AND c.wikiPageId IS NOT NULL
 
           UNION ALL
 
@@ -42,6 +43,7 @@ async function getPageComponents(pageId) {
             c.componentName,
             c.componentDescription,
             c.wikiSlug,
+            c.wikiPageId,
             c.sequence,
             c.iconName,
             c.isActive,
@@ -49,7 +51,7 @@ async function getPageComponents(pageId) {
             ct.sortPath + '.' + CAST(c.sequence AS VARCHAR(MAX))
           FROM AR_Pages_Components c
           JOIN ComponentTree ct ON c.parentComponentId = ct.componentId
-          WHERE c.pageId = @pageId
+          WHERE c.pageId = @pageId AND c.wikiPageId IS NOT NULL
         )
         SELECT
           componentId,
@@ -59,6 +61,7 @@ async function getPageComponents(pageId) {
           componentName,
           componentDescription,
           wikiSlug,
+          wikiPageId,
           sequence,
           iconName,
           isActive,
@@ -96,6 +99,7 @@ async function getComponentByKey(pageId, componentKey) {
           componentName,
           componentDescription,
           wikiSlug,
+          wikiPageId,
           sequence,
           iconName,
           isActive
@@ -128,6 +132,7 @@ async function getAllComponents() {
         c.componentName,
         c.componentDescription,
         c.wikiSlug,
+        c.wikiPageId,
         c.sequence,
         c.iconName,
         c.isActive
@@ -151,14 +156,19 @@ async function getAllComponents() {
 async function createComponent(component) {
   try {
     let pool = await sql.connect(config.database);
+
+    // Auto-genera componentKey se non fornito (usa wikiPageId come base)
+    const componentKey = component.componentKey || `wiki-${component.wikiPageId || Date.now()}`;
+
     const result = await pool
       .request()
       .input("pageId", sql.Int, component.pageId)
       .input("parentComponentId", sql.Int, component.parentComponentId || null)
-      .input("componentKey", sql.NVarChar(100), component.componentKey)
+      .input("componentKey", sql.NVarChar(100), componentKey)
       .input("componentName", sql.NVarChar(200), component.componentName)
       .input("componentDescription", sql.NVarChar(500), component.componentDescription || null)
       .input("wikiSlug", sql.NVarChar(500), component.wikiSlug || null)
+      .input("wikiPageId", sql.Int, component.wikiPageId || null)
       .input("sequence", sql.Int, component.sequence || 0)
       .input("iconName", sql.NVarChar(50), component.iconName || null)
       .input("isActive", sql.Bit, component.isActive !== undefined ? component.isActive : 1)
@@ -170,6 +180,7 @@ async function createComponent(component) {
           componentName,
           componentDescription,
           wikiSlug,
+          wikiPageId,
           sequence,
           iconName,
           isActive
@@ -181,6 +192,7 @@ async function createComponent(component) {
           @componentName,
           @componentDescription,
           @wikiSlug,
+          @wikiPageId,
           @sequence,
           @iconName,
           @isActive
@@ -194,6 +206,7 @@ async function createComponent(component) {
           componentName,
           componentDescription,
           wikiSlug,
+          wikiPageId,
           sequence,
           iconName,
           isActive
@@ -225,6 +238,7 @@ async function updateComponent(componentId, component) {
       .input("componentName", sql.NVarChar(200), component.componentName)
       .input("componentDescription", sql.NVarChar(500), component.componentDescription || null)
       .input("wikiSlug", sql.NVarChar(500), component.wikiSlug || null)
+      .input("wikiPageId", sql.Int, component.wikiPageId || null)
       .input("sequence", sql.Int, component.sequence || 0)
       .input("iconName", sql.NVarChar(50), component.iconName || null)
       .input("isActive", sql.Bit, component.isActive !== undefined ? component.isActive : 1)
@@ -236,6 +250,7 @@ async function updateComponent(componentId, component) {
           componentName = @componentName,
           componentDescription = @componentDescription,
           wikiSlug = @wikiSlug,
+          wikiPageId = @wikiPageId,
           sequence = @sequence,
           iconName = @iconName,
           isActive = @isActive
@@ -249,6 +264,7 @@ async function updateComponent(componentId, component) {
           componentName,
           componentDescription,
           wikiSlug,
+          wikiPageId,
           sequence,
           iconName,
           isActive
@@ -349,36 +365,124 @@ async function resolveWikiUrl(pageId, componentKey = null) {
     if (componentKey) {
       // Cerca il componente specifico
       const component = await getComponentByKey(pageId, componentKey);
-      if (component && component.wikiSlug) {
-        return {
-          wikiSlug: component.wikiSlug,
-          source: 'component',
-          componentName: component.componentName
-        };
+      if (component) {
+        // Priorità 1: wikiPageId (ID immutabile)
+        if (component.wikiPageId) {
+          const wikiPage = await getWikiPagePath(component.wikiPageId);
+          if (wikiPage) {
+            return {
+              wikiSlug: wikiPage.path,
+              source: 'component',
+              componentName: component.componentName,
+              wikiPageId: component.wikiPageId,
+              wikiTitle: wikiPage.title
+            };
+          }
+        }
+
+        // Fallback 1: wikiSlug (retrocompatibilità)
+        if (component.wikiSlug) {
+          return {
+            wikiSlug: component.wikiSlug,
+            source: 'component',
+            componentName: component.componentName
+          };
+        }
       }
     }
 
-    // Fallback: cerca wikiSlug della pagina principale
+    // Fallback: cerca nella pagina principale
     const result = await pool
       .request()
       .input("pageId", sql.Int, pageId)
       .query(`
-        SELECT wikiSlug, pageName
+        SELECT wikiPageId, wikiSlug, pageName
         FROM AR_Pages
         WHERE pageId = @pageId
       `);
 
-    if (result.recordset.length > 0 && result.recordset[0].wikiSlug) {
-      return {
-        wikiSlug: result.recordset[0].wikiSlug,
-        source: 'page',
-        pageName: result.recordset[0].pageName
-      };
+    if (result.recordset.length > 0) {
+      const page = result.recordset[0];
+
+      // Priorità 1: wikiPageId
+      if (page.wikiPageId) {
+        const wikiPage = await getWikiPagePath(page.wikiPageId);
+        if (wikiPage) {
+          return {
+            wikiSlug: wikiPage.path,
+            source: 'page',
+            pageName: page.pageName,
+            wikiPageId: page.wikiPageId,
+            wikiTitle: wikiPage.title
+          };
+        }
+      }
+
+      // Fallback: wikiSlug
+      if (page.wikiSlug) {
+        return {
+          wikiSlug: page.wikiSlug,
+          source: 'page',
+          pageName: page.pageName
+        };
+      }
     }
 
     return null;
   } catch (error) {
     console.error("Error in resolveWikiUrl:", error);
+    throw error;
+  }
+}
+
+/**
+ * Ottiene tutte le pagine wiki dal database WikiJS
+ * @returns {Promise<Array>} Array di pagine wiki con id, path, title, description
+ */
+async function getAllWikiPages() {
+  try {
+    let pool = await sql.connect(config.database);
+    const result = await pool.request().query(`
+      SELECT
+        id,
+        path,
+        title,
+        description,
+        isPublished,
+        createdAt,
+        updatedAt
+      FROM [WikiJS]..pages
+      WHERE isPublished = 1
+      ORDER BY path
+    `);
+
+    return result.recordset;
+  } catch (error) {
+    console.error("Error in getAllWikiPages:", error);
+    throw error;
+  }
+}
+
+/**
+ * Ottiene il path di una pagina wiki dato il suo ID
+ * @param {number} wikiPageId - ID della pagina wiki
+ * @returns {Promise<string|null>} Path della pagina o null se non trovata
+ */
+async function getWikiPagePath(wikiPageId) {
+  try {
+    let pool = await sql.connect(config.database);
+    const result = await pool
+      .request()
+      .input("wikiPageId", sql.Int, wikiPageId)
+      .query(`
+        SELECT path, title
+        FROM [WikiJS]..pages
+        WHERE id = @wikiPageId
+      `);
+
+    return result.recordset.length > 0 ? result.recordset[0] : null;
+  } catch (error) {
+    console.error("Error in getWikiPagePath:", error);
     throw error;
   }
 }
@@ -391,5 +495,7 @@ module.exports = {
   updateComponent,
   deleteComponent,
   getAvailableParents,
-  resolveWikiUrl
+  resolveWikiUrl,
+  getAllWikiPages,
+  getWikiPagePath
 };

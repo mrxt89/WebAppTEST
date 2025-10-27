@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardHeader,
@@ -16,7 +16,9 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -28,7 +30,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { BookOpen, Check, ChevronsUpDown, ExternalLink, Plus, Edit, Trash2, X } from "lucide-react";
 import { swal } from "../../../lib/common";
+import useWikiManagement from "@/hooks/useWikiManagement";
+import axiosInstance from "@/lib/axios";
 
 const PagesTab = ({
   pages,
@@ -52,12 +70,144 @@ const PagesTab = ({
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmTitle, setConfirmTitle] = useState("");
 
+  // Stati per la gestione wiki components
+  const [wikiPages, setWikiPages] = useState([]);
+  const [wikiPageSearchOpen, setWikiPageSearchOpen] = useState(false);
+  const [loadingWikiPages, setLoadingWikiPages] = useState(false);
+  const [wikiComponents, setWikiComponents] = useState([]);
+  const [loadingWikiComponents, setLoadingWikiComponents] = useState(false);
+  const [wikiDialogOpen, setWikiDialogOpen] = useState(false);
+  const [editingWikiComponent, setEditingWikiComponent] = useState(null);
+  const [wikiFormData, setWikiFormData] = useState({
+    componentName: "",
+    componentDescription: "",
+    wikiPageId: null,
+    sequence: 0,
+    iconName: "",
+    isActive: true,
+  });
+
+  // Hook per wiki
+  const {
+    fetchWikiPages,
+    fetchComponentsByPage,
+    createComponent,
+    updateComponent,
+    deleteComponent,
+  } = useWikiManagement();
+
+  // Carica pagine wiki all'avvio
+  useEffect(() => {
+    const loadWikiPages = async () => {
+      setLoadingWikiPages(true);
+      const pages = await fetchWikiPages();
+      setWikiPages(pages);
+      setLoadingWikiPages(false);
+    };
+    loadWikiPages();
+  }, [fetchWikiPages]);
+
+  // Carica componenti wiki quando cambia la pagina selezionata
+  useEffect(() => {
+    if (selectedPage) {
+      loadWikiComponentsForPage(selectedPage.pageId);
+    } else {
+      setWikiComponents([]);
+    }
+  }, [selectedPage]);
+
   const handleSelectPage = (page) => {
     setSelectedPage(page);
     setSelectedGroups([]);
     setApplyToChildren(false);
     setPageDisabled(page.disabled);
     setPageInheritPermissions(!!page.inheritPermissions);
+  };
+
+  // Funzioni per gestione componenti wiki
+  const loadWikiComponentsForPage = async (pageId) => {
+    setLoadingWikiComponents(true);
+    try {
+      const components = await fetchComponentsByPage(pageId);
+      setWikiComponents(components);
+    } catch (error) {
+      console.error("Error loading wiki components:", error);
+      setWikiComponents([]);
+    } finally {
+      setLoadingWikiComponents(false);
+    }
+  };
+
+  const handleAddWikiComponent = () => {
+    setEditingWikiComponent(null);
+    setWikiFormData({
+      componentName: "",
+      componentDescription: "",
+      wikiPageId: null,
+      sequence: ((wikiComponents?.length || 0) + 1) * 10,
+      iconName: "BookOpen",
+      isActive: true,
+    });
+    setWikiDialogOpen(true);
+  };
+
+  const handleEditWikiComponent = (component) => {
+    setEditingWikiComponent(component);
+    setWikiFormData({
+      componentName: component.componentName,
+      componentDescription: component.componentDescription || "",
+      wikiPageId: component.wikiPageId || null,
+      sequence: component.sequence,
+      iconName: component.iconName || "BookOpen",
+      isActive: component.isActive,
+    });
+    setWikiDialogOpen(true);
+  };
+
+  const handleDeleteWikiComponent = async (componentId) => {
+    if (!confirm("Sei sicuro di voler eliminare questo componente wiki?")) {
+      return;
+    }
+
+    try {
+      await deleteComponent(componentId);
+      await loadWikiComponentsForPage(selectedPage.pageId);
+      swal.fire("Successo", "Componente wiki eliminato con successo", "success");
+    } catch (error) {
+      console.error("Error deleting wiki component:", error);
+    }
+  };
+
+  const handleSaveWikiComponent = async () => {
+    if (!wikiFormData.componentName) {
+      swal.fire("Attenzione", "Inserisci il nome del componente", "warning");
+      return;
+    }
+
+    if (!wikiFormData.wikiPageId) {
+      swal.fire("Attenzione", "Seleziona una pagina wiki", "warning");
+      return;
+    }
+
+    try {
+      const data = {
+        ...wikiFormData,
+        pageId: selectedPage.pageId,
+        // componentKey sarà auto-generato dal backend se non fornito
+      };
+
+      if (editingWikiComponent) {
+        await updateComponent(editingWikiComponent.componentId, data);
+      } else {
+        await createComponent(data);
+      }
+
+      setWikiDialogOpen(false);
+      await loadWikiComponentsForPage(selectedPage.pageId);
+      swal.fire("Successo", "Componente wiki salvato con successo", "success");
+    } catch (error) {
+      console.error("Error saving wiki component:", error);
+    }
   };
 
   const handleGroupCheckbox = (groupId) => {
@@ -388,6 +538,87 @@ const PagesTab = ({
           </div>
         )}
 
+        {/* Sezione componenti wiki collegati */}
+        <div className="border rounded-md p-4 bg-muted/30">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-md font-medium flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Documentazione Wiki ({wikiComponents?.length || 0})
+            </h4>
+            <Button size="sm" onClick={handleAddWikiComponent} className="h-7">
+              <Plus className="h-3 w-3 mr-1" />
+              Aggiungi
+            </Button>
+          </div>
+
+          {loadingWikiComponents ? (
+            <div className="text-center py-4 text-sm text-muted-foreground">
+              Caricamento componenti wiki...
+            </div>
+          ) : !wikiComponents || wikiComponents.length === 0 ? (
+            <div className="text-center py-4 text-sm text-muted-foreground">
+              Nessun componente wiki collegato
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {wikiComponents.map((component) => {
+                const wikiPage = wikiPages.find(p => p.id === component.wikiPageId);
+                return (
+                  <div
+                    key={component.componentId}
+                    className="flex items-center justify-between p-2 border rounded hover:bg-accent/50"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                        <span className="font-medium text-sm">{component.componentName}</span>
+                        {component.componentDescription && (
+                          <span className="text-xs text-muted-foreground truncate">
+                            - {component.componentDescription}
+                          </span>
+                        )}
+                      </div>
+                      {wikiPage && (
+                        <div className="text-xs text-muted-foreground ml-6 mt-1 font-mono truncate">
+                          {wikiPage.path}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 ml-2">
+                      {wikiPage && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => window.open(`${window.location.origin}/wiki${wikiPage.path}`, '_blank')}
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => handleEditWikiComponent(component)}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteWikiComponent(component.componentId)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div>
           <div className="flex justify-content-around items-center mb-2 h-11">
             <h4 className="text-md font-medium">Gruppi con accesso</h4>
@@ -529,6 +760,116 @@ const PagesTab = ({
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog gestione componente wiki */}
+      <Dialog open={wikiDialogOpen} onOpenChange={setWikiDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingWikiComponent ? "Modifica Componente Wiki" : "Nuovo Componente Wiki"}
+            </DialogTitle>
+            <DialogDescription>
+              Configura il componente wiki per la pagina {selectedPage?.pageName}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="componentName">
+                Nome Componente <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="componentName"
+                value={wikiFormData.componentName}
+                onChange={(e) => setWikiFormData({ ...wikiFormData, componentName: e.target.value })}
+                placeholder="es. Dashboard Articoli"
+              />
+              <p className="text-xs text-muted-foreground">
+                Nome visualizzato per questo collegamento wiki
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="componentDescription">Descrizione</Label>
+              <Textarea
+                id="componentDescription"
+                value={wikiFormData.componentDescription}
+                onChange={(e) => setWikiFormData({ ...wikiFormData, componentDescription: e.target.value })}
+                placeholder="Descrizione del componente"
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>
+                Pagina Wiki <span className="text-red-500">*</span>
+              </Label>
+              <Popover open={wikiPageSearchOpen} onOpenChange={setWikiPageSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                  >
+                    {wikiFormData.wikiPageId ? (
+                      <div className="flex items-center gap-2 truncate">
+                        <BookOpen className="h-4 w-4" />
+                        <span className="truncate">
+                          {wikiPages.find(p => p.id === wikiFormData.wikiPageId)?.title || "Selezionata"}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Seleziona pagina wiki...</span>
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[500px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Cerca..." />
+                    <CommandList>
+                      <CommandEmpty>Nessuna pagina trovata.</CommandEmpty>
+                      <CommandGroup>
+                        {wikiPages.map((page) => (
+                          <CommandItem
+                            key={page.id}
+                            value={`${page.title} ${page.path}`}
+                            onSelect={() => {
+                              setWikiFormData({ ...wikiFormData, wikiPageId: page.id });
+                              setWikiPageSearchOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                wikiFormData.wikiPageId === page.id ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <span className="font-medium truncate">{page.title}</span>
+                              <span className="text-xs text-muted-foreground font-mono truncate">
+                                {page.path}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWikiDialogOpen(false)}>
+              Annulla
+            </Button>
+            <Button onClick={handleSaveWikiComponent}>
+              {editingWikiComponent ? "Aggiorna" : "Crea"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog di conferma */}
       <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
