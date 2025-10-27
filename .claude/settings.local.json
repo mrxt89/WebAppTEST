@@ -21,7 +21,8 @@
       "Bash(docker exec webapptest-backend-1 sh -c \"grep -A 5 -B 5 ''Error\\|error'' /usr/src/app/logs/* 2>/dev/null | head -50 || echo ''No log files found''\")",
       "Bash(docker logs webapptest-backend-1)",
       "Bash(tree:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
