@@ -4,9 +4,18 @@ import * as LucideIcons from 'lucide-react';
 
 const WIKI_BASE_URL = import.meta.env.VITE_WIKI_BASE_URL || 'http://192.168.42.122:3003/it';
 
-const WikiDocsTreeView = ({ components, currentComponentKey, onClose }) => {
+const WikiDocsTreeView = ({ components, wikiPages = [], currentComponentKey, onClose }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState(new Set());
+
+  // Create a map of wikiPageId -> path for quick lookup
+  const wikiPageMap = useMemo(() => {
+    const map = new Map();
+    wikiPages.forEach(page => {
+      map.set(page.id, page.path);
+    });
+    return map;
+  }, [wikiPages]);
 
   // Auto-expand all by default
   useMemo(() => {
@@ -49,17 +58,27 @@ const WikiDocsTreeView = ({ components, currentComponentKey, onClose }) => {
 
   // Handle component click
   const handleClick = (component, event) => {
-    if (!component.wikiSlug) return;
+    // Priorità 1: usa wikiPageId per recuperare il path dal DB WikiJS
+    if (component.wikiPageId) {
+      const wikiPath = wikiPageMap.get(component.wikiPageId);
+      if (wikiPath) {
+        const wikiUrl = `${WIKI_BASE_URL}${wikiPath}`;
+        window.open(wikiUrl, '_blank', 'noopener,noreferrer');
+        if (!(event.ctrlKey || event.metaKey)) {
+          onClose(); // Chiudi il drawer se non è Ctrl/Cmd+Click
+        }
+        return;
+      }
+    }
 
-    const wikiUrl = `${WIKI_BASE_URL}${component.wikiSlug}`;
-
-    if (event.ctrlKey || event.metaKey) {
-      // Ctrl/Cmd + Click → nuova tab
+    // Fallback: usa wikiSlug (retrocompatibilità)
+    if (component.wikiSlug) {
+      const wikiUrl = `${WIKI_BASE_URL}${component.wikiSlug}`;
       window.open(wikiUrl, '_blank', 'noopener,noreferrer');
-    } else {
-      // Click normale → stessa tab
-      window.open(wikiUrl, '_blank', 'noopener,noreferrer');
-      onClose(); // Chiudi il drawer dopo il click
+      if (!(event.ctrlKey || event.metaKey)) {
+        onClose(); // Chiudi il drawer se non è Ctrl/Cmd+Click
+      }
+      return;
     }
   };
 
@@ -75,11 +94,13 @@ const WikiDocsTreeView = ({ components, currentComponentKey, onClose }) => {
 
       const paddingLeft = 16 + (level * 20);
 
+      const hasWikiLink = component.wikiPageId || component.wikiSlug;
+
       return (
         <div key={component.componentId} className="nav-tree-node">
           <div
-            className={`nav-tree-item ${isActive ? 'active' : ''} ${!component.wikiSlug ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={(e) => component.wikiSlug && handleClick(component, e)}
+            className={`nav-tree-item ${isActive ? 'active' : ''} ${!hasWikiLink ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={(e) => hasWikiLink && handleClick(component, e)}
             style={{ paddingLeft: `${paddingLeft}px` }}
             title={component.componentDescription || ''}
           >
@@ -100,7 +121,7 @@ const WikiDocsTreeView = ({ components, currentComponentKey, onClose }) => {
             <span className="nav-tree-label">{component.componentName}</span>
 
             {/* Active indicator or external link icon */}
-            {component.wikiSlug && (
+            {hasWikiLink && (
               <ExternalLink className="nav-tree-arrow" style={{ width: '14px', height: '14px' }} />
             )}
           </div>

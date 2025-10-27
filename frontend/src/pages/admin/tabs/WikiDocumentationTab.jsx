@@ -67,12 +67,17 @@ const WikiDocumentationTab = ({ pages }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingComponent, setEditingComponent] = useState(null);
   const [expandedComponents, setExpandedComponents] = useState(new Set());
-  
+
   // Nuovi stati per la ricerca avanzata
   const [pageSearchOpen, setPageSearchOpen] = useState(false);
   const [componentSearchQuery, setComponentSearchQuery] = useState("");
   const [filterActive, setFilterActive] = useState("all"); // all, active, inactive
   const [viewMode, setViewMode] = useState("tree"); // tree, list
+
+  // Stati per le pagine wiki
+  const [wikiPages, setWikiPages] = useState([]);
+  const [wikiPageSearchOpen, setWikiPageSearchOpen] = useState(false);
+  const [loadingWikiPages, setLoadingWikiPages] = useState(false);
 
   // Use custom hook
   const {
@@ -82,6 +87,7 @@ const WikiDocumentationTab = ({ pages }) => {
     createComponent,
     updateComponent,
     deleteComponent,
+    fetchWikiPages,
   } = useWikiManagement();
 
   // Form state
@@ -90,11 +96,23 @@ const WikiDocumentationTab = ({ pages }) => {
     componentName: "",
     componentDescription: "",
     wikiSlug: "",
+    wikiPageId: null,
     parentComponentId: null,
     sequence: 0,
     iconName: "",
     isActive: true,
   });
+
+  // Load wiki pages on component mount
+  useEffect(() => {
+    const loadWikiPages = async () => {
+      setLoadingWikiPages(true);
+      const pages = await fetchWikiPages();
+      setWikiPages(pages);
+      setLoadingWikiPages(false);
+    };
+    loadWikiPages();
+  }, [fetchWikiPages]);
 
   // Load components when page is selected
   useEffect(() => {
@@ -142,6 +160,7 @@ const WikiDocumentationTab = ({ pages }) => {
       componentName: "",
       componentDescription: "",
       wikiSlug: "",
+      wikiPageId: null,
       parentComponentId: null,
       sequence: (components.length + 1) * 10,
       iconName: "",
@@ -157,6 +176,7 @@ const WikiDocumentationTab = ({ pages }) => {
       componentName: component.componentName,
       componentDescription: component.componentDescription || "",
       wikiSlug: component.wikiSlug || "",
+      wikiPageId: component.wikiPageId || null,
       parentComponentId: component.parentComponentId,
       sequence: component.sequence,
       iconName: component.iconName || "",
@@ -746,25 +766,92 @@ const WikiDocumentationTab = ({ pages }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="wikiSlug" className="flex items-center gap-1">
-                    Wiki Slug <span className="text-red-500">*</span>
+                  <Label htmlFor="wikiPage" className="flex items-center gap-1">
+                    Pagina Wiki <span className="text-red-500">*</span>
                   </Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="wikiSlug"
-                      value={formData.wikiSlug}
-                      onChange={(e) =>
-                        setFormData({ ...formData, wikiSlug: e.target.value })
-                      }
-                      placeholder="/progetti/dashboard-progetti/articoli"
-                      className="font-mono"
-                    />
-                    {formData.wikiSlug && (
+                  <div className="flex items-center gap-2 flex-1">
+                    <Popover open={wikiPageSearchOpen} onOpenChange={setWikiPageSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={wikiPageSearchOpen}
+                          className="w-full justify-between font-mono text-sm"
+                        >
+                          {formData.wikiPageId ? (
+                            <div className="flex items-center gap-2 truncate">
+                              <BookOpen className="h-4 w-4 flex-shrink-0" />
+                              <span className="truncate">
+                                {wikiPages.find(p => p.id === formData.wikiPageId)?.title || "Pagina selezionata"}
+                              </span>
+                              <span className="text-muted-foreground text-xs truncate">
+                                ({wikiPages.find(p => p.id === formData.wikiPageId)?.path})
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Seleziona una pagina wiki...</span>
+                          )}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[600px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Cerca pagina wiki..." />
+                          <CommandList>
+                            <CommandEmpty>Nessuna pagina wiki trovata.</CommandEmpty>
+                            <CommandGroup>
+                              {loadingWikiPages ? (
+                                <div className="p-4 text-center text-sm text-muted-foreground">
+                                  Caricamento pagine wiki...
+                                </div>
+                              ) : (
+                                wikiPages.map((page) => (
+                                  <CommandItem
+                                    key={page.id}
+                                    value={`${page.title} ${page.path}`}
+                                    onSelect={() => {
+                                      setFormData({ ...formData, wikiPageId: page.id, wikiSlug: "" });
+                                      setWikiPageSearchOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        formData.wikiPageId === page.id ? "opacity-100" : "opacity-0"
+                                      }`}
+                                    />
+                                    <div className="flex flex-col gap-1 flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <BookOpen className="h-4 w-4 flex-shrink-0" />
+                                        <span className="font-medium truncate">{page.title}</span>
+                                      </div>
+                                      <span className="text-xs text-muted-foreground font-mono truncate">
+                                        {page.path}
+                                      </span>
+                                      {page.description && (
+                                        <span className="text-xs text-muted-foreground truncate">
+                                          {page.description}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </CommandItem>
+                                ))
+                              )}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    {formData.wikiPageId && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => window.open(formData.wikiSlug, '_blank')}
-                        className="flex items-center gap-1"
+                        onClick={() => {
+                          const selectedPage = wikiPages.find(p => p.id === formData.wikiPageId);
+                          if (selectedPage) {
+                            window.open(`${window.location.origin}/wiki${selectedPage.path}`, '_blank');
+                          }
+                        }}
+                        className="flex items-center gap-1 flex-shrink-0"
                       >
                         <ExternalLink className="h-3 w-3" />
                         Anteprima
@@ -772,8 +859,8 @@ const WikiDocumentationTab = ({ pages }) => {
                     )}
                   </div>
                   <div className="text-xs text-muted-foreground space-y-1">
-                    <p>Path relativo della pagina wiki (es. /progetti/dashboard-progetti/articoli)</p>
-                    <p><strong>Formato:</strong> /sezione/sottosezione/componente</p>
+                    <p>Seleziona la pagina wiki dal database WikiJS. Il collegamento è basato su ID immutabile.</p>
+                    <p><strong>Vantaggi:</strong> Se rinomini il path nel wiki, il collegamento funziona ancora.</p>
                   </div>
                 </div>
               </div>

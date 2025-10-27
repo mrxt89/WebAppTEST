@@ -15,8 +15,21 @@ const WikiDocsPanel = ({
   const drawerRef = useRef(null);
   const overlayRef = useRef(null);
 
-  // Use custom hook to fetch components
-  const { components, loading, fetchComponentsByPage } = useWikiManagement();
+  // Use custom hook to fetch components and wiki pages
+  const { components, loading, fetchComponentsByPage, fetchWikiPages, getWikiPagePath } = useWikiManagement();
+  const [wikiPages, setWikiPages] = React.useState([]);
+  const [loadingWikiPages, setLoadingWikiPages] = React.useState(false);
+
+  // Load wiki pages on mount
+  useEffect(() => {
+    const loadWikiPages = async () => {
+      setLoadingWikiPages(true);
+      const pages = await fetchWikiPages();
+      setWikiPages(pages);
+      setLoadingWikiPages(false);
+    };
+    loadWikiPages();
+  }, [fetchWikiPages]);
 
   // Load components when panel opens
   useEffect(() => {
@@ -110,13 +123,14 @@ const WikiDocsPanel = ({
 
         {/* Content */}
         <div className="h-[calc(100%-73px)] flex flex-col">
-          {loading ? (
+          {(loading || loadingWikiPages) ? (
             <div className="nav-tree-loading">
               Caricamento...
             </div>
           ) : (
             <WikiDocsTreeView
               components={components}
+              wikiPages={wikiPages}
               currentComponentKey={currentComponentKey}
               onClose={onClose}
             />

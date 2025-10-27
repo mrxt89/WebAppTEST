@@ -107,7 +107,7 @@ router.post("/components", async (req, res) => {
     console.error("Error creating component:", error);
     if (error.message && error.message.includes("UNIQUE")) {
       res.status(400).json({
-        error: "Esiste già un componente con questa chiave per questa pagina"
+        error: "Questa pagina wiki è già collegata a questa pagina dell'applicazione"
       });
     } else {
       res.status(500).json({ error: "Errore nella creazione del componente" });
@@ -136,7 +136,7 @@ router.put("/components/:componentId", async (req, res) => {
     console.error("Error updating component:", error);
     if (error.message && error.message.includes("UNIQUE")) {
       res.status(400).json({
-        error: "Esiste già un componente con questa chiave per questa pagina"
+        error: "Questa pagina wiki è già collegata a questa pagina dell'applicazione"
       });
     } else {
       res.status(500).json({ error: "Errore nell'aggiornamento del componente" });
@@ -156,6 +156,40 @@ router.delete("/components/:componentId", async (req, res) => {
   } catch (error) {
     console.error("Error deleting component:", error);
     res.status(500).json({ error: "Errore nell'eliminazione del componente" });
+  }
+});
+
+/**
+ * GET /api/wiki/pages
+ * Ottiene tutte le pagine wiki dal database WikiJS
+ */
+router.get("/pages", async (req, res) => {
+  try {
+    const wikiPages = await wikiManagement.getAllWikiPages();
+    res.json(wikiPages);
+  } catch (error) {
+    console.error("Error getting wiki pages:", error);
+    res.status(500).json({ error: "Errore nel recupero delle pagine wiki" });
+  }
+});
+
+/**
+ * GET /api/wiki/pages/:wikiPageId/path
+ * Ottiene il path di una pagina wiki dato il suo ID
+ */
+router.get("/pages/:wikiPageId/path", async (req, res) => {
+  try {
+    const { wikiPageId } = req.params;
+    const wikiPage = await wikiManagement.getWikiPagePath(parseInt(wikiPageId));
+
+    if (!wikiPage) {
+      return res.status(404).json({ error: "Pagina wiki non trovata" });
+    }
+
+    res.json(wikiPage);
+  } catch (error) {
+    console.error("Error getting wiki page path:", error);
+    res.status(500).json({ error: "Errore nel recupero del path della pagina wiki" });
   }
 });
 

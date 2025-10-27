@@ -22,7 +22,9 @@
       "Bash(docker logs webapptest-backend-1)",
       "Bash(tree:*)",
       "Bash(docker exec:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(docker ps:*)",
+      "Bash(where:*)"
     ],
     "deny": [],
     "ask": []
