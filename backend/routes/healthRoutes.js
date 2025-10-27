@@ -5,6 +5,15 @@ const sql = require('mssql');
 const config = require('../config');
 const os = require('os');
 
+// Simple ping endpoint (lightweight, no auth required)
+router.get('/ping', (req, res) => {
+    res.json({
+        success: true,
+        message: 'pong',
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Health check endpoint
 router.get('/health', async (req, res) => {
     const health = {

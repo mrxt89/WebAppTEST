@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Inbox, Send, RefreshCw, CheckCircle, XCircle, Building2, Package, Wrench, Filter, Search, Info } from 'lucide-react';
+import { Inbox, Send, RefreshCw, CheckCircle, XCircle, Building2, Package, Wrench, Filter, Search, Info, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import IntercompanyRequestDetailsPanel from './components/IntercompanyRequestDetailsPanel';
 import { ItemCodeDialog } from './components/ItemCodeDialog';
 import { TemporaryItemsPanel } from './components/TemporaryItemsPanel';
@@ -27,6 +27,16 @@ const IntercompanyDashboard = ({ onExit }) => {
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Stati per ordinamento e filtri avanzati
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [companyFilter, setCompanyFilter] = useState('all');
+  const [dateRangeFilter, setDateRangeFilter] = useState('all');
+  
+  // Stati per paginazione
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [respondModalOpen, setRespondModalOpen] = useState(false);
   const [respondAction, setRespondAction] = useState(null);
@@ -254,17 +264,149 @@ const IntercompanyDashboard = ({ onExit }) => {
     );
   };
 
-  const filterRequests = (requests) => {
-    if (!searchQuery) return requests;
-    const query = searchQuery.toLowerCase();
-    return requests.filter((req) =>
-      req.ComponentCode?.toLowerCase().includes(query) ||
-      req.ComponentDescription?.toLowerCase().includes(query) ||
-      req.ProjectCode?.toLowerCase().includes(query) ||
-      req.SourceCompanyName?.toLowerCase().includes(query) ||
-      req.TargetCompanyName?.toLowerCase().includes(query)
-    );
+  // Funzione per ordinamento
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
   };
+
+  // Funzione per ordinare i dati
+  const sortData = (data) => {
+    if (!sortConfig.key) return data;
+    
+    return [...data].sort((a, b) => {
+      let aValue = a[sortConfig.key];
+      let bValue = b[sortConfig.key];
+      
+      // Gestione valori null/undefined
+      if (aValue == null) aValue = '';
+      if (bValue == null) bValue = '';
+      
+      // Conversione per date
+      if (sortConfig.key === 'RequestDate') {
+        aValue = new Date(aValue);
+        bValue = new Date(bValue);
+      }
+      
+      // Conversione per stringhe
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+      
+      if (aValue < bValue) {
+        return sortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  };
+
+  // Funzione per filtrare i dati
+  const filterRequests = (requests) => {
+    let filtered = requests;
+    
+    // Filtro per ricerca testuale
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((req) =>
+        req.ComponentCode?.toLowerCase().includes(query) ||
+        req.ComponentDescription?.toLowerCase().includes(query) ||
+        req.ProjectCode?.toLowerCase().includes(query) ||
+        req.SourceCompanyName?.toLowerCase().includes(query) ||
+        req.TargetCompanyName?.toLowerCase().includes(query) ||
+        req.SourceProjectName?.toLowerCase().includes(query) ||
+        req.TargetProjectName?.toLowerCase().includes(query) ||
+        req.SourceProjectDescription?.toLowerCase().includes(query) ||
+        req.TargetProjectDescription?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Filtro per stato
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((req) => req.Status === statusFilter);
+    }
+    
+    // Filtro per tipo
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter((req) => req.IntercompanyType === typeFilter);
+    }
+    
+    // Filtro per company
+    if (companyFilter !== 'all') {
+      filtered = filtered.filter((req) => 
+        req.SourceCompanyName === companyFilter || 
+        req.TargetCompanyName === companyFilter
+      );
+    }
+    
+    // Filtro per range di date
+    if (dateRangeFilter !== 'all') {
+      const now = new Date();
+      const filterDate = new Date();
+      
+      switch (dateRangeFilter) {
+        case 'today':
+          filterDate.setHours(0, 0, 0, 0);
+          break;
+        case 'week':
+          filterDate.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          filterDate.setMonth(now.getMonth() - 1);
+          break;
+        case 'quarter':
+          filterDate.setMonth(now.getMonth() - 3);
+          break;
+        default:
+          break;
+      }
+      
+      filtered = filtered.filter((req) => new Date(req.RequestDate) >= filterDate);
+    }
+    
+    return filtered;
+  };
+
+  // Funzione per ottenere le company uniche
+  const getUniqueCompanies = (requests) => {
+    const companies = new Set();
+    requests.forEach(req => {
+      if (req.SourceCompanyName) companies.add(req.SourceCompanyName);
+      if (req.TargetCompanyName) companies.add(req.TargetCompanyName);
+    });
+    return Array.from(companies).sort();
+  };
+
+  // Funzioni per paginazione
+  const getPaginatedData = (data) => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return data.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = (data) => {
+    return Math.ceil(data.length / pageSize);
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (newPageSize) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset alla prima pagina
+  };
+
+  // Reset paginazione quando cambiano i filtri
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, typeFilter, companyFilter, dateRangeFilter]);
 
   const getStats = (requests) => {
     return {
@@ -275,8 +417,12 @@ const IntercompanyDashboard = ({ onExit }) => {
     };
   };
 
-  const stats = getStats(activeTab === 'inbox' ? inboxRequests : outboxRequests);
-  const filteredRequests = filterRequests(activeTab === 'inbox' ? inboxRequests : outboxRequests);
+  const currentRequests = activeTab === 'inbox' ? inboxRequests : outboxRequests;
+  const stats = getStats(currentRequests);
+  const filteredRequests = sortData(filterRequests(currentRequests));
+  const paginatedRequests = getPaginatedData(filteredRequests);
+  const totalPages = getTotalPages(filteredRequests);
+  const uniqueCompanies = getUniqueCompanies(currentRequests);
 
   const renderRequestTable = (requests, direction) => {
     if (loading) {
@@ -299,14 +445,102 @@ const IntercompanyDashboard = ({ onExit }) => {
     }
 
     return (
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Componente</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead>{direction === 'IN' ? 'Da Company' : 'A Company'}</TableHead>
-            <TableHead>Stato</TableHead>
-            <TableHead>Data</TableHead>
+      <div className="border rounded-lg">
+        <div className="overflow-auto max-h-[600px]">
+          <Table>
+            <TableHeader className="sticky top-0 bg-white z-10">
+              <TableRow>
+            <TableHead>
+              <button
+                onClick={() => handleSort('ComponentCode')}
+                className="flex items-center gap-1 hover:text-gray-600"
+              >
+                Componente
+                {sortConfig.key === 'ComponentCode' ? (
+                  sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                ) : (
+                  <ArrowUpDown className="w-3 h-3 opacity-50" />
+                )}
+              </button>
+            </TableHead>
+            <TableHead>
+              <button
+                onClick={() => handleSort('IntercompanyType')}
+                className="flex items-center gap-1 hover:text-gray-600"
+              >
+                Tipo
+                {sortConfig.key === 'IntercompanyType' ? (
+                  sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                ) : (
+                  <ArrowUpDown className="w-3 h-3 opacity-50" />
+                )}
+              </button>
+            </TableHead>
+            <TableHead>
+              <button
+                onClick={() => handleSort('SourceProjectName')}
+                className="flex items-center gap-1 hover:text-gray-600"
+              >
+                Progetto Source
+                {sortConfig.key === 'SourceProjectName' ? (
+                  sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                ) : (
+                  <ArrowUpDown className="w-3 h-3 opacity-50" />
+                )}
+              </button>
+            </TableHead>
+            <TableHead>
+              <button
+                onClick={() => handleSort('TargetProjectName')}
+                className="flex items-center gap-1 hover:text-gray-600"
+              >
+                Progetto Target
+                {sortConfig.key === 'TargetProjectName' ? (
+                  sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                ) : (
+                  <ArrowUpDown className="w-3 h-3 opacity-50" />
+                )}
+              </button>
+            </TableHead>
+            <TableHead>
+              <button
+                onClick={() => handleSort(direction === 'IN' ? 'SourceCompanyName' : 'TargetCompanyName')}
+                className="flex items-center gap-1 hover:text-gray-600"
+              >
+                {direction === 'IN' ? 'Da Company' : 'A Company'}
+                {sortConfig.key === (direction === 'IN' ? 'SourceCompanyName' : 'TargetCompanyName') ? (
+                  sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                ) : (
+                  <ArrowUpDown className="w-3 h-3 opacity-50" />
+                )}
+              </button>
+            </TableHead>
+            <TableHead>
+              <button
+                onClick={() => handleSort('Status')}
+                className="flex items-center gap-1 hover:text-gray-600"
+              >
+                Stato
+                {sortConfig.key === 'Status' ? (
+                  sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                ) : (
+                  <ArrowUpDown className="w-3 h-3 opacity-50" />
+                )}
+              </button>
+            </TableHead>
+            <TableHead>
+              <button
+                onClick={() => handleSort('RequestDate')}
+                className="flex items-center gap-1 hover:text-gray-600"
+              >
+                Data
+                {sortConfig.key === 'RequestDate' ? (
+                  sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                ) : (
+                  <ArrowUpDown className="w-3 h-3 opacity-50" />
+                )}
+              </button>
+            </TableHead>
             {direction === 'IN' && <TableHead className="text-right">Azioni</TableHead>}
           </TableRow>
         </TableHeader>
@@ -339,6 +573,21 @@ const IntercompanyDashboard = ({ onExit }) => {
               </TableCell>
               <TableCell>{getTypeBadge(request.IntercompanyType)}</TableCell>
               <TableCell>
+                <div className="text-sm font-medium">
+                  {request.SourceProjectName || 'N/A'}
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="text-sm">
+                  <div className="font-medium">{request.TargetProjectName || 'N/A'}</div>
+                  {request.TargetProjectDescription && (
+                    <div className="text-xs text-gray-500 truncate max-w-[150px]">
+                      {request.TargetProjectDescription}
+                    </div>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>
                 <div className="flex items-center gap-1 text-sm">
                   <Building2 className="w-3 h-3" />
                   {direction === 'IN' ? request.SourceCompanyName : request.TargetCompanyName}
@@ -369,8 +618,124 @@ const IntercompanyDashboard = ({ onExit }) => {
               </TableCell>
             </TableRow>
           ))}
-        </TableBody>
-      </Table>
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  };
+
+  // Componente per la paginazione
+  const PaginationControls = ({ currentPage, totalPages, onPageChange, pageSize, onPageSizeChange, totalItems, filteredItems }) => {
+    if (totalPages <= 1) return null;
+
+    const startItem = (currentPage - 1) * pageSize + 1;
+    const endItem = Math.min(currentPage * pageSize, filteredItems);
+
+    const getPageNumbers = () => {
+      const pages = [];
+      const maxVisiblePages = 5;
+      
+      if (totalPages <= maxVisiblePages) {
+        for (let i = 1; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        if (currentPage <= 3) {
+          for (let i = 1; i <= 4; i++) pages.push(i);
+          pages.push('...');
+          pages.push(totalPages);
+        } else if (currentPage >= totalPages - 2) {
+          pages.push(1);
+          pages.push('...');
+          for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+        } else {
+          pages.push(1);
+          pages.push('...');
+          for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+          pages.push('...');
+          pages.push(totalPages);
+        }
+      }
+      
+      return pages;
+    };
+
+    return (
+      <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-600">
+            Mostrando {startItem}-{endItem} di {filteredItems} elementi
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Elementi per pagina:</span>
+            <Select value={pageSize.toString()} onValueChange={(value) => onPageSizeChange(parseInt(value))}>
+              <SelectTrigger className="w-20 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(1)}
+            disabled={currentPage === 1}
+            className="h-8 w-8 p-0"
+          >
+            <ChevronsLeft className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="h-8 w-8 p-0"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          
+          {getPageNumbers().map((page, index) => (
+            <Button
+              key={index}
+              variant={page === currentPage ? "default" : "outline"}
+              size="sm"
+              onClick={() => typeof page === 'number' && onPageChange(page)}
+              disabled={page === '...'}
+              className="h-8 w-8 p-0"
+            >
+              {page}
+            </Button>
+          ))}
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="h-8 w-8 p-0"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(totalPages)}
+            disabled={currentPage === totalPages}
+            className="h-8 w-8 p-0"
+          >
+            <ChevronsRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
     );
   };
 
@@ -455,11 +820,11 @@ const IntercompanyDashboard = ({ onExit }) => {
               </TabsList>
 
               {/* Filtri */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <div className="relative w-64">
                   <Search className="absolute right-2 top-2.5 w-4 h-4 text-gray-400" />
                   <Input
-                    placeholder="Cerca..."
+                    placeholder="Cerca componente, progetto source/target, company..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-8"
@@ -468,26 +833,113 @@ const IntercompanyDashboard = ({ onExit }) => {
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-40">
                     <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue />
+                    <SelectValue placeholder="Stato" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tutti</SelectItem>
+                    <SelectItem value="all">Tutti gli stati</SelectItem>
                     <SelectItem value="PENDING">In Attesa</SelectItem>
                     <SelectItem value="APPROVED">Approvate</SelectItem>
                     <SelectItem value="REJECTED">Rifiutate</SelectItem>
                     <SelectItem value="DRAFT">Bozze</SelectItem>
                   </SelectContent>
                 </Select>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutti i tipi</SelectItem>
+                    <SelectItem value="ACQUISTO">Acquisto</SelectItem>
+                    <SelectItem value="CONTO_LAVORO">Conto Lavoro</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={dateRangeFilter} onValueChange={setDateRangeFilter}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Periodo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tutti i periodi</SelectItem>
+                    <SelectItem value="today">Oggi</SelectItem>
+                    <SelectItem value="week">Ultima settimana</SelectItem>
+                    <SelectItem value="month">Ultimo mese</SelectItem>
+                    <SelectItem value="quarter">Ultimo trimestre</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setStatusFilter('all');
+                    setTypeFilter('all');
+                    setCompanyFilter('all');
+                    setDateRangeFilter('all');
+                    setSortConfig({ key: null, direction: 'asc' });
+                    setCurrentPage(1);
+                  }}
+                  className="h-9"
+                >
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                  Reset
+                </Button>
               </div>
             </div>
           </CardHeader>
 
           <TabsContent value="inbox" className="m-0">
-            {renderRequestTable(filteredRequests, 'IN')}
+            <div className="p-4 border-b bg-gray-50">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">
+                  Mostrando {filteredRequests.length} di {currentRequests.length} richieste
+                  {(searchQuery || statusFilter !== 'all' || typeFilter !== 'all' || companyFilter !== 'all' || dateRangeFilter !== 'all') && (
+                    <span className="text-blue-600 ml-1">(filtrate)</span>
+                  )}
+                </span>
+                {sortConfig.key && (
+                  <span className="text-xs text-gray-500">
+                    Ordinato per: {sortConfig.key} ({sortConfig.direction === 'asc' ? 'A→Z' : 'Z→A'})
+                  </span>
+                )}
+              </div>
+            </div>
+            {renderRequestTable(paginatedRequests, 'IN')}
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              pageSize={pageSize}
+              onPageSizeChange={handlePageSizeChange}
+              totalItems={currentRequests.length}
+              filteredItems={filteredRequests.length}
+            />
           </TabsContent>
 
           <TabsContent value="outbox" className="m-0">
-            {renderRequestTable(filteredRequests, 'OUT')}
+            <div className="p-4 border-b bg-gray-50">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">
+                  Mostrando {filteredRequests.length} di {currentRequests.length} richieste
+                  {(searchQuery || statusFilter !== 'all' || typeFilter !== 'all' || companyFilter !== 'all' || dateRangeFilter !== 'all') && (
+                    <span className="text-blue-600 ml-1">(filtrate)</span>
+                  )}
+                </span>
+                {sortConfig.key && (
+                  <span className="text-xs text-gray-500">
+                    Ordinato per: {sortConfig.key} ({sortConfig.direction === 'asc' ? 'A→Z' : 'Z→A'})
+                  </span>
+                )}
+              </div>
+            </div>
+            {renderRequestTable(paginatedRequests, 'OUT')}
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              pageSize={pageSize}
+              onPageSizeChange={handlePageSizeChange}
+              totalItems={currentRequests.length}
+              filteredItems={filteredRequests.length}
+            />
           </TabsContent>
 
           <TabsContent value="temporary" className="m-0 p-6">
