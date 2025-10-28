@@ -1272,16 +1272,32 @@ router.post('/attachment-locks/:attachmentId', authenticateToken, async (req, re
     try {
         const attachmentId = parseInt(req.params.attachmentId);
         const userId = req.user.UserId;
-        
+
         // Verifica che l'allegato esista
         const attachment = await getAttachmentById(attachmentId);
         if (!attachment) {
             return res.status(404).json({ success: 0, message: 'Allegato non trovato' });
         }
-        
+
+        // Determina se è un ItemAttachment (ha ItemCode o ProjectItemId)
+        const isItemAttachment = attachment.ItemCode || attachment.ProjectItemId;
+
+        // Per ItemAttachment, non creare lock nel database (FK constraint problem)
+        // ma restituisci comunque successo per permettere l'apertura del file
+        if (isItemAttachment) {
+            console.log(`ItemAttachment detected (ID: ${attachmentId}), skipping database lock`);
+            return res.json({
+                success: 1,
+                message: 'Lock creato con successo',
+                lockId: null, // Nessun lock reale nel DB
+                isItemAttachment: true
+            });
+        }
+
+        // Per Attachment normali, crea il lock nel database
         const result = await createAttachmentLock(attachmentId, userId);
         res.json(result);
-        
+
     } catch (error) {
         if (error.code === 'FILE_LOCKED') {
             return res.status(409).json({
@@ -1292,7 +1308,7 @@ router.post('/attachment-locks/:attachmentId', authenticateToken, async (req, re
                 lockedAt: error.lockedAt
             });
         }
-        
+
         console.error('Error creating attachment lock:', error);
         res.status(500).json({ success: 0, message: 'Errore nella creazione del lock' });
     }
@@ -1303,10 +1319,25 @@ router.delete('/attachment-locks/:attachmentId', authenticateToken, async (req, 
     try {
         const attachmentId = parseInt(req.params.attachmentId);
         const userId = req.user.UserId;
-        
+
+        // Verifica se è un ItemAttachment
+        const attachment = await getAttachmentById(attachmentId);
+        const isItemAttachment = attachment && (attachment.ItemCode || attachment.ProjectItemId);
+
+        // Per ItemAttachment, non c'è lock da rilasciare nel DB
+        if (isItemAttachment) {
+            console.log(`ItemAttachment detected (ID: ${attachmentId}), no lock to release`);
+            return res.json({
+                success: 1,
+                message: 'Lock rilasciato con successo',
+                rowsAffected: 0,
+                isItemAttachment: true
+            });
+        }
+
         const result = await releaseAttachmentLock(attachmentId, userId);
         res.json(result);
-        
+
     } catch (error) {
         console.error('Error releasing attachment lock:', error);
         res.status(500).json({ success: 0, message: 'Errore nel rilascio del lock' });
@@ -1317,14 +1348,28 @@ router.delete('/attachment-locks/:attachmentId', authenticateToken, async (req, 
 router.get('/attachment-locks/:attachmentId', authenticateToken, async (req, res) => {
     try {
         const attachmentId = parseInt(req.params.attachmentId);
-        
+
+        // Verifica se è un ItemAttachment
+        const attachment = await getAttachmentById(attachmentId);
+        const isItemAttachment = attachment && (attachment.ItemCode || attachment.ProjectItemId);
+
+        // Per ItemAttachment, non ci sono lock nel DB
+        if (isItemAttachment) {
+            return res.json({
+                success: 1,
+                hasLock: false,
+                lockInfo: null,
+                isItemAttachment: true
+            });
+        }
+
         const lockInfo = await getAttachmentLockInfo(attachmentId);
-        res.json({ 
-            success: 1, 
+        res.json({
+            success: 1,
             hasLock: !!lockInfo,
             lockInfo: lockInfo
         });
-        
+
     } catch (error) {
         console.error('Error getting attachment lock info:', error);
         res.status(500).json({ success: 0, message: 'Errore nel recupero delle informazioni del lock' });
@@ -1336,15 +1381,30 @@ router.delete('/attachment-locks/:attachmentId/force', authenticateToken, async 
     try {
         const attachmentId = parseInt(req.params.attachmentId);
         const userId = req.user.UserId;
-        
+
         // Verifica che l'utente sia admin (implementa la tua logica di autorizzazione)
         // if (!req.user.isAdmin) {
         //     return res.status(403).json({ success: 0, message: 'Accesso negato' });
         // }
-        
+
+        // Verifica se è un ItemAttachment
+        const attachment = await getAttachmentById(attachmentId);
+        const isItemAttachment = attachment && (attachment.ItemCode || attachment.ProjectItemId);
+
+        // Per ItemAttachment, non c'è lock da forzare
+        if (isItemAttachment) {
+            console.log(`ItemAttachment detected (ID: ${attachmentId}), no lock to force release`);
+            return res.json({
+                success: 1,
+                message: 'Lock forzato rilasciato',
+                rowsAffected: 0,
+                isItemAttachment: true
+            });
+        }
+
         const result = await forceReleaseAttachmentLock(attachmentId);
         res.json(result);
-        
+
     } catch (error) {
         console.error('Error force releasing attachment lock:', error);
         res.status(500).json({ success: 0, message: 'Errore nel force release del lock' });
