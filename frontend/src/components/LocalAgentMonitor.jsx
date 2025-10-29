@@ -1,6 +1,6 @@
 // frontend/src/components/LocalAgentMonitor.jsx
 import React, { useState, useEffect } from 'react';
-import { X, FileText, AlertCircle, Check, Clock, ChevronDown } from 'lucide-react';
+import { X, FileText, AlertCircle, Check, Clock, ChevronDown, Download, Info, ExternalLink, RefreshCw } from 'lucide-react';
 import localAgentService from '@/services/localAgentService';
 import { toast } from 'react-toastify';
 
@@ -224,13 +224,16 @@ export const AgentStatusBadge = () => {
   const [status, setStatus] = useState('checking');
   const [sessionCount, setSessionCount] = useState(0);
   const [isClicked, setIsClicked] = useState(false);
-  
+  const [showMenu, setShowMenu] = useState(false);
+  const [agentVersion, setAgentVersion] = useState(null);
+
   useEffect(() => {
     const checkStatus = async () => {
       try {
         const statusData = await localAgentService.getStatus();
         if (statusData) {
           setStatus('online');
+          setAgentVersion(statusData.version);
           // Gestisci sia il caso in cui sessions è un numero che un array
           if (typeof statusData.sessions === 'number') {
             setSessionCount(statusData.sessions);
@@ -242,19 +245,33 @@ export const AgentStatusBadge = () => {
         } else {
           setStatus('offline');
           setSessionCount(0);
+          setAgentVersion(null);
         }
       } catch (error) {
         // Ignora silenziosamente errori di connessione
         setStatus('offline');
         setSessionCount(0);
+        setAgentVersion(null);
       }
     };
-    
+
     checkStatus();
     const interval = setInterval(checkStatus, 10000);
-    
+
     return () => clearInterval(interval);
   }, []);
+
+  // Chiudi menu quando si clicca fuori
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showMenu && !e.target.closest('.agent-menu-container')) {
+        setShowMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
   
   const getStatusColor = () => {
     switch (status) {
@@ -292,39 +309,203 @@ export const AgentStatusBadge = () => {
     }
   };
   
-  const handleBadgeClick = () => {
-    if (status === 'online' && sessionCount > 0) {
-      setIsClicked(true);
-      openAgentWindow();
-      
-      // Reset dell'effetto click dopo 200ms
-      setTimeout(() => setIsClicked(false), 200);
+  const handleBadgeClick = (e) => {
+    e.stopPropagation();
+    setShowMenu(!showMenu);
+    setIsClicked(true);
+    setTimeout(() => setIsClicked(false), 200);
+  };
+
+  const handleDownloadAgent = async () => {
+    setShowMenu(false);
+    try {
+      // Usa l'endpoint backend autenticato
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/download/agent/windows', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'WebApp-Local-Agent-Setup.7z';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        toast.success('Download avviato!', {
+          position: 'bottom-right'
+        });
+      } else {
+        throw new Error('Download fallito');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      // Fallback al download pubblico
+      window.open('/downloads/WebApp-Local-Agent-Setup.7z', '_blank');
+    }
+  };
+
+  const handleViewSessions = () => {
+    setShowMenu(false);
+    openAgentWindow();
+  };
+
+  const handleCheckForUpdates = async () => {
+    setShowMenu(false);
+    try {
+      const response = await fetch('/downloads/version.json');
+      const latestVersion = await response.json();
+
+      if (agentVersion && latestVersion.version) {
+        if (agentVersion === latestVersion.version) {
+          toast.info(`Stai usando l'ultima versione (${agentVersion})`, {
+            position: 'bottom-right'
+          });
+        } else {
+          toast.info(`Nuova versione disponibile: ${latestVersion.version}`, {
+            position: 'bottom-right',
+            autoClose: 5000
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Version check error:', error);
     }
   };
 
   return (
-    <div 
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200 ${getStatusBg()} hover:shadow-sm group relative ${
-        status === 'online' && sessionCount > 0 ? 'cursor-pointer hover:scale-105' : 'cursor-help'
-      } ${isClicked ? 'scale-95' : ''}`}
-      title={`Local Agent: ${status === 'online' ? 'Connesso e funzionante' : status === 'offline' ? 'Non disponibile' : 'Verifica in corso'}`}
-      onClick={handleBadgeClick}
-    >
-      <div className={`w-1.5 h-1.5 rounded-full ${getStatusColor()} ${status === 'checking' ? 'animate-pulse' : status === 'online' ? 'animate-pulse' : ''}`} />
-      <span className="text-xs font-medium text-slate-700">{getStatusText()}</span>
-      
-      {/* Tooltip */}
-      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-        {status === 'online' ? 
-          sessionCount > 0 ? 
-            `Clicca per vedere i ${sessionCount} file aperti` : 
-            'Local Agent attivo' : 
-          status === 'offline' ? 
-          'Local Agent non disponibile' : 
-          'Verifica connessione...'
-        }
-        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-800"></div>
+    <div className="agent-menu-container relative">
+      <div
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200 ${getStatusBg()} hover:shadow-sm group cursor-pointer ${
+          isClicked ? 'scale-95' : ''
+        }`}
+        onClick={handleBadgeClick}
+      >
+        <div className={`w-1.5 h-1.5 rounded-full ${getStatusColor()} ${status === 'checking' ? 'animate-pulse' : status === 'online' ? 'animate-pulse' : ''}`} />
+        <span className="text-xs font-medium text-slate-700">{getStatusText()}</span>
+
+        {/* Icona download per offline */}
+        {status === 'offline' && (
+          <Download className="w-3 h-3 text-blue-600" />
+        )}
+
+        {/* ChevronDown per indicare menu */}
+        <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showMenu ? 'rotate-180' : ''}`} />
       </div>
+
+      {/* Dropdown Menu */}
+      {showMenu && (
+        <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+          {/* Header info */}
+          <div className="px-4 py-2 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-600">Local Agent</span>
+              {agentVersion && (
+                <span className="text-xs text-gray-400">v{agentVersion}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 mt-1">
+              <div className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
+              <span className={`text-xs font-medium ${
+                status === 'online' ? 'text-emerald-600' :
+                status === 'offline' ? 'text-slate-500' : 'text-amber-600'
+              }`}>
+                {status === 'online' ? 'Connesso' : status === 'offline' ? 'Non installato/attivo' : 'Verifica in corso...'}
+              </span>
+            </div>
+          </div>
+
+          {/* Menu items - Offline */}
+          {status === 'offline' && (
+            <>
+              <button
+                onClick={handleDownloadAgent}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors text-left group"
+              >
+                <Download className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform" />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900">Scarica Agent</div>
+                  <div className="text-xs text-gray-500">Installa per aprire file localmente</div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  window.open('/downloads/README.txt', '_blank');
+                }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left"
+              >
+                <Info className="w-4 h-4 text-gray-400" />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-700">Guida installazione</div>
+                  <div className="text-xs text-gray-500">Come installare e usare</div>
+                </div>
+              </button>
+            </>
+          )}
+
+          {/* Menu items - Online */}
+          {status === 'online' && (
+            <>
+              {sessionCount > 0 && (
+                <button
+                  onClick={handleViewSessions}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors text-left group"
+                >
+                  <FileText className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900">Vedi file aperti</div>
+                    <div className="text-xs text-gray-500">{sessionCount} file in modifica</div>
+                  </div>
+                </button>
+              )}
+
+              <button
+                onClick={handleCheckForUpdates}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left"
+              >
+                <RefreshCw className="w-4 h-4 text-gray-400" />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-700">Verifica aggiornamenti</div>
+                  <div className="text-xs text-gray-500">Controlla nuove versioni</div>
+                </div>
+              </button>
+
+              <button
+                onClick={handleDownloadAgent}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left"
+              >
+                <Download className="w-4 h-4 text-gray-400" />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-700">Scarica versione aggiornata</div>
+                  <div className="text-xs text-gray-500">Ultima versione disponibile</div>
+                </div>
+              </button>
+            </>
+          )}
+
+          {/* Link esterni */}
+          <div className="border-t border-gray-100 mt-1 pt-1">
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                window.open('http://127.0.0.1:7865', '_blank');
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-left"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+              <span className="text-xs text-gray-600">Apri pannello Agent</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

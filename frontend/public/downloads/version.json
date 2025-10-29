@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "releaseDate": "2025-10-29",
+  "fileName": "WebApp-Local-Agent-Setup.7z",
+  "fileSize": "69 MB",
+  "platform": "Windows",
+  "changelog": [
+    "Fix: Risolto problema connessione IPv4/IPv6",
+    "Feature: Agent locale per editing file",
+    "Feature: Sincronizzazione automatica modifiche"
+  ],
+  "requirements": {
+    "os": "Windows 10/11",
+    "architecture": "x64"
+  },
+  "installation": [
+    "1. Estrarre il contenuto del file .7z",
+    "2. Eseguire 'WebApp Local Agent.exe' come Amministratore",
+    "3. L'agent si avvierà automaticamente all'avvio del sistema"
+  ]
+}

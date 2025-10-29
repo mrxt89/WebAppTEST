@@ -411,15 +411,15 @@ app.post('/api/logout', authenticateToken, async (req, res) => {
   }
 });
 
-// Route per download Local Agent
+// Route per download Agent
 app.get('/api/download/agent/windows', authenticateToken, (req, res) => {
-  const file = path.join(__dirname, 'downloads', 'webapp-agent-setup.exe');
-  
+  const file = path.join(__dirname, 'downloads', 'WebApp-Local-Agent-Setup.7z');
+
   if (!fs.existsSync(file)) {
     return res.status(404).json({ error: 'Agent installer not found' });
   }
-  
-  res.download(file, 'webapp-agent-setup.exe');
+
+  res.download(file, 'WebApp-Local-Agent-Setup.7z');
 });
 
 // Route per informazioni sul database

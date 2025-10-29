@@ -133,6 +133,7 @@ const WikiDocsPanel = ({
               wikiPages={wikiPages}
               currentComponentKey={currentComponentKey}
               onClose={onClose}
+              getWikiPagePath={getWikiPagePath}
             />
           )}
         </div>

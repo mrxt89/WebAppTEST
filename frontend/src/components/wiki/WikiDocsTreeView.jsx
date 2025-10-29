@@ -2,9 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { ChevronRight, FileText, Search, X, ExternalLink } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
-const WIKI_BASE_URL = import.meta.env.VITE_WIKI_BASE_URL || 'http://192.168.42.122:3003/it';
+const WIKI_BASE_URL = import.meta.env.VITE_WIKI_BASE_URL || 'http://192.168.42.122:3003/it/';
 
-const WikiDocsTreeView = ({ components, wikiPages = [], currentComponentKey, onClose }) => {
+const WikiDocsTreeView = ({ components, wikiPages = [], currentComponentKey, onClose, getWikiPagePath }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState(new Set());
 
@@ -57,17 +57,28 @@ const WikiDocsTreeView = ({ components, wikiPages = [], currentComponentKey, onC
   };
 
   // Handle component click
-  const handleClick = (component, event) => {
+  const handleClick = async (component, event) => {
     // Priorità 1: usa wikiPageId per recuperare il path dal DB WikiJS
     if (component.wikiPageId) {
       const wikiPath = wikiPageMap.get(component.wikiPageId);
-      if (wikiPath) {
-        const wikiUrl = `${WIKI_BASE_URL}${wikiPath}`;
-        window.open(wikiUrl, '_blank', 'noopener,noreferrer');
-        if (!(event.ctrlKey || event.metaKey)) {
-          onClose(); // Chiudi il drawer se non è Ctrl/Cmd+Click
+      try {
+        let resolvedPath = wikiPath;
+        // Fallback on-demand: se non presente nella mappa, chiedi il path al backend
+        if (!resolvedPath && typeof getWikiPagePath === 'function') {
+          resolvedPath = await getWikiPagePath(component.wikiPageId);
+          // opzionale: non aggiorniamo la mappa locale per evitare side effects
         }
-        return;
+
+        if (resolvedPath) {
+          const wikiUrl = `${WIKI_BASE_URL}${resolvedPath}`;
+          window.open(wikiUrl, '_blank', 'noopener,noreferrer');
+          if (!(event.ctrlKey || event.metaKey)) {
+            onClose();
+          }
+          return;
+        }
+      } catch (err) {
+        // Silenzioso: se fallisce, proveremo il fallback slug sotto
       }
     }
 
@@ -94,7 +105,7 @@ const WikiDocsTreeView = ({ components, wikiPages = [], currentComponentKey, onC
 
       const paddingLeft = 16 + (level * 20);
 
-      const hasWikiLink = component.wikiPageId || component.wikiSlug;
+      const hasWikiLink = !!(component.wikiPageId || component.wikiSlug);
 
       return (
         <div key={component.componentId} className="nav-tree-node">

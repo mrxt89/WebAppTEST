@@ -92,8 +92,8 @@ const MyTasksList = ({
   const [isResizing, setIsResizing] = useState(null);
   const tableRef = useRef(null);
   
-  // Stati per i filtri di colonna
-  const [localFilters, setLocalFilters] = useState({
+  // Stati per i filtri di colonna (sincronizzati con prop columnFilters)
+  const defaultColumnFilters = {
     title: "",
     project: "",
     assignedTo: "",
@@ -101,7 +101,9 @@ const MyTasksList = ({
     status: "",
     dueDate: "",
     priority: ""
-  });
+  };
+
+  const [localFilters, setLocalFilters] = useState(defaultColumnFilters);
   
   // Stati per l'ordinamento
   const [sortConfig, setSortConfig] = useState({
@@ -261,6 +263,12 @@ const MyTasksList = ({
       document.body.style.userSelect = '';
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
+
+  // Sincronizza i filtri locali con i filtri provenienti dal genitore
+  useEffect(() => {
+    const merged = { ...defaultColumnFilters, ...(columnFilters || {}) };
+    setLocalFilters(merged);
+  }, [columnFilters]);
 
   // Gestione filtri locali
   const handleLocalFilterChange = (field, value) => {

@@ -586,6 +586,17 @@ const MyTasksPage = () => {
                 toggleFilters={toggleFilters}
               />
             )}
+            {activeTab === "tasks" && hasActiveFilters() && (
+              <div className="ml-2">
+                <Button
+                  variant="link"
+                  onClick={resetFilters}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Rimuovi filtri
+                </Button>
+              </div>
+            )}
           </div>
   
           <TabsContent value="tasks" className="space-y-6">
