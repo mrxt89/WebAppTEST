@@ -227,17 +227,18 @@ const getExportLog = async (companyId, filters = {}) => {
 const checkItemExportability = async (companyId, itemId) => {
     try {
         let pool = await sql.connect(config.database);
-        
+
         // Check if item exists and has required data
         const checkQuery = `
-            SELECT 
+            SELECT
                 i.Id,
                 i.Item,
                 i.Description,
                 i.Nature,
                 i.stato_erp,
-                CASE 
+                CASE
                     WHEN i.Item IS NULL OR i.Item = '' THEN 'Codice articolo mancante'
+                    WHEN LEN(i.Item) != 15 THEN 'Il codice articolo deve essere esattamente di 15 caratteri (attuale: ' + CAST(LEN(i.Item) AS VARCHAR(10)) + ')'
                     WHEN i.Description IS NULL OR i.Description = '' THEN 'Descrizione mancante'
                     WHEN i.Nature IS NULL THEN 'Natura articolo non definita'
                     WHEN i.stato_erp = 1 THEN 'Articolo già esportato'
@@ -247,21 +248,21 @@ const checkItemExportability = async (companyId, itemId) => {
             FROM MA_ProjectArticles_Items i
             WHERE i.Id = @ItemId AND i.CompanyId = @CompanyId
         `;
-        
+
         const result = await pool.request()
             .input('ItemId', sql.BigInt, itemId)
             .input('CompanyId', sql.Int, companyId)
             .query(checkQuery);
-        
+
         if (result.recordset.length === 0) {
             return {
                 canExport: false,
                 reason: 'Articolo non trovato'
             };
         }
-        
+
         const item = result.recordset[0];
-        
+
         return {
             canExport: item.BlockingReason === null,
             reason: item.BlockingReason || '',
@@ -283,28 +284,33 @@ const checkItemExportability = async (companyId, itemId) => {
 const checkBOMExportability = async (companyId, bomId, version) => {
     try {
         let pool = await sql.connect(config.database);
-        
-        // Check if BOM exists
+
+        // Check if BOM exists and validate Item code length
         const bomCheckQuery = `
-            SELECT 
+            SELECT
                 b.Id,
                 b.BOM,
                 b.Description,
                 b.ItemId,
                 b.stato_erp,
                 i.Item as ItemCode,
-                i.stato_erp as ItemExported
+                i.stato_erp as ItemExported,
+                CASE
+                    WHEN i.Item IS NULL OR i.Item = '' THEN 'Codice articolo della distinta mancante'
+                    WHEN LEN(i.Item) != 15 THEN 'Il codice articolo della distinta deve essere esattamente di 15 caratteri (attuale: ' + CAST(LEN(i.Item) AS VARCHAR(10)) + ')'
+                    ELSE NULL
+                END as ItemCodeError
             FROM MA_ProjectArticles_BillOfMaterials b
             INNER JOIN MA_ProjectArticles_Items i ON b.ItemId = i.Id AND i.CompanyId = @CompanyId
             WHERE b.Id = @BOMId AND b.CompanyId = @CompanyId AND b.Version = @Version
         `;
-        
+
         const bomResult = await pool.request()
             .input('BOMId', sql.BigInt, bomId)
             .input('CompanyId', sql.Int, companyId)
             .input('Version', sql.Int, version)
             .query(bomCheckQuery);
-        
+
         if (bomResult.recordset.length === 0) {
             return {
                 canExport: false,
@@ -312,9 +318,18 @@ const checkBOMExportability = async (companyId, bomId, version) => {
                 componentsInfo: {}
             };
         }
-        
+
         const bom = bomResult.recordset[0];
-        
+
+        // Check if item code has validation errors
+        if (bom.ItemCodeError) {
+            return {
+                canExport: false,
+                reason: bom.ItemCodeError,
+                componentsInfo: {}
+            };
+        }
+
         if (bom.stato_erp === 1) {
             return {
                 canExport: false,
@@ -323,32 +338,34 @@ const checkBOMExportability = async (companyId, bomId, version) => {
                 alreadyExported: true
             };
         }
-        
-        // Check components status (informativo, non bloccante)
+
+        // Check components status including code length validation
         const componentsQuery = `
-            SELECT 
+            SELECT
                 COUNT(*) as TotalComponents,
                 SUM(CASE WHEN i.stato_erp = 1 THEN 1 ELSE 0 END) as ExportedComponents,
                 SUM(CASE WHEN i.Item IS NULL OR i.Item = '' THEN 1 ELSE 0 END) as ComponentsWithoutCode,
+                SUM(CASE WHEN LEN(i.Item) != 15 AND i.Item IS NOT NULL AND i.Item != '' THEN 1 ELSE 0 END) as ComponentsWithInvalidLength,
                 SUM(CASE WHEN i.stato_erp = 0 AND (i.Item IS NOT NULL AND i.Item != '') THEN 1 ELSE 0 END) as ComponentsToExport
             FROM MA_ProjectArticles_BOMComponents c
             INNER JOIN MA_ProjectArticles_Items i ON c.ComponentId = i.Id AND i.CompanyId = @CompanyId
             WHERE c.BOMId = @BOMId AND c.CompanyId = @CompanyId
         `;
-        
+
         const componentsResult = await pool.request()
             .input('BOMId', sql.BigInt, bomId)
             .input('CompanyId', sql.Int, companyId)
             .query(componentsQuery);
-        
+
         const componentsInfo = componentsResult.recordset[0] || {
             TotalComponents: 0,
             ExportedComponents: 0,
             ComponentsWithoutCode: 0,
+            ComponentsWithInvalidLength: 0,
             ComponentsToExport: 0
         };
-        
-        // Check only critical conditions
+
+        // Check critical conditions - components without code
         if (componentsInfo.ComponentsWithoutCode > 0) {
             return {
                 canExport: false,
@@ -356,13 +373,45 @@ const checkBOMExportability = async (companyId, bomId, version) => {
                 componentsInfo: componentsInfo
             };
         }
-        
+
+        // NEW: Check if components have invalid code length
+        if (componentsInfo.ComponentsWithInvalidLength > 0) {
+            // Get details of invalid components
+            const invalidComponentsQuery = `
+                SELECT TOP 5
+                    i.Item,
+                    LEN(i.Item) as CurrentLength
+                FROM MA_ProjectArticles_BOMComponents c
+                INNER JOIN MA_ProjectArticles_Items i ON c.ComponentId = i.Id AND i.CompanyId = @CompanyId
+                WHERE c.BOMId = @BOMId
+                    AND c.CompanyId = @CompanyId
+                    AND LEN(i.Item) != 15
+                    AND i.Item IS NOT NULL
+                    AND i.Item != ''
+            `;
+
+            const invalidResult = await pool.request()
+                .input('BOMId', sql.BigInt, bomId)
+                .input('CompanyId', sql.Int, companyId)
+                .query(invalidComponentsQuery);
+
+            const examples = invalidResult.recordset
+                .map(c => `${c.Item} (${c.CurrentLength} car.)`)
+                .join(', ');
+
+            return {
+                canExport: false,
+                reason: `${componentsInfo.ComponentsWithInvalidLength} componenti con codice non di 15 caratteri. Esempi: ${examples}`,
+                componentsInfo: componentsInfo
+            };
+        }
+
         // BOM can be exported - the stored procedure will handle missing components
         return {
             canExport: true,
             reason: '',
             componentsInfo: componentsInfo,
-            note: componentsInfo.ComponentsToExport > 0 ? 
+            note: componentsInfo.ComponentsToExport > 0 ?
                 `Verranno esportati automaticamente ${componentsInfo.ComponentsToExport} componenti` : null
         };
     } catch (err) {

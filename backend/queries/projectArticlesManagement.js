@@ -928,13 +928,15 @@ const getItemById = async (companyId, itemId) => {
                         r.TargetProjectItemId, r.TargetCompanyId, r.Nature,
                         srcComp.Description AS SourceCompanyName,
                         tgtComp.Description AS TargetCompanyName,
-                        srcItem.Item AS SourceItemCode, 
+                        srcItem.Item AS SourceItemCode,
                         srcItem.Description AS SourceItemDescription,
-                        tgtItem.Item AS TargetItemCode, 
+                        tgtItem.Item AS TargetItemCode,
                         tgtItem.Description AS TargetItemDescription,
-                        CASE 
-                            WHEN r.Nature = 22413314 THEN 'Acquisto'
-                            WHEN r.Nature = 22413312 THEN 'Conto Lavoro'
+                        tgtItem.Nature AS TargetItemNature,
+                        CASE
+                            WHEN ISNULL(tgtItem.Nature, r.Nature) = 22413314 THEN 'Acquisto'
+                            WHEN ISNULL(tgtItem.Nature, r.Nature) = 22413312 THEN 'Conto Lavoro'
+                            WHEN ISNULL(tgtItem.Nature, r.Nature) = 22413313 THEN 'Prodotto Finito'
                             ELSE 'Altro'
                         END AS NatureDescription
                     FROM dbo.MA_ProjectArticles_References r
@@ -3551,15 +3553,18 @@ const getIntercompanyRequests = async (companyId, direction = 'IN', status = nul
                 ref.TBCreatedId AS RequestUserId,
                 ref.RequestNotes AS Notes,
                 ref.ResponseNotes,
-                -- Determina tipo intercompany a partire dalla Nature della reference se presente, altrimenti dal componente
+                -- Determina tipo intercompany a partire dalla Nature dell'item TARGET
+                -- Se non esiste ancora (codice temporaneo), fallback su ref.Nature o comp.Nature
                 CASE
-                    WHEN ISNULL(ref.Nature, comp.Nature) = 22413314 THEN 'ACQUISTO'
+                    WHEN ISNULL(tgtItem.Nature, ISNULL(ref.Nature, comp.Nature)) = 22413314 THEN 'ACQUISTO'
+                    WHEN ISNULL(tgtItem.Nature, ISNULL(ref.Nature, comp.Nature)) = 22413313 THEN 'PRODOTTO FINITO'
                     ELSE 'CONTO_LAVORO'
                 END AS IntercompanyType
             FROM MA_ProjectArticles_References ref
             INNER JOIN AR_Companies srcComp ON ref.SourceCompanyId = srcComp.CompanyId
             INNER JOIN AR_Companies tgtComp ON ref.TargetCompanyId = tgtComp.CompanyId
             LEFT JOIN MA_ProjectArticles_Items comp ON comp.Id = ref.SourceProjectItemId AND comp.CompanyId = ref.SourceCompanyId
+            LEFT JOIN MA_ProjectArticles_Items tgtItem ON tgtItem.Id = ref.TargetProjectItemId AND tgtItem.CompanyId = ref.TargetCompanyId
             LEFT JOIN MA_Projects srcProj ON ref.SourceProjectId = srcProj.ProjectID AND srcProj.CompanyId = ref.SourceCompanyId
             LEFT JOIN MA_Projects tgtProj ON ref.TargetProjectId = tgtProj.ProjectID AND tgtProj.CompanyId = ref.TargetCompanyId
             WHERE 1=1
@@ -4085,34 +4090,69 @@ const replaceTemporaryItem = async (temporaryItemId, definitiveItemCode, company
         let pool = await sql.connect(config.database);
         const request = pool.request();
 
-        // Trova l'articolo definitivo
+        // Prima valida il nuovo codice
         request.input('CompanyId', sql.Int, companyId);
-        request.input('DefinitiveItemCode', sql.VarChar(64), definitiveItemCode);
+        request.input('ItemCode', sql.VarChar(64), definitiveItemCode);
+        request.input('ExcludeItemId', sql.BigInt, temporaryItemId);
+        request.output('IsValid', sql.Int);
+        request.output('ErrorMessage', sql.NVarChar(255));
 
-        const findItemQuery = `
-            SELECT Id, Item, Description
-            FROM MA_ProjectArticles_Items
-            WHERE CompanyId = @CompanyId AND Item = @DefinitiveItemCode
-        `;
+        await request.execute('MA_ProjectArticles_ValidateItemCode');
 
-        const findResult = await request.query(findItemQuery);
+        const isValid = request.parameters.IsValid.value;
+        const errorMessage = request.parameters.ErrorMessage.value;
 
-        if (!findResult.recordset || findResult.recordset.length === 0) {
-            throw new Error(`Articolo definitivo ${definitiveItemCode} non trovato`);
+        if (isValid === 0) {
+            throw new Error(errorMessage || `Codice ${definitiveItemCode} non valido`);
         }
 
-        const definitiveItemId = findResult.recordset[0].Id;
+        // Verifica che l'articolo temporaneo esista
+        const checkTempQuery = `
+            SELECT Id, Item, Description
+            FROM MA_ProjectArticles_Items
+            WHERE CompanyId = @CompanyId AND Id = @TemporaryItemId
+        `;
+
+        const request2 = pool.request();
+        request2.input('CompanyId', sql.Int, companyId);
+        request2.input('TemporaryItemId', sql.BigInt, temporaryItemId);
+        const tempResult = await request2.query(checkTempQuery);
+
+        if (!tempResult.recordset || tempResult.recordset.length === 0) {
+            throw new Error(`Articolo temporaneo non trovato`);
+        }
+
+        const definitiveItemId = temporaryItemId; // Rinominiamo l'articolo temporaneo, non lo sostituiamo
 
         // Inizia transazione
         const transaction = pool.transaction();
         await transaction.begin();
 
         try {
-            // 1. Aggiorna le references
+            // 1. Rinomina l'articolo temporaneo con il nuovo codice
+            const renameItemQuery = `
+                UPDATE MA_ProjectArticles_Items
+                SET
+                    Item = @DefinitiveItemCode,
+                    TBModified = GETDATE(),
+                    TBModifiedId = @UserId,
+                    Notes = CONCAT(ISNULL(Notes, ''), ' [RINOMINATO DA: ', Item, ' A: ', @DefinitiveItemCode, ' il ', CONVERT(VARCHAR, GETDATE(), 120), ']')
+                WHERE Id = @TemporaryItemId AND CompanyId = @CompanyId
+            `;
+
+            const reqRename = transaction.request();
+            reqRename.input('UserId', sql.Int, userId);
+            reqRename.input('DefinitiveItemCode', sql.VarChar(64), definitiveItemCode);
+            reqRename.input('TemporaryItemId', sql.BigInt, temporaryItemId);
+            reqRename.input('CompanyId', sql.Int, companyId);
+            await reqRename.query(renameItemQuery);
+
+            // 2. Aggiorna le references con il nuovo codice
+            // NOTA: Il trigger TR_UpdateReferencesOnItemChange si occuperà di questo automaticamente
+            // ma lo facciamo comunque esplicitamente per sicurezza
             const updateReferencesQuery = `
                 UPDATE MA_ProjectArticles_References
                 SET
-                    TargetProjectItemId = @DefinitiveItemId,
                     TargetProjectItemCode = @DefinitiveItemCode,
                     TBModified = GETDATE(),
                     TBModifiedId = @UserId
@@ -4121,49 +4161,17 @@ const replaceTemporaryItem = async (temporaryItemId, definitiveItemCode, company
             `;
 
             const reqRefs = transaction.request();
-            reqRefs.input('DefinitiveItemId', sql.BigInt, definitiveItemId);
             reqRefs.input('DefinitiveItemCode', sql.VarChar(64), definitiveItemCode);
             reqRefs.input('UserId', sql.Int, userId);
             reqRefs.input('TemporaryItemId', sql.BigInt, temporaryItemId);
             reqRefs.input('CompanyId', sql.Int, companyId);
             await reqRefs.query(updateReferencesQuery);
 
-            // 2. Aggiorna le associazioni progetti-articoli
-            const updateProjectItemsQuery = `
-                UPDATE MA_ProjectsItems
-                SET ItemId = @DefinitiveItemId
-                WHERE ItemId = @TemporaryItemId AND CompanyId = @CompanyId
-            `;
-
-            const reqProj = transaction.request();
-            reqProj.input('DefinitiveItemId', sql.BigInt, definitiveItemId);
-            reqProj.input('TemporaryItemId', sql.BigInt, temporaryItemId);
-            reqProj.input('CompanyId', sql.Int, companyId);
-            await reqProj.query(updateProjectItemsQuery);
-
-            // 3. Disabilita l'articolo temporaneo
-            const disableItemQuery = `
-                UPDATE MA_ProjectArticles_Items
-                SET
-                    Disabled = 1,
-                    TBModified = GETDATE(),
-                    TBModifiedId = @UserId,
-                    Notes = CONCAT(ISNULL(Notes, ''), ' [SOSTITUITO CON: ', @DefinitiveItemCode, ' il ', CONVERT(VARCHAR, GETDATE(), 120), ']')
-                WHERE Id = @TemporaryItemId AND CompanyId = @CompanyId
-            `;
-
-            const reqDisable = transaction.request();
-            reqDisable.input('UserId', sql.Int, userId);
-            reqDisable.input('DefinitiveItemCode', sql.VarChar(64), definitiveItemCode);
-            reqDisable.input('TemporaryItemId', sql.BigInt, temporaryItemId);
-            reqDisable.input('CompanyId', sql.Int, companyId);
-            await reqDisable.query(disableItemQuery);
-
             await transaction.commit();
 
             return {
                 success: 1,
-                msg: `Articolo temporaneo sostituito con ${definitiveItemCode}`,
+                msg: `Articolo rinominato in ${definitiveItemCode}`,
                 definitiveItemId: definitiveItemId,
                 definitiveItemCode: definitiveItemCode
             };
@@ -4175,7 +4183,7 @@ const replaceTemporaryItem = async (temporaryItemId, definitiveItemCode, company
         console.error('Error in replaceTemporaryItem:', err);
         return {
             success: 0,
-            msg: err.message || 'Errore durante la sostituzione dell\'articolo temporaneo'
+            msg: err.message || 'Errore durante la rinomina dell\'articolo'
         };
     }
 };

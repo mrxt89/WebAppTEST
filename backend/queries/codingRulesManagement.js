@@ -349,7 +349,59 @@ const applyBatchRecodingAlternative = async (companyId, userId, items) => {
                         status: 'success',
                         message: `Sostituito con articolo esistente ${item.UseExistingArticleId}`
                     });
-                    
+
+                    // NUOVO: Aggiorna referenze Intercompany anche quando si sostituisce con esistente
+                    try {
+                        const updateIntercompanyRequest = new sql.Request(transaction);
+                        const intercompanyResult = await updateIntercompanyRequest
+                            .input('ItemId', sql.BigInt, item.ItemId)
+                            .input('OldCode', sql.VarChar(64), item.OldCode)
+                            .input('NewCode', sql.VarChar(64), item.NewCode)
+                            .input('CompanyId', sql.Int, companyId)
+                            .input('UserId', sql.Int, userId)
+                            .query(`
+                                -- Aggiorna TargetProjectItemCode quando l'item è il TARGET
+                                UPDATE ref
+                                SET ref.TargetProjectItemCode = @NewCode,
+                                    ref.TBModified = GETDATE(),
+                                    ref.TBModifiedId = @UserId
+                                FROM MA_ProjectArticles_References ref
+                                INNER JOIN MA_ProjectArticles_Items targetItem
+                                    ON ref.TargetProjectItemId = targetItem.Id
+                                    AND ref.TargetCompanyId = targetItem.CompanyId
+                                WHERE targetItem.Id = @ItemId
+                                    AND targetItem.CompanyId = @CompanyId;
+
+                                -- Aggiorna quando l'item è SOURCE ma il codice è in TargetProjectItemCode
+                                UPDATE ref
+                                SET ref.TargetProjectItemCode = @NewCode,
+                                    ref.TBModified = GETDATE(),
+                                    ref.TBModifiedId = @UserId
+                                FROM MA_ProjectArticles_References ref
+                                INNER JOIN MA_ProjectArticles_Items sourceItem
+                                    ON ref.SourceProjectItemId = sourceItem.Id
+                                    AND ref.SourceCompanyId = sourceItem.CompanyId
+                                WHERE sourceItem.Id = @ItemId
+                                    AND sourceItem.CompanyId = @CompanyId
+                                    AND ref.TargetProjectItemCode = @OldCode;
+
+                                SELECT @@ROWCOUNT AS UpdatedCount;
+                            `);
+
+                        const intercompanyUpdatedCount = intercompanyResult.recordset[0]?.UpdatedCount || 0;
+                        if (intercompanyUpdatedCount > 0) {
+                            console.log(`Aggiornate ${intercompanyUpdatedCount} referenze Intercompany per item ${item.ItemId} (sostituzione con esistente)`);
+                            // Aggiorna il messaggio di successo
+                            const lastProcessed = processedItems[processedItems.length - 1];
+                            if (lastProcessed && lastProcessed.itemId === item.ItemId) {
+                                lastProcessed.message += ` (${intercompanyUpdatedCount} referenze Intercompany aggiornate)`;
+                            }
+                        }
+                    } catch (intercompanyError) {
+                        console.error('Errore nell\'aggiornamento referenze Intercompany (sostituzione):', intercompanyError);
+                        // Non blocchiamo la ricodifica se fallisce l'aggiornamento Intercompany
+                    }
+
                 } else {
                     // Ricodifica normale
                     
@@ -420,7 +472,59 @@ const applyBatchRecodingAlternative = async (companyId, userId, items) => {
                         message: 'Ricodifica completata'
                     });
                 }
-                
+
+                // NUOVO: Aggiorna referenze Intercompany dopo ricodifica
+                try {
+                    const updateIntercompanyRequest = new sql.Request(transaction);
+                    const intercompanyResult = await updateIntercompanyRequest
+                        .input('ItemId', sql.BigInt, item.ItemId)
+                        .input('OldCode', sql.VarChar(64), item.OldCode)
+                        .input('NewCode', sql.VarChar(64), item.NewCode)
+                        .input('CompanyId', sql.Int, companyId)
+                        .input('UserId', sql.Int, userId)
+                        .query(`
+                            -- Aggiorna TargetProjectItemCode quando l'item è il TARGET
+                            UPDATE ref
+                            SET ref.TargetProjectItemCode = @NewCode,
+                                ref.TBModified = GETDATE(),
+                                ref.TBModifiedId = @UserId
+                            FROM MA_ProjectArticles_References ref
+                            INNER JOIN MA_ProjectArticles_Items targetItem
+                                ON ref.TargetProjectItemId = targetItem.Id
+                                AND ref.TargetCompanyId = targetItem.CompanyId
+                            WHERE targetItem.Id = @ItemId
+                                AND targetItem.CompanyId = @CompanyId;
+
+                            -- Aggiorna quando l'item è SOURCE ma il codice è in TargetProjectItemCode
+                            UPDATE ref
+                            SET ref.TargetProjectItemCode = @NewCode,
+                                ref.TBModified = GETDATE(),
+                                ref.TBModifiedId = @UserId
+                            FROM MA_ProjectArticles_References ref
+                            INNER JOIN MA_ProjectArticles_Items sourceItem
+                                ON ref.SourceProjectItemId = sourceItem.Id
+                                AND ref.SourceCompanyId = sourceItem.CompanyId
+                            WHERE sourceItem.Id = @ItemId
+                                AND sourceItem.CompanyId = @CompanyId
+                                AND ref.TargetProjectItemCode = @OldCode;
+
+                            SELECT @@ROWCOUNT AS UpdatedCount;
+                        `);
+
+                    const intercompanyUpdatedCount = intercompanyResult.recordset[0]?.UpdatedCount || 0;
+                    if (intercompanyUpdatedCount > 0) {
+                        console.log(`Aggiornate ${intercompanyUpdatedCount} referenze Intercompany per item ${item.ItemId}`);
+                        // Aggiorna il messaggio di successo
+                        const lastProcessed = processedItems[processedItems.length - 1];
+                        if (lastProcessed && lastProcessed.itemId === item.ItemId) {
+                            lastProcessed.message += ` (${intercompanyUpdatedCount} referenze Intercompany aggiornate)`;
+                        }
+                    }
+                } catch (intercompanyError) {
+                    console.error('Errore nell\'aggiornamento referenze Intercompany:', intercompanyError);
+                    // Non blocchiamo la ricodifica se fallisce l'aggiornamento Intercompany
+                }
+
                 // Log history (se la tabella esiste)
                 try {
                     const historyRequest = new sql.Request(transaction);

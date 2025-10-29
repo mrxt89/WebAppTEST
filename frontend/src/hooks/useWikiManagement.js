@@ -12,17 +12,19 @@ const useWikiManagement = () => {
   const fetchComponentsByPage = useCallback(async (pageId) => {
     if (!pageId) {
       setComponents([]);
-      return;
+      return [];
     }
 
     setLoading(true);
     try {
       const response = await axiosInstance.get(`/wiki/components/page/${pageId}`);
       setComponents(response.data);
+      return response.data;
     } catch (error) {
       console.error("Error fetching page components:", error);
       toast.error("Errore nel caricamento dei componenti");
       setComponents([]);
+      return [];
     } finally {
       setLoading(false);
     }
