@@ -10,18 +10,22 @@ const useWikiManagement = () => {
    * Carica tutti i componenti di una pagina specifica
    */
   const fetchComponentsByPage = useCallback(async (pageId) => {
+    console.log('[useWikiManagement] fetchComponentsByPage called with pageId:', pageId);
     if (!pageId) {
+      console.log('[useWikiManagement] No pageId provided, clearing components');
       setComponents([]);
       return [];
     }
 
+    console.log('[useWikiManagement] Starting API call to /wiki/components/page/' + pageId);
     setLoading(true);
     try {
       const response = await axiosInstance.get(`/wiki/components/page/${pageId}`);
+      console.log('[useWikiManagement] API response:', response.data);
       setComponents(response.data);
       return response.data;
     } catch (error) {
-      console.error("Error fetching page components:", error);
+      console.error("[useWikiManagement] Error fetching page components:", error);
       toast.error("Errore nel caricamento dei componenti");
       setComponents([]);
       return [];
@@ -184,6 +188,29 @@ const useWikiManagement = () => {
     }
   }, []);
 
+  /**
+   * Ottiene una pagina AR_Pages tramite route
+   */
+  const getPageByRoute = useCallback(async (route) => {
+    try {
+      console.log('[useWikiManagement] getPageByRoute called with route:', route);
+      // Encodifica solo i caratteri speciali mantenendo gli slash
+      // Dividi la route per slash, encodifica ogni parte, poi riunisci
+      const encodedRoute = route.split('/').map(part => encodeURIComponent(part)).join('/');
+      console.log('[useWikiManagement] Encoded route:', encodedRoute);
+      const response = await axiosInstance.get(`/wiki/pages/route${encodedRoute}`);
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        console.warn("Pagina non trovata per route:", route);
+        return null;
+      }
+      console.error("Error getting page by route:", error);
+      toast.error("Errore nel recupero della pagina");
+      return null;
+    }
+  }, []);
+
   return {
     // State
     components,
@@ -200,6 +227,7 @@ const useWikiManagement = () => {
     refreshComponents,
     fetchWikiPages,
     getWikiPagePath,
+    getPageByRoute,
   };
 };
 

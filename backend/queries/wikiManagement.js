@@ -487,6 +487,88 @@ async function getWikiPagePath(wikiPageId) {
   }
 }
 
+/**
+ * Ottiene una pagina dalla tabella AR_Pages tramite route
+ * Cerca prima match esatto, poi match per prefisso (route inizia con pageRoute)
+ * @param {string} route - Route da cercare (es: "/progetti/dashboard")
+ * @returns {Promise<Object|null>} Pagina trovata o null
+ */
+async function getPageByRoute(route) {
+  try {
+    console.log('[wikiManagement] getPageByRoute called with route:', route);
+    let pool = await sql.connect(config.database);
+    console.log('[wikiManagement] Database connected:', config.database.database);
+
+    // Prima cerca match esatto
+    const exactMatch = await pool
+      .request()
+      .input("route", sql.NVarChar(510), route)
+      .query(`
+        SELECT TOP 1
+          pageId,
+          pageName,
+          pageRoute,
+          pageComponent,
+          pageParent,
+          pageLevel,
+          disabled,
+          pageDescription,
+          wikiSlug,
+          sequence,
+          inheritPermissions
+        FROM AR_Pages
+        WHERE pageRoute = @route 
+          AND disabled = 0
+        ORDER BY sequence, pageId
+      `);
+
+    console.log('[wikiManagement] Exact match result:', exactMatch.recordset.length, 'rows');
+    if (exactMatch.recordset.length > 0) {
+      console.log('[wikiManagement] Found exact match:', exactMatch.recordset[0]);
+      return exactMatch.recordset[0];
+    }
+
+    console.log('[wikiManagement] No exact match, trying prefix match...');
+    // Se non trovato, cerca per prefisso (route inizia con pageRoute)
+    // Ordina per lunghezza pageRoute discendente per prendere il match più specifico
+    const prefixMatch = await pool
+      .request()
+      .input("route", sql.NVarChar(510), route)
+      .query(`
+        SELECT TOP 1
+          pageId,
+          pageName,
+          pageRoute,
+          pageComponent,
+          pageParent,
+          pageLevel,
+          disabled,
+          pageDescription,
+          wikiSlug,
+          sequence,
+          inheritPermissions
+        FROM AR_Pages
+        WHERE pageRoute IS NOT NULL
+          AND pageRoute != ''
+          AND @route LIKE pageRoute + '%'
+          AND disabled = 0
+        ORDER BY LEN(pageRoute) DESC, sequence, pageId
+      `);
+
+    console.log('[wikiManagement] Prefix match result:', prefixMatch.recordset.length, 'rows');
+    if (prefixMatch.recordset.length > 0) {
+      console.log('[wikiManagement] Found prefix match:', prefixMatch.recordset[0]);
+      return prefixMatch.recordset[0];
+    }
+
+    console.log('[wikiManagement] No page found for route:', route);
+    return null;
+  } catch (error) {
+    console.error("Error in getPageByRoute:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   getPageComponents,
   getComponentByKey,
@@ -497,5 +579,6 @@ module.exports = {
   getAvailableParents,
   resolveWikiUrl,
   getAllWikiPages,
-  getWikiPagePath
+  getWikiPagePath,
+  getPageByRoute
 };

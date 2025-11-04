@@ -99,6 +99,7 @@ const BOMCostingParameters = ({
     try {
       setLoadingParameters(true);
       const response = await axios.get('/bom-costing/parameters');
+      console.log('Global parameters:', response)
 
       if (response.data.success) {
         setGlobalParameters(response.data.data || []);
@@ -221,7 +222,7 @@ const BOMCostingParameters = ({
           {/* Quantità Ordine */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="orderQuantity">Quantità Ordine</Label>
+              <Label htmlFor="orderQuantity">Quantità lotto di prod.</Label>
               <Input
                 id="orderQuantity"
                 type="number"

@@ -193,4 +193,29 @@ router.get("/pages/:wikiPageId/path", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/wiki/pages/route/:route
+ * Ottiene una pagina AR_Pages tramite route
+ */
+router.get("/pages/route/:route(*)", async (req, res) => {
+  try {
+    const { route } = req.params;
+    // Decodifica la route (potrebbe contenere caratteri speciali)
+    const decodedRoute = decodeURIComponent(route);
+    // Aggiungi slash iniziale se non presente (Express lo consuma nel pattern)
+    const normalizedRoute = decodedRoute.startsWith('/') ? decodedRoute : `/${decodedRoute}`;
+    console.log('[wikiRoutes] Original route:', route, '| Decoded:', decodedRoute, '| Normalized:', normalizedRoute);
+    const page = await wikiManagement.getPageByRoute(normalizedRoute);
+
+    if (!page) {
+      return res.status(404).json({ error: "Pagina non trovata per questa route" });
+    }
+
+    res.json(page);
+  } catch (error) {
+    console.error("Error getting page by route:", error);
+    res.status(500).json({ error: "Errore nel recupero della pagina per route" });
+  }
+});
+
 module.exports = router;

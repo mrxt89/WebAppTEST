@@ -28,16 +28,12 @@ const WikiDocLink = ({
   const triggerRef = useRef(null);
 
   /**
-   * Apri pannello laterale documentazione o wiki diretto
+   * Apri pannello laterale documentazione
    */
   const handleClick = () => {
-    if (pageId) {
-      // Se c'è un pageId, apri il pannello laterale con i componenti
+    // Apri sempre il pannello laterale se c'è qualcosa da mostrare
+    if (pageId || wikiSlug) {
       setPanelOpen(true);
-    } else if (wikiSlug) {
-      // Fallback: apri direttamente il wiki se non c'è pageId
-      const wikiUrl = `${config.WIKI_URL}/it/${wikiSlug}`;
-      window.open(wikiUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -67,11 +63,12 @@ const WikiDocLink = ({
       </Tooltip>
 
       {/* Pannello laterale con lista componenti */}
-      {pageId && (
+      {(pageId || wikiSlug) && (
         <WikiDocsPanel
           isOpen={panelOpen}
           onClose={() => setPanelOpen(false)}
           pageId={pageId}
+          wikiSlug={wikiSlug}
           currentComponentKey={componentKey}
           triggerRef={triggerRef}
         />

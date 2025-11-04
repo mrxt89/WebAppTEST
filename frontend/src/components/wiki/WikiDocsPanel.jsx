@@ -9,6 +9,7 @@ const WikiDocsPanel = ({
   isOpen,
   onClose,
   pageId,
+  wikiSlug,
   currentComponentKey,
   triggerRef
 }) => {
