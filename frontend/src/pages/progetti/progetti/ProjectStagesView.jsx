@@ -36,6 +36,9 @@ import {
   MoreVertical,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
+  ArrowLeft,
+  ArrowRight,
   Check,
   X,
   AlertCircle,
@@ -850,10 +853,15 @@ const ProjectStages = ({ project, onTaskClick, canEdit, refreshProject }) => {
     IsGateRequired: true,
   });
   const [showIntro, setShowIntro] = useState(false);
-  const [unassignedTasksFixed, setUnassignedTasksFixed] = useState(() => {
+  const [unassignedPanelCollapsed, setUnassignedPanelCollapsed] = useState(() => {
     // Recupera lo stato dal localStorage
-    const saved = localStorage.getItem('unassignedTasksFixed');
+    const saved = localStorage.getItem('unassignedPanelCollapsed');
     return saved ? JSON.parse(saved) : false;
+  });
+  const [unassignedPanelPosition, setUnassignedPanelPosition] = useState(() => {
+    // Recupera la posizione dal localStorage (left o right)
+    const saved = localStorage.getItem('unassignedPanelPosition');
+    return saved || 'right';
   });
 
   useEffect(() => {
@@ -876,8 +884,13 @@ const ProjectStages = ({ project, onTaskClick, canEdit, refreshProject }) => {
 
   useEffect(() => {
     // Salva lo stato nel localStorage quando cambia
-    localStorage.setItem('unassignedTasksFixed', JSON.stringify(unassignedTasksFixed));
-  }, [unassignedTasksFixed]);
+    localStorage.setItem('unassignedPanelCollapsed', JSON.stringify(unassignedPanelCollapsed));
+  }, [unassignedPanelCollapsed]);
+
+  useEffect(() => {
+    // Salva la posizione nel localStorage quando cambia
+    localStorage.setItem('unassignedPanelPosition', unassignedPanelPosition);
+  }, [unassignedPanelPosition]);
 
   useEffect(() => {
     // Salva lo stato delle sezioni aperte nel localStorage quando cambia
@@ -898,9 +911,11 @@ const ProjectStages = ({ project, onTaskClick, canEdit, refreshProject }) => {
   // Funzione per resettare le preferenze salvate
   const resetPreferences = () => {
     setExpandedStages({});
-    setUnassignedTasksFixed(false);
+    setUnassignedPanelCollapsed(false);
+    setUnassignedPanelPosition('right');
     localStorage.removeItem('expandedStages');
-    localStorage.removeItem('unassignedTasksFixed');
+    localStorage.removeItem('unassignedPanelCollapsed');
+    localStorage.removeItem('unassignedPanelPosition');
     
     // Espandi automaticamente la prima fase non completata
     if (stages.length > 0) {
@@ -931,16 +946,9 @@ const ProjectStages = ({ project, onTaskClick, canEdit, refreshProject }) => {
     const attemptScroll = (attempts = 0) => {
       const stageElement = document.getElementById(`stage-${stageId}`);
       if (stageElement) {
-        // Calcola la posizione considerando l'header sticky e la sezione attività non assegnate
+        // Calcola la posizione considerando l'header sticky
         const overviewCard = document.querySelector('.sticky.top-0');
-        const unassignedCard = document.querySelector('.sticky.z-10');
-        
         let headerHeight = overviewCard ? overviewCard.offsetHeight + 20 : 120;
-        
-        // Se la sezione attività non assegnate è fissa, aggiungi la sua altezza
-        if (unassignedCard && unassignedTasksFixed) {
-          headerHeight += unassignedCard.offsetHeight + 20;
-        }
         
         const elementTop = stageElement.offsetTop - headerHeight;
         
@@ -1084,7 +1092,11 @@ const ProjectStages = ({ project, onTaskClick, canEdit, refreshProject }) => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 transition-all duration-500 ease-in-out ${
+      !unassignedPanelCollapsed && enrichedStages.length > 0 
+        ? (unassignedPanelPosition === 'right' ? 'pr-96' : 'pl-96') 
+        : '' // Quando compresso, nessun padding - il pannello è sovrapposto
+    }`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -1210,9 +1222,9 @@ const ProjectStages = ({ project, onTaskClick, canEdit, refreshProject }) => {
 
       {/* Stages Progress Overview */}
       {enrichedStages.length > 0 && (
-        <Card className="mb-4 bg-gradient-to-r from-blue-50 to-green-50 sticky z-20 shadow-sm" style={{ top: '-24px' }}>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between mb-2 p-2 shadow-sm">
+        <Card className="bg-gradient-to-r from-blue-50 to-green-50 sticky z-20 shadow-sm" style={{ top: '-24px' }}>
+          <CardContent className="">
+            <div className="flex items-center justify-between p-2 shadow-sm">
               <h4 className="text-sm font-medium text-gray-700">Progresso complessivo</h4>
               <span className="text-sm text-gray-600">
                 {enrichedStages.filter(s => s.GateStatus === "APPROVED").length} di {enrichedStages.length} fasi completate
@@ -1245,20 +1257,39 @@ const ProjectStages = ({ project, onTaskClick, canEdit, refreshProject }) => {
                   barText = "Nessuna attività completata";
                 }
                 
+                // Tronca il titolo dello stage se troppo lungo
+                const maxTitleLength = 20;
+                const truncatedTitle = stage.StageName.length > maxTitleLength 
+                  ? stage.StageName.substring(0, maxTitleLength) + '...'
+                  : stage.StageName;
+                
                 return (
                   <TooltipProvider key={stage.StageID}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div 
-                          className={`flex-1 h-2 rounded-full transition-all cursor-pointer hover:h-3 hover:shadow-sm relative ${
+                          className={`flex-1 h-6 rounded-md transition-all cursor-pointer hover:h-7 hover:shadow-sm relative overflow-hidden ${
                             barColor
                           } ${isCompleted ? 'ring-2 ring-green-200' : ''}`}
                           onClick={() => scrollToStage(stage.StageID)}
                           title={`Clicca per andare a ${stage.StageName}`}
                         >
+                          {/* Overlay scuro per migliorare leggibilità del testo */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent pointer-events-none" />
+                          
+                          {/* Titolo dello stage */}
+                          <div className="absolute inset-0 flex items-center px-2 pointer-events-none">
+                            <span 
+                              className="text-xs font-medium text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] truncate"
+                              title={stage.StageName}
+                            >
+                              {truncatedTitle}
+                            </span>
+                          </div>
+                          
                           {/* Indicatore di completamento */}
                           {isCompleted && (
-                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center z-10">
                               <CheckCircle className="w-2 h-2 text-white" />
                             </div>
                           )}
@@ -1283,97 +1314,158 @@ const ProjectStages = ({ project, onTaskClick, canEdit, refreshProject }) => {
         </Card>
       )}
 
-      {/* Unassigned Tasks */}
+      {/* Unassigned Tasks - Pannello Laterale */}
       {enrichedStages.length > 0 && (
-        <Card className={`border-orange-200 bg-orange-50 ${unassignedTasksFixed ? 'sticky z-10 shadow-sm' : ''}`} style={unassignedTasksFixed ? { top: '120px' } : {}}>
-          <CardHeader className="pb-3 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-200">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-orange-600" />
-                Attività da assegnare
-                <Badge variant="outline" className="ml-2 bg-orange-100 text-orange-800 border-orange-300">
-                  {unassignedTasks.length}
-                </Badge>
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setUnassignedTasksFixed(!unassignedTasksFixed)}
-                className="flex items-center gap-1"
-                title={unassignedTasksFixed ? "Rimuovi dalla posizione fissa" : "Mantieni fissa in alto"}
-              >
-                {unassignedTasksFixed ? (
-                  <>
-                    <EyeOff className="h-4 w-4" />
-                    Scorrevole
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-4 w-4" />
-                    Fissa
-                  </>
-                )}
-              </Button>
-            </div>
-            <p className="text-sm text-gray-600">
-              Queste attività non sono ancora state assegnate a una fase. Trascinale nella fase appropriata o trascina qui le attività dalle fasi per rimuoverle.
-            </p>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div 
-              className="min-h-[120px] max-h-[250px] rounded-lg border-2 border-dashed p-3 transition-colors border-orange-300 overflow-y-auto"
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.currentTarget.classList.add('border-orange-500', 'bg-orange-100');
-              }}
-              onDragLeave={(e) => {
-                e.currentTarget.classList.remove('border-orange-500', 'bg-orange-100');
-              }}
-              onDrop={async (e) => {
-                e.preventDefault();
-                e.currentTarget.classList.remove('border-orange-500', 'bg-orange-100');
+        <div 
+          className={`fixed ${unassignedPanelPosition === 'right' ? 'right-0' : 'left-0'} z-30 flex transition-all duration-500 ease-in-out ${
+            unassignedPanelCollapsed ? 'w-10' : 'w-96'
+          }`}
+          style={{ 
+            top: unassignedPanelCollapsed ? '120px' : '80px',
+            height: unassignedPanelCollapsed ? '120px' : 'calc(100vh - 80px)',
+            transition: 'width 500ms cubic-bezier(0.4, 0, 0.2, 1), height 500ms cubic-bezier(0.4, 0, 0.2, 1), top 500ms cubic-bezier(0.4, 0, 0.2, 1)'
+          }}
+        >
+          {/* Pannello principale */}
+          <Card className={`h-full border-orange-200 bg-orange-50 shadow-lg flex flex-col overflow-hidden transition-all duration-500 ease-in-out ${
+            unassignedPanelCollapsed ? 'w-' : 'w-full'
+          }`}
+          style={{
+            transition: 'width 500ms cubic-bezier(0.4, 0, 0.2, 1)'
+          }}>
+            {!unassignedPanelCollapsed ? (
+              <div className="flex flex-col h-full w-full opacity-100 transition-opacity duration-300 ease-in-out delay-0">
+                {/* Header del pannello espanso */}
+                <CardHeader className="pb-3 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-200 flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-orange-600" />
+                      Attività da assegnare
+                      <Badge variant="outline" className="ml-2 bg-orange-100 text-orange-800 border-orange-300">
+                        {unassignedTasks.length}
+                      </Badge>
+                    </CardTitle>
+                    <div className="flex items-center gap-1">
+                      {/* Pulsante per cambiare posizione */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setUnassignedPanelPosition(unassignedPanelPosition === 'right' ? 'left' : 'right')}
+                        className="h-8 w-8 p-0"
+                        title={`Sposta a ${unassignedPanelPosition === 'right' ? 'sinistra' : 'destra'}`}
+                      >
+                        {unassignedPanelPosition === 'right' ? (
+                          <ArrowLeft className="h-4 w-4" />
+                        ) : (
+                          <ArrowRight className="h-4 w-4" />
+                        )}
+                      </Button>
+                      {/* Pulsante per comprimere */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setUnassignedPanelCollapsed(true)}
+                        className="h-8 w-8 p-0"
+                        title="Comprimi pannello"
+                      >
+                        {unassignedPanelPosition === 'right' ? (
+                          <ChevronRight className="h-4 w-4" />
+                        ) : (
+                          <ChevronLeft className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">
+                    Queste attività non sono ancora state assegnate a una fase. Trascinale nella fase appropriata o trascina qui le attività dalle fasi per rimuoverle.
+                  </p>
+                </CardHeader>
                 
-                const taskData = JSON.parse(e.dataTransfer.getData("task"));
-                if (taskData.StageID) {
-                  // Rimuovi l'attività dallo stage (assegnandola a null)
-                  await handleMoveTask(taskData.TaskID, null);
-                }
-              }}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                {unassignedTasks.map((task) => (
-                  <div
-                    key={task.TaskID}
-                    draggable={canEdit}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("task", JSON.stringify({
-                        TaskID: task.TaskID,
-                        StageID: null
-                      }));
+                {/* Contenuto del pannello espanso */}
+                <CardContent className="pt-4 flex-1 overflow-hidden flex flex-col">
+                  <div 
+                    className="flex-1 rounded-lg border-2 border-dashed p-3 transition-colors border-orange-300 overflow-y-auto"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.add('border-orange-500', 'bg-orange-100');
                     }}
-                    className={canEdit ? "cursor-move" : ""}
+                    onDragLeave={(e) => {
+                      e.currentTarget.classList.remove('border-orange-500', 'bg-orange-100');
+                    }}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove('border-orange-500', 'bg-orange-100');
+                      
+                      const taskData = JSON.parse(e.dataTransfer.getData("task"));
+                      if (taskData.StageID) {
+                        // Rimuovi l'attività dallo stage (assegnandola a null)
+                        await handleMoveTask(taskData.TaskID, null);
+                      }
+                    }}
                   >
-                    <TaskCard 
-                      task={task} 
-                      onTaskClick={onTaskClick} 
-                      isStageBlocked={false} 
-                      onRemoveFromStage={null}
-                      canEdit={canEdit} 
-                    />
+                    <div className="grid grid-cols-1 gap-2">
+                      {unassignedTasks.map((task) => (
+                        <div
+                          key={task.TaskID}
+                          draggable={canEdit}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData("task", JSON.stringify({
+                              TaskID: task.TaskID,
+                              StageID: null
+                            }));
+                          }}
+                          className={canEdit ? "cursor-move" : ""}
+                        >
+                          <TaskCard 
+                            task={task} 
+                            onTaskClick={onTaskClick} 
+                            isStageBlocked={false} 
+                            onRemoveFromStage={null}
+                            canEdit={canEdit} 
+                          />
+                        </div>
+                      ))}
+                      {unassignedTasks.length === 0 && (
+                        <div className="text-center py-4">
+                          <AlertCircle className="h-8 w-8 text-orange-400 mx-auto mb-2" />
+                          <p className="text-sm text-orange-600">
+                            Trascina qui le attività dalle fasi per rimuoverle
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ))}
-                {unassignedTasks.length === 0 && (
-                  <div className="col-span-2 text-center py-4">
-                    <AlertCircle className="h-8 w-8 text-orange-400 mx-auto mb-2" />
-                    <p className="text-sm text-orange-600">
-                      Trascina qui le attività dalle fasi per rimuoverle
-                    </p>
-                  </div>
-                )}
+                </CardContent>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            ) : (
+              /* Pannello compresso - mostra solo counter e pulsante per espandere */
+              <div className="h-full flex flex-col items-center justify-between py-4">
+                <div className="flex flex-col items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-orange-600" />
+                  <Badge 
+                    variant="" 
+                    className="bg-orange-100 text-orange-800 border-orange-300 text-xs font-bold flex items-center justify-center px-2 "
+                  >
+                    {unassignedTasks.length}
+                  </Badge>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setUnassignedPanelCollapsed(false)}
+                  className="h-8 w-8 p-0"
+                  title="Espandi pannello"
+                >
+                  {unassignedPanelPosition === 'right' ? (
+                    <ChevronLeft className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            )}
+          </Card>
+        </div>
       )}
 
       {/* Stages */}

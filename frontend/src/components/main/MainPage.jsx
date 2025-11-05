@@ -23,6 +23,7 @@ import { fetchNotificationAttachments } from "@/redux/features/notifications/not
 import { registerOpenChatModal, initChatPagination, setOpenChatData  } from "@/redux/features/notifications/notificationsSlice";
 import { WikiProvider, WikiHelper } from "../wiki";
 import WikiDocLink from "../wiki/WikiDocLink";
+import { useBreadcrumbRegistration } from "@/context/WikiDocsContext";
 
 const MainPage = () => {
   const dispatch = useDispatch();
@@ -86,6 +87,7 @@ const MainPage = () => {
   const dropdownRef = useRef(null);
   const [menuItems, setMenuItems] = useState([]);
   const [breadcrumb, setBreadcrumb] = useState([]);
+  const registerBreadcrumb = useBreadcrumbRegistration();
   const [isPageComponent, setIsPageComponent] = useState(false);
   const [pageTitle, setPageTitle] = useState("");
   const [currentLevelItems, setCurrentLevelItems] = useState([]);
@@ -852,6 +854,12 @@ const openChatModal = async (notificationId) => {
     fetchMenuItems();
   }, []);
 
+  // Registra il breadcrumb nel WikiDocsContext quando cambia
+  useEffect(() => {
+    if (registerBreadcrumb) {
+      registerBreadcrumb(breadcrumb);
+    }
+  }, [breadcrumb, registerBreadcrumb]);
 
   const handleNavigate = (item, state = {}) => {
     const newBreadcrumb = [...breadcrumb, item];

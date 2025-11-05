@@ -21,7 +21,10 @@ const TabCostingParameters = () => {
       <BOMCostingParameters
         bomId={bom.Id}
         companyId={company?.CompanyId}
-        initialParameters={{}}
+        bom={bom}
+        initialParameters={{
+          productionLot: bom.ProductionLot || 1
+        }}
         readOnly={false}
       />
     </div>

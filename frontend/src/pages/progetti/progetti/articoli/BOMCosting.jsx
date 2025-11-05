@@ -1127,13 +1127,39 @@ const BOMCosting = ({ selectedItem }) => {
             });
           });
 
+          // Mappa 3: BOMId -> ProductionLot (da costComponents o bomComponents)
+          const bomProductionLotMap = new Map();
+          // Prima cerca nei costComponents (hanno il ProductionLot dal backend)
+          costComponents.forEach(comp => {
+            if (comp.BOMId && comp.ProductionLot) {
+              bomProductionLotMap.set(comp.BOMId.toString(), comp.ProductionLot);
+            }
+          });
+          // Poi cerca nei bomComponents (potrebbero avere il ProductionLot)
+          bomComponents.forEach(comp => {
+            if (comp.BOMId && comp.ProductionLot && !bomProductionLotMap.has(comp.BOMId.toString())) {
+              bomProductionLotMap.set(comp.BOMId.toString(), comp.ProductionLot);
+            }
+          });
+          // Aggiungi il ProductionLot principale per la BOM root
+          if (selectedBOM?.Id) {
+            bomProductionLotMap.set(selectedBOM.Id.toString(), productionLot);
+          }
+
           console.log('Operation cost map size:', operationCostMap.size);
           console.log('Material cost map size:', materialCostMap.size);
+          console.log('BOM ProductionLot map size:', bomProductionLotMap.size);
 
           // Arricchisci i componenti BOM con i costi REALI da SP_CalculateBOMCosting
           const enrichedComponents = bomComponents.map(bomComp => {
             const operationData = operationCostMap.get(bomComp.BOMId?.toString());
             const materialData = materialCostMap.get(bomComp.ComponentId?.toString());
+            
+            // Recupera il ProductionLot specifico di questo componente
+            const componentProductionLot = bomComp.ProductionLot || 
+                                        bomComp.BOMProductionLot || 
+                                        (bomComp.BOMId ? bomProductionLotMap.get(bomComp.BOMId.toString()) : null) ||
+                                        (bomComp.Level === 0 ? productionLot : null);
 
             // Costi materiali da SP_CalculateBOMCosting (non da GET_BOM_MULTILEVEL)
             const materialCost = materialData?.CalculatedTotalCost || 0;
@@ -1142,13 +1168,18 @@ const BOMCosting = ({ selectedItem }) => {
             return {
               ...bomComp,
               OperationCost: operationData?.ProcessingCost || 0,
-              FixedCost: operationData ? operationData.FixedCostTotal / productionLot : 0,
+              // Usa il ProductionLot del componente, non quello principale
+              FixedCost: operationData && componentProductionLot ? 
+                        operationData.FixedCostTotal / componentProductionLot : 0,
               FixedCostTotal: operationData?.FixedCostTotal || 0,
               MaterialCost: materialCost,
               TotalCost: materialCost + operationCost,
               CalculatedTotalCost: materialCost + operationCost,
               UnitCost: materialData?.UnitCost || 0,
-              Quantity: bomComp.Quantity || materialData?.Quantity || 0
+              Quantity: bomComp.Quantity || materialData?.Quantity || 0,
+              // Aggiungi il ProductionLot specifico del componente
+              ProductionLot: componentProductionLot,
+              BOMProductionLot: componentProductionLot
             };
           });
 

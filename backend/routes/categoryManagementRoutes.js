@@ -56,7 +56,8 @@ router.post('/projectsCategories/categories/details', authenticateToken, async (
 router.patch('/projectsCategories/categories/:id/toggle', authenticateToken, async (req, res) => {
     try {
         const categoryId = parseInt(req.params.id);
-        const result = await toggleCategoryStatus(categoryId);
+        const userId = req.user.UserId;
+        const result = await toggleCategoryStatus(categoryId, userId);
         res.json(result);
     } catch (err) {
         console.error('Error toggling category status:', err);

@@ -47,10 +47,10 @@ const getPaginatedProjectCustomers = async (page = 0, pageSize = 50, filters = {
     });
 
     const result = await request.query(`
-      SELECT 
-        Id, CustomerCode, CompanyName, TaxIdNumber, 
-        Address, City, County, Country, ZIPCode,
-        ERPCustSupp, ERPCustSuppType, Disabled, 
+      SELECT
+        Id, CustomerCode, CompanyName, TaxIdNumber,
+        Address, City, County, Country, Region, ZIPCode,
+        ERPCustSupp, ERPCustSuppType, Disabled,
         fscodice, Creationdate, TBCreatedId, TBModified
       FROM MA_ProjectCustomers ${whereClause}
       ${orderBy}
@@ -78,10 +78,10 @@ const getAllProjectCustomers = async (userId) => {
       SET NOCOUNT ON;
       DECLARE @CompanyId INT = ISNULL((SELECT CompanyId FROM AR_Users WHERE userId = @UserId), 0);
 
-      SELECT 
-        Id, CustomerCode, CompanyName, TaxIdNumber, 
-        Address, City, County, Country, ZIPCode,
-        ERPCustSupp, ERPCustSuppType, Disabled, 
+      SELECT
+        Id, CustomerCode, CompanyName, TaxIdNumber,
+        Address, City, County, Country, Region, ZIPCode,
+        ERPCustSupp, ERPCustSuppType, Disabled,
         fscodice, Creationdate, TBCreatedId, TBModified
       FROM MA_ProjectCustomers (NOLOCK)
       WHERE CompanyId = @CompanyId
@@ -117,12 +117,12 @@ const getProjectCustomerById = async (Id, userId) => {
       .query(`
         DECLARE @CompanyId INT = ISNULL((SELECT CompanyId FROM AR_Users WHERE userId = @UserId), 0);
         
-        SELECT 
-          Id, CustomerCode, CompanyName, TaxIdNumber, 
-          Address, City, County, Country, ZIPCode,
-          ERPCustSupp, ERPCustSuppType, Disabled, 
+        SELECT
+          Id, CustomerCode, CompanyName, TaxIdNumber,
+          Address, City, County, Country, Region, ZIPCode,
+          ERPCustSupp, ERPCustSuppType, Disabled,
           fscodice, Creationdate, TBCreatedId, TBModified
-        FROM MA_ProjectCustomers 
+        FROM MA_ProjectCustomers
         WHERE Id = @Id AND CompanyId = @CompanyId`);
     
     if (result.recordset[0]) {
@@ -159,6 +159,7 @@ const updateProjectCustomer = async (Id, customerData, userId, companyId) => {
       request.input('City', sql.VarChar(64), customerData.City || '');
       request.input('County', sql.VarChar(3), customerData.County || '');
       request.input('Country', sql.VarChar(64), customerData.Country || '');
+      request.input('Region', sql.VarChar(32), customerData.Region || '');
       request.input('ZIPCode', sql.VarChar(10), customerData.ZIPCode || '');
       request.input('ERPCustSupp', sql.VarChar(12), customerData.ERPCustSupp || '');
       request.input('ERPCustSuppType', sql.Int, customerData.ERPCustSuppType || CUSTOMER_TYPE);
@@ -171,14 +172,14 @@ const updateProjectCustomer = async (Id, customerData, userId, companyId) => {
           DECLARE @Id INT = (SELECT ISNULL(MAX(Id), 0) + 1 FROM MA_ProjectCustomers WHERE CompanyId = @CompanyId);
 
         INSERT INTO MA_ProjectCustomers (
-          CompanyId, Id, CustomerCode, CompanyName, TaxIdNumber, 
-          Address, City, County, Country, ZIPCode,
-          ERPCustSupp, ERPCustSuppType, Disabled, fscodice, 
+          CompanyId, Id, CustomerCode, CompanyName, TaxIdNumber,
+          Address, City, County, Country, Region, ZIPCode,
+          ERPCustSupp, ERPCustSuppType, Disabled, fscodice,
           Creationdate, TBCreatedId
         ) VALUES (
-          @CompanyId, @Id, @CustomerCode, @CompanyName, @TaxIdNumber, 
-          @Address, @City, @County, @Country, @ZIPCode,
-          @ERPCustSupp, @ERPCustSuppType, @Disabled, @fscodice, 
+          @CompanyId, @Id, @CustomerCode, @CompanyName, @TaxIdNumber,
+          @Address, @City, @County, @Country, @Region, @ZIPCode,
+          @ERPCustSupp, @ERPCustSuppType, @Disabled, @fscodice,
           GETDATE(), @TBCreatedId
         )
         
@@ -189,14 +190,17 @@ const updateProjectCustomer = async (Id, customerData, userId, companyId) => {
       return { success: true, newId: result.recordset[0].newId };
     } else {
       // UPDATE - Aggiornamento cliente esistente
+      // Prima otteniamo il CompanyId con un request separato
+      const companyRequest = pool.request()
+        .input('UserId', sql.Int, userId);
+      
+      const companyResult = await companyRequest.query('SELECT CompanyId FROM AR_Users WHERE userId = @UserId');
+      const companyId = companyResult.recordset[0]?.CompanyId || 0;
+
+      // Ora creiamo un nuovo request per l'UPDATE
       const request = pool.request()
         .input('Id', sql.Int, Id)
-        .input('UserId', sql.Int, userId);
-
-      // Get CompanyId from userId
-      const companyResult = await request.query('SELECT CompanyId FROM AR_Users WHERE userId = @UserId');
-      const companyId = companyResult.recordset[0]?.CompanyId || 0;
-      // Non dichiariamo una seconda volta il parametro, lo utilizziamo direttamente nella query
+        .input('CompanyId', sql.Int, companyId);
 
       // Costruisce un array di campi da aggiornare solo se sono presenti in customerData
       const updateFields = [];
@@ -276,13 +280,23 @@ const updateProjectCustomer = async (Id, customerData, userId, companyId) => {
       }
 
       // Costruisce la query solo con i campi presenti
+      // Usiamo @CompanyId come parametro invece di interpolazione
       const query = `
         UPDATE MA_ProjectCustomers
         SET ${updateFields.join(', ')}
-        WHERE Id = @Id AND CompanyId = ${companyId}
+        WHERE Id = @Id AND CompanyId = @CompanyId
       `;
 
-      await request.query(query);
+      const updateResult = await request.query(query);
+      
+      // Verifica se sono state modificate delle righe
+      if (updateResult.rowsAffected[0] === 0) {
+        return { 
+          success: false, 
+          message: 'Nessun cliente trovato con l\'ID specificato o non si hanno i permessi per modificarlo' 
+        };
+      }
+
       return { success: true };
     }
   } catch (err) {
@@ -352,6 +366,7 @@ const linkToERPCustomer = async (Id, erpCustSupp, userId) => {
       .input('City', sql.VarChar(64), erpCustomer.City)
       .input('County', sql.VarChar(3), erpCustomer.County)
       .input('Country', sql.VarChar(64), erpCustomer.Country)
+      .input('Region', sql.VarChar(32), erpCustomer.Region || '')
       .input('ZIPCode', sql.VarChar(10), erpCustomer.ZIPCode)
       .query(`
         DECLARE @CompanyId INT = ISNULL((SELECT CompanyId FROM AR_Users WHERE userId = @UserId), 0);
@@ -365,6 +380,7 @@ const linkToERPCustomer = async (Id, erpCustSupp, userId) => {
             City = @City,
             County = @County,
             Country = @Country,
+            Region = @Region,
             ZIPCode = @ZIPCode,
             TBModified = @UserId
         WHERE Id = @Id AND CompanyId = @CompanyId
@@ -454,6 +470,7 @@ const addUpdateProjectCustomersBulk = async (customers, userId) => {
         request.input('City', sql.VarChar(64), customer.City || '');
         request.input('County', sql.VarChar(3), customer.County || '');
         request.input('Country', sql.VarChar(64), customer.Country || '');
+        request.input('Region', sql.VarChar(32), customer.Region || '');
         request.input('ZIPCode', sql.VarChar(10), customer.ZIPCode || '');
         request.input('ERPCustSupp', sql.VarChar(12), customer.ERPCustSupp || '');
         request.input('ERPCustSuppType', sql.Int, customer.ERPCustSuppType || CUSTOMER_TYPE);
@@ -465,14 +482,14 @@ const addUpdateProjectCustomersBulk = async (customers, userId) => {
           // INSERT
           const insertQuery = `
             INSERT INTO MA_ProjectCustomers (
-              CompanyId, Id, CustomerCode, CompanyName, TaxIdNumber, 
-              Address, City, County, Country, ZIPCode,
-              ERPCustSupp, ERPCustSuppType, Disabled, fscodice, 
+              CompanyId, Id, CustomerCode, CompanyName, TaxIdNumber,
+              Address, City, County, Country, Region, ZIPCode,
+              ERPCustSupp, ERPCustSuppType, Disabled, fscodice,
               Creationdate, TBCreatedId
             ) VALUES (
-              @CompanyId, @Id, @CustomerCode, @CompanyName, @TaxIdNumber, 
-              @Address, @City, @County, @Country, @ZIPCode,
-              @ERPCustSupp, @ERPCustSuppType, @Disabled, @fscodice, 
+              @CompanyId, @Id, @CustomerCode, @CompanyName, @TaxIdNumber,
+              @Address, @City, @County, @Country, @Region, @ZIPCode,
+              @ERPCustSupp, @ERPCustSuppType, @Disabled, @fscodice,
               GETDATE(), @UserId
             )
           `;
@@ -495,6 +512,7 @@ const addUpdateProjectCustomersBulk = async (customers, userId) => {
                 City = @City,
                 County = @County,
                 Country = @Country,
+                Region = @Region,
                 ZIPCode = @ZIPCode,
                 ERPCustSupp = @ERPCustSupp,
                 ERPCustSuppType = @ERPCustSuppType,
@@ -620,6 +638,7 @@ const importERPCustomerAsProspect = async (erpCustSupp, userId) => {
       insertRequest.input('City', sql.VarChar(64), erpCustomer.City || '');
       insertRequest.input('County', sql.VarChar(3), erpCustomer.County || '');
       insertRequest.input('Country', sql.VarChar(64), erpCustomer.Country || '');
+      insertRequest.input('Region', sql.VarChar(32), erpCustomer.Region || '');
       insertRequest.input('ZIPCode', sql.VarChar(10), erpCustomer.ZIPCode || '');
       insertRequest.input('ERPCustSupp', sql.VarChar(12), erpCustomer.CustSupp);
       insertRequest.input('ERPCustSuppType', sql.Int, erpCustomer.CustSuppType);
@@ -628,14 +647,14 @@ const importERPCustomerAsProspect = async (erpCustSupp, userId) => {
       
       const insertQuery = `
         INSERT INTO MA_ProjectCustomers (
-          CompanyId, Id, CustomerCode, CompanyName, TaxIdNumber, 
-          Address, City, County, Country, ZIPCode,
-          ERPCustSupp, ERPCustSuppType, Disabled, 
+          CompanyId, Id, CustomerCode, CompanyName, TaxIdNumber,
+          Address, City, County, Country, Region, ZIPCode,
+          ERPCustSupp, ERPCustSuppType, Disabled,
           Creationdate, TBCreatedId
         ) VALUES (
-          @CompanyId, @Id, @CustomerCode, @CompanyName, @TaxIdNumber, 
-          @Address, @City, @County, @Country, @ZIPCode,
-          @ERPCustSupp, @ERPCustSuppType, @Disabled, 
+          @CompanyId, @Id, @CustomerCode, @CompanyName, @TaxIdNumber,
+          @Address, @City, @County, @Country, @Region, @ZIPCode,
+          @ERPCustSupp, @ERPCustSuppType, @Disabled,
           GETDATE(), @UserId
         )
       `;

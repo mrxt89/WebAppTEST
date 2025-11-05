@@ -280,6 +280,43 @@ const calculateBOMCosting = async (companyId, bomId, options = {}) => {
                 // Recordset[1]: Componenti con costi (ComponentId, ItemCode, UnitCost, FixedCost, TotalCost, CalculatedTotalCost)
                 componentDetails = result.recordsets[1];
 
+                // Arricchisci i componenti con il ProductionLot dalla loro BOM
+                if (componentDetails && componentDetails.length > 0) {
+                    // Raccogli tutti i BOMId univoci dai componenti (validati come BigInt)
+                    const bomIds = [...new Set(componentDetails
+                        .map(c => c.BOMId)
+                        .filter(id => id != null && !isNaN(parseInt(id)))
+                        .map(id => BigInt(id))
+                    )];
+                    
+                    if (bomIds.length > 0) {
+                        // Recupera i ProductionLot per tutti i BOMId usando una query con valori validati
+                        // Costruiamo la lista di ID come stringa validata (solo numeri)
+                        const bomIdsList = bomIds.map(id => id.toString()).join(',');
+                        const bomProductionLotsQuery = `
+                            SELECT Id, ProductionLot
+                            FROM MA_ProjectArticles_BillOfMaterials
+                            WHERE CompanyId = @CompanyId AND Id IN (${bomIdsList})
+                        `;
+                        
+                        const bomLotsRequest = pool.request()
+                            .input('CompanyId', sql.Int, companyId);
+                        
+                        const bomLotsResult = await bomLotsRequest.query(bomProductionLotsQuery);
+                        const bomLotsMap = new Map();
+                        bomLotsResult.recordset.forEach(row => {
+                            bomLotsMap.set(row.Id.toString(), row.ProductionLot);
+                        });
+                        
+                        // Aggiungi il ProductionLot a ogni componente
+                        componentDetails = componentDetails.map(comp => ({
+                            ...comp,
+                            ProductionLot: comp.BOMId ? (bomLotsMap.get(comp.BOMId.toString()) || null) : null,
+                            BOMProductionLot: comp.BOMId ? (bomLotsMap.get(comp.BOMId.toString()) || null) : null
+                        }));
+                    }
+                }
+
                 // Recordset[3]: Routing con ProcessingCost e SetupCost (BOMId, Operation, ProcessingTime, ProcessingCost, SetupCost, etc.)
                 if (result.recordsets.length > 3) {
                     routingDetails = result.recordsets[3];

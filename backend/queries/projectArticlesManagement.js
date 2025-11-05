@@ -354,7 +354,7 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
             if (bomData.Version) request.input('Version', sql.Int, bomData.Version);
             if (bomData.UoM) request.input('UoM', sql.VarChar(8), bomData.UoM);
             if (bomData.BOMStatus) request.input('BOMStatus', sql.VarChar(50), bomData.BOMStatus);
-            if (bomData.ProductionLot) request.input('ProductionLot', sql.Int, bomData.ProductionLot);
+            if (bomData.ProductionLot !== undefined) request.input('ProductionLot', sql.Int, bomData.ProductionLot);
             
             // Campi di costo
             if (bomData.RMCost !== undefined) request.input('RMCost', sql.Float, bomData.RMCost);
@@ -528,12 +528,51 @@ const getBOMData = async (action, companyId, id, itemId = null, version = null, 
                 // CORREZIONE: Per GET_BOM_MULTILEVEL dovremmo utilizzare recordsets[0] per i componenti
                 // anche quando non includiamo il routing
                 if (result.recordsets && result.recordsets.length > 0) {
-                   
-                        processedResult = {
-                            components: result.recordsets[0] || [],
-                            routing: result.recordsets.length > 1 ? result.recordsets[1] : []
-                        };
-                   
+                    let components = result.recordsets[0] || [];
+                    
+                    // Arricchisci i componenti con il ProductionLot dalla loro BOM
+                    if (components && components.length > 0) {
+                        // Raccogli tutti i BOMId univoci dai componenti (validati come BigInt)
+                        const bomIds = [...new Set(components
+                            .map(c => c.BOMId || c.ComponentBOMId)
+                            .filter(id => id != null && !isNaN(parseInt(id)))
+                            .map(id => BigInt(id))
+                        )];
+                        
+                        if (bomIds.length > 0) {
+                            // Recupera i ProductionLot per tutti i BOMId usando una query con valori validati
+                            const bomIdsList = bomIds.map(id => id.toString()).join(',');
+                            const bomProductionLotsQuery = `
+                                SELECT Id, ProductionLot
+                                FROM MA_ProjectArticles_BillOfMaterials
+                                WHERE CompanyId = @CompanyId AND Id IN (${bomIdsList})
+                            `;
+                            
+                            const bomLotsRequest = pool.request()
+                                .input('CompanyId', sql.Int, companyId);
+                            
+                            const bomLotsResult = await bomLotsRequest.query(bomProductionLotsQuery);
+                            const bomLotsMap = new Map();
+                            bomLotsResult.recordset.forEach(row => {
+                                bomLotsMap.set(row.Id.toString(), row.ProductionLot);
+                            });
+                            
+                            // Aggiungi il ProductionLot a ogni componente
+                            components = components.map(comp => {
+                                const bomId = (comp.BOMId || comp.ComponentBOMId)?.toString();
+                                return {
+                                    ...comp,
+                                    ProductionLot: bomId ? (bomLotsMap.get(bomId) || null) : null,
+                                    BOMProductionLot: bomId ? (bomLotsMap.get(bomId) || null) : null
+                                };
+                            });
+                        }
+                    }
+                    
+                    processedResult = {
+                        components: components,
+                        routing: result.recordsets.length > 1 ? result.recordsets[1] : []
+                    };
                 } else {
                     // Nessun recordset restituito
                     processedResult = { components: [], routing: [], availableVersions: [] };

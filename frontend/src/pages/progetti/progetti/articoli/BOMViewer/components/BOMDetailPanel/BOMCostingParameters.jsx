@@ -37,12 +37,13 @@ import { it } from 'date-fns/locale';
 const BOMCostingParameters = ({
   bomId,
   companyId,
+  bom,
   initialParameters = {},
   onParametersChange,
   readOnly = false
 }) => {
   const [parameters, setParameters] = useState({
-    orderQuantity: initialParameters.orderQuantity || '',
+    orderQuantity: initialParameters.productionLot || initialParameters.orderQuantity || '',
     scrapPercentage: initialParameters.scrapPercentage || '',
     useGranularMarkups: initialParameters.useGranularMarkups ?? true,
     updateBOMRecord: initialParameters.updateBOMRecord ?? true,
@@ -179,12 +180,30 @@ const BOMCostingParameters = ({
         }
       };
 
+      // Salva lo storico dei parametri
       const response = await axios.post('/bom-costing/history', {
         bomId: bomId,
         costingData: costingData
       });
 
       if (response.data.success) {
+        // Aggiorna anche il campo ProductionLot nella tabella BOM principale
+        if (parameters.orderQuantity && bom) {
+          try {
+            await axios.post('/projectArticles/boms', {
+              action: 'UPDATE',
+              bomData: {
+                Id: bomId,
+                Version: bom.Version || 1,
+                ProductionLot: parseFloat(parameters.orderQuantity)
+              }
+            });
+          } catch (bomUpdateError) {
+            console.error('Error updating BOM ProductionLot:', bomUpdateError);
+            // Non bloccare il salvataggio se l'aggiornamento della BOM fallisce
+          }
+        }
+
         swal.fire('Successo', 'Parametri salvati con successo', 'success');
         await loadHistory();
       }

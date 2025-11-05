@@ -114,19 +114,16 @@ const ProjectCustomersTable = ({
 
   // Gestione dei cambiamenti nelle celle
   const handleCellChange = useCallback(
-    (rowIndex, field, value) => {
-      const item = projectCustomers[rowIndex];
-      if (!item) return;
-
+    (customerId, field, value) => {
       setLocalChanges((prev) => ({
         ...prev,
-        [item.Id]: {
-          ...(prev[item.Id] || {}),
+        [customerId]: {
+          ...(prev[customerId] || {}),
           [field]: value,
         },
       }));
     },
-    [projectCustomers],
+    [],
   );
 
   // Salvataggio delle modifiche
@@ -134,10 +131,16 @@ const ProjectCustomersTable = ({
     try {
       const changesEntries = Object.entries(localChanges);
 
+      if (changesEntries.length === 0) {
+        return;
+      }
+
+      // Salva tutte le modifiche
       for (const [customerId, changes] of changesEntries) {
         await onUpdateCustomer(customerId, changes);
       }
 
+      // Pulisci le modifiche locali solo dopo che tutte le modifiche sono state salvate
       setLocalChanges({});
 
       swal.fire({
@@ -152,6 +155,7 @@ const ProjectCustomersTable = ({
     } catch (error) {
       console.error("Error saving changes:", error);
       swal.fire("Errore", "Errore nel salvataggio delle modifiche", "error");
+      // Non pulire le modifiche locali in caso di errore, così l'utente può riprovare
     }
   };
 
@@ -280,13 +284,13 @@ const ProjectCustomersTable = ({
         type="text"
         value={value}
         readOnly={column.readOnly || !!item.ERPCustSupp} // ReadOnly se collegato a ERP
-        onChange={(e) =>
-          handleCellChange(
-            filteredAndSortedData.indexOf(item),
-            column.field,
-            e.target.value,
-          )
-        }
+        onChange={(e) => {
+          handleCellChange(item.Id, column.field, e.target.value);
+        }}
+        onKeyDown={(e) => {
+          // Previene la propagazione degli eventi di tastiera per evitare conflitti con sorting/filtering
+          e.stopPropagation();
+        }}
         className="w-full p-2"
         style={{
           position: isFixed ? "sticky" : "initial",

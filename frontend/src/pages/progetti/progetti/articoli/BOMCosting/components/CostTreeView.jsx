@@ -130,11 +130,11 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
 
         {/* Cycle info - Layout tabellare */}
         <div className="flex-1 flex items-center ml-2 min-w-0">
-          {/* Colonna 1: Operazione e Centro di Lavoro (60%) - CON INDENTAZIONE */}
+          {/* Colonna 1: Operazione e Centro di Lavoro (55%) - CON INDENTAZIONE */}
           <div 
             className="flex items-center gap-2 min-w-0" 
             style={{ 
-              width: '60%',
+              width: '55%',
               paddingLeft: `${indent}px`
             }}
           >
@@ -156,18 +156,23 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
             -
           </div>
 
-          {/* Colonna 4: Costo Unitario (9%) */}
-          <div className="text-xs font-medium text-gray-900 text-right flex-shrink-0" style={{ width: '9%' }}>
+          {/* Colonna 4: Lotto Produzione (8%) */}
+          <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: '8%' }}>
+            {cycle.ProductionLot || '-'}
+          </div>
+
+          {/* Colonna 5: Costo Unitario (8%) */}
+          <div className="text-xs font-medium text-gray-900 text-right flex-shrink-0" style={{ width: '8%' }}>
             {formatCurrency(unitCost)}
           </div>
 
-          {/* Colonna 5: Costo Fisso (9%) */}
-          <div className="text-xs font-medium text-orange-700 text-right flex-shrink-0" style={{ width: '9%' }}>
+          {/* Colonna 6: Costo Fisso (8%) */}
+          <div className="text-xs font-medium text-orange-700 text-right flex-shrink-0" style={{ width: '8%' }}>
             {fixedCost > 0 ? formatCurrency(fixedCost) : '-'}
           </div>
 
-          {/* Colonna 6: Costo Totale (9%) */}
-          <div className="text-xs font-semibold text-green-900 text-right flex-shrink-0" style={{ width: '9%' }}>
+          {/* Colonna 7: Costo Totale (8%) */}
+          <div className="text-xs font-semibold text-green-900 text-right flex-shrink-0" style={{ width: '8%' }}>
             {formatCurrency(totalCost)}
           </div>
         </div>
@@ -318,11 +323,11 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
 
         {/* Component info - Layout tabellare */}
         <div className="flex-1 flex items-center ml-2 min-w-0">
-          {/* Colonna 1: Codice e Descrizione (60%) - CON INDENTAZIONE */}
+          {/* Colonna 1: Codice e Descrizione (55%) - CON INDENTAZIONE */}
           <div 
             className="flex items-center gap-2 min-w-0" 
             style={{ 
-              width: '60%',
+              width: '55%',
               paddingLeft: `${indent}px`
             }}
           >
@@ -340,7 +345,7 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
 
           </div>
 
-          {/* Colonna 2: Quantità e UM (8%) */}
+          {/* Colonna 2: Quantità (8%) */}
           <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: '8%' }}>
             {!isRootNode && node.data.Quantity > 0 ? (
               <>{node.data.Quantity.toFixed(3)}</>
@@ -354,21 +359,26 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
             {uom}
           </div>
 
-          {/* Colonna 4: Costo Unitario (9%) */}
-          <div className="text-xs font-medium text-gray-900 text-right flex-shrink-0" style={{ width: '9%' }}>
+          {/* Colonna 4: Lotto Produzione (8%) */}
+          <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: '8%' }}>
+            {node.data.ProductionLot ?? node.data.BOMProductionLot ?? '-'}
+          </div>
+
+          {/* Colonna 5: Costo Unitario (8%) */}
+          <div className="text-xs font-medium text-gray-900 text-right flex-shrink-0" style={{ width: '8%' }}>
             {formatCurrency(unitCost)}
           </div>
 
-          {/* Colonna 5: Costo Fisso (9%) */}
-          <div className="text-xs font-medium text-orange-700 text-right flex-shrink-0" style={{ width: '9%' }}>
+          {/* Colonna 6: Costo Fisso (8%) */}
+          <div className="text-xs font-medium text-orange-700 text-right flex-shrink-0" style={{ width: '8%' }}>
             {fixedCost > 0 ? formatCurrency(fixedCost) : '-'}
           </div>
 
-          {/* Colonna 6: Costo Totale (9%) */}
+          {/* Colonna 7: Costo Totale (8%) */}
           <div className={cn(
             "text-xs font-semibold text-right flex-shrink-0",
             isRootNode ? "text-purple-900 text-sm" : "text-blue-900"
-          )} style={{ width: '9%' }}>
+          )} style={{ width: '8%' }}>
             {formatCurrency(totalCost)}
           </div>
         </div>
@@ -475,6 +485,10 @@ const CostTreeView = ({ costingResult }) => {
           ...comp,
           // Mantieni TUTTI i campi del backend inclusi i costi pre-calcolati
           // NON sovrascrivere i costi, usa direttamente quelli del backend
+          // Usa il ProductionLot specifico del componente dalla sua BOM
+          // Solo per il nodo root (Level 0) usa il productionLot principale se non presente
+          ProductionLot: comp.ProductionLot || comp.BOMProductionLot || (comp.Level === 0 ? productionLot : undefined),
+          BOMProductionLot: comp.BOMProductionLot || (comp.Level === 0 ? productionLot : undefined)
         },
         children: []
       };
@@ -506,9 +520,11 @@ const CostTreeView = ({ costingResult }) => {
 
         // IMPORTANTE: Usa i costi che arrivano dal backend nelle operazioni di routing
         // Il backend restituisce già ProcessingCost e SetupCost calcolati
+        // Usa il ProductionLot del componente, non quello principale
+        const componentProductionLot = comp.ProductionLot || comp.BOMProductionLot || productionLot;
         const processingCost = route.ProcessingCost || 0;
         const setupCostTotal = route.SetupCost || 0; // Costo fisso totale per il lotto
-        const setupCostUnit = setupCostTotal / productionLot; // Costo fisso unitario
+        const setupCostUnit = componentProductionLot > 0 ? (setupCostTotal / componentProductionLot) : 0; // Costo fisso unitario
         const totalCost = route.TotalCost || (processingCost + setupCostUnit);
 
         const cycleNode = {
@@ -519,7 +535,7 @@ const CostTreeView = ({ costingResult }) => {
             ...route,
             // Usa i costi pre-calcolati dal backend
             UnitCost: processingCost,
-            FixedCost: setupCostUnit, // Costo fisso unitario (diviso per lotto)
+            FixedCost: setupCostUnit, // Costo fisso unitario (diviso per lotto del componente)
             FixedCostTotal: setupCostTotal, // Mantieni anche il totale
             TotalCost: totalCost,
             Operation: route.Operation,
@@ -527,7 +543,7 @@ const CostTreeView = ({ costingResult }) => {
             WorkCenter: route.WorkCenter,
             WorkCenterDescription: route.WorkCenterDescription,
             Qty: 1,
-            ProductionLot: productionLot
+            ProductionLot: componentProductionLot // Usa il lotto del componente, non quello principale
           },
           children: []
         };
@@ -1099,12 +1115,13 @@ const CostTreeView = ({ costingResult }) => {
           <div className="w-8"></div> {/* Spazio per toggle */}
           <div className="w-6"></div> {/* Spazio per icona */}
           <div className="flex-1 flex items-center ml-2">
-            <div style={{ width: '60%' }}>Componente / Operazione</div>
+            <div style={{ width: '55%' }}>Componente / Operazione</div>
             <div style={{ width: '8%' }} className="text-right">Q.tà</div>
             <div style={{ width: '5%' }} className="text-center">UM</div>
-            <div style={{ width: '9%' }} className="text-right">Costo Unit.</div>
-            <div style={{ width: '9%' }} className="text-right">Costi Fissi</div>
-            <div style={{ width: '9%' }} className="text-right">Costo Tot.</div>
+            <div style={{ width: '8%' }} className="text-right">Lotto</div>
+            <div style={{ width: '8%' }} className="text-right">Costo Unit.</div>
+            <div style={{ width: '8%' }} className="text-right">Costi Fissi</div>
+            <div style={{ width: '8%' }} className="text-right">Costo Tot.</div>
           </div>
         </div>
 
