@@ -15,6 +15,8 @@ import {
   ExternalLink,
   Sparkles,
 } from "lucide-react";
+import { FileSymlink } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -27,6 +29,7 @@ const TaskCard = ({
   isUpdating,
   canDrag,
   onProjectClick,
+  currentUserId,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -93,6 +96,15 @@ const TaskCard = ({
 
   const priority = priorityConfig[task.Priority] || priorityConfig.BASSA;
 
+  const openExternalLink = (e) => {
+    e.stopPropagation();
+    const prj = encodeURIComponent(task.ProjectName || "");
+    const stp = task.TaskSequence != null ? task.TaskSequence : "";
+    const ute = currentUserId != null ? currentUserId : "";
+    const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}`;
+    window.open(url, "_blank", "noopener");
+  };
+
   return (
     <motion.div
       layout
@@ -146,13 +158,23 @@ const TaskCard = ({
               )}
             </div>
 
-            {/* Progetto - sempre visibile */}
-            <div 
-              className="inline-flex items-center gap-1 text-blue-600 hover:underline cursor-pointer text-xs"
-              onClick={navigateToProject}
-            >
-              <span className="truncate">{task.ProjectName}</span>
-              <ExternalLink className="h-3 w-3 flex-shrink-0" />
+            {/* Progetto e link esterno */}
+            <div className="flex items-center justify-between gap-2">
+              <div 
+                className="inline-flex items-center gap-1 text-blue-600 hover:underline cursor-pointer text-xs"
+                onClick={navigateToProject}
+              >
+                <span className="truncate">{task.ProjectName}</span>
+                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+              </div>
+              <button
+                type="button"
+                onClick={openExternalLink}
+                title="Apri in nuova scheda"
+                className="flex-shrink-0 text-gray-500 hover:text-gray-700"
+              >
+                <FileSymlink className="h-4 w-4" />
+              </button>
             </div>
 
             {/* Info base: utente e data */}
@@ -268,6 +290,7 @@ const MyTasksKanban = ({
   isOwnTask,
   onProjectClick,
 }) => {
+  const { user } = useAuth();
   const [localTasks, setLocalTasks] = useState(tasks);
   const [draggedTask, setDraggedTask] = useState(null);
   const [dropTargetStatus, setDropTargetStatus] = useState(null);
@@ -589,6 +612,7 @@ const MyTasksKanban = ({
                               isUpdating={isTaskUpdating}
                               canDrag={canDrag && !isTaskUpdating}
                               onProjectClick={onProjectClick || ((projectId) => navigate(`/progetti/detail/${projectId}`))}
+                              currentUserId={user?.userId}
                             />
                           );
                         })

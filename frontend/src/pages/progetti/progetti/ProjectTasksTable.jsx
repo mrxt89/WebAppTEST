@@ -31,7 +31,7 @@ import {
   hasAdminOrManagerPermission,
   canEditTask,
 } from "@/lib/taskPermissionsUtils";
-import { MoreVertical, Eye, Ban, CheckCircle2, Pin, PinOff, Users } from "lucide-react";
+import { MoreVertical, Eye, Ban, CheckCircle2, Pin, PinOff, Users, FileSymlink } from "lucide-react";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
 import { toast } from "@/components/ui/use-toast";
 
@@ -540,6 +540,22 @@ const ProjectTasksTableImproved = ({
                           >
                             <Eye className="mr-2 h-4 w-4" />
                             Visualizza
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuSeparator />
+                          
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const prj = encodeURIComponent(project?.Name || task.ProjectName || "");
+                              const stp = task.TaskSequence != null ? task.TaskSequence : "";
+                              const ute = currentUserId ?? "";
+                              const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}`;
+                              window.open(url, "_blank", "noopener");
+                            }}
+                          >
+                            <FileSymlink className="mr-2 h-4 w-4" />
+                            Apri in gestione fasi
                           </DropdownMenuItem>
                           
                           <DropdownMenuSeparator />

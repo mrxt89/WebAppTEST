@@ -28,6 +28,8 @@ import {
   Ban,
   Eye,
 } from "lucide-react";
+import { FileSymlink } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,6 +43,7 @@ const TaskCard = ({
   isUpdating,
   canDrag,
   canManage,
+  currentUserId,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef(null);
@@ -93,6 +96,15 @@ const TaskCard = ({
   };
 
   const priority = priorityConfig[task.Priority] || priorityConfig.BASSA;
+
+  const openExternalLink = (e) => {
+    e.stopPropagation();
+    const prj = encodeURIComponent(task.ProjectName || "");
+    const stp = task.TaskSequence != null ? task.TaskSequence : "";
+    const ute = currentUserId != null ? currentUserId : "";
+    const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}`;
+    window.open(url, "_blank", "noopener");
+  };
 
   // Funzioni per gestire il delay di hover
   const handleMouseEnter = (e) => {
@@ -305,6 +317,14 @@ const TaskCard = ({
                   <AlertTriangle className="w-4 h-4 text-red-500" />
                 </motion.div>
               )}
+              <button
+                type="button"
+                onClick={openExternalLink}
+                title="Apri in nuova scheda"
+                className="flex-shrink-0 text-gray-500 hover:text-gray-700"
+              >
+                <FileSymlink className="h-4 w-4" />
+              </button>
             </div>
 
             {/* Info base: utente e data */}
@@ -440,6 +460,7 @@ const TasksKanban = ({
   projectId,
   refreshProject,
 }) => {
+  const { user } = useAuth();
   const [localTasks, setLocalTasks] = useState(tasks);
   const [showDelayedOnly, setShowDelayedOnly] = useState(false);
   const [draggedTask, setDraggedTask] = useState(null);
@@ -800,6 +821,7 @@ const TasksKanban = ({
                               isUpdating={isTaskUpdating}
                               canDrag={canDrag && !isTaskUpdating}
                               canManage={canManage}
+                              currentUserId={user?.userId}
                             />
                           );
                         })

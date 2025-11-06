@@ -49,6 +49,7 @@ import {
   X,
   ArrowUpDown,
 } from "lucide-react";
+import { FileSymlink } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { toast } from "@/components/ui/use-toast";
@@ -990,6 +991,22 @@ const MyTasksList = ({
                         >
                           <Eye className="mr-2 h-4 w-4" />
                           Visualizza
+                        </DropdownMenuItem>
+                        
+                        <DropdownMenuSeparator />
+
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const prj = encodeURIComponent(task.ProjectName || "");
+                            const stp = task.TaskSequence != null ? task.TaskSequence : "";
+                            const ute = user?.userId ?? "";
+                            const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}`;
+                            window.open(url, "_blank", "noopener");
+                          }}
+                        >
+                          <FileSymlink className="mr-2 h-4 w-4" />
+                          Apri in gestione Fasi
                         </DropdownMenuItem>
                         
                         <DropdownMenuSeparator />

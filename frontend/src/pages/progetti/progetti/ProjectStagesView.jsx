@@ -1328,7 +1328,7 @@ const ProjectStages = ({ project, onTaskClick, canEdit, refreshProject }) => {
         >
           {/* Pannello principale */}
           <Card className={`h-full border-orange-200 bg-orange-50 shadow-lg flex flex-col overflow-hidden transition-all duration-500 ease-in-out ${
-            unassignedPanelCollapsed ? 'w-' : 'w-full'
+            unassignedPanelCollapsed ? 'w-10' : 'w-full'
           }`}
           style={{
             transition: 'width 500ms cubic-bezier(0.4, 0, 0.2, 1)'
