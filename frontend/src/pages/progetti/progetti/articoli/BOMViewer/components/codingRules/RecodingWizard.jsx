@@ -38,10 +38,13 @@ const RecodingWizard = ({
   onApply,
 }) => {
   const { project, smartRefresh } = useBOMViewer();
-  const { 
+  const {
     loading: rulesLoading,
     applyBatchRecoding,
-    resetHierarchyCache 
+    resetHierarchyCache,
+    // Funzioni logica semplificata
+    getSimplifiedConfig,
+    applySimplifiedBatchRecoding
   } = useRecodingRules();
 
   // Stati del wizard
@@ -51,6 +54,10 @@ const RecodingWizard = ({
   const [isApplying, setIsApplying] = useState(false);
   const [applyProgress, setApplyProgress] = useState(0);
   const [applyResults, setApplyResults] = useState(null);
+
+  // Configurazione logica semplificata
+  const [simplifiedConfig, setSimplifiedConfig] = useState(null);
+  const [loadingConfig, setLoadingConfig] = useState(true);
 
   // Filtra componenti bloccati
   const recodableItems = useMemo(() => {
@@ -67,10 +74,25 @@ const RecodingWizard = ({
     });
   }, [items]);
 
-  // Reset cache quando si apre il wizard
+  // Carica configurazione al mount
   useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        setLoadingConfig(true);
+        const config = await getSimplifiedConfig();
+        setSimplifiedConfig(config);
+      } catch (error) {
+        console.error("Error loading simplified config:", error);
+        // Fallback su logica normale
+        setSimplifiedConfig({ IsActive: false, CharactersToKeep: 7 });
+      } finally {
+        setLoadingConfig(false);
+      }
+    };
+
+    loadConfig();
     resetHierarchyCache();
-  }, [resetHierarchyCache]);
+  }, [getSimplifiedConfig, resetHierarchyCache]);
 
   // Gestisce i cambiamenti dai componenti figli
   const handleDataChange = (data) => {
@@ -171,10 +193,17 @@ const RecodingWizard = ({
       const progressInterval = setInterval(() => {
         setApplyProgress(prev => Math.min(prev + 10, 90));
       }, 200);
-      
-      // Applica ricodifica
-      const result = await applyBatchRecoding(companyId, userId || 1, itemsToRecode);
-      
+
+      // Applica ricodifica usando la logica appropriata
+      let result;
+      if (simplifiedConfig?.IsActive) {
+        // Usa logica semplificata
+        result = await applySimplifiedBatchRecoding(itemsToRecode);
+      } else {
+        // Usa logica gerarchica tradizionale
+        result = await applyBatchRecoding(companyId, userId || 1, itemsToRecode);
+      }
+
       clearInterval(progressInterval);
       setApplyProgress(100);
       
@@ -266,9 +295,15 @@ const RecodingWizard = ({
           <DialogTitle className="flex items-center gap-2">
             <Code className="h-5 w-5" />
             Ricodifica Componenti - {project?.Description || "Progetto"}
+            {simplifiedConfig?.IsActive && (
+              <Badge variant="outline" className="ml-2">
+                Modalità Semplificata
+              </Badge>
+            )}
           </DialogTitle>
           <DialogDescription>
             Gestisci la ricodifica secondo le regole aziendali {companyId === 1 ? "RICOS" : ""}
+            {simplifiedConfig?.IsActive && ` - Mantieni ${simplifiedConfig.CharactersToKeep} caratteri`}
           </DialogDescription>
         </DialogHeader>
 
@@ -324,13 +359,21 @@ const RecodingWizard = ({
 
               {/* Tabella componenti */}
               <div className="flex-1 overflow-hidden">
-                <RecodingTable
-                  items={recodableItems}
-                  companyId={companyId}
-                  onDataChange={handleDataChange}
-                  loading={rulesLoading}
-                  className="h-full"
-                />
+                {loadingConfig ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                    <span className="ml-2 text-gray-500">Caricamento configurazione...</span>
+                  </div>
+                ) : (
+                  <RecodingTable
+                    items={recodableItems}
+                    companyId={companyId}
+                    onDataChange={handleDataChange}
+                    loading={rulesLoading}
+                    simplifiedConfig={simplifiedConfig}
+                    className="h-full"
+                  />
+                )}
               </div>
             </div>
           )}

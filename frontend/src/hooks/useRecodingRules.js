@@ -459,12 +459,142 @@ const useRecodingRules = () => {
       }
     }, [makeRequest]);
 
+  /**
+   * =====================================================
+   * FUNZIONI PER LOGICA SEMPLIFICATA
+   * =====================================================
+   */
+
+  /**
+   * Carica configurazione logica semplificata
+   */
+  const getSimplifiedConfig = useCallback(async () => {
+    try {
+      setLoading(true);
+      const url = `${config.API_BASE_URL}/codingRules/simplified/config`;
+      const data = await makeRequest(url);
+      return data;
+    } catch (err) {
+      setError(err.message);
+      console.error("Error getting simplified config:", err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [makeRequest]);
+
+  /**
+   * Aggiorna configurazione logica semplificata
+   */
+  const updateSimplifiedConfig = useCallback(async (isActive, charactersToKeep) => {
+    try {
+      setLoading(true);
+      const url = `${config.API_BASE_URL}/codingRules/simplified/config`;
+      const response = await makeRequest(url, {
+        method: 'POST',
+        body: JSON.stringify({ isActive, charactersToKeep })
+      });
+      return response;
+    } catch (err) {
+      setError(err.message);
+      console.error("Error updating simplified config:", err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [makeRequest]);
+
+  /**
+   * Ottieni prossimo sequenziale semplificato per un prefisso
+   */
+  const getNextSimplifiedSequential = useCallback(async (prefix) => {
+    try {
+      const url = `${config.API_BASE_URL}/codingRules/simplified/getNextSequential`;
+      const response = await makeRequest(url, {
+        method: 'POST',
+        body: JSON.stringify({ prefix })
+      });
+      if (response && response.success) {
+        return response.sequential;
+      }
+      throw new Error(response?.msg || 'Errore nel calcolo sequenziale');
+    } catch (err) {
+      console.error("Error getting simplified sequential:", err);
+      throw err;
+    }
+  }, [makeRequest]);
+
+  /**
+   * Genera preview codice semplificato
+   */
+  const generateSimplifiedPreview = useCallback(async (originalCode, charactersToKeep) => {
+    try {
+      const url = `${config.API_BASE_URL}/codingRules/simplified/preview`;
+      const response = await makeRequest(url, {
+        method: 'POST',
+        body: JSON.stringify({ originalCode, charactersToKeep })
+      });
+      if (response && response.success) {
+        return response.previewCode;
+      }
+      throw new Error(response?.msg || 'Errore generazione preview');
+    } catch (err) {
+      console.error("Error generating simplified preview:", err);
+      throw err;
+    }
+  }, [makeRequest]);
+
+  /**
+   * Genera preview batch codici semplificati
+   */
+  const generateSimplifiedBatchPreview = useCallback(async (items, charactersToKeep) => {
+    try {
+      setLoading(true);
+      const url = `${config.API_BASE_URL}/codingRules/simplified/previewBatch`;
+      const response = await makeRequest(url, {
+        method: 'POST',
+        body: JSON.stringify({ items, charactersToKeep })
+      });
+      if (response && response.success) {
+        return response.previews;
+      }
+      throw new Error(response?.msg || 'Errore generazione preview batch');
+    } catch (err) {
+      setError(err.message);
+      console.error("Error generating simplified batch preview:", err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [makeRequest]);
+
+  /**
+   * Applica ricodifica batch con logica semplificata
+   */
+  const applySimplifiedBatchRecoding = useCallback(async (items) => {
+    try {
+      setLoading(true);
+      const url = `${config.API_BASE_URL}/codingRules/simplified/apply`;
+      const response = await makeRequest(url, {
+        method: 'POST',
+        body: JSON.stringify({ items })
+      });
+      return response;
+    } catch (err) {
+      setError(err.message);
+      console.error("Error applying simplified batch recoding:", err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [makeRequest]);
+
   return {
     // Stati
     loading,
     error,
     hierarchyCache,
-    
+
     // Funzioni di caricamento
     loadCategories,
     loadMacroFamilies,
@@ -472,7 +602,7 @@ const useRecodingRules = () => {
     loadTypes,
     loadAliases,
     loadFullHierarchy,
-    
+
     // Funzioni di utility
     getNextSequential,
     validateCode,
@@ -480,9 +610,17 @@ const useRecodingRules = () => {
     getPreviewBatch,
     applyBatchRecoding,
     resetHierarchyCache,
-    
+
     // Funzione di creazione
     createElement,
+
+    // Funzioni logica semplificata
+    getSimplifiedConfig,
+    updateSimplifiedConfig,
+    getNextSimplifiedSequential,
+    generateSimplifiedPreview,
+    generateSimplifiedBatchPreview,
+    applySimplifiedBatchRecoding,
   };
 };
 

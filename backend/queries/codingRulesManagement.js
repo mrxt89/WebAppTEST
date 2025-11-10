@@ -1111,6 +1111,290 @@ const createAlias = async (companyId, aliasData) => {
     }
 };
 
+/**
+ * =====================================================
+ * FUNZIONI PER LOGICA SEMPLIFICATA
+ * =====================================================
+ */
+
+/**
+ * Get simplified coding configuration for a company
+ * @param {number} companyId - Company ID
+ * @returns {Promise<Object>} Configuration object
+ */
+const getSimplifiedConfig = async (companyId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+
+        request.input('CompanyId', sql.Int, companyId);
+
+        const result = await request.execute('MA_CodingRules_GetSimplifiedConfig');
+
+        return result.recordset[0] || {
+            CompanyId: companyId,
+            IsActive: false,
+            CharactersToKeep: 7
+        };
+    } catch (err) {
+        console.error('Error getting simplified config:', err);
+        throw err;
+    }
+};
+
+/**
+ * Update simplified coding configuration
+ * @param {number} companyId - Company ID
+ * @param {Object} configData - Configuration data {isActive, charactersToKeep}
+ * @param {number} userId - User ID
+ * @returns {Promise<Object>} Updated configuration
+ */
+const updateSimplifiedConfig = async (companyId, configData, userId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('IsActive', sql.Bit, configData.isActive);
+        request.input('CharactersToKeep', sql.Int, configData.charactersToKeep);
+        request.input('UserId', sql.Int, userId);
+
+        const result = await request.query(`
+            MERGE MA_CodingRules_SimplifiedConfig AS target
+            USING (SELECT @CompanyId AS CompanyId) AS source
+            ON target.CompanyId = source.CompanyId
+            WHEN MATCHED THEN
+                UPDATE SET
+                    IsActive = @IsActive,
+                    CharactersToKeep = @CharactersToKeep,
+                    EditDate = GETDATE(),
+                    EditUser = @UserId
+            WHEN NOT MATCHED THEN
+                INSERT (CompanyId, IsActive, CharactersToKeep, CreateUser, CreateDate)
+                VALUES (@CompanyId, @IsActive, @CharactersToKeep, @UserId, GETDATE())
+            OUTPUT INSERTED.*;
+        `);
+
+        return result.recordset[0];
+    } catch (err) {
+        console.error('Error updating simplified config:', err);
+        throw err;
+    }
+};
+
+/**
+ * Get next simplified sequential for a prefix
+ * @param {number} companyId - Company ID
+ * @param {string} prefix - Code prefix (e.g., "RCANCSP")
+ * @returns {Promise<string>} Next sequential (e.g., "000", "001", "A00", etc.)
+ */
+const getNextSimplifiedSequential = async (companyId, prefix) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('Prefix', sql.VarChar(14), prefix);
+        request.output('NextSequential', sql.VarChar(10));
+
+        await request.execute('MA_CodingRules_GetNextSimplifiedSequential');
+
+        return request.parameters.NextSequential.value;
+    } catch (err) {
+        console.error('Error getting next simplified sequential:', err);
+        throw err;
+    }
+};
+
+/**
+ * Reconstruct description from code prefix using coding rules tables
+ * @param {number} companyId - Company ID
+ * @param {string} codePrefix - Code prefix (e.g., "RCANCSP")
+ * @param {number} charactersToKeep - Number of characters in prefix
+ * @returns {Promise<string|null>} Reconstructed description or null if not found
+ */
+const reconstructDescriptionFromCode = async (companyId, codePrefix, charactersToKeep) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('CodePrefix', sql.VarChar(14), codePrefix);
+        request.input('CharactersToKeep', sql.Int, charactersToKeep);
+        request.output('ReconstructedDescription', sql.NVarChar(512));
+
+        await request.execute('MA_CodingRules_ReconstructDescriptionFromCode');
+
+        return request.parameters.ReconstructedDescription.value;
+    } catch (err) {
+        console.error('Error reconstructing description from code:', err);
+        // Fallback silenzioso: se c'è errore, restituisci null
+        return null;
+    }
+};
+
+/**
+ * Generate simplified code preview
+ * @param {number} companyId - Company ID
+ * @param {string} originalCode - Original article code
+ * @param {number} charactersToKeep - Number of characters to keep from original
+ * @returns {Promise<string>} Preview code (e.g., "RCANCSP00000001")
+ */
+const generateSimplifiedPreview = async (companyId, originalCode, charactersToKeep) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('OriginalCode', sql.VarChar(64), originalCode);
+        request.input('CharactersToKeep', sql.Int, charactersToKeep);
+        request.output('PreviewCode', sql.VarChar(64));
+
+        await request.execute('MA_CodingRules_GenerateSimplifiedPreview');
+
+        return request.parameters.PreviewCode.value;
+    } catch (err) {
+        console.error('Error generating simplified preview:', err);
+        throw err;
+    }
+};
+
+/**
+ * Generate preview for multiple items
+ * @param {number} companyId - Company ID
+ * @param {Array} items - Array of items with {itemId, originalCode, originalDescription}
+ * @param {number} charactersToKeep - Number of characters to keep
+ * @returns {Promise<Array>} Array of items with preview codes and descriptions
+ */
+const generateSimplifiedBatchPreview = async (companyId, items, charactersToKeep) => {
+    try {
+        const results = [];
+
+        for (const item of items) {
+            const previewCode = await generateSimplifiedPreview(
+                companyId,
+                item.originalCode,
+                charactersToKeep
+            );
+
+            // Estrai prefisso per ricostruire descrizione
+            const codePrefix = item.originalCode.substring(0, charactersToKeep);
+
+            // Prova a ricostruire la descrizione dalle tabelle
+            const reconstructedDescription = await reconstructDescriptionFromCode(
+                companyId,
+                codePrefix,
+                charactersToKeep
+            );
+
+            // Fallback silenzioso alla descrizione originale se non trovata
+            const finalDescription = reconstructedDescription || item.originalDescription;
+
+            results.push({
+                itemId: item.itemId,
+                originalCode: item.originalCode,
+                originalDescription: item.originalDescription,
+                previewCode: previewCode,
+                previewDescription: finalDescription,
+                descriptionReconstructed: reconstructedDescription !== null // Flag per debugging
+            });
+        }
+
+        return results;
+    } catch (err) {
+        console.error('Error generating simplified batch preview:', err);
+        throw err;
+    }
+};
+
+/**
+ * Apply simplified batch recoding
+ * @param {number} companyId - Company ID
+ * @param {number} userId - User ID
+ * @param {Array} items - Array of items to recode
+ * @returns {Promise<Object>} Result with success/error counts
+ */
+const applySimplifiedBatchRecoding = async (companyId, userId, items) => {
+    try {
+        let pool = await sql.connect(config.database);
+
+        // Crea TVP (Table Valued Parameter)
+        const tvp = new sql.Table();
+        tvp.columns.add('ItemId', sql.BigInt);
+        tvp.columns.add('OldCode', sql.VarChar(64));
+        tvp.columns.add('NewCode', sql.VarChar(64));
+        tvp.columns.add('NewDescription', sql.NVarChar(128));
+        tvp.columns.add('MacroFamilyId', sql.BigInt);
+        tvp.columns.add('FamilyId', sql.BigInt);
+        tvp.columns.add('TypeId', sql.BigInt);
+        tvp.columns.add('AliasId', sql.BigInt);
+        tvp.columns.add('Measures', sql.VarChar(2));
+        tvp.columns.add('Sequential', sql.Int);
+        tvp.columns.add('UseExistingArticleId', sql.BigInt);
+        tvp.columns.add('ReplaceWithExisting', sql.Bit);
+
+        // Popola TVP
+        items.forEach(item => {
+            tvp.rows.add(
+                item.ItemId,
+                item.OldCode,
+                item.NewCode,
+                item.NewDescription || null,
+                item.MacroFamilyId || null,
+                item.FamilyId || null,
+                item.TypeId || null,
+                item.AliasId || null,
+                item.Measures || null,
+                item.Sequential || null,
+                item.UseExistingArticleId || null,
+                item.ReplaceWithExisting || 0
+            );
+        });
+
+        const request = pool.request();
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('UserId', sql.Int, userId);
+        request.input('Items', tvp);
+        request.output('SuccessCount', sql.Int);
+        request.output('ErrorCount', sql.Int);
+
+        const result = await request.execute('MA_CodingRules_ApplySimplifiedBatch');
+
+        const successCount = result.output.SuccessCount;
+        const errorCount = result.output.ErrorCount;
+        const errors = result.recordset || [];
+
+        return {
+            success: true,
+            successCount: successCount,
+            errorCount: errorCount,
+            errors: errors.map(err => ({
+                itemId: err.ItemId,
+                oldCode: err.OldCode,
+                errorMessage: err.ErrorMessage
+            }))
+        };
+    } catch (err) {
+        console.error('Error applying simplified batch recoding:', err);
+        throw err;
+    }
+};
+
+/**
+ * Build simplified code manually (without DB call)
+ * @param {string} originalCode - Original code
+ * @param {number} charactersToKeep - Characters to keep
+ * @param {string} sequential - Sequential part (e.g., "000", "A12")
+ * @returns {string} Complete simplified code
+ */
+const buildSimplifiedCode = (originalCode, charactersToKeep, sequential) => {
+    const prefix = originalCode.substring(0, charactersToKeep);
+    const totalLength = 15;
+    const zeroPadding = '0'.repeat(totalLength - charactersToKeep - sequential.length);
+
+    return prefix + zeroPadding + sequential;
+};
+
 // Export all functions
 module.exports = {
     getCodingHierarchy,
@@ -1128,5 +1412,14 @@ module.exports = {
     createMacroFamily,
     createFamily,
     createType,
-    createAlias
+    createAlias,
+    // Simplified logic functions
+    getSimplifiedConfig,
+    updateSimplifiedConfig,
+    getNextSimplifiedSequential,
+    generateSimplifiedPreview,
+    generateSimplifiedBatchPreview,
+    applySimplifiedBatchRecoding,
+    buildSimplifiedCode,
+    reconstructDescriptionFromCode
 };

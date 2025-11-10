@@ -13,7 +13,14 @@ const {
     createMacroFamily,
     createFamily,
     createType,
-    createAlias
+    createAlias,
+    // Simplified logic functions
+    getSimplifiedConfig,
+    updateSimplifiedConfig,
+    getNextSimplifiedSequential,
+    generateSimplifiedPreview,
+    generateSimplifiedBatchPreview,
+    applySimplifiedBatchRecoding
 } = require('../queries/codingRulesManagement');
 
 // Get coding configuration for company
@@ -583,6 +590,199 @@ router.post('/codingRules/aliases', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: 0,
             msg: err.message || 'Errore nella creazione dell\'alias'
+        });
+    }
+});
+
+// =====================================================
+// ENDPOINTS PER LOGICA SEMPLIFICATA
+// =====================================================
+
+// Get simplified coding configuration
+router.get('/codingRules/simplified/config', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+
+        const config = await getSimplifiedConfig(companyId);
+        res.json(config);
+    } catch (err) {
+        console.error('Error fetching simplified config:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nel recupero della configurazione semplificata'
+        });
+    }
+});
+
+// Update simplified coding configuration
+router.post('/codingRules/simplified/config', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const userId = req.user.UserId;
+        const { isActive, charactersToKeep } = req.body;
+
+        // Validation
+        if (typeof isActive !== 'boolean') {
+            return res.status(400).json({
+                success: 0,
+                msg: 'isActive deve essere un valore boolean'
+            });
+        }
+
+        if (!charactersToKeep || charactersToKeep < 1 || charactersToKeep > 14) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'charactersToKeep deve essere tra 1 e 14'
+            });
+        }
+
+        const config = await updateSimplifiedConfig(companyId, {
+            isActive,
+            charactersToKeep
+        }, userId);
+
+        res.json({
+            success: 1,
+            data: config,
+            msg: 'Configurazione aggiornata con successo'
+        });
+    } catch (err) {
+        console.error('Error updating simplified config:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nell\'aggiornamento della configurazione'
+        });
+    }
+});
+
+// Get next simplified sequential for a prefix
+router.post('/codingRules/simplified/getNextSequential', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { prefix } = req.body;
+
+        if (!prefix || prefix.length < 1 || prefix.length > 14) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Prefisso non valido (1-14 caratteri)'
+            });
+        }
+
+        const sequential = await getNextSimplifiedSequential(companyId, prefix);
+
+        res.json({
+            success: 1,
+            sequential: sequential
+        });
+    } catch (err) {
+        console.error('Error getting simplified sequential:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nel calcolo del sequenziale'
+        });
+    }
+});
+
+// Generate simplified code preview
+router.post('/codingRules/simplified/preview', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { originalCode, charactersToKeep } = req.body;
+
+        if (!originalCode) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Codice originale richiesto'
+            });
+        }
+
+        if (!charactersToKeep || charactersToKeep < 1 || charactersToKeep > 14) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'charactersToKeep deve essere tra 1 e 14'
+            });
+        }
+
+        const previewCode = await generateSimplifiedPreview(
+            companyId,
+            originalCode,
+            charactersToKeep
+        );
+
+        res.json({
+            success: 1,
+            previewCode: previewCode
+        });
+    } catch (err) {
+        console.error('Error generating simplified preview:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nella generazione preview'
+        });
+    }
+});
+
+// Generate simplified batch preview
+router.post('/codingRules/simplified/previewBatch', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { items, charactersToKeep } = req.body;
+
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Array items richiesto'
+            });
+        }
+
+        if (!charactersToKeep || charactersToKeep < 1 || charactersToKeep > 14) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'charactersToKeep deve essere tra 1 e 14'
+            });
+        }
+
+        const previews = await generateSimplifiedBatchPreview(
+            companyId,
+            items,
+            charactersToKeep
+        );
+
+        res.json({
+            success: 1,
+            previews: previews
+        });
+    } catch (err) {
+        console.error('Error generating simplified batch preview:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nella generazione preview batch'
+        });
+    }
+});
+
+// Apply simplified batch recoding
+router.post('/codingRules/simplified/apply', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const userId = req.user.UserId;
+        const { items } = req.body;
+
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Array items richiesto'
+            });
+        }
+
+        const result = await applySimplifiedBatchRecoding(companyId, userId, items);
+
+        res.json(result);
+    } catch (err) {
+        console.error('Error applying simplified batch recoding:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nell\'applicazione della ricodifica'
         });
     }
 });

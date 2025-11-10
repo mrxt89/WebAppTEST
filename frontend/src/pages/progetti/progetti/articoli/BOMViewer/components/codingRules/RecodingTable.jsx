@@ -31,6 +31,7 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import CodingHierarchySelector from "./CodingHierarchySelector";
+import SimplifiedRecodingSelector from "./SimplifiedRecodingSelector";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const RecodingTable = ({
@@ -38,6 +39,7 @@ const RecodingTable = ({
   companyId,
   onDataChange,
   loading = false,
+  simplifiedConfig = null,
   className = ""
 }) => {
   // Stati per gestire i dati della tabella
@@ -485,21 +487,45 @@ const RecodingTable = ({
                     </TableCell>
                   </TableRow>
                   
-                  {/* Riga espansa con selettore gerarchico */}
+                  {/* Riga espansa con selettore (gerarchico o semplificato) */}
                   {isExpanded && !isLocked && (
                     <TableRow>
                       <TableCell colSpan={8} className="bg-gray-50 p-4">
-                        <CodingHierarchySelector
-                          companyId={companyId}
-                          componentId={itemId}
-                          currentCode={item.ComponentItemCode || item.Item}
-                          currentDescription={item.Description}
-                          isRoot={isRoot}
-                          value={item.recodingData}
-                          onChange={(data) => handleSelectorChange(itemId, data)}
-                          onDescriptionChange={(desc) => handleDescriptionChange(itemId, desc)}
-                          disabled={loading}
-                        />
+                        {simplifiedConfig?.IsActive ? (
+                          // Logica semplificata
+                          <SimplifiedRecodingSelector
+                            item={item}
+                            charactersToKeep={simplifiedConfig.CharactersToKeep}
+                            onPreviewGenerated={(previewData) => {
+                              // Aggiorna i dati con il preview generato
+                              handleSelectorChange(itemId, {
+                                newCode: previewData.previewCode,
+                                newDescription: item.Description, // Mantieni descrizione originale
+                                // Copia i campi gerarchia dall'articolo originale
+                                macroFamilyId: item.MacrofamilyId,
+                                familyId: item.FamilyId,
+                                typeId: item.ItemTypeId,
+                                aliasId: item.AliasId,
+                                categoryId: item.CategoryId,
+                                isValid: true
+                              });
+                            }}
+                            disabled={loading}
+                          />
+                        ) : (
+                          // Logica gerarchica tradizionale
+                          <CodingHierarchySelector
+                            companyId={companyId}
+                            componentId={itemId}
+                            currentCode={item.ComponentItemCode || item.Item}
+                            currentDescription={item.Description}
+                            isRoot={isRoot}
+                            value={item.recodingData}
+                            onChange={(data) => handleSelectorChange(itemId, data)}
+                            onDescriptionChange={(desc) => handleDescriptionChange(itemId, desc)}
+                            disabled={loading}
+                          />
+                        )}
                       </TableCell>
                     </TableRow>
                   )}
