@@ -49,6 +49,7 @@ const TaskCard = ({
   const hoverTimeoutRef = useRef(null);
   const mouseEnterTimeRef = useRef(null);
   const lastMousePositionRef = useRef({ x: 0, y: 0 });
+  const { user } = useAuth();
   
   const priorityConfig = {
     ALTA: { 
@@ -101,7 +102,7 @@ const TaskCard = ({
     e.stopPropagation();
     const prj = encodeURIComponent(task.ProjectName || "");
     const stp = task.TaskSequence != null ? task.TaskSequence : "";
-    const ute = currentUserId != null ? currentUserId : "";
+    const ute = user?.ERPUserId ?? 0;
     const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}`;
     window.open(url, "_blank", "noopener");
   };

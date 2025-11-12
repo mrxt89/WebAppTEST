@@ -66,7 +66,7 @@ const useAdminActions = () => {
 
   const removeUserFromCompany = async (userId, companyId) => {
     try {
-      await axiosInstance.post(`/user/${userId}/remove-company/${companyId}`, {});
+      const response = await axiosInstance.post(`/user/${userId}/remove-company/${companyId}`, {});
       fetchUsers(); // Aggiorna l'elenco degli utenti
       return response.data;
     } catch (error) {
@@ -77,7 +77,7 @@ const useAdminActions = () => {
 
   const setPrimaryCompany = async (userId, companyId) => {
     try {
-      await axiosInstance.post(
+      const response = await axiosInstance.post(
         `/user/${userId}/set-primary-company/${companyId}`,
         {},
       );
@@ -85,6 +85,20 @@ const useAdminActions = () => {
       return response.data;
     } catch (error) {
       console.error("Error setting primary company:", error);
+      throw error;
+    }
+  };
+
+  const updateUserERPUserId = async (userId, companyId, erpUserId) => {
+    try {
+      const response = await axiosInstance.put(
+        `/user/${userId}/company/${companyId}/erp-user-id`,
+        { erpUserId: erpUserId || 0 }
+      );
+      fetchUsers(); // Aggiorna l'elenco degli utenti
+      return response.data;
+    } catch (error) {
+      console.error("Error updating ERPUserId:", error);
       throw error;
     }
   };
@@ -459,6 +473,7 @@ const useAdminActions = () => {
     assignUserToCompany,
     removeUserFromCompany,
     setPrimaryCompany,
+    updateUserERPUserId,
     addGroup,
     updateGroup,
     removeUserFromGroup,

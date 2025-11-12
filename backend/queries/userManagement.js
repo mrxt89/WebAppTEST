@@ -266,7 +266,7 @@ async function getUserCompanies(userId) {
     let result = await pool.request()
       .input('userId', sql.Int, userId)
       .query(`
-        SELECT c.CompanyId, c.Description, c.CompanyCode
+        SELECT c.CompanyId, c.Description, c.CompanyCode, ISNULL(cu.ERPUserId, 0) AS ERPUserId
         FROM AR_CompaniesUsers cu
         JOIN AR_Companies c ON cu.CompanyId = c.CompanyId
         WHERE cu.UserId = @userId AND c.IsActive = 1
@@ -440,6 +440,45 @@ async function getUserCompaniesByUsername(username) {
   }
 }
 
+// Funzione per aggiornare ERPUserId di un utente per una specifica azienda
+async function updateUserERPUserId(userId, companyId, erpUserId) {
+  console.log(`[USER_MANAGEMENT] Updating ERPUserId for user ${userId} in company ${companyId} to ${erpUserId}`);
+  try {
+    let pool = await sql.connect(config.database);
+    
+    // Verifica se l'associazione esiste
+    const checkResult = await pool.request()
+      .input('userId', sql.Int, userId)
+      .input('companyId', sql.Int, companyId)
+      .query(`
+        SELECT COUNT(*) AS count 
+        FROM AR_CompaniesUsers 
+        WHERE UserId = @userId AND CompanyId = @companyId
+      `);
+    
+    if (checkResult.recordset[0].count === 0) {
+      return { success: false, message: 'Utente non associato a questa azienda' };
+    }
+    
+    // Aggiorna o inserisce ERPUserId
+    const result = await pool.request()
+      .input('userId', sql.Int, userId)
+      .input('companyId', sql.Int, companyId)
+      .input('erpUserId', sql.Int, erpUserId || null)
+      .query(`
+        UPDATE AR_CompaniesUsers 
+        SET ERPUserId = @erpUserId
+        WHERE UserId = @userId AND CompanyId = @companyId
+      `);
+    
+    console.log(`[USER_MANAGEMENT] ERPUserId updated. Rows affected: ${result.rowsAffected[0]}`);
+    return { success: true };
+  } catch (err) {
+    console.error('[USER_MANAGEMENT] Error updating ERPUserId:', err);
+    throw err;
+  }
+}
+
 // Ricordati di esportare la nuova funzione nel module.exports
 
 module.exports = {
@@ -456,4 +495,5 @@ module.exports = {
   removeUserFromCompany,
   updateUserPrimaryCompany,
   getUserCompaniesByUsername,
+  updateUserERPUserId,
 };

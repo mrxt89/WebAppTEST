@@ -78,6 +78,7 @@ const AdminDashboard = () => {
     assignUserToCompany,
     removeUserFromCompany,
     setPrimaryCompany,
+    updateUserERPUserId,
     refreshData,
   } = useAdminActions();
 
@@ -197,6 +198,7 @@ const AdminDashboard = () => {
               assignUserToCompany={assignUserToCompany}
               removeUserFromCompany={removeUserFromCompany}
               setPrimaryCompany={setPrimaryCompany}
+              updateUserERPUserId={updateUserERPUserId}
               refreshData={() => refreshData("users")}
             />
           </TabsContent>

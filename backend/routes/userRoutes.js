@@ -13,7 +13,8 @@ const {
   assignUserToCompany,
   removeUserFromCompany,
   updateUserPrimaryCompany, 
-  getUserCompaniesByUsername
+  getUserCompaniesByUsername,
+  updateUserERPUserId
 } = require('../queries/userManagement');
 const authenticateToken = require('../authenticateToken');
 
@@ -168,6 +169,24 @@ router.post('/user/:userId/set-primary-company/:companyId', authenticateToken, a
     }
   } catch (err) {
     console.error('Error updating user primary company:', err);
+    res.status(500).send('Internal server error');
+  }
+});
+
+// Endpoint per aggiornare ERPUserId di un utente per una specifica azienda
+router.put('/user/:userId/company/:companyId/erp-user-id', authenticateToken, async (req, res) => {
+  try {
+    const { userId, companyId } = req.params;
+    const { erpUserId } = req.body;
+    const result = await updateUserERPUserId(userId, companyId, erpUserId);
+    
+    if (result.success) {
+      res.status(200).json({ message: 'ERPUserId updated successfully' });
+    } else {
+      res.status(400).json({ message: result.message });
+    }
+  } catch (err) {
+    console.error('Error updating ERPUserId:', err);
     res.status(500).send('Internal server error');
   }
 });

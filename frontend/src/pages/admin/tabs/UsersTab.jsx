@@ -35,6 +35,7 @@ const UsersTab = ({
   assignUserToCompany,
   removeUserFromCompany,
   setPrimaryCompany,
+  updateUserERPUserId,
 }) => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [userCompanies, setUserCompanies] = useState([]);
@@ -42,6 +43,7 @@ const UsersTab = ({
   const [selectedCompanies, setSelectedCompanies] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [showDisabled, setShowDisabled] = useState(false);
+  const [editingERPUserId, setEditingERPUserId] = useState({ companyId: null, value: '' });
 
   // Stati per i dialoghi
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -320,6 +322,34 @@ const UsersTab = ({
     }
   };
 
+  const handleSaveERPUserId = async (companyId) => {
+    if (!selectedUser) return;
+    
+    const erpUserId = editingERPUserId.value === '' ? 0 : parseInt(editingERPUserId.value);
+    
+    if (isNaN(erpUserId)) {
+      swal.fire("Errore", "Inserisci un numero valido per ERP User ID", "error");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await updateUserERPUserId(selectedUser.userId, companyId, erpUserId);
+      swal.fire("Successo", "ERP User ID aggiornato con successo.", "success");
+      handleSelectUser(selectedUser); // Ricarica i dati dell'utente
+      setEditingERPUserId({ companyId: null, value: '' });
+    } catch (error) {
+      console.error("Errore durante l'aggiornamento di ERP User ID:", error);
+      swal.fire(
+        "Errore",
+        error.response?.data?.message || "Errore durante l'aggiornamento di ERP User ID.",
+        "error",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderUserDetails = () => {
     if (!selectedUser) {
       return (
@@ -446,44 +476,99 @@ const UsersTab = ({
                   {userCompanies.map((company) => (
                     <div
                       key={company.CompanyId}
-                      className="flex items-center space-x-2 p-2 hover:bg-accent rounded"
+                      className="flex items-center space-x-3 p-2 hover:bg-accent rounded border"
                     >
-                      <div className="flex items-center space-x-2 w-full">
-                        <Checkbox
-                          id={`company-${company.CompanyId}`}
-                          checked={selectedCompanies.includes(
-                            company.CompanyId,
-                          )}
-                          className={`${selectedCompanies.includes(company.CompanyId) ? "bg-primary" : ""}`}
-                          onCheckedChange={() =>
-                            handleCompanyCheckbox(company.CompanyId)
-                          }
-                        />
-                        <Label
-                          htmlFor={`company-${company.CompanyId}`}
-                          className="flex-1 cursor-pointer"
-                        >
-                          {company.Description}{" "}
-                          {company.CompanyId === selectedUser.CompanyId && (
-                            <Badge variant="outline" className="ml-2">
-                              Principale
-                            </Badge>
-                          )}
+                      <Checkbox
+                        id={`company-${company.CompanyId}`}
+                        checked={selectedCompanies.includes(
+                          company.CompanyId,
+                        )}
+                        className={`${selectedCompanies.includes(company.CompanyId) ? "bg-primary" : ""}`}
+                        onCheckedChange={() =>
+                          handleCompanyCheckbox(company.CompanyId)
+                        }
+                      />
+                      <Label
+                        htmlFor={`company-${company.CompanyId}`}
+                        className="flex-1 cursor-pointer font-medium"
+                      >
+                        {company.Description}
+                        {company.CompanyId === selectedUser.CompanyId && (
+                          <Badge variant="outline" className="ml-2">
+                            Principale
+                          </Badge>
+                        )}
+                      </Label>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Label htmlFor={`erp-user-id-${company.CompanyId}`} className="text-sm whitespace-nowrap">
+                          ERP User ID:
                         </Label>
-                        {company.CompanyId !== selectedUser.CompanyId && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSetPrimaryCompany(company.CompanyId);
-                            }}
-                          >
-                            <i className="fa-solid fa-star mr-2"></i>
-                            Imposta principale
-                          </Button>
+                        {editingERPUserId.companyId === company.CompanyId ? (
+                          <>
+                            <Input
+                              id={`erp-user-id-${company.CompanyId}`}
+                              type="number"
+                              value={editingERPUserId.value}
+                              onChange={(e) => setEditingERPUserId({ ...editingERPUserId, value: e.target.value })}
+                              className="w-20 h-8"
+                              placeholder="0"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleSaveERPUserId(company.CompanyId);
+                                } else if (e.key === 'Escape') {
+                                  setEditingERPUserId({ companyId: null, value: '' });
+                                }
+                              }}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSaveERPUserId(company.CompanyId)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <i className="fa-solid fa-check"></i>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setEditingERPUserId({ companyId: null, value: '' })}
+                              className="h-8 w-8 p-0"
+                            >
+                              <i className="fa-solid fa-times"></i>
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-sm font-medium w-12 text-center">
+                              {company.ERPUserId || 0}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingERPUserId({ companyId: company.CompanyId, value: company.ERPUserId || '' })}
+                              className="h-8 w-8 p-0"
+                            >
+                              <i className="fa-solid fa-pen-to-square"></i>
+                            </Button>
+                          </>
                         )}
                       </div>
+                      
+                      {company.CompanyId !== selectedUser.CompanyId && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSetPrimaryCompany(company.CompanyId);
+                          }}
+                          className="whitespace-nowrap"
+                        >
+                          <i className="fa-solid fa-star mr-2"></i>
+                          Imposta principale
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>

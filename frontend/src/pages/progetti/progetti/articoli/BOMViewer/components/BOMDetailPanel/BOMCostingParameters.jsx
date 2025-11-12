@@ -67,11 +67,33 @@ const BOMCostingParameters = ({
 
   useEffect(() => {
     if (bomId) {
+      // Reset dei custom markups prima di ricaricare
+      setCustomMarkups({
+        markupRM: '',
+        markupOperations: '',
+        markupExternalOps: '',
+        markupInternalOps: '',
+        markupOverhead: '',
+        markupSconto: ''
+      });
+      
+      // Ricarica tutti i dati per la nuova versione
       loadHistory();
       loadGlobalParameters();
       loadCustomMarkups();
     }
   }, [bomId]);
+
+  // Aggiorna i parametri quando cambiano initialParameters o bom (es. cambio versione)
+  useEffect(() => {
+    setParameters({
+      orderQuantity: initialParameters.productionLot || initialParameters.orderQuantity || bom?.ProductionLot || '',
+      scrapPercentage: initialParameters.scrapPercentage || '',
+      useGranularMarkups: initialParameters.useGranularMarkups ?? true,
+      updateBOMRecord: initialParameters.updateBOMRecord ?? true,
+      notes: initialParameters.notes || ''
+    });
+  }, [initialParameters, bom?.ProductionLot, bom?.Version]);
 
   const loadHistory = async () => {
     if (!bomId) return;
@@ -245,7 +267,7 @@ const BOMCostingParameters = ({
               <Input
                 id="orderQuantity"
                 type="number"
-                step="0.01"
+                step="1"
                 value={parameters.orderQuantity}
                 onChange={(e) => handleParameterChange('orderQuantity', e.target.value)}
                 disabled={readOnly}
@@ -270,7 +292,7 @@ const BOMCostingParameters = ({
 
           {/* Opzioni */}
           <div className="space-y-3 pt-2 border-t">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between d-none">
               <div className="space-y-0.5">
                 <Label htmlFor="useGranularMarkups">Ricarichi Granulari</Label>
                 <p className="text-xs text-gray-500">

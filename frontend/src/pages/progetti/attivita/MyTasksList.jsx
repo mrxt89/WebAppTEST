@@ -1000,7 +1000,7 @@ const MyTasksList = ({
                             e.stopPropagation();
                             const prj = encodeURIComponent(task.ProjectName || "");
                             const stp = task.TaskSequence != null ? task.TaskSequence : "";
-                            const ute = user?.userId ?? "";
+                            const ute = user?.ERPUserId ?? 0;
                             const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}`;
                             window.open(url, "_blank", "noopener");
                           }}

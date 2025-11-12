@@ -34,6 +34,7 @@ import {
 import { MoreVertical, Eye, Ban, CheckCircle2, Pin, PinOff, Users, FileSymlink } from "lucide-react";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
 import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 const ProjectTasksTableImproved = ({
   project,
@@ -55,6 +56,7 @@ const ProjectTasksTableImproved = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { users } = useNotifications();
   const { manageTaskPin } = useProjectActions();
+  const { user } = useAuth();
 
   // Stati per gestire i pin
   const [pinnedTasks, setPinnedTasks] = useState(new Set());
@@ -549,7 +551,7 @@ const ProjectTasksTableImproved = ({
                               e.stopPropagation();
                               const prj = encodeURIComponent(project?.Name || task.ProjectName || "");
                               const stp = task.TaskSequence != null ? task.TaskSequence : "";
-                              const ute = currentUserId ?? "";
+                              const ute = user?.ERPUserId ?? 0;
                               const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}`;
                               window.open(url, "_blank", "noopener");
                             }}

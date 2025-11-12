@@ -442,21 +442,24 @@ app.get('/api/dbinfo', async (req, res) => {
 // Route per ottenere l'utente corrente
 app.get('/api/currentUser', authenticateToken, async (req, res) => {
   const userId = req.user.UserId;
+  const companyId = req.user.CompanyId;
   const query = `
   SELECT 
     T0.userId, 
     T0.username, 
     T0.email, 
     T0.CompanyId,
+    ISNULL(T1.ERPUserId, 0) AS ERPUserId,
     (
-        SELECT T1.groupName
-        FROM AR_Groups T1
-        JOIN AR_GroupMembers T2 ON T2.groupId = T1.groupId
-        WHERE T2.userId = T0.userId
+        SELECT T2.groupName
+        FROM AR_Groups T2
+        JOIN AR_GroupMembers T3 ON T3.groupId = T2.groupId
+        WHERE T3.userId = T0.userId
         FOR JSON AUTO
     ) AS groups
   FROM 
     AR_Users T0
+    LEFT JOIN AR_CompaniesUsers T1 ON T1.UserId = T0.userId AND T1.CompanyId = @companyId
   WHERE 
     T0.userId = @userId
   `;
@@ -465,6 +468,7 @@ app.get('/api/currentUser', authenticateToken, async (req, res) => {
     let pool = await sql.connect(config.database);
     let result = await pool.request()
       .input('userId', sql.Int, userId)
+      .input('companyId', sql.Int, companyId)
       .query(query);
     const user = result.recordset[0];
     if (user) {

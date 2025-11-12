@@ -184,36 +184,57 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
 
 // Funzione ricorsiva per calcolare il costo totale dei figli
 // Usa sempre i dati RAW (MaterialCost + OperationCost) non quelli calcolati per visualizzazione
-const calculateChildrenCost = (node) => {
-  if (!node.children || node.children.length === 0) return 0;
+// parentLot: lotto di produzione del componente padre (per dividere i costi fissi)
+// Restituisce un oggetto con variableCost e fixedCostTotal
+const calculateChildrenCost = (node, parentLot = 100) => {
+  if (!node.children || node.children.length === 0) {
+    return { variableCost: 0, fixedCostTotal: 0 };
+  }
 
-  return node.children.reduce((sum, child) => {
+  // Somma i costi variabili e i costi fissi totali separatamente
+  const result = node.children.reduce((acc, child) => {
     // Se il figlio è un'operazione (cycle), aggiungi il suo costo
     if (child.type === "cycle") {
-      return sum + (child.data.TotalCost || 0);
+      const cycleProcessingCost = child.data.UnitCost || 0; // Costo variabile dell'operazione
+      const cycleFixedCostTotal = child.data.FixedCostTotal || 0;
+      return {
+        variableCost: acc.variableCost + cycleProcessingCost,
+        fixedCostTotal: acc.fixedCostTotal + cycleFixedCostTotal
+      };
     }
 
     // Se il figlio è un componente:
     // - Se ha figli propri → somma SOLO i costi dei suoi figli (ricorsivo)
-    // - Se NON ha figli (foglia) → usa MaterialCost + OperationCost
+    // - Se NON ha figli (foglia) → usa MaterialCost + OperationCost + FixedCostTotal
     if (child.type === "component") {
       const hasGrandChildren = child.children && child.children.length > 0;
 
       if (hasGrandChildren) {
         // Ha figli: somma solo i costi dei figli (i costi propri sarebbero duplicati)
-        const childrenCost = calculateChildrenCost(child);
-        return sum + childrenCost;
+        // Usa il lotto del componente figlio per il calcolo ricorsivo
+        const childLot = child.data.ProductionLot || child.data.BOMProductionLot || parentLot;
+        const childrenResult = calculateChildrenCost(child, childLot);
+        const childFixedCostTotal = child.data.FixedCostTotal || 0;
+        return {
+          variableCost: acc.variableCost + childrenResult.variableCost,
+          fixedCostTotal: acc.fixedCostTotal + childrenResult.fixedCostTotal + childFixedCostTotal
+        };
       } else {
         // Foglia: usa i dati RAW originali
         const materialCost = child.data.MaterialCost || 0;
         const operationCost = child.data.OperationCost || 0;
-        const childOwnCost = materialCost + operationCost;
-        return sum + childOwnCost;
+        const childFixedCostTotal = child.data.FixedCostTotal || 0;
+        return {
+          variableCost: acc.variableCost + materialCost + operationCost,
+          fixedCostTotal: acc.fixedCostTotal + childFixedCostTotal
+        };
       }
     }
 
-    return sum;
-  }, 0);
+    return acc;
+  }, { variableCost: 0, fixedCostTotal: 0 });
+
+  return result;
 };
 
 // Componente per un nodo componente
@@ -246,9 +267,17 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
       fixedCost = 0;
     } else {
       // Compresso con figli → mostra SOLO la somma ricorsiva dei figli
-      totalCost = calculateChildrenCost(node);
+      // Usa il lotto del componente corrente per dividere i costi fissi
+      const componentLot = node.data.ProductionLot || node.data.BOMProductionLot || 100;
+      const childrenCostResult = calculateChildrenCost(node, componentLot);
+      
+      // Calcola il costo fisso unitario dividendo per il lotto del componente
+      const fixedCostUnit = componentLot > 0 ? (childrenCostResult.fixedCostTotal / componentLot) : 0;
+      
+      // Il costo totale è la somma dei costi variabili + costi fissi unitari
+      totalCost = childrenCostResult.variableCost + fixedCostUnit;
       unitCost = 0; // Il costo unitario non ha senso per un aggregato
-      fixedCost = 0; // I costi fissi sono già inclusi nei figli
+      fixedCost = fixedCostUnit; // Costo fisso unitario (già diviso per il lotto)
     }
   } else {
     // Foglia senza figli → mostra il costo proprio
