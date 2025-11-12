@@ -102,7 +102,8 @@ const TaskCard = ({
     const prj = encodeURIComponent(task.ProjectName || "");
     const stp = task.TaskSequence != null ? task.TaskSequence : "";
     const ute = user?.ERPUserId ?? 0;
-    const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}`;
+    const ope = encodeURIComponent(task.Operation || "");
+    const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}&ope=${ope}`;
     window.open(url, "_blank", "noopener");
   };
 
@@ -171,7 +172,7 @@ const TaskCard = ({
               <button
                 type="button"
                 onClick={openExternalLink}
-                title="Apri in nuova scheda"
+                title="Apri avanzamento attività"
                 className="flex-shrink-0 text-gray-500 hover:text-gray-700"
               >
                 <FileSymlink className="h-4 w-4" />

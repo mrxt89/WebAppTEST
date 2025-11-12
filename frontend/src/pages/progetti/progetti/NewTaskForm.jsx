@@ -28,15 +28,16 @@ import { Badge } from "@/components/ui/badge";
 import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Users, 
-  User, 
-  FileText, 
-  Calendar, 
+import {
+  Users,
+  User,
+  FileText,
+  Calendar,
   ListTodo,
   Clock,
   AlertTriangle,
-  Flag
+  Flag,
+  Search
 } from "lucide-react";
 import { config } from "../../../config";
 import useUsers from "../../../hooks/useUsersActions";
@@ -51,6 +52,9 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
   const [availableGroups, setAvailableGroups] = useState([]);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
+  const [availableOperations, setAvailableOperations] = useState([]);
+  const [isLoadingOperations, setIsLoadingOperations] = useState(false);
+  const [operationSearch, setOperationSearch] = useState("");
 
   // Ottieni l'utente loggato dal localStorage
   const [currentUserId, setCurrentUserId] = useState(() => {
@@ -78,11 +82,13 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
     Status: "DA FARE",
     PredecessorTaskID: null,
     DefaultGroupId: null,
+    Operation: null, // Codice operazione
   });
 
   useEffect(() => {
     fetchUsers();
     fetchGroups();
+    fetchOperations();
   }, [fetchUsers]);
 
   // Funzione per caricare i gruppi
@@ -107,6 +113,32 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
       console.error("Error fetching groups:", error);
     } finally {
       setIsLoadingGroups(false);
+    }
+  }, []);
+
+  // Funzione per caricare le operazioni
+  const fetchOperations = useCallback(async () => {
+    try {
+      setIsLoadingOperations(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${config.API_BASE_URL}/utility/operations`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Error fetching operations");
+      }
+
+      const result = await response.json();
+      setAvailableOperations(result.data || []);
+    } catch (error) {
+      console.error("Error fetching operations:", error);
+      setAvailableOperations([]);
+    } finally {
+      setIsLoadingOperations(false);
     }
   }, []);
 
@@ -421,6 +453,87 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Operazione */}
+          <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+            <h3 className="text-xs font-medium text-gray-500">Operazione</h3>
+
+            <div>
+              <Label htmlFor="operation" className="flex items-center text-sm">
+                <ListTodo className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                Codice Operazione (opzionale)
+              </Label>
+              <div className="mt-1 space-y-2">
+                <div className="relative">
+                  <Input
+                    type="text"
+                    placeholder="Cerca operazione per codice o descrizione..."
+                    value={operationSearch}
+                    onChange={(e) => setOperationSearch(e.target.value)}
+                    className="pr-8"
+                    disabled={isLoadingOperations}
+                  />
+                  <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                </div>
+                <ScrollArea className="h-36 rounded-md border bg-white">
+                  <div className="p-2 space-y-1">
+                    <div
+                      className={`p-2 rounded cursor-pointer hover:bg-gray-100 transition-colors ${
+                        !taskData.Operation ? "bg-blue-50 border border-blue-200" : ""
+                      }`}
+                      onClick={() => setTaskData((prev) => ({ ...prev, Operation: null }))}
+                    >
+                      <p className="text-sm text-gray-500 italic">Nessuna operazione</p>
+                    </div>
+                    {isLoadingOperations ? (
+                      <div className="p-4 text-center text-sm text-gray-500">
+                        Caricamento operazioni...
+                      </div>
+                    ) : (
+                      availableOperations
+                        .filter((op) => {
+                          if (!operationSearch) return true;
+                          const searchLower = operationSearch.toLowerCase();
+                          return (
+                            op.Code?.toLowerCase().includes(searchLower) ||
+                            op.Description?.toLowerCase().includes(searchLower)
+                          );
+                        })
+                        .map((op) => (
+                          <div
+                            key={op.Code}
+                            className={`p-2 rounded cursor-pointer hover:bg-gray-100 transition-colors ${
+                              taskData.Operation === op.Code
+                                ? "bg-blue-50 border border-blue-200"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              setTaskData((prev) => ({ ...prev, Operation: op.Code }))
+                            }
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium text-sm">{op.Code}</span>
+                              {op.Description && (
+                                <span className="text-xs text-gray-500 line-clamp-2">{op.Description}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                </ScrollArea>
+                {taskData.Operation && (
+                  <div className="p-2 bg-blue-50 rounded-md border border-blue-200">
+                    <p className="text-xs text-blue-700">
+                      <span className="font-medium">Selezionato:</span> {taskData.Operation}
+                      {availableOperations.find((op) => op.Code === taskData.Operation)?.Description &&
+                        ` - ${availableOperations.find((op) => op.Code === taskData.Operation)?.Description}`}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

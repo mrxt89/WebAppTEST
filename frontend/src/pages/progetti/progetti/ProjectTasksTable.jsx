@@ -72,6 +72,7 @@ const ProjectTasksTableImproved = ({
     100, // priority
     80,  // comments
     80,  // attachments
+    60,  // link
     60   // actions
   ]);
   const [isResizing, setIsResizing] = useState(null);
@@ -478,7 +479,7 @@ const ProjectTasksTableImproved = ({
                     onMouseDown={(e) => handleMouseDown(e, 6)}
                   />
                 </TableHead>
-                <TableHead 
+                <TableHead
                   style={{ width: `${columnWidths[7]}px`, position: 'relative' }}
                   className="text-center"
                 >
@@ -489,6 +490,9 @@ const ProjectTasksTableImproved = ({
                   />
                 </TableHead>
                 <TableHead style={{ width: `${columnWidths[8]}px` }} className="text-center">
+                  Link
+                </TableHead>
+                <TableHead style={{ width: `${columnWidths[9]}px` }} className="text-center">
                   Azioni
                 </TableHead>
               </TableRow>
@@ -519,7 +523,28 @@ const ProjectTasksTableImproved = ({
                       setEditingCell={setEditingCell}
                       currentUserId={currentUserId}
                     />
-                    
+
+                    {/* Colonna link esterno */}
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const prj = encodeURIComponent(project?.Name || task.ProjectName || "");
+                          const stp = task.TaskSequence != null ? task.TaskSequence : "";
+                          const ute = user?.ERPUserId ?? 0;
+                          const ope = encodeURIComponent(task.Operation || "");
+                          const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}&ope=${ope}`;
+                          window.open(url, "_blank", "noopener");
+                        }}
+                        title="Apri in gestione fasi"
+                      >
+                        <FileSymlink className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+
                     {/* Colonna azioni */}
                     <TableCell className="text-center">
                       <DropdownMenu>
@@ -534,7 +559,7 @@ const ProjectTasksTableImproved = ({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
                               onTaskClick(task);
@@ -543,23 +568,7 @@ const ProjectTasksTableImproved = ({
                             <Eye className="mr-2 h-4 w-4" />
                             Visualizza
                           </DropdownMenuItem>
-                          
-                          <DropdownMenuSeparator />
-                          
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const prj = encodeURIComponent(project?.Name || task.ProjectName || "");
-                              const stp = task.TaskSequence != null ? task.TaskSequence : "";
-                              const ute = user?.ERPUserId ?? 0;
-                              const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}`;
-                              window.open(url, "_blank", "noopener");
-                            }}
-                          >
-                            <FileSymlink className="mr-2 h-4 w-4" />
-                            Apri in gestione fasi
-                          </DropdownMenuItem>
-                          
+
                           <DropdownMenuSeparator />
                           
                           <DropdownMenuItem

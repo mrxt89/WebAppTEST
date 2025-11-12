@@ -54,6 +54,7 @@ import CalendarIntegration from "../../../components/calendar/CalendarIntegratio
 import useProjectActions from "../../../hooks/useProjectManagementActions";
 import useCalendar from "../../../hooks/useCalendar";
 import { swal } from "../../../lib/common";
+import { config } from "../../../config";
 
 const TaskDetailsPanel = ({
   project,
@@ -104,6 +105,10 @@ const TaskDetailsPanel = ({
     loading: false,
     error: null,
   });
+
+  // Stato per operations
+  const [availableOperations, setAvailableOperations] = useState([]);
+  const [isLoadingOperations, setIsLoadingOperations] = useState(false);
 
   // Configurazione stati e priorità
   const statusConfig = {
@@ -209,6 +214,38 @@ const TaskDetailsPanel = ({
       setEditedTask(task);
     }
   }, [isOpen, task, editedTask]);
+
+  // Carica operations quando il pannello si apre
+  useEffect(() => {
+    const fetchOperations = async () => {
+      if (!isOpen) return;
+
+      try {
+        setIsLoadingOperations(true);
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${config.API_BASE_URL}/utility/operations`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Error fetching operations");
+        }
+
+        const result = await response.json();
+        setAvailableOperations(result.data || []);
+      } catch (error) {
+        console.error("Error fetching operations:", error);
+        setAvailableOperations([]);
+      } finally {
+        setIsLoadingOperations(false);
+      }
+    };
+
+    fetchOperations();
+  }, [isOpen]);
 
   // Gestione resize del pannello
   const handleResizeStart = useCallback((e) => {
@@ -348,6 +385,26 @@ const TaskDetailsPanel = ({
       }
     } catch (error) {
       console.error("Error updating task priority:", error);
+    }
+  };
+
+  // Gestione cambio operation
+  const handleOperationChange = async (newOperation) => {
+    if (!editedTask?.TaskID || editedTask?.TaskDisabled) return;
+
+    try {
+      const updatedTaskData = {
+        ...editedTask,
+        Operation: newOperation === "NONE" ? null : newOperation,
+      };
+
+      const result = await onUpdate(updatedTaskData);
+      if (result?.success && result?.task) {
+        setEditedTask(result.task);
+        refreshProject(activeTab);
+      }
+    } catch (error) {
+      console.error("Error updating task operation:", error);
     }
   };
 

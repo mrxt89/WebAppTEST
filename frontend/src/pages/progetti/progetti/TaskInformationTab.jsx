@@ -16,12 +16,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Calendar, 
-  UserPlus, 
-  Users, 
-  User, 
-  Link2, 
+import {
+  Calendar,
+  UserPlus,
+  Users,
+  User,
+  Link2,
   FileText,
   CalendarDays,
   UserCheck,
@@ -29,7 +29,8 @@ import {
   AlertCircle,
   X,
   ChevronDown,
-  Search
+  Search,
+  ListTodo
 } from "lucide-react";
 import { config } from "../../../config";
 
@@ -48,6 +49,7 @@ const TaskInformationTab = ({
     DueDate: "",
     AssignedTo: "",
     PredecessorTaskID: null,
+    Operation: null,
   });
 
   const [selectedParticipants, setSelectedParticipants] = useState([]);
@@ -57,6 +59,11 @@ const TaskInformationTab = ({
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [participantSearch, setParticipantSearch] = useState("");
   const [isParticipantDropdownOpen, setIsParticipantDropdownOpen] = useState(false);
+
+  // Stati per operations
+  const [availableOperations, setAvailableOperations] = useState([]);
+  const [isLoadingOperations, setIsLoadingOperations] = useState(false);
+  const [operationSearch, setOperationSearch] = useState("");
   
   // Stati per dipendenze multiple
   const [selectedPredecessors, setSelectedPredecessors] = useState([]);
@@ -130,6 +137,7 @@ const TaskInformationTab = ({
         DueDate: task.DueDate?.split("T")[0] || "",
         AssignedTo: task.AssignedTo?.toString() || "",
         PredecessorTaskID: task.PredecessorTaskID || null,
+        Operation: task.Operation || null,
       });
 
       const normalizedParticipants = normalizeParticipants(task.Participants);
@@ -153,12 +161,40 @@ const TaskInformationTab = ({
     }
   }, [task]);
 
+  // Funzione per caricare le operazioni
+  const fetchOperations = useCallback(async () => {
+    try {
+      setIsLoadingOperations(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${config.API_BASE_URL}/utility/operations`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Error fetching operations");
+      }
+
+      const result = await response.json();
+      setAvailableOperations(result.data || []);
+    } catch (error) {
+      console.error("Error fetching operations:", error);
+      setAvailableOperations([]);
+    } finally {
+      setIsLoadingOperations(false);
+    }
+    console.log("Available operations:", availableOperations);
+  }, []);
+
   // Carica i gruppi quando si entra in modalità modifica
   useEffect(() => {
     if (isEditing) {
       fetchGroups();
+      fetchOperations();
     }
-  }, [isEditing, fetchGroups]);
+  }, [isEditing, fetchGroups, fetchOperations]);
 
   const getInitials = (firstName, lastName) => {
     return `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""}`.toUpperCase();
@@ -699,6 +735,98 @@ const TaskInformationTab = ({
                 ) : (
                   <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <p className="text-sm text-gray-500 italic">Nessun gruppo assegnato</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="w-full border-t border-gray-200" />
+
+              {/* Operazione */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-1">
+                  <ListTodo className="h-3 w-3" />
+                  Operazione (opzionale)
+                </Label>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        placeholder="Cerca operazione..."
+                        value={operationSearch}
+                        onChange={(e) => setOperationSearch(e.target.value)}
+                        className="pr-8"
+                      />
+                      <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    </div>
+                    <ScrollArea className="h-48 rounded-md border">
+                      <div className="p-2 space-y-1">
+                        <div
+                          className={`p-2 rounded cursor-pointer hover:bg-gray-100 ${
+                            !editedData.Operation ? "bg-blue-50 border border-blue-200" : ""
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditedData((prev) => ({ ...prev, Operation: null }));
+                          }}
+                        >
+                          <p className="text-sm text-gray-500 italic">Nessuna operazione</p>
+                        </div>
+                        {isLoadingOperations ? (
+                          <div className="p-4 text-center text-sm text-gray-500">
+                            Caricamento operazioni...
+                          </div>
+                        ) : (
+                          availableOperations
+                            .filter((op) => {
+                              if (!operationSearch) return true;
+                              const searchLower = operationSearch.toLowerCase();
+                              return (
+                                op.Code?.toLowerCase().includes(searchLower) ||
+                                op.Description?.toLowerCase().includes(searchLower)
+                              );
+                            })
+                            .map((op) => (
+                              <div
+                                key={op.Code}
+                                className={`p-2 rounded cursor-pointer hover:bg-gray-100 transition-colors ${
+                                  editedData.Operation === op.Code
+                                    ? "bg-blue-50 border border-blue-200"
+                                    : ""
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  console.log("Operation clicked:", op.Code);
+                                  setEditedData((prev) => ({ ...prev, Operation: op.Code }));
+                                }}
+                              >
+                                <div className="flex flex-col" style={{ pointerEvents: 'none' }}>
+                                  <span className="font-medium text-sm">{op.Code}</span>
+                                  {op.Description && (
+                                    <span className="text-xs text-gray-500">{op.Description}</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                ) : task?.Operation ? (
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <ListTodo className="h-4 w-4 text-gray-600" />
+                    <div>
+                      <p className="font-medium">{task.Operation}</p>
+                      {availableOperations.find((op) => op.Code === task.Operation)?.Description && (
+                        <p className="text-xs text-gray-500">
+                          {availableOperations.find((op) => op.Code === task.Operation)?.Description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-sm text-gray-500 italic">Nessuna operazione assegnata</p>
                   </div>
                 )}
               </div>

@@ -35,7 +35,8 @@ const getTemplates = async (userId) => {
                             td.PredecessorDetailID,
                             pred.Title AS PredecessorTitle,
                             tts.StageTemplateID,
-                            st.StageName AS StageName
+                            st.StageName AS StageName,
+                            td.Operation
                         FROM MA_TasksTemplatesDetail td
                         LEFT JOIN AR_Users u ON td.DefaultAssignedTo = u.userId
                         LEFT JOIN AR_Groups g ON td.DefaultGroupId = g.groupId
@@ -153,6 +154,7 @@ const addUpdateTemplateDetail = async (detailData) => {
             .input('Priority', sql.VarChar(10), detailData.Priority || 'MEDIA')
             .input('StandardDays', sql.Int, detailData.StandardDays || 1)
             .input('PredecessorDetailID', sql.Int, detailData.PredecessorDetailID || null)
+            .input('Operation', sql.VarChar(21), detailData.Operation || null)
             .execute('MA_AddUpdateTaskTemplateDetail');
 
         return result.recordset[0];

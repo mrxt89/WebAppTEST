@@ -60,6 +60,7 @@ const TemplatesPage = () => {
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [operations, setOperations] = useState([]);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isStagesDialogOpen, setIsStagesDialogOpen] = useState(false);
@@ -81,12 +82,39 @@ const TemplatesPage = () => {
       const categoriesData = await fetchCategories();
       const usersData = await fetchUsers();
       const groupsData = await fetchGroups();
+      const operationsData = await fetchOperations();
       setCategories(categoriesData);
       setUsers(usersData);
       setGroups(groupsData);
+      setOperations(operationsData);
     } catch (error) {
       console.error("Error loading initial data:", error);
       swal.fire("Errore", "Errore nel caricamento dei dati", "error");
+    }
+  };
+
+  const fetchOperations = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api"}/utility/operations`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Error fetching operations");
+      }
+
+      const result = await response.json();
+      return result.data || [];
+    } catch (error) {
+      console.error("Error fetching operations:", error);
+      return [];
     }
   };
 
@@ -184,6 +212,7 @@ const TemplatesPage = () => {
         Priority: currentTask.Priority || "MEDIA",
         StandardDays: currentTask.StandardDays || 1,
         PredecessorDetailID: currentTask.PredecessorDetailID,
+        Operation: currentTask.Operation || null,
       });
 
       if (result.success) {
@@ -441,6 +470,7 @@ const TemplatesPage = () => {
                                 TemplateID: template.TemplateID,
                                 Priority: "MEDIA",
                                 StandardDays: 1,
+                                Operation: null,
                               });
                               setIsTaskDialogOpen(true);
                             }}
@@ -732,6 +762,37 @@ const TemplatesPage = () => {
                         {task.TaskSequence} - {task.Title}
                       </SelectItem>
                     ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Operazione (opzionale)</Label>
+              <Select
+                value={currentTask?.Operation || "NONE"}
+                onValueChange={(value) =>
+                  setCurrentTask({
+                    ...currentTask,
+                    Operation: value === "NONE" ? null : value,
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleziona operazione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">- Nessuna operazione -</SelectItem>
+                  {operations.map((op) => (
+                    <SelectItem key={op.Code} value={op.Code}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{op.Code}</span>
+                        {op.Description && (
+                          <span className="text-xs text-gray-500">
+                            {op.Description}
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -88,6 +88,7 @@ const MyTasksList = ({
     100, // priority
     80,  // comments
     80,  // attachments
+    60,  // link
     60   // actions
   ]);
   const [isResizing, setIsResizing] = useState(null);
@@ -750,7 +751,7 @@ const MyTasksList = ({
                 />
               </TableHead>
               
-              <TableHead 
+              <TableHead
                 style={{ width: `${columnWidths[8]}px`, position: 'relative' }}
                 className="text-center"
               >
@@ -760,8 +761,12 @@ const MyTasksList = ({
                   onMouseDown={(e) => handleMouseDown(e, 8)}
                 />
               </TableHead>
-              
+
               <TableHead style={{ width: `${columnWidths[9]}px` }} className="text-center">
+                Link
+              </TableHead>
+
+              <TableHead style={{ width: `${columnWidths[10]}px` }} className="text-center">
                 Azioni
               </TableHead>
             </TableRow>
@@ -968,7 +973,28 @@ const MyTasksList = ({
                       <span className="text-gray-400">-</span>
                     )}
                   </TableCell>
-                  
+
+                  {/* Link esterno */}
+                  <TableCell className="text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const prj = encodeURIComponent(task.ProjectName || "");
+                        const stp = task.TaskSequence != null ? task.TaskSequence : "";
+                        const ute = user?.ERPUserId ?? 0;
+                        const ope = encodeURIComponent(task.Operation || "");
+                        const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}&ope=${ope}`;
+                        window.open(url, "_blank", "noopener");
+                      }}
+                      title="Apri in gestione fasi"
+                    >
+                      <FileSymlink className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+
                   {/* Azioni */}
                   <TableCell className="text-center">
                     <DropdownMenu>
@@ -992,23 +1018,7 @@ const MyTasksList = ({
                           <Eye className="mr-2 h-4 w-4" />
                           Visualizza
                         </DropdownMenuItem>
-                        
-                        <DropdownMenuSeparator />
 
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const prj = encodeURIComponent(task.ProjectName || "");
-                            const stp = task.TaskSequence != null ? task.TaskSequence : "";
-                            const ute = user?.ERPUserId ?? 0;
-                            const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}`;
-                            window.open(url, "_blank", "noopener");
-                          }}
-                        >
-                          <FileSymlink className="mr-2 h-4 w-4" />
-                          Apri in gestione Fasi
-                        </DropdownMenuItem>
-                        
                         <DropdownMenuSeparator />
                         
                         <DropdownMenuItem

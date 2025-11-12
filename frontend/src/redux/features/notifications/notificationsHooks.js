@@ -153,13 +153,13 @@ export const useNotifications = () => {
 
   // Memoized selectors to prevent unnecessary re-renders
   const memoizedOpenChatIds = useMemo(() => {
-    if (!openChatIds || openChatIds.size === 0) return [];
-    return Array.from(openChatIds).sort((a, b) => a - b);
+    if (!openChatIds || !Array.isArray(openChatIds) || openChatIds.length === 0) return [];
+    return [...openChatIds].sort((a, b) => a - b);
   }, [openChatIds]);
   
   const memoizedStandaloneChats = useMemo(() => {
-    if (!standaloneChats || standaloneChats.size === 0) return [];
-    return Array.from(standaloneChats).sort((a, b) => a - b);
+    if (!standaloneChats || !Array.isArray(standaloneChats) || standaloneChats.length === 0) return [];
+    return [...standaloneChats].sort((a, b) => a - b);
   }, [standaloneChats]);
 
   // Ref per tenere traccia delle operazioni in corso
@@ -773,7 +773,8 @@ const handleFetchAttachmentViewStats = useCallback(
 
   const isStandaloneChat = useCallback(
     (notificationId) => {
-      return standaloneChats.has(parseInt(notificationId));
+      if (!standaloneChats || !Array.isArray(standaloneChats)) return false;
+      return standaloneChats.includes(parseInt(notificationId));
     },
     [standaloneChats],
   );
@@ -954,8 +955,8 @@ const handleFetchAttachmentViewStats = useCallback(
   const cleanupStandaloneWindows = useCallback(() => {
     const toRemove = [];
 
-    // Converti il Set in array
-    const chats = Array.from(standaloneChats);
+    // Copia l'array standaloneChats
+    const chats = Array.isArray(standaloneChats) ? [...standaloneChats] : [];
 
     for (const id of chats) {
       // Per ogni ID, verifica se la finestra è ancora aperta
