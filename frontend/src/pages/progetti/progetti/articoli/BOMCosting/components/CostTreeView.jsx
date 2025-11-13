@@ -91,9 +91,8 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
   const unitCost = cycle.UnitCost || 0;
   const fixedCost = cycle.FixedCost || 0;
   
-  // Calcola il costo totale: (Costo Unitario × Quantità) + Costi Fissi
-  const totalCost = cycle.TotalCost || cycle.CycleCost || 
-    ((unitCost * quantity) + fixedCost);
+  // Calcola il costo variabile (solo parte variabile del ciclo)
+  const variableCost = unitCost * quantity;
 
   return (
     <div>
@@ -171,9 +170,9 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
             {fixedCost > 0 ? formatCurrency(fixedCost) : '-'}
           </div>
 
-          {/* Colonna 7: Costo Totale (8%) */}
+          {/* Colonna 7: Costo Variabile (8%) */}
           <div className="text-xs font-semibold text-green-900 text-right flex-shrink-0" style={{ width: '8%' }}>
-            {formatCurrency(totalCost)}
+            {formatCurrency(variableCost)}
           </div>
         </div>
       </div>
@@ -248,42 +247,54 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
   const isRootNode = node.data.Level === 0;
   const hasChildren = node.children && node.children.length > 0;
 
+  // Verifica se ha figli COMPONENTI (non solo cicli)
+  const hasComponentChildren = node.children && node.children.some(child => child.type === "component");
+
   // Logica di visualizzazione dei costi:
-  // 1. Se ESPANSO e ha figli → mostra 0 (i costi sono visibili nei figli)
-  // 2. Se COMPRESSO e ha figli → mostra SOLO la somma ricorsiva dei figli
-  // 3. Se NON ha figli (foglia) → mostra il costo proprio
+  // 1. Se ESPANSO e ha figli COMPONENTI → mostra solo il FixedCost del componente, i costi variabili sono nei figli
+  // 2. Se COMPRESSO e ha figli COMPONENTI → mostra la somma ricorsiva di tutti i costi dei figli + FixedCost proprio
+  // 3. Se NON ha figli COMPONENTI (foglia) → mostra tutti i costi propri (anche se ha cicli)
 
   const ownCost = node.data.CalculatedTotalCost || node.data.TotalCost || 0;
   const ownUnitCost = node.data.UnitCost || 0;
-  const ownFixedCost = node.data.FixedCost || 0;
+  const componentLot = node.data.ProductionLot || node.data.BOMProductionLot || 1;
+  const ownFixedCostTotal = node.data.FixedCostTotal || (node.data.FixedCost * componentLot) || 0;
+  const ownFixedCost = componentLot > 0 ? (ownFixedCostTotal / componentLot) : (node.data.FixedCost || 0);
+  const ownMaterialCost = node.data.MaterialCost || 0;
+  const ownOperationCost = node.data.OperationCost || 0;
+  let ownVariableCost = ownMaterialCost + ownOperationCost;
+  if (ownVariableCost === 0) {
+    ownVariableCost = Math.max(ownCost - ownFixedCost, 0);
+  }
 
-  let totalCost, unitCost, fixedCost;
+  let variableCost, unitCost, fixedCost;
 
-  if (hasChildren) {
+  if (hasComponentChildren) {
+    // Ha figli COMPONENTI (altri articoli nella distinta)
     if (expanded) {
-      // Espanso con figli → mostra 0 (i costi sono nei figli visibili)
-      totalCost = 0;
-      unitCost = 0;
-      fixedCost = 0;
+      // Espanso con figli componenti → i costi variabili sono visualizzati nei figli componenti.
+      // Il costo fisso del componente rimane visibile (tranne per il root).
+      variableCost = 0; // I costi variabili sono visualizzati nei figli
+      unitCost = 0; // I costi unitari sono nei figli
+      fixedCost = node.data.Level === 0 ? 0 : ownFixedCost;
     } else {
-      // Compresso con figli → mostra SOLO la somma ricorsiva dei figli
-      // Usa il lotto del componente corrente per dividere i costi fissi
-      const componentLot = node.data.ProductionLot || node.data.BOMProductionLot || 100;
+      // Compresso con figli componenti → mostra SOLO la somma ricorsiva dei costi fissi dei figli
+      // NON sommare ownFixedCost perché i costi fissi appartengono solo ai componenti foglia
       const childrenCostResult = calculateChildrenCost(node, componentLot);
-      
-      // Calcola il costo fisso unitario dividendo per il lotto del componente
-      const fixedCostUnit = componentLot > 0 ? (childrenCostResult.fixedCostTotal / componentLot) : 0;
-      
-      // Il costo totale è la somma dei costi variabili + costi fissi unitari
-      totalCost = childrenCostResult.variableCost + fixedCostUnit;
+
+      const fixedCostUnitFromChildren =
+        componentLot > 0 ? childrenCostResult.fixedCostTotal / componentLot : 0;
+
+      variableCost = childrenCostResult.variableCost;
       unitCost = 0; // Il costo unitario non ha senso per un aggregato
-      fixedCost = fixedCostUnit; // Costo fisso unitario (già diviso per il lotto)
+      fixedCost = fixedCostUnitFromChildren; // Solo costi fissi dei figli, NON del componente padre
     }
   } else {
-    // Foglia senza figli → mostra il costo proprio
-    totalCost = ownCost;
+    // Foglia senza figli COMPONENTI (può avere solo cicli o niente)
+    // → mostra TUTTI i costi propri, incluso il FixedCost
+    variableCost = ownVariableCost;
     unitCost = ownUnitCost;
-    fixedCost = ownFixedCost;
+    fixedCost = ownFixedCost; // FixedCost del componente
   }
 
   const uom = node.data.UoM || '';
@@ -403,12 +414,12 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
             {fixedCost > 0 ? formatCurrency(fixedCost) : '-'}
           </div>
 
-          {/* Colonna 7: Costo Totale (8%) */}
+          {/* Colonna 7: Costo Variabile (8%) */}
           <div className={cn(
             "text-xs font-semibold text-right flex-shrink-0",
             isRootNode ? "text-purple-900 text-sm" : "text-blue-900"
           )} style={{ width: '8%' }}>
-            {formatCurrency(totalCost)}
+            {formatCurrency(variableCost)}
           </div>
         </div>
       </div>
@@ -505,6 +516,8 @@ const CostTreeView = ({ costingResult }) => {
       // IMPORTANTE: Usa i costi che arrivano direttamente dal backend SENZA ricalcolarli
       // Il backend restituisce già: UnitCost, FixedCost, TotalCost, CalculatedTotalCost
       // MaterialCost, OperationCost già calcolati dalla stored procedure
+
+      // I dati vengono passati correttamente dal backend con tutti i campi inclusi FixedCost
 
       const node = {
         id: nodeId,
@@ -786,11 +799,33 @@ const CostTreeView = ({ costingResult }) => {
           // Verifica se ha figli (componenti o cicli)
           const hasChildren = node.children && node.children.length > 0;
 
-          // Se ha figli, mostra 0 (i costi sono nei figli esplosi)
-          // Se NON ha figli (foglia), mostra i costi reali
-          const unitCost = hasChildren ? 0 : (node.data.UnitCost || 0);
-          const fixedCost = hasChildren ? 0 : (node.data.FixedCost || 0);
-          const totalCost = hasChildren ? 0 : (node.data.CalculatedTotalCost || node.data.TotalCost || 0);
+          const componentLot = node.data.ProductionLot || node.data.BOMProductionLot || 1;
+          const ownFixedCostTotal = node.data.FixedCostTotal || (node.data.FixedCost * componentLot) || 0;
+          const ownFixedCost = componentLot > 0 ? (ownFixedCostTotal / componentLot) : (node.data.FixedCost || 0);
+          const materialCost = node.data.MaterialCost || 0;
+          const operationCost = node.data.OperationCost || 0;
+          let ownVariableCost = materialCost + operationCost;
+          if (ownVariableCost === 0) {
+            const total = node.data.CalculatedTotalCost || node.data.TotalCost || 0;
+            ownVariableCost = Math.max(total - ownFixedCost, 0);
+          }
+
+          let unitCost;
+          let fixedCost;
+          let variableCost;
+
+          if (hasChildren) {
+            const childrenCosts = calculateChildrenCost(node, componentLot);
+            const fixedFromChildren = componentLot > 0 ? (childrenCosts.fixedCostTotal / componentLot) : 0;
+
+            unitCost = 0;
+            variableCost = childrenCosts.variableCost;
+            fixedCost = fixedFromChildren + ownFixedCost;
+          } else {
+            unitCost = node.data.UnitCost || 0;
+            variableCost = ownVariableCost;
+            fixedCost = ownFixedCost;
+          }
 
           rows.push({
             'Livello': level,
@@ -801,7 +836,7 @@ const CostTreeView = ({ costingResult }) => {
             'UM': uom,
             'Costo Unitario (€)': unitCost,
             'Costi Fissi (€)': fixedCost > 0 ? fixedCost : null,
-            'Costo Totale (€)': totalCost
+            'Costo Variabile (€)': variableCost
           });
 
           // Aggiungi i cicli (operazioni) del componente
@@ -813,7 +848,7 @@ const CostTreeView = ({ costingResult }) => {
                 const cycleQty = child.data.Qty || 1;
                 const cycleUnitCost = child.data.UnitCost || 0;
                 const cycleFixedCost = child.data.FixedCost || 0;
-                const cycleTotalCost = child.data.TotalCost || 0;
+                const cycleVariableCost = cycleUnitCost * cycleQty;
 
                 rows.push({
                   'Livello': level + 1,
@@ -824,7 +859,7 @@ const CostTreeView = ({ costingResult }) => {
                   'UM': '-',
                   'Costo Unitario (€)': cycleUnitCost,
                   'Costi Fissi (€)': cycleFixedCost > 0 ? cycleFixedCost : null,
-                  'Costo Totale (€)': cycleTotalCost
+                  'Costo Variabile (€)': cycleVariableCost
                 });
               }
             });
@@ -855,8 +890,9 @@ const CostTreeView = ({ costingResult }) => {
         'Quantità': null,
         'UM': '',
         'Costo Unitario (€)': null,
-        'Costi Fissi (€)': null,
-        'Costo Totale (€)': costing.unit_cost_final || 0
+        'Costi Fissi (€)': costing.fixed_costs_per_lot || 0,
+        'Costo Variabile (€)': costing.total_variable_costs ||
+          ((costing.variable_costs_material || 0) + (costing.variable_costs_operations || 0))
       },
       {
         'Livello': 'Lotto Produzione',
@@ -867,7 +903,7 @@ const CostTreeView = ({ costingResult }) => {
         'UM': 'PZ',
         'Costo Unitario (€)': null,
         'Costi Fissi (€)': null,
-        'Costo Totale (€)': null
+        'Costo Variabile (€)': null
       },
       {
         'Livello': 'Materiali',
@@ -878,7 +914,7 @@ const CostTreeView = ({ costingResult }) => {
         'UM': '',
         'Costo Unitario (€)': null,
         'Costi Fissi (€)': null,
-        'Costo Totale (€)': costing.variable_costs_material || 0
+        'Costo Variabile (€)': costing.variable_costs_material || 0
       },
       {
         'Livello': 'Operazioni',
@@ -889,7 +925,7 @@ const CostTreeView = ({ costingResult }) => {
         'UM': '',
         'Costo Unitario (€)': null,
         'Costi Fissi (€)': null,
-        'Costo Totale (€)': costing.variable_costs_operations || 0
+        'Costo Variabile (€)': costing.variable_costs_operations || 0
       },
       {
         'Livello': 'Fissi',
@@ -899,8 +935,8 @@ const CostTreeView = ({ costingResult }) => {
         'Quantità': null,
         'UM': '',
         'Costo Unitario (€)': null,
-        'Costi Fissi (€)': null,
-        'Costo Totale (€)': costing.fixed_costs_per_lot || 0
+        'Costi Fissi (€)': costing.fixed_costs_per_lot || 0,
+        'Costo Variabile (€)': null
       },
       {
         'Livello': 'Ricarichi',
@@ -911,7 +947,7 @@ const CostTreeView = ({ costingResult }) => {
         'UM': '',
         'Costo Unitario (€)': null,
         'Costi Fissi (€)': null,
-        'Costo Totale (€)': (costing.ricarico_mp_amount || 0) +
+        'Costo Variabile (€)': (costing.ricarico_mp_amount || 0) +
           (costing.ricarico_ope_amount || 0) +
           (costing.ricarico_trasporto_amount || 0) +
           (costing.ricarico_scarto_amount || 0) +
@@ -928,7 +964,7 @@ const CostTreeView = ({ costingResult }) => {
         'UM': '',
         'Costo Unitario (€)': null,
         'Costi Fissi (€)': null,
-        'Costo Totale (€)': null
+        'Costo Variabile (€)': null
       },
       {
         'Livello': 'Livello',
@@ -939,7 +975,7 @@ const CostTreeView = ({ costingResult }) => {
         'UM': 'UM',
         'Costo Unitario (€)': 'Costo Unitario (€)',
         'Costi Fissi (€)': 'Costi Fissi (€)',
-        'Costo Totale (€)': 'Costo Totale (€)'
+        'Costo Variabile (€)': 'Costo Variabile (€)'
       }
     ];
 
@@ -960,13 +996,13 @@ const CostTreeView = ({ costingResult }) => {
       { wch: 5 },   // UM
       { wch: 18 },  // Costo Unitario
       { wch: 15 },  // Costi Fissi
-      { wch: 16 }   // Costo Totale
+      { wch: 16 }   // Costo Variabile
     ];
     worksheet['!cols'] = colWidths;
 
     // Formatta le celle numeriche (formato italiano con zero iniziale)
     // Le colonne numeriche sono: E (Quantità - indice 4), G (Costo Unitario - indice 6),
-    // H (Costi Fissi - indice 7), I (Costo Totale - indice 8)
+    // H (Costi Fissi - indice 7), I (Costo Variabile - indice 8)
     const range = XLSX.utils.decode_range(worksheet['!ref']);
     for (let row = range.s.r; row <= range.e.r; row++) {
       // Formatta Quantità (colonna E, indice 4) - 3 decimali
@@ -990,11 +1026,11 @@ const CostTreeView = ({ costingResult }) => {
         worksheet[fixedCostCell].t = 'n';
       }
 
-      // Formatta Costo Totale (colonna I, indice 8) - fino a 3 decimali
-      const totalCostCell = XLSX.utils.encode_cell({ r: row, c: 8 });
-      if (worksheet[totalCostCell] && typeof worksheet[totalCostCell].v === 'number') {
-        worksheet[totalCostCell].z = '0.000 "€"';
-        worksheet[totalCostCell].t = 'n';
+      // Formatta Costo Variabile (colonna I, indice 8) - fino a 3 decimali
+      const variableCostCell = XLSX.utils.encode_cell({ r: row, c: 8 });
+      if (worksheet[variableCostCell] && typeof worksheet[variableCostCell].v === 'number') {
+        worksheet[variableCostCell].z = '0.000 "€"';
+        worksheet[variableCostCell].t = 'n';
       }
     }
 
@@ -1150,7 +1186,7 @@ const CostTreeView = ({ costingResult }) => {
             <div style={{ width: '8%' }} className="text-right">Lotto</div>
             <div style={{ width: '8%' }} className="text-right">Costo Unit.</div>
             <div style={{ width: '8%' }} className="text-right">Costi Fissi</div>
-            <div style={{ width: '8%' }} className="text-right">Costo Tot.</div>
+            <div style={{ width: '8%' }} className="text-right">Costo Variabile</div>
           </div>
         </div>
 

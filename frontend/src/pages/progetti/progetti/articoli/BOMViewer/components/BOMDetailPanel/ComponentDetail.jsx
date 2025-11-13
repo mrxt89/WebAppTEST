@@ -266,19 +266,19 @@ const ComponentDetail = ({ component, editMode }) => {
           if (component[field] !== value) {
             newChanges[componentId].bomComponentChanges[field] = value;
             
-            // Se è stata modificata la Quantity, UnitCost o FixedCost, ricalcola il TotalCost
-            if (field === 'Quantity' || field === 'UnitCost' || field === 'FixedCost') {
+            // Se è stata modificata la Quantity o UnitCost, ricalcola il TotalCost
+            // Il FixedCost non contribuisce al TotalCost del componente, viene salvato separatamente
+            if (field === 'Quantity' || field === 'UnitCost') {
               const currentUnitCost = field === 'UnitCost' ? value : (formData.UnitCost || 0);
               const currentQuantity = field === 'Quantity' ? value : (formData.Quantity || 1);
-              const currentFixedCost = field === 'FixedCost' ? value : (formData.FixedCost || 0);
               
-              const newTotalCost = (currentUnitCost * currentQuantity) + currentFixedCost;
+              /* 2025.11.13 - Il costo fisso non contribuisce al costo totale del componente ma solo al costo finale della bom */
+              const newTotalCost = (currentUnitCost * currentQuantity) || 0;
               newChanges[componentId].bomComponentChanges.TotalCost = newTotalCost;
               
               console.log('Ricalcolo TotalCost:', {
                 UnitCost: currentUnitCost,
                 Quantity: currentQuantity,
-                FixedCost: currentFixedCost,
                 TotalCost: newTotalCost
               });
             }
@@ -286,8 +286,8 @@ const ComponentDetail = ({ component, editMode }) => {
             // Se il valore è tornato all'originale, rimuovi la modifica
             delete newChanges[componentId].bomComponentChanges[field];
             
-            // Se era stata modificata la Quantity, UnitCost o FixedCost, rimuovi anche il TotalCost
-            if (field === 'Quantity' || field === 'UnitCost' || field === 'FixedCost') {
+            // Se era stata modificata la Quantity o UnitCost, rimuovi anche il TotalCost
+            if (field === 'Quantity' || field === 'UnitCost') {
               delete newChanges[componentId].bomComponentChanges.TotalCost;
             }
           }
@@ -775,15 +775,16 @@ const ComponentDetail = ({ component, editMode }) => {
               {(() => {
                 const unitCost = formData.UnitCost || 0;
                 const quantity = formData.Quantity || 1;
-                const fixedCost = formData.FixedCost || 0;
-                const totalCost = (unitCost * quantity) + fixedCost;
+                const totalCost = (unitCost * quantity);
                 return totalCost.toFixed(2) + ' €';
               })()}
             </div>
           </div>
         </div>
         <div className="mt-2 text-xs text-green-600">
-          <strong>Formula:</strong> Costo Totale = (Costo Unitario × Quantità) + Costo Fisso
+          <strong>Formula:</strong> Costo Totale = Costo Unitario × Quantità
+          <br />
+          <span className="text-gray-600">Nota: Il costo fisso viene salvato separatamente e contribuisce solo al costo finale della BOM.</span>
         </div>
       </div>
       

@@ -813,11 +813,16 @@ const BOMCosting = ({ selectedItem }) => {
             const materialCost = materialData?.CalculatedTotalCost || materialData?.TotalCost || 0;
             const operationCost = operationData?.OperationCost || 0;
 
+            // FixedCost totale = FixedCost del componente (materiale) + FixedCost delle operazioni
+            const componentFixedCost = materialData?.FixedCost || 0;
+            const operationFixedCost = operationData ? (operationData.FixedCostTotal / productionLot) : 0;
+            const totalFixedCost = componentFixedCost + operationFixedCost;
+
             return {
               ...bomComp,
               OperationCost: operationData?.ProcessingCost || 0,
-              FixedCost: operationData ? operationData.FixedCostTotal / productionLot : 0,
-              FixedCostTotal: operationData?.FixedCostTotal || 0,
+              FixedCost: totalFixedCost,
+              FixedCostTotal: (componentFixedCost * productionLot) + (operationData?.FixedCostTotal || 0),
               MaterialCost: materialCost,
               TotalCost: materialCost + operationCost,
               CalculatedTotalCost: materialCost + operationCost,
@@ -990,11 +995,16 @@ const BOMCosting = ({ selectedItem }) => {
             const materialCost = materialData?.CalculatedTotalCost || materialData?.TotalCost || 0;
             const operationCost = operationData?.OperationCost || 0;
 
+            // FixedCost totale = FixedCost del componente (materiale) + FixedCost delle operazioni
+            const componentFixedCost = materialData?.FixedCost || 0;
+            const operationFixedCost = operationData ? (operationData.FixedCostTotal / productionLot) : 0;
+            const totalFixedCost = componentFixedCost + operationFixedCost;
+
             return {
               ...bomComp,
               OperationCost: operationData?.ProcessingCost || 0,
-              FixedCost: operationData ? operationData.FixedCostTotal / productionLot : 0,
-              FixedCostTotal: operationData?.FixedCostTotal || 0,
+              FixedCost: totalFixedCost,
+              FixedCostTotal: (componentFixedCost * productionLot) + (operationData?.FixedCostTotal || 0),
               MaterialCost: materialCost,
               TotalCost: materialCost + operationCost,
               CalculatedTotalCost: materialCost + operationCost,
@@ -1123,7 +1133,8 @@ const BOMCosting = ({ selectedItem }) => {
             materialCostMap.set(componentId, {
               UnitCost: comp.UnitCost || 0,
               CalculatedTotalCost: comp.CalculatedTotalCost || comp.TotalCost || 0,
-              Quantity: comp.Quantity || 0
+              Quantity: comp.Quantity || 0,
+              FixedCost: comp.FixedCost || 0  // ← AGGIUNTO: Include il FixedCost dal componente
             });
           });
 
@@ -1168,10 +1179,17 @@ const BOMCosting = ({ selectedItem }) => {
             return {
               ...bomComp,
               OperationCost: operationData?.ProcessingCost || 0,
-              // Usa il ProductionLot del componente, non quello principale
-              FixedCost: operationData && componentProductionLot ? 
-                        operationData.FixedCostTotal / componentProductionLot : 0,
-              FixedCostTotal: operationData?.FixedCostTotal || 0,
+            // Fixed cost componenti: somma costo fisso materiale + eventuale quota operazioni
+            FixedCost: (
+              (materialData?.FixedCost || 0) +
+              (operationData && componentProductionLot
+                ? operationData.FixedCostTotal / componentProductionLot
+                : 0)
+            ),
+            FixedCostTotal: (
+              (materialData?.FixedCostTotal ?? materialData?.FixedCost ?? 0) +
+              (operationData?.FixedCostTotal || 0)
+            ),
               MaterialCost: materialCost,
               TotalCost: materialCost + operationCost,
               CalculatedTotalCost: materialCost + operationCost,

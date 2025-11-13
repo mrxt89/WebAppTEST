@@ -165,6 +165,26 @@ export const BOMViewerProvider = ({
     }
   }, [item?.Id, bom]);
 
+  // Aggiorna il selectedNode quando cambiano i bomComponents (dopo un refresh)
+  useEffect(() => {
+    if (selectedNode && selectedNode.type === "component" && bomComponents.length > 0) {
+      // Trova il componente aggiornato nei nuovi dati
+      const updatedComponent = bomComponents.find(
+        (comp) =>
+          comp.ComponentId === selectedNode.data.ComponentId &&
+          comp.Line === selectedNode.data.Line
+      );
+
+      if (updatedComponent) {
+        // Aggiorna il selectedNode con i nuovi dati
+        setSelectedNode({
+          ...selectedNode,
+          data: updatedComponent,
+        });
+      }
+    }
+  }, [bomComponents]);
+
   // Load master data function
   const loadMasterData = useCallback(async () => {
     if (!isMounted.current) return;
