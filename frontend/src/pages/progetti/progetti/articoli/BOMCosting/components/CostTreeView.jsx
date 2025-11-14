@@ -195,10 +195,11 @@ const calculateChildrenCost = (node, parentLot = 100) => {
     // Se il figlio è un'operazione (cycle), aggiungi il suo costo
     if (child.type === "cycle") {
       const cycleProcessingCost = child.data.UnitCost || 0; // Costo variabile dell'operazione
-      const cycleFixedCostTotal = child.data.FixedCostTotal || 0;
+      // IMPORTANTE: I costi fissi sono già unitari, usa FixedCost (non FixedCostTotal)
+      const cycleFixedCost = child.data.FixedCost || 0;
       return {
         variableCost: acc.variableCost + cycleProcessingCost,
-        fixedCostTotal: acc.fixedCostTotal + cycleFixedCostTotal
+        fixedCostTotal: acc.fixedCostTotal + cycleFixedCost
       };
     }
 
@@ -210,22 +211,31 @@ const calculateChildrenCost = (node, parentLot = 100) => {
 
       if (hasGrandChildren) {
         // Ha figli: somma solo i costi dei figli (i costi propri sarebbero duplicati)
+        // NON sommare childFixedCostTotal perché i costi fissi sono già inclusi nei figli
         // Usa il lotto del componente figlio per il calcolo ricorsivo
         const childLot = child.data.ProductionLot || child.data.BOMProductionLot || parentLot;
         const childrenResult = calculateChildrenCost(child, childLot);
-        const childFixedCostTotal = child.data.FixedCostTotal || 0;
+        // NON sommare childFixedCostTotal perché i costi fissi del componente con figli
+        // sono già distribuiti nei suoi figli (ricorsivamente)
         return {
           variableCost: acc.variableCost + childrenResult.variableCost,
-          fixedCostTotal: acc.fixedCostTotal + childrenResult.fixedCostTotal + childFixedCostTotal
+          fixedCostTotal: acc.fixedCostTotal + childrenResult.fixedCostTotal
         };
       } else {
         // Foglia: usa i dati RAW originali
+        // NOTA: I cicli del componente foglia sono già processati come child.type === "cycle"
+        // quindi non vanno aggiunti di nuovo qui
         const materialCost = child.data.MaterialCost || 0;
         const operationCost = child.data.OperationCost || 0;
-        const childFixedCostTotal = child.data.FixedCostTotal || 0;
+        
+        // IMPORTANTE: I costi fissi sono già unitari, usa sempre FixedCost (non FixedCostTotal)
+        const childFixedCost = child.data.FixedCost !== undefined && child.data.FixedCost !== null
+          ? child.data.FixedCost
+          : 0;
+        
         return {
           variableCost: acc.variableCost + materialCost + operationCost,
-          fixedCostTotal: acc.fixedCostTotal + childFixedCostTotal
+          fixedCostTotal: acc.fixedCostTotal + childFixedCost
         };
       }
     }
@@ -258,8 +268,22 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
   const ownCost = node.data.CalculatedTotalCost || node.data.TotalCost || 0;
   const ownUnitCost = node.data.UnitCost || 0;
   const componentLot = node.data.ProductionLot || node.data.BOMProductionLot || 1;
-  const ownFixedCostTotal = node.data.FixedCostTotal || (node.data.FixedCost * componentLot) || 0;
-  const ownFixedCost = componentLot > 0 ? (ownFixedCostTotal / componentLot) : (node.data.FixedCost || 0);
+  
+  // Calcola i costi fissi PROPRI del componente (solo dai suoi cicli diretti, non accumulati dai figli)
+  // Per componenti con figli, i costi fissi propri sono solo quelli dei cicli (operazioni) diretti
+  const ownFixedCostFromCycles = node.children && node.children.length > 0
+    ? node.children
+        .filter(child => child.type === "cycle")
+        .reduce((sum, cycle) => sum + (cycle.data.FixedCost || 0), 0)
+    : 0;
+  
+  // Usa i costi fissi dai cicli se disponibili, altrimenti usa FixedCost dal backend
+  // IMPORTANTE: FixedCost è già unitario, non va diviso per il lotto
+  const ownFixedCost = ownFixedCostFromCycles > 0 
+    ? ownFixedCostFromCycles
+    : (node.data.FixedCost !== undefined ? node.data.FixedCost : 
+       (componentLot > 0 && node.data.FixedCostTotal ? (node.data.FixedCostTotal / componentLot) : 0));
+  
   const ownMaterialCost = node.data.MaterialCost || 0;
   const ownOperationCost = node.data.OperationCost || 0;
   let ownVariableCost = ownMaterialCost + ownOperationCost;
@@ -273,17 +297,20 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
     // Ha figli COMPONENTI (altri articoli nella distinta)
     if (expanded) {
       // Espanso con figli componenti → i costi variabili sono visualizzati nei figli componenti.
-      // Il costo fisso del componente rimane visibile (tranne per il root).
+      // NON mostrare costi fissi perché:
+      // 1. I cicli (operazioni) del componente sono già mostrati come nodi separati
+      // 2. I costi fissi dei componenti figli sono già mostrati nei componenti figli
       variableCost = 0; // I costi variabili sono visualizzati nei figli
       unitCost = 0; // I costi unitari sono nei figli
-      fixedCost = node.data.Level === 0 ? 0 : ownFixedCost;
+      fixedCost = 0; // I costi fissi sono nei cicli (mostrati separatamente) e nei componenti figli
     } else {
       // Compresso con figli componenti → mostra SOLO la somma ricorsiva dei costi fissi dei figli
       // NON sommare ownFixedCost perché i costi fissi appartengono solo ai componenti foglia
       const childrenCostResult = calculateChildrenCost(node, componentLot);
 
-      const fixedCostUnitFromChildren =
-        componentLot > 0 ? childrenCostResult.fixedCostTotal / componentLot : 0;
+      // IMPORTANTE: I costi fissi sono già unitari, fixedCostTotal è già la somma dei costi fissi unitari
+      // NON dividere per il lotto!
+      const fixedCostUnitFromChildren = childrenCostResult.fixedCostTotal || 0;
 
       variableCost = childrenCostResult.variableCost;
       unitCost = 0; // Il costo unitario non ha senso per un aggregato
@@ -482,6 +509,7 @@ const CostTreeView = ({ costingResult }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showMarkupDetail, setShowMarkupDetail] = useState(false);
+  const [showCostingRules, setShowCostingRules] = useState(false);
 
   // Costruisci l'albero dai dati di costificazione
   const treeData = useMemo(() => {
@@ -562,12 +590,12 @@ const CostTreeView = ({ costingResult }) => {
 
         // IMPORTANTE: Usa i costi che arrivano dal backend nelle operazioni di routing
         // Il backend restituisce già ProcessingCost e SetupCost calcolati
-        // Usa il ProductionLot del componente, non quello principale
+        // REGOLA: Per i costi fissi delle operazioni si usa il costo TOTALE di setup, non diviso per lotto
         const componentProductionLot = comp.ProductionLot || comp.BOMProductionLot || productionLot;
         const processingCost = route.ProcessingCost || 0;
         const setupCostTotal = route.SetupCost || 0; // Costo fisso totale per il lotto
-        const setupCostUnit = componentProductionLot > 0 ? (setupCostTotal / componentProductionLot) : 0; // Costo fisso unitario
-        const totalCost = route.TotalCost || (processingCost + setupCostUnit);
+        // NON dividere per il lotto - usiamo il costo totale
+        const totalCost = route.TotalCost || (processingCost + setupCostTotal);
 
         const cycleNode = {
           id: `cycle-${nodeId}-${opIndex}`,
@@ -577,7 +605,7 @@ const CostTreeView = ({ costingResult }) => {
             ...route,
             // Usa i costi pre-calcolati dal backend
             UnitCost: processingCost,
-            FixedCost: setupCostUnit, // Costo fisso unitario (diviso per lotto del componente)
+            FixedCost: setupCostTotal, // Costo fisso TOTALE (non diviso per lotto)
             FixedCostTotal: setupCostTotal, // Mantieni anche il totale
             TotalCost: totalCost,
             Operation: route.Operation,
