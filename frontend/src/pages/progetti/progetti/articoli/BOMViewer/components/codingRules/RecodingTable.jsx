@@ -40,6 +40,7 @@ const RecodingTable = ({
   onDataChange,
   loading = false,
   simplifiedConfig = null,
+  forceHierarchicalMode = false, // Forza uso logica gerarchica anche se semplificata è attiva
   className = ""
 }) => {
   // Stati per gestire i dati della tabella
@@ -491,8 +492,8 @@ const RecodingTable = ({
                   {isExpanded && !isLocked && (
                     <TableRow>
                       <TableCell colSpan={8} className="bg-gray-50 p-4">
-                        {simplifiedConfig?.IsActive ? (
-                          // Logica semplificata
+                        {simplifiedConfig?.IsActive && !forceHierarchicalMode ? (
+                          // Logica semplificata (solo se non forzata la gerarchica)
                           <SimplifiedRecodingSelector
                             item={item}
                             charactersToKeep={simplifiedConfig.CharactersToKeep}
@@ -513,7 +514,7 @@ const RecodingTable = ({
                             disabled={loading}
                           />
                         ) : (
-                          // Logica gerarchica tradizionale
+                          // Logica gerarchica tradizionale (sempre quando forceHierarchicalMode è true o semplificata non attiva)
                           <CodingHierarchySelector
                             companyId={companyId}
                             componentId={itemId}

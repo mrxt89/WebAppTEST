@@ -2420,10 +2420,24 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
             createNewBOM: importData.createNewBOM,
             componentsCount: importData.components?.length || 0
         });
-        
+
+        // DEBUG: Log dei primi 3 componenti ricevuti
+        if (importData.components && importData.components.length > 0) {
+            console.log('DEBUG: Primi 3 componenti ricevuti:',
+                importData.components.slice(0, 3).map(c => ({
+                    code: c.ComponentItemCode,
+                    level: c.Level,
+                    path: c.Path,
+                    useOriginal: c.UseOriginalCode
+                }))
+            );
+        } else {
+            console.log('ATTENZIONE: Nessun componente nell\'array importData.components!');
+        }
+
         // IMPORTANTE: Definisci il tipo di tabella TVP
         const tvp = new sql.Table('SelectedComponentsTableType');
-        
+
         // Definisci le colonne del TVP nell'ordine esatto della definizione SQL
         tvp.columns.add('ComponentItemCode', sql.VarChar(64));
         tvp.columns.add('Level', sql.Int);
@@ -2433,20 +2447,28 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         tvp.columns.add('ComponentType', sql.Int);
         tvp.columns.add('Nature', sql.Int);
         tvp.columns.add('UoM', sql.VarChar(10));
-        
+
         // Aggiungi i componenti alla tabella
-        importData.components.forEach(comp => {
-            tvp.rows.add(
-                comp.ComponentItemCode || comp.Component,
-                comp.Level || 0,
-                comp.Path || '',
-                comp.UseOriginalCode ? 1 : 0,  // IMPORTANTE: Converti boolean in bit
-                comp.Quantity || 1,
-                comp.ComponentType || 7798784,
-                comp.Nature || 22413312,
-                comp.UoM || 'PZ'
-            );
+        let addedRowsCount = 0;
+        importData.components.forEach((comp, index) => {
+            try {
+                tvp.rows.add(
+                    comp.ComponentItemCode || comp.Component,
+                    comp.Level || 0,
+                    comp.Path || '',
+                    comp.UseOriginalCode ? 1 : 0,  // IMPORTANTE: Converti boolean in bit
+                    comp.Quantity || 1,
+                    comp.ComponentType || 7798784,
+                    comp.Nature || 22413312,
+                    comp.UoM || 'NR'  // CORRETTO da 'PZ' a 'NR'
+                );
+                addedRowsCount++;
+            } catch (err) {
+                console.error(`Errore aggiungendo componente ${index}:`, err.message, comp);
+            }
         });
+
+        console.log(`DEBUG: Righe aggiunte al TVP: ${addedRowsCount} su ${importData.components.length}`);
 
 
         
@@ -2473,26 +2495,46 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         request.output('ImportedComponents', sql.Int);
         request.output('ErrorCode', sql.Int);
         request.output('ErrorMessage', sql.NVarChar(4000));
-        
+
+        // DEBUG: Log parametri prima dell'esecuzione
+        console.log('DEBUG: Parametri SP prima dell\'esecuzione:', {
+            CompanyId: companyId,
+            UserId: userId,
+            ProjectId: projectId,
+            SourceItem: sourceItemCode,
+            CreateNewBOM: importData.createNewBOM ? 1 : 0,
+            TVPRowsCount: tvp.rows.length
+        });
+
         // Esegui la stored procedure
+        console.log('DEBUG: Esecuzione MA_ProjectArticles_ImportWithSelection...');
         const result = await request.execute('MA_ProjectArticles_ImportWithSelection');
-        
+        console.log('DEBUG: SP eseguita, estrazione parametri di output...');
+
         // Estrai i valori di output
         const returnItemId = request.parameters.ReturnItemId.value;
         const returnBOMId = request.parameters.ReturnBOMId.value;
         const importedComponents = request.parameters.ImportedComponents.value || 0;
         const errorCode = request.parameters.ErrorCode.value || 0;
         const errorMessage = request.parameters.ErrorMessage.value || '';
-        
 
-        
+        // DEBUG: Log parametri di output
+        console.log('DEBUG: Parametri di output dalla SP:', {
+            returnItemId,
+            returnBOMId,
+            importedComponents,
+            errorCode,
+            errorMessage: errorMessage || '(nessun errore)'
+        });
+
+
         // Controllo errori
         if (errorCode !== 0) {
             console.error('SP Error:', {
                 errorCode,
                 errorMessage
             });
-            
+
             return {
                 success: 0,
                 msg: errorMessage || `Errore durante l'importazione. Codice errore: ${errorCode}`

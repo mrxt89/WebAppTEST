@@ -1,4 +1,4 @@
-// BOMViewer/components/BOMHeader.jsx - Versione con ricodifica diretta
+﻿// BOMViewer/components/BOMHeader.jsx - Versione con ricodifica diretta
 import React, { useEffect, useState, useRef } from "react";
 import { useBOMViewer } from "../context/BOMViewerContext";
 import BOMHeaderEdit from "./BOMHeaderEdit";
@@ -522,7 +522,7 @@ const BOMHeader = () => {
          code: "",
          description: "",
          nature: "22413312",
-         uom: "PZ",
+         UoM: "PZ",
          quantity: 1,
        });
        setShowAddManualDialog(true);
@@ -582,7 +582,7 @@ const BOMHeader = () => {
        componentDescription: `Nuovo componente temporaneo`,
        quantity: 1,
        nature: 22413312, // Semilavorato
-       uom: "PZ",
+       UoM: "PZ",
        importBOM: true,
      });
 
@@ -649,7 +649,7 @@ const BOMHeader = () => {
          code: "",
          description: "",
          nature: "22413312",
-         uom: "PZ",
+         UoM: "PZ",
          quantity: 1,
        });
 
@@ -700,6 +700,7 @@ const BOMHeader = () => {
        ComponentCode: componentCode,
        ComponentType: 7798784, // Articolo
        Quantity: 1,
+      UoM: item.BaseUoM || "PZ", // Usa l'unità di misura dell'articolo
        ImportBOM: true, // Importa anche la distinta se presente
        createTempComponent: false, // Non creiamo un codice temporaneo
      });
@@ -1429,6 +1430,7 @@ const BOMHeader = () => {
            setRecodingItems([]);
          }}
          onApply={handleApplyRecoding}
+         forceHierarchicalMode={true} // Forza logica gerarchica per ricodifica da pagina distinte basi
        />
      )}
    </>

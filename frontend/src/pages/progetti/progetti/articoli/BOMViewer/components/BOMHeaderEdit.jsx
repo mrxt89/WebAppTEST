@@ -122,7 +122,7 @@ const BOMHeaderEdit = () => {
   // Handler per ricodifica articolo principale
   const handleRecodeRoot = () => {
     // Verifica se l'articolo è bloccato
-    if (item?.stato_erp === 1) {
+    if (item?.stato_erp == 1) {
       toast({
         title: "Articolo bloccato",
         description: "L'articolo principale è presente in ERP e non può essere ricodificato",
@@ -165,7 +165,7 @@ const BOMHeaderEdit = () => {
 
     // Verifica componenti bloccati
     const lockedComponents = selectedComponents.filter(c => 
-      c.data && c.data.stato_erp === 1
+      c.data && c.data.stato_erp == 1
     );
     
     if (lockedComponents.length > 0) {
@@ -190,7 +190,7 @@ const BOMHeaderEdit = () => {
 
     // Filtra solo i componenti ricodificabili
     const recodableComponents = selectedComponents.filter(c => 
-      c.data && c.data.stato_erp !== 1
+      c.data && c.data.stato_erp != 1
     );
 
     if (recodableComponents.length === 0) {
@@ -780,7 +780,7 @@ const BOMHeaderEdit = () => {
               variant="outline"
               size="sm"
               onClick={handleRecodeRoot}
-              disabled={item?.stato_erp === 1 || loading}
+              disabled={item?.stato_erp == 1 || loading}
               className="bg-white"
             >
               <Code className="h-4 w-4 mr-1" />
@@ -801,7 +801,7 @@ const BOMHeaderEdit = () => {
             )}
 
             {/* Export in ERP - solo se non già esportato */}
-            {bom?.stato_erp !== 1 && (
+            {bom?.stato_erp != 1 && (
               <Button
                 variant="outline"
                 size="sm"
@@ -824,7 +824,7 @@ const BOMHeaderEdit = () => {
             )}
 
             {/* Sync da ERP - solo se già esportato */}
-            {bom?.stato_erp === 1 && (
+            {bom?.stato_erp == 1 && (
               <Button
                 variant="outline"
                 size="sm"
@@ -847,7 +847,7 @@ const BOMHeaderEdit = () => {
             )}
 
             {/* Indicatore stato ERP */}
-            {bom?.stato_erp === 1 && (
+            {bom?.stato_erp == 1 && (
               <div className="ml-auto flex items-center gap-2 text-sm text-green-700">
                 <CheckCircle2 className="h-4 w-4" />
                 <span>Presente in ERP</span>
@@ -962,6 +962,7 @@ const BOMHeaderEdit = () => {
             setRecodingItems([]);
           }}
           onApply={handleApplyRecoding}
+          forceHierarchicalMode={true} // Forza logica gerarchica per ricodifica da pagina distinte basi
         />
       )}
     </>

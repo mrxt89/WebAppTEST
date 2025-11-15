@@ -36,6 +36,7 @@ const RecodingWizard = ({
   userId,
   onClose,
   onApply,
+  forceHierarchicalMode = false, // Forza uso logica gerarchica anche se semplificata è attiva
 }) => {
   const { project, smartRefresh } = useBOMViewer();
   const {
@@ -371,6 +372,7 @@ const RecodingWizard = ({
                     onDataChange={handleDataChange}
                     loading={rulesLoading}
                     simplifiedConfig={simplifiedConfig}
+                    forceHierarchicalMode={forceHierarchicalMode}
                     className="h-full"
                   />
                 )}

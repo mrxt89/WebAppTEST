@@ -35,6 +35,7 @@ import { MoreVertical, Eye, Ban, CheckCircle2, Pin, PinOff, Users, FileSymlink }
 import useProjectActions from "../../../hooks/useProjectManagementActions";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { getPhaseProgressUrl } from "@/lib/utils";
 
 const ProjectTasksTableImproved = ({
   project,
@@ -532,11 +533,12 @@ const ProjectTasksTableImproved = ({
                         className="h-8 w-8 p-0"
                         onClick={(e) => {
                           e.stopPropagation();
-                          const prj = encodeURIComponent(project?.Name || task.ProjectName || "");
+                          const prj = project?.Name || task.ProjectName || "";
                           const stp = task.TaskSequence != null ? task.TaskSequence : "";
                           const ute = user?.ERPUserId ?? 0;
-                          const ope = encodeURIComponent(task.Operation || "");
-                          const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}&ope=${ope}`;
+                          const ope = task.Operation || "";
+                          const companyId = user?.CompanyId || 1; // Default a Ricos se non disponibile
+                          const url = getPhaseProgressUrl(companyId, prj, stp, ute, ope);
                           window.open(url, "_blank", "noopener");
                         }}
                         title="Apri in gestione fasi"

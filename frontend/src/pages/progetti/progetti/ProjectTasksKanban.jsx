@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { FileSymlink } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { getPhaseProgressUrl } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import useProjectActions from "../../../hooks/useProjectManagementActions";
 import { motion, AnimatePresence } from "framer-motion";
@@ -100,11 +101,12 @@ const TaskCard = ({
 
   const openExternalLink = (e) => {
     e.stopPropagation();
-    const prj = encodeURIComponent(task.ProjectName || "");
+    const prj = task.ProjectName || "";
     const stp = task.TaskSequence != null ? task.TaskSequence : "";
     const ute = user?.ERPUserId ?? 0;
-    const ope = encodeURIComponent(task.Operation || "");
-    const url = `http://192.168.42.118/ricos/webapp/wap_01.asp?prj=${prj}&stp=${stp}&ute=${ute}&ope=${ope}`;
+    const ope = task.Operation || "";
+    const companyId = user?.CompanyId || 1; // Default a Ricos se non disponibile
+    const url = getPhaseProgressUrl(companyId, prj, stp, ute, ope);
     window.open(url, "_blank", "noopener");
   };
 
