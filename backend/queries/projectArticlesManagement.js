@@ -2400,9 +2400,14 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
     
     try {
         pool = await sql.connect(config.database);
-        
+
         // NON usare transazioni esterne - la stored procedure gestisce le proprie transazioni
         const request = pool.request();
+
+        // IMPORTANTE: Aumenta timeout per gestire BOM con molti componenti
+        // Default: 120 secondi (2 minuti) - troppo poco per BOM grandi
+        // Nuovo: 300 secondi (5 minuti) - gestisce fino a ~100 componenti
+        request.timeout = 300000; // 5 minuti in millisecondi
         
         // Estrai il codice articolo dal sourceItem
         const sourceItemCode = importData.sourceItem.Item || importData.sourceItem.BOM || '';
@@ -2412,14 +2417,24 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         const sourceBOMId = importData.sourceBOMId || null;
         const sourceBOMVersion = importData.sourceBOMVersion || null;
         
+        const componentsCount = importData.components?.length || 0;
+
         console.log('Import data:', {
             sourceItemCode,
             sourceItemDescription,
             sourceBOMId,
             sourceBOMVersion,
             createNewBOM: importData.createNewBOM,
-            componentsCount: importData.components?.length || 0
+            componentsCount
         });
+
+        // AVVISO: Numero componenti elevato
+        if (componentsCount > 50) {
+            console.warn(`⚠️ ATTENZIONE: Importazione con ${componentsCount} componenti. Potrebbe richiedere diversi minuti.`);
+        }
+        if (componentsCount > 100) {
+            console.warn(`🔴 ALERT: ${componentsCount} componenti potrebbero causare timeout! Considerare split in batch più piccoli.`);
+        }
 
         // DEBUG: Log dei primi 3 componenti ricevuti
         if (importData.components && importData.components.length > 0) {
@@ -2506,10 +2521,20 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
             TVPRowsCount: tvp.rows.length
         });
 
+        // IMPORTANTE: Cattura i messaggi PRINT dalla stored procedure
+        // Questo ci permette di vedere dove si ferma la SP quando fallisce
+        let spPrintMessages = [];
+        request.on('info', info => {
+            const msg = info.message;
+            console.log('SQL PRINT:', msg);
+            spPrintMessages.push(msg);
+        });
+
         // Esegui la stored procedure
         console.log('DEBUG: Esecuzione MA_ProjectArticles_ImportWithSelection...');
         const result = await request.execute('MA_ProjectArticles_ImportWithSelection');
         console.log('DEBUG: SP eseguita, estrazione parametri di output...');
+        console.log('DEBUG: Messaggi PRINT ricevuti dalla SP:', spPrintMessages.length);
 
         // Estrai i valori di output
         const returnItemId = request.parameters.ReturnItemId.value;
@@ -2540,7 +2565,35 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
                 msg: errorMessage || `Errore durante l'importazione. Codice errore: ${errorCode}`
             };
         }
-        
+
+        // CONTROLLO CRITICO: Se avevamo componenti ma non ne è stato importato nessuno
+        // Questo indica un timeout silenzioso o un problema nella stored procedure
+        const selectedComponentsCount = importData.components?.length || 0;
+        if (selectedComponentsCount > 0 && importedComponents === 0 && errorCode === 0) {
+            console.error('ATTENZIONE: Importazione fallita silenziosamente!', {
+                componenteSelezionati: selectedComponentsCount,
+                componenteImportati: importedComponents,
+                errorCode
+            });
+
+            // Stampa gli ultimi messaggi PRINT dalla SP per diagnostica
+            if (spPrintMessages.length > 0) {
+                console.error('Ultimi messaggi dalla SP:');
+                spPrintMessages.slice(-10).forEach((msg, i) => {
+                    console.error(`  [${i + 1}] ${msg}`);
+                });
+            } else {
+                console.error('NESSUN messaggio PRINT ricevuto dalla SP - possibile crash o exit precoce');
+            }
+
+            return {
+                success: 0,
+                msg: `Nessun componente importato (${selectedComponentsCount} selezionati). ` +
+                     `Possibile timeout o problema di performance. ` +
+                     `Prova a selezionare meno componenti (max consigliato: 50).`
+            };
+        }
+
         // Se non abbiamo un ID articolo valido, c'è stato un problema
         if (!returnItemId) {
             
