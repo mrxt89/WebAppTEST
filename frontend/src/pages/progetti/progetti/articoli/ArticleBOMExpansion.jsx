@@ -343,7 +343,29 @@ const ArticleBOMExpansion = ({
     }
 
     if (!attachments || attachments.length === 0) {
-      return null;
+      return (
+        <div className="mt-1 ml-4">
+          <div className="border-l-2 border-blue-400 pl-2 py-1 bg-blue-50 rounded-sm w-50">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Paperclip className="h-3 w-3 text-blue-600" />
+                <span className="text-xs text-blue-700">
+                  Nessun documento allegato 
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-3 text-xs"
+                onClick={() => handleUploadOpen(component)}
+              >
+                <Upload className="h-3 w-3 mr-1" />
+                Carica
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
     }
 
     return (
@@ -357,28 +379,24 @@ const ArticleBOMExpansion = ({
               </span>
             </div>
             <div className="flex items-center gap-1">
-              {canEdit && (
-                <>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="h-6 px-2 text-xs"
-                    onClick={() => handleUploadOpen(component)}
-                  >
-                    <Upload className="h-3 w-3 mr-1" />
-                    Carica
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="h-6 px-2 text-xs"
-                    onClick={() => handleDownloadAllAttachments(component)}
-                  >
-                    <Download className="h-3 w-3 mr-1" />
-                    Tutti
-                  </Button>
-                </>
-              )}
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-6 px-3 text-xs"
+                onClick={() => handleUploadOpen(component)}
+              >
+                <Upload className="h-3 w-3 mr-1" />
+                Carica
+              </Button>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="h-6 px-2 text-xs"
+                onClick={() => handleDownloadAllAttachments(component)}
+              >
+                <Download className="h-3 w-3 mr-1" />
+                Tutti
+              </Button>
             </div>
           </div>
           
@@ -454,9 +472,9 @@ const ArticleBOMExpansion = ({
             ))}
           </div>
         </div>
-      </div>
-    );
-  }, [canEdit, formatBytes, handleUploadOpen, handleDownloadAttachment, handleDownloadAllAttachments, handleViewPreview, handleViewDetails, handleDeleteAttachment]);
+        </div>
+      );
+    }, [formatBytes, handleUploadOpen, handleDownloadAttachment, handleDownloadAllAttachments, handleViewPreview, handleViewDetails, handleDeleteAttachment]);
 
   // Componente per renderizzare un singolo componente della BOM
   const BOMComponent = useCallback(({ component, level = 0 }) => {
@@ -549,13 +567,11 @@ const ArticleBOMExpansion = ({
         </div>
 
         {/* Allegati del componente */}
-        {(hasAttachments || isLoadingAttachments) && (
-          <AttachmentsSection 
-            attachments={attachmentsForComponent}
-            component={component}
-            isLoading={isLoadingAttachments}
-          />
-        )}
+        <AttachmentsSection 
+          attachments={attachmentsForComponent}
+          component={component}
+          isLoading={isLoadingAttachments}
+        />
 
         {/* Routing del componente */}
         {hasRouting && (
@@ -654,9 +670,23 @@ const ArticleBOMExpansion = ({
           </div>
         </ScrollArea>
       ) : (
-        <div className="border rounded-lg py-4 text-center text-gray-500">
-          <FileText className="h-6 w-6 mx-auto mb-1" />
-          <p className="text-sm">Nessun documento allegato</p>
+        <div className="border rounded-lg py-6 text-center text-gray-500 flex flex-col items-center gap-3">
+          <FileText className="h-6 w-6 mx-auto" />
+          <p className="text-sm">Nessun documento allegato per questo articolo</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            onClick={() => {
+              if (bomData?.components?.length > 0) {
+                // Apri l'uploader usando il primo componente disponibile
+                handleUploadOpen(bomData.components[0]);
+              }
+            }}
+          >
+            <Upload className="h-4 w-4 mr-1" />
+            Carica allegati
+          </Button>
         </div>
       )}
 

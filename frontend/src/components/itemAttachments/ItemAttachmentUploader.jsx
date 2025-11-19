@@ -1,5 +1,5 @@
 // Frontend/src/components/itemAttachments/ItemAttachmentUploader.js
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -58,45 +58,145 @@ function ItemAttachmentUploader({
   const auth = useAuth();
 
   // Stati per il form
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [description, setDescription] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState([]); // [{ id, file, description }]
   const [isPublic, setIsPublic] = useState(false);
   const [isErpAttachment, setIsErpAttachment] = useState(false);
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState("");
   const [selectedCategories, setSelectedCategories] = useState([]);
+  const [categoriesSelectOpen, setCategoriesSelectOpen] = useState(false);
 
   // Stati per il caricamento
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState({}); // { fileName: 'uploading' | 'success' | 'error' }
 
   // Hook per le azioni sugli allegati
   const {
     uploadAttachmentByItemCode,
     uploadAttachmentByProjectItemId,
     loading,
+    categories: hookCategories,
+    getAttachmentCategories,
   } = useItemAttachmentsActions();
 
-  // Gestione selezione file
-  const handleFileSelect = (file) => {
-    if (file) {
-      setSelectedFile(file);
+  const [availableCategories, setAvailableCategories] = useState(
+    categories || [],
+  );
+
+  useEffect(() => {
+    if (categories && categories.length > 0) {
+      setAvailableCategories(categories);
     }
+  }, [categories]);
+
+  useEffect(() => {
+    if ((!categories || categories.length === 0) && hookCategories.length > 0) {
+      setAvailableCategories(hookCategories);
+    }
+  }, [hookCategories, categories]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCategories = async () => {
+      try {
+        const data = await getAttachmentCategories();
+        if (isMounted && data) {
+          setAvailableCategories(data);
+        }
+      } catch (error) {
+        console.error("Errore nel recupero delle categorie:", error);
+      }
+    };
+
+    if (
+      open &&
+      (!availableCategories || availableCategories.length === 0) &&
+      getAttachmentCategories
+    ) {
+      fetchCategories();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    open,
+    availableCategories?.length,
+    getAttachmentCategories,
+  ]);
+
+  const createFileEntry = (file) => ({
+    id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()
+      .toString(36)
+      .slice(2, 9)}`,
+    file,
+    description: "",
+  });
+
+  // Gestione selezione file (supporta sia singolo che multiplo)
+  const handleFileSelect = (fileOrFiles) => {
+    if (!fileOrFiles) return;
+
+    const normalizedFiles = Array.isArray(fileOrFiles)
+      ? fileOrFiles
+      : fileOrFiles?.target?.files
+      ? Array.from(fileOrFiles.target.files)
+      : fileOrFiles?.name
+      ? [fileOrFiles]
+      : [];
+
+    if (!normalizedFiles.length) {
+      return;
+    }
+
+    setSelectedFiles((prev) => {
+      const existing = prev || [];
+      const newEntries = normalizedFiles
+        .filter(
+          (file) =>
+            !existing.some(
+              (entry) =>
+                entry.file.name === file.name &&
+                entry.file.size === file.size &&
+                entry.file.lastModified === file.lastModified
+            )
+        )
+        .map((file) => createFileEntry(file));
+
+      return [...existing, ...newEntries];
+    });
   };
 
-  // Gestione caricamento file
+  // Rimuovi un file dalla lista
+  const handleRemoveFile = (entryId) => {
+    setSelectedFiles((prev) => prev.filter((entry) => entry.id !== entryId));
+    setUploadStatus((prev) => {
+      const { [entryId]: _, ...rest } = prev || {};
+      return rest;
+    });
+  };
+
+  const handleDescriptionChange = (entryId, value) => {
+    setSelectedFiles((prev) =>
+      prev.map((entry) =>
+        entry.id === entryId ? { ...entry, description: value } : entry
+      )
+    );
+  };
+
+  // Gestione caricamento file multipli
   const handleFileUpload = async () => {
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
       return;
     }
 
     setIsUploading(true);
     setUploadProgress(0);
+    setUploadStatus({});
 
     try {
-      // Prepara i metadati
-      const metadata = {
-        description: description || null,
+      const commonMetadata = {
         isPublic: isPublic.toString(),
         isErpAttachment: isErpAttachment.toString(),
         tags: tags.length > 0 ? tags.join(", ") : null,
@@ -105,49 +205,107 @@ function ItemAttachmentUploader({
           .join(","),
       };
 
-      let result;
+      const results = [];
+      const totalFiles = selectedFiles.length;
+      let successCount = 0;
+      let errorCount = 0;
 
-      // Simula la progress bar
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const entry = selectedFiles[i];
+        const { id, file, description } = entry;
+
+        setUploadStatus((prev) => ({
+          ...prev,
+          [id]: "uploading",
+        }));
+
+        try {
+          const metadata = {
+            ...commonMetadata,
+            description: description?.trim() ? description.trim() : null,
+          };
+
+          let result;
+          if (itemCode) {
+            result = await uploadAttachmentByItemCode(itemCode, file, metadata);
+          } else if (projectItemId) {
+            result = await uploadAttachmentByProjectItemId(
+              projectItemId,
+              file,
+              metadata,
+            );
           }
-          return prev + 10;
-        });
-      }, 300);
 
-      // Carica l'allegato in base al tipo di articolo
-      if (itemCode) {
-        result = await uploadAttachmentByItemCode(
-          itemCode,
-          selectedFile,
-          metadata,
-        );
-      } else if (projectItemId) {
-        result = await uploadAttachmentByProjectItemId(
-          projectItemId,
-          selectedFile,
-          metadata,
-        );
+          results.push({ file: file.name, success: true, result });
+          successCount++;
+
+          setUploadStatus((prev) => ({
+            ...prev,
+            [id]: "success",
+          }));
+        } catch (error) {
+          console.error(`Error uploading file ${file.name}:`, error);
+          errorCount++;
+          results.push({
+            file: file.name,
+            success: false,
+            error: error.message,
+          });
+
+          setUploadStatus((prev) => ({
+            ...prev,
+            [id]: "error",
+          }));
+        }
+
+        const progress = ((i + 1) / totalFiles) * 100;
+        setUploadProgress(progress);
       }
 
-      // Completa la progress bar
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      // Notifica il completamento
       if (onUploadComplete) {
-        onUploadComplete(result);
+        onUploadComplete(results);
       }
 
-      // Reset del form
-      resetForm();
-    } catch (error) {
-      console.error("Error uploading file:", error);
+      if (window.swal && window.swal.fire) {
+        if (errorCount === 0) {
+          window.swal.fire({
+            title: "Successo",
+            text: `Tutti i ${successCount} file sono stati caricati con successo`,
+            icon: "success",
+            timer: 2000,
+          });
+        } else {
+          const errorList = results
+            .filter((r) => !r.success)
+            .slice(0, 5)
+            .map((r) => `<li>${r.file}: ${r.error}</li>`)
+            .join("");
+          window.swal.fire({
+            title: "Caricamento completato",
+            html: `
+              <p>Caricati con successo: <strong>${successCount}</strong></p>
+              <p>Errori: <strong>${errorCount}</strong></p>
+              ${
+                errorCount > 0
+                  ? `<ul style="text-align:left;margin-top:8px;">${errorList}${
+                      errorCount > 5
+                        ? `<li>...altri ${errorCount - 5} file</li>`
+                        : ""
+                    }</ul>`
+                  : ""
+              }
+            `,
+            icon: successCount > 0 ? "warning" : "error",
+            confirmButtonText: "OK",
+          });
+        }
+      }
 
-      // Mostra notifica di errore
+      if (errorCount === 0) {
+        resetForm();
+      }
+    } catch (error) {
+      console.error("Error in upload process:", error);
       if (window.swal && window.swal.fire) {
         window.swal.fire({
           title: "Errore",
@@ -158,6 +316,7 @@ function ItemAttachmentUploader({
       }
     } finally {
       setIsUploading(false);
+      setUploadProgress(100);
     }
   };
 
@@ -183,14 +342,14 @@ function ItemAttachmentUploader({
 
   // Reset del form
   const resetForm = () => {
-    setSelectedFile(null);
-    setDescription("");
+    setSelectedFiles([]);
     setIsPublic(false);
     setIsErpAttachment(false);
     setTags([]);
     setTagInput("");
     setSelectedCategories([]);
     setUploadProgress(0);
+    setUploadStatus({});
   };
 
   // Gestione chiusura
@@ -199,13 +358,14 @@ function ItemAttachmentUploader({
     onClose();
   };
 
-  // Funzione per renderizzare la preview del file
+  // Funzione per renderizzare la preview dei file
   const renderFilePreview = () => {
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
       return (
         <FileDropZone
           onFileSelect={handleFileSelect}
           disabled={isUploading}
+          multiple={true}
           acceptedFileTypes={[
             "application/pdf",
             "application/msword",
@@ -222,6 +382,32 @@ function ItemAttachmentUploader({
             ".iges",
             ".igs",
             ".stl",
+            ".3dm",
+            ".3ds",
+            ".fbx",
+            ".obj",
+            ".gltf",
+            ".glb",
+            ".ply",
+            ".dae",
+            ".ipt",
+            ".iam",
+            ".idw",
+            ".sldprt",
+            ".sldasm",
+            ".slddrw",
+            ".x_t",
+            ".x_b",
+            ".par",
+            ".asm",
+            ".CATPart",
+            ".CATProduct",
+            ".wrl",
+            ".jt",
+            ".skp",
+            ".blend",
+            ".f3d",
+            ".f3z",
           ]}
           sx={{
             height: 200,
@@ -231,65 +417,153 @@ function ItemAttachmentUploader({
       );
     }
 
-    const isImage = selectedFile.type.startsWith("image/");
-
     return (
-      <Paper
-        elevation={0}
-        sx={{
-          p: 2,
-          mb: 3,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderRadius: 1,
-          border: "1px solid",
-          borderColor: "divider",
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center" }}>
-          {isImage ? (
-            <Box
-              component="img"
-              src={URL.createObjectURL(selectedFile)}
-              alt="Preview"
-              sx={{
-                width: 60,
-                height: 60,
-                borderRadius: 1,
-                mr: 2,
-                objectFit: "cover",
-              }}
-            />
-          ) : (
-            <DescriptionIcon
-              sx={{ fontSize: 50, mr: 2, color: "primary.main" }}
-            />
-          )}
-          <Box>
-            <Typography variant="subtitle1" noWrap>
-              {selectedFile.name}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              {formatBytes(selectedFile.size)}
-            </Typography>
-          </Box>
-        </Box>
-        <IconButton
-          size="small"
-          onClick={() => setSelectedFile(null)}
-          disabled={isUploading}
-          color="error"
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+          File selezionati ({selectedFiles.length})
+        </Typography>
+        <Box
+          sx={{
+            maxHeight: 320,
+            overflowY: "auto",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 1,
+            p: 1,
+          }}
         >
-          <ClearIcon fontSize="small" />
-        </IconButton>
-      </Paper>
+          {selectedFiles.map((entry) => {
+            const { id, file, description } = entry;
+            const isImage = file.type?.startsWith("image/");
+            const fileStatus = uploadStatus[id];
+            const isUploadingFile = fileStatus === "uploading";
+            const isSuccess = fileStatus === "success";
+            const isError = fileStatus === "error";
+
+            return (
+              <Paper
+                key={id}
+                elevation={0}
+                sx={{
+                  p: 1.5,
+                  mb: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
+                  borderRadius: 1,
+                  border: "1px solid",
+                  borderColor: isError
+                    ? "error.main"
+                    : isSuccess
+                    ? "success.main"
+                    : "divider",
+                  backgroundColor: isUploadingFile
+                    ? "action.hover"
+                    : isSuccess
+                    ? "success.light"
+                    : isError
+                    ? "error.light"
+                    : "background.paper",
+                }}
+              >
+                <Box
+                  display="flex"
+                  alignItems="center"
+                  gap={2}
+                  sx={{ width: "100%" }}
+                >
+                  {isImage ? (
+                    <Box
+                      component="img"
+                      src={URL.createObjectURL(file)}
+                      alt="Preview"
+                      sx={{
+                        width: 50,
+                        height: 50,
+                        borderRadius: 1,
+                        objectFit: "cover",
+                      }}
+                    />
+                  ) : (
+                    <DescriptionIcon
+                      sx={{
+                        fontSize: 40,
+                        color: isError
+                          ? "error.main"
+                          : isSuccess
+                          ? "success.main"
+                          : "primary.main",
+                      }}
+                    />
+                  )}
+                  <Box flex={1}>
+                    <Typography
+                      variant="body2"
+                      fontWeight="medium"
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      {file.name}
+                      {isUploadingFile && (
+                        <CircularProgress size={14} sx={{ ml: 1 }} />
+                      )}
+                      {isSuccess && (
+                        <Typography
+                          component="span"
+                          variant="caption"
+                          color="success.main"
+                        >
+                          ✓
+                        </Typography>
+                      )}
+                      {isError && (
+                        <Typography
+                          component="span"
+                          variant="caption"
+                          color="error.main"
+                        >
+                          ✗
+                        </Typography>
+                      )}
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary">
+                      {formatBytes(file.size)}
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleRemoveFile(id)}
+                    disabled={isUploading && isUploadingFile}
+                    color="error"
+                  >
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+                <TextField
+                  label="Descrizione (opzionale)"
+                  fullWidth
+                  value={description}
+                  onChange={(e) => handleDescriptionChange(id, e.target.value)}
+                  disabled={isUploading}
+                  size="small"
+                  multiline
+                  minRows={2}
+                  placeholder="Aggiungi una descrizione personalizzata per questo file"
+                />
+              </Paper>
+            );
+          })}
+        </Box>
+      </Box>
     );
   };
 
   // Render delle categorie
   const renderCategories = () => {
-    if (categories.length === 0) {
+    if (!availableCategories || availableCategories.length === 0) {
       return (
         <Typography variant="body2" color="textSecondary">
           Non ci sono categorie disponibili
@@ -304,26 +578,65 @@ function ItemAttachmentUploader({
           labelId="categories-label"
           multiple
           value={selectedCategories}
-          onChange={(e) => setSelectedCategories(e.target.value)}
+          onChange={(e) => {
+            setSelectedCategories(e.target.value);
+            setCategoriesSelectOpen(false);
+          }}
           disabled={isUploading}
+          open={categoriesSelectOpen}
+          onClose={() => setCategoriesSelectOpen(false)}
+          onOpen={() => setCategoriesSelectOpen(true)}
           renderValue={(selected) => (
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-              {selected.map((category) => (
-                <Chip
-                  key={category.CategoryID || category}
-                  label={
-                    category.CategoryName ||
-                    categories.find((c) => c.CategoryID === category)
-                      ?.CategoryName ||
-                    category
-                  }
-                  size="small"
-                />
-              ))}
+              {selected.length === 0 && (
+                <Typography variant="body2" color="textSecondary">
+                  Nessuna categoria selezionata
+                </Typography>
+              )}
+              {selected.map((category) => {
+                const categoryObj =
+                  category.CategoryID && category.CategoryName
+                    ? category
+                    : availableCategories.find(
+                        (c) =>
+                          c.CategoryID === (category.CategoryID || category),
+                      );
+
+                const label =
+                  categoryObj?.CategoryName ||
+                  category.CategoryName ||
+                  category;
+
+                const categoryId = categoryObj?.CategoryID || category;
+
+                return (
+                  <Chip
+                    key={categoryId}
+                    label={label}
+                    size="small"
+                    onDelete={
+                      isUploading
+                        ? undefined
+                        : (event) => {
+                            event.stopPropagation();
+                            setSelectedCategories((prev) =>
+                              prev.filter(
+                                (cat) =>
+                                  (cat.CategoryID || cat) !== categoryId,
+                              ),
+                            );
+                          }
+                    }
+                    deleteIcon={
+                      !isUploading ? <ClearIcon fontSize="small" /> : undefined
+                    }
+                  />
+                );
+              })}
             </Box>
           )}
         >
-          {categories.map((category) => (
+          {availableCategories.map((category) => (
             <MenuItem key={category.CategoryID} value={category}>
               {category.CategoryName}
             </MenuItem>
@@ -409,17 +722,10 @@ function ItemAttachmentUploader({
                   Informazioni generali
                 </Typography>
 
-                <TextField
-                  label="Descrizione"
-                  fullWidth
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  disabled={isUploading}
-                  multiline
-                  rows={3}
-                  placeholder="Aggiungi una descrizione opzionale per questo allegato"
-                  sx={{ mb: 2 }}
-                />
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                  Le impostazioni seguenti saranno applicate a tutti i file selezionati.
+                  Puoi specificare una descrizione individuale per ciascun file direttamente nella lista.
+                </Typography>
 
                 <TextField
                   label="Tag"
@@ -507,12 +813,16 @@ function ItemAttachmentUploader({
           variant="contained"
           color="primary"
           onClick={handleFileUpload}
-          disabled={!selectedFile || isUploading}
+          disabled={selectedFiles.length === 0 || isUploading}
           startIcon={
             isUploading ? <CircularProgress size={16} /> : <UploadIcon />
           }
         >
-          {isUploading ? "Caricamento in corso..." : "Carica allegato"}
+          {isUploading
+            ? `Caricamento... (${selectedFiles.length} file)`
+            : selectedFiles.length > 0
+            ? `Carica ${selectedFiles.length} ${selectedFiles.length === 1 ? "allegato" : "allegati"}`
+            : "Carica allegato"}
         </Button>
       </DialogActions>
     </Dialog>

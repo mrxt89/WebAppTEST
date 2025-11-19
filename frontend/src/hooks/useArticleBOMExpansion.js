@@ -68,8 +68,16 @@ const useArticleBOMExpansion = () => {
       }
 
       const result = await response.json();
-      // Il backend restituisce direttamente l'array degli allegati
-      return result || [];
+
+      if (Array.isArray(result)) {
+        return result;
+      }
+
+      if (result?.data && Array.isArray(result.data)) {
+        return result.data;
+      }
+
+      return [];
     } catch (error) {
       console.error('Error loading component attachments:', error);
       throw error;
@@ -93,8 +101,16 @@ const useArticleBOMExpansion = () => {
       }
 
       const result = await response.json();
-      // Il backend restituisce direttamente l'array degli allegati
-      return result || [];
+
+      if (Array.isArray(result)) {
+        return result;
+      }
+
+      if (result?.data && Array.isArray(result.data)) {
+        return result.data;
+      }
+
+      return [];
     } catch (error) {
       console.error('Error loading item attachments:', error);
       throw error;

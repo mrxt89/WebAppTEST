@@ -65,6 +65,10 @@ const ALLOWED_MIME_TYPES = [
     'application/x-tar',
     'application/dxf',
     'application/dwg',
+    'application/acad',
+    'application/vnd.autodesk.dwg',
+    'application/vnd.autodesk.step',
+    'application/x-step',
     'application/step',
     'application/stp',
     'application/iges',
@@ -77,6 +81,22 @@ const ALLOWED_MIME_TYPES = [
     'application/vnd.solidworks.part',
     'application/vnd.solidworks.assembly',
     'application/vnd.solidworks.drawing',
+    'application/x-solidedge-part',
+    'application/x-solidedge-assembly',
+    'application/x-solidedge-sheet',
+    'application/vnd.siemens.plm.parasolid',
+    'application/x-rhino3d',
+    'application/x-3ds',
+    'application/x-obj',
+    'application/x-sketchup',
+    'application/x-blend',
+    'application/vnd.dassault.catia',
+    'application/x-jt',
+    'model/vrml',
+    'model/x3d+xml',
+    'model/obj',
+    'application/3ds',
+    'application/vnd.fusion360',
     // Formati email
     'message/rfc822',
     'application/vnd.ms-outlook',
@@ -88,6 +108,7 @@ const ALLOWED_MIME_TYPES = [
     'text/x-eml',
     'message/partial',
     'application/x-emlx',
+    'application/octet-stream'  // Fallback per formati binari sconosciuti
 ];
 
 // Configurazione multer
@@ -122,10 +143,73 @@ const upload = multer({
             return;
         }
 
-        // Controllo aggiuntivo basato sull'estensione per file CAD e tecnici
-        const cadExtensions = ['.dxf', '.dwg', '.step', '.stp', '.iges', '.igs', '.stl', '.ipt', '.iam', '.idw', '.sldprt', '.sldasm', '.slddrw'];
+        // Controllo aggiuntivo basato sull'estensione per file CAD, tecnici e 3D
+        const cadExtensions = [
+            // Estensioni base
+            '.dxf', '.dwg', '.step', '.stp', '.iges', '.igs', '.stl', '.ipt', '.iam', '.idw', '.sldprt', '.sldasm', '.slddrw',
+            
+            // Rhino
+            '.3dm',
+            
+            // SolidEdge
+            '.par', '.asm', '.psm', '.pwd', '.dft',
+            
+            // Parasolid
+            '.x_t', '.x_b', '.xmt', '.xmt_txt',
+            
+            // CATIA
+            '.CATPart', '.CATProduct', '.CATDrawing', '.cgr', '.3dxml',
+            
+            // Fusion 360
+            '.f3d', '.f3z',
+            
+            // SketchUp
+            '.skp', '.skb',
+            
+            // Blender
+            '.blend',
+            
+            // Altri formati 3D
+            '.jt',         // Siemens JT
+            '.wrl',        // VRML
+            '.obj',        // Wavefront OBJ
+            '.fbx',        // Autodesk FBX
+            '.dae',        // COLLADA
+            '.3ds',        // 3D Studio
+            '.max',        // 3ds Max
+            '.c4d',        // Cinema 4D
+            '.mb', '.ma',  // Maya
+            '.x3d', '.x3dz', // X3D
+            '.gltf', '.glb', // glTF
+            '.usd', '.usda', '.usdc', '.usdz', // Universal Scene Description
+            '.rvt', '.rfa', // Revit
+            '.ifc',        // Industry Foundation Classes (BIM)
+            '.prt',        // NX/Unigraphics (gestito separatamente per .prt.1, .prt.2, etc.)
+            '.sat', '.sab', // ACIS
+            '.vda',        // VDA-FS
+            '.neu',        // NEU
+            '.iv',         // Inventor
+            '.prc',        // Product Representation Compact
+            '.creo',       // PTC Creo/ProE
+            '.pln',        // ArchiCAD 
+            '.ply',        // Polygon File Format
+            '.zpr',        // Z Corporation
+            '.scad',       // OpenSCAD
+            '.slc',        // SLC format
+            '.vtk',        // Visualization Toolkit
+            '.off',        // Object File Format
+            '.amf',        // Additive Manufacturing File
+            '.3mf'         // 3D Manufacturing Format
+        ];
+        
         const emailExtensions = ['.eml', '.msg', '.mbox', '.pst', '.emlx'];
         const ext = path.extname(file.originalname).toLowerCase();
+        
+        // Aggiungi supporto per estensioni numeriche come .prt.1, .prt.2, etc.
+        if (ext.match(/\.\d+$/) && file.originalname.includes('.prt.')) {
+            cb(null, true);
+            return;
+        }
         
         if (cadExtensions.includes(ext) || emailExtensions.includes(ext)) {
             cb(null, true);

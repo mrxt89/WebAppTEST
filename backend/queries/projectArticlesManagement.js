@@ -2543,15 +2543,24 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         const errorCode = request.parameters.ErrorCode.value || 0;
         const errorMessage = request.parameters.ErrorMessage.value || '';
 
-        // DEBUG: Log parametri di output
+        // DEBUG: Log parametri di output con maggiori dettagli
         console.log('DEBUG: Parametri di output dalla SP:', {
-            returnItemId,
-            returnBOMId,
-            importedComponents,
-            errorCode,
+            returnItemId: returnItemId,
+            returnItemIdType: typeof returnItemId,
+            returnBOMId: returnBOMId,
+            returnBOMIdType: typeof returnBOMId,
+            importedComponents: importedComponents,
+            importedComponentsType: typeof importedComponents,
+            errorCode: errorCode,
             errorMessage: errorMessage || '(nessun errore)'
         });
 
+        // DEBUG: Log dei parametri raw
+        console.log('DEBUG: Parametri RAW:', {
+            returnItemIdRaw: request.parameters.ReturnItemId.value,
+            returnBOMIdRaw: request.parameters.ReturnBOMId.value,
+            importedComponentsRaw: request.parameters.ImportedComponents.value
+        });
 
         // Controllo errori
         if (errorCode !== 0) {
@@ -2566,13 +2575,32 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
             };
         }
 
-        // CONTROLLO CRITICO: Se avevamo componenti ma non ne è stato importato nessuno
-        // Questo indica un timeout silenzioso o un problema nella stored procedure
+        // CONTROLLO MIGLIORATO: Verifica se l'importazione ha avuto successo
+        // Un'importazione è considerata riuscita se:
+        // 1. Non ci sono errori (errorCode === 0) E
+        // 2. ALMENO UNO tra:
+        //    - returnItemId è valorizzato (articolo creato)
+        //    - returnBOMId è valorizzato (BOM creata)
         const selectedComponentsCount = importData.components?.length || 0;
-        if (selectedComponentsCount > 0 && importedComponents === 0 && errorCode === 0) {
+        const hasItemId = returnItemId !== null && returnItemId !== undefined;
+        const hasBOMId = returnBOMId !== null && returnBOMId !== undefined;
+        const hasImportedComponents = importedComponents > 0;
+
+        console.log('DEBUG: Controllo successo importazione:', {
+            selectedComponentsCount,
+            hasItemId,
+            hasBOMId,
+            hasImportedComponents,
+            importazioneRiuscita: hasItemId || hasBOMId
+        });
+
+        // SOLO se NIENTE è stato creato, allora fallisci
+        if (selectedComponentsCount > 0 && !hasItemId && !hasBOMId && errorCode === 0) {
             console.error('ATTENZIONE: Importazione fallita silenziosamente!', {
                 componenteSelezionati: selectedComponentsCount,
                 componenteImportati: importedComponents,
+                hasItemId,
+                hasBOMId,
                 errorCode
             });
 

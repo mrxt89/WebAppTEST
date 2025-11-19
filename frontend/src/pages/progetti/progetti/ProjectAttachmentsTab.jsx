@@ -74,56 +74,46 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
 
   const handleFileSelect = async (fileOrFiles) => {
     console.log("handleFileSelect called with:", fileOrFiles);
-    
-    let file;
-    
-    // Gestione differenziata per FileDropZone e input standard
+
+    // Normalizza l'input in un array di File
+    let files = [];
     if (Array.isArray(fileOrFiles)) {
-      // Se è un array, prendi il primo file
-      file = fileOrFiles[0];
+      files = fileOrFiles;
     } else if (fileOrFiles?.target?.files) {
-      // Se viene da un evento input file standard
-      file = fileOrFiles.target.files[0];
-    } else if (typeof fileOrFiles === 'object' && fileOrFiles !== null && fileOrFiles.name) {
-      // Se è direttamente un oggetto File (verificato tramite proprietà)
-      file = fileOrFiles;
-    } else {
-      console.error("Formato file non riconosciuto:", fileOrFiles);
-      return;
+      files = Array.from(fileOrFiles.target.files);
+    } else if (
+      typeof fileOrFiles === "object" &&
+      fileOrFiles !== null &&
+      fileOrFiles.name
+    ) {
+      files = [fileOrFiles];
     }
 
-    if (!file) {
-      console.log("No file selected");
+    if (!files.length) {
+      console.log("No files selected");
       return;
     }
-
-    // Log dettagliato del file per debug
-    console.log("File details:", {
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      lastModified: file.lastModified,
-      constructor: file.constructor?.name
-    });
 
     // Verifica che project.ProjectID sia definito
     if (!project?.ProjectID) {
-      console.error("Project ID is missing, cannot upload file");
+      console.error("Project ID is missing, cannot upload files");
       swal.fire({
         title: "Errore",
-        text: "ID progetto mancante, impossibile caricare il file",
+        text: "ID progetto mancante, impossibile caricare i file",
         icon: "error",
         timer: 1500,
       });
       return;
     }
 
-    // Verifica che il file sia valido (usando proprietà invece di instanceof)
-    if (!file || typeof file !== 'object' || !file.name || file.size === 0) {
-      console.error("File non valido o vuoto");
+    const validFiles = files.filter(
+      (file) => file && typeof file === "object" && file.name && file.size > 0,
+    );
+
+    if (!validFiles.length) {
       swal.fire({
         title: "Errore",
-        text: "File non valido o vuoto",
+        text: "Nessun file valido da caricare",
         icon: "error",
         timer: 1500,
       });
@@ -132,32 +122,80 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
 
     try {
       setUploading(true);
+      let successCount = 0;
+      const errorFiles = [];
 
-      // Usa la nuova versione con oggetto options
-      const result = await uploadAttachment(file, {
-        projectId: project.ProjectID,
-        taskId: 0,
-      });
+      for (const file of validFiles) {
+        console.log("Uploading file:", {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          lastModified: file.lastModified,
+        });
 
-      if (result.success) {
+        try {
+          const result = await uploadAttachment(file, {
+            projectId: project.ProjectID,
+            taskId: 0,
+          });
+
+          if (result.success) {
+            successCount += 1;
+          } else {
+            throw new Error(result.message || "Upload fallito");
+          }
+        } catch (error) {
+          console.error(`Upload error for ${file.name}:`, error);
+          errorFiles.push({
+            name: file.name,
+            message: error.message || "Errore nel caricamento",
+          });
+        }
+      }
+
+      if (successCount > 0) {
         await loadAttachments();
         onAttachmentChange && onAttachmentChange();
-        // Nascondo il pannello dopo caricamento completato
         setShowUploadPanel(false);
-        swal.fire({
-          title: "Successo",
-          text: "Allegato caricato con successo",
-          icon: "success",
-          timer: 1500
-        });
-      } else {
-        throw new Error(result.message || "Upload fallito");
       }
+
+      const summaryIcon =
+        errorFiles.length === 0
+          ? "success"
+          : successCount > 0
+          ? "warning"
+          : "error";
+
+      const errorDetails =
+        errorFiles.length > 0
+          ? `<ul style="text-align:left;margin-top:8px;">${errorFiles
+              .slice(0, 5)
+              .map(
+                (file) =>
+                  `<li><strong>${file.name}</strong>: ${file.message}</li>`,
+              )
+              .join("")}${
+              errorFiles.length > 5
+                ? `<li>...altri ${errorFiles.length - 5} file</li>`
+                : ""
+            }</ul>`
+          : "";
+
+      swal.fire({
+        title: "Caricamento completato",
+        html: `
+          <p>File caricati correttamente: <strong>${successCount}</strong></p>
+          <p>File in errore: <strong>${errorFiles.length}</strong></p>
+          ${errorDetails}
+        `,
+        icon: summaryIcon,
+        confirmButtonText: "OK",
+      });
     } catch (error) {
-      console.error("Upload error:", error);
+      console.error("Unexpected upload error:", error);
       swal.fire({
         title: "Errore",
-        text: error.message || "Errore nel caricamento dell'allegato",
+        text: error.message || "Errore nel caricamento degli allegati",
         icon: "error",
         timer: 1500,
       });
@@ -271,6 +309,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
                 onChange={handleFileSelect}
                 className="hidden"
                 accept="*/*"
+                multiple
               />
               <Button
                 onClick={toggleUploadPanel}
@@ -326,7 +365,7 @@ const ProjectAttachmentsTab = ({ project, canEdit, onAttachmentChange }) => {
             <FileDropZone
               onFileSelect={handleFileSelect}
               disabled={uploading || !project?.ProjectID}
-              multiple={false}
+              multiple
               sx={{ 
                 minHeight: "200px", 
                 border: "2px dashed", 

@@ -247,16 +247,6 @@ const FileDropZone = ({
                   ? "È possibile caricare più file contemporaneamente"
                   : "È possibile caricare un solo file"}
               </Typography>
-              {acceptedFileTypes.length > 0 && (
-                <Typography
-                  variant="caption"
-                  color="textSecondary"
-                  align="center"
-                  sx={{ mt: 1 }}
-                >
-                  Tipi di file accettati: {acceptedFileTypes.join(", ")}
-                </Typography>
-              )}
             </>
           )}
         </>

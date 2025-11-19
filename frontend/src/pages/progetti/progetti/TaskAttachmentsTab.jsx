@@ -58,52 +58,107 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
   }, [task?.TaskID]);
 
   const handleFileSelect = async (input) => {
-    let file;
+    let files = [];
 
-    // Se viene da input file standard
-    if (input?.target?.files) {
-      file = input.target.files[0];
-    } else {
-      // Se viene da drag & drop
-      file = input;
+    if (Array.isArray(input)) {
+      files = input;
+    } else if (input?.target?.files) {
+      files = Array.from(input.target.files);
+    } else if (input && input.name) {
+      files = [input];
     }
 
-    if (!file) {
-      console.log("No file selected");
+    if (!files.length) {
+      console.log("No files selected");
+      return;
+    }
+
+    const validFiles = files.filter(
+      (file) => file && typeof file === "object" && file.name && file.size > 0,
+    );
+
+    if (!validFiles.length) {
+      swal.fire({
+        title: "Errore",
+        text: "Nessun file valido da caricare",
+        icon: "error",
+        timer: 1500,
+      });
       return;
     }
 
     try {
       setUploading(true);
+      let successCount = 0;
+      const errorFiles = [];
 
-      // Usa la nuova versione con oggetto options
-      const result = await uploadAttachment(file, {
-        projectId: task.ProjectID,
-        taskId: task.TaskID,
-      });
+      for (const file of validFiles) {
+        try {
+          const result = await uploadAttachment(file, {
+            projectId: task.ProjectID,
+            taskId: task.TaskID,
+          });
 
-      if (result.success) {
-        await loadAttachments();
-        // Chiamiamo onAttachmentChange con un parametro che indica di mantenere la tab attiva
-        if (onAttachmentChange) onAttachmentChange(() => {
-          // Questo callback serve a eseguire operazioni dopo il refresh
-          // ma non cambia la tab attiva
-        });
-        
-        // Nascondo il pannello dopo caricamento completato
-        setShowUploadPanel(false);
-        swal.fire({
-          title: "Successo",
-          text: "Allegato caricato con successo",
-          icon: "success",
-          timer: 1500
-        });
+          if (result.success) {
+            successCount += 1;
+          } else {
+            throw new Error(result.message || "Upload fallito");
+          }
+        } catch (error) {
+          console.error(`Upload error for ${file.name}:`, error);
+          errorFiles.push({
+            name: file.name,
+            message: error.message || "Errore nel caricamento",
+          });
+        }
       }
+
+      if (successCount > 0) {
+        await loadAttachments();
+        if (onAttachmentChange)
+          onAttachmentChange(() => {
+            // Mantieni la tab attiva dopo il refresh
+          });
+        setShowUploadPanel(false);
+      }
+
+      const summaryIcon =
+        errorFiles.length === 0
+          ? "success"
+          : successCount > 0
+          ? "warning"
+          : "error";
+
+      const errorDetails =
+        errorFiles.length > 0
+          ? `<ul style="text-align:left;margin-top:8px;">${errorFiles
+              .slice(0, 5)
+              .map(
+                (file) =>
+                  `<li><strong>${file.name}</strong>: ${file.message}</li>`,
+              )
+              .join("")}${
+              errorFiles.length > 5
+                ? `<li>...altri ${errorFiles.length - 5} file</li>`
+                : ""
+            }</ul>`
+          : "";
+
+      swal.fire({
+        title: "Caricamento completato",
+        html: `
+          <p>File caricati correttamente: <strong>${successCount}</strong></p>
+          <p>File in errore: <strong>${errorFiles.length}</strong></p>
+          ${errorDetails}
+        `,
+        icon: summaryIcon,
+        confirmButtonText: "OK",
+      });
     } catch (error) {
       console.error("Upload error:", error);
       swal.fire({
         title: "Errore",
-        text: "Errore nel caricamento dell'allegato",
+        text: error.message || "Errore nel caricamento degli allegati",
         icon: "error",
         timer: 1500,
       });
@@ -172,6 +227,7 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
                 ref={fileInputRef}
                 onChange={handleFileSelect}
                 className="hidden"
+                multiple
               />
               <Button
                 onClick={toggleUploadPanel}
@@ -229,7 +285,7 @@ const TaskAttachmentsTab = ({ task, canEdit, onAttachmentChange }) => {
             <FileDropZone
               onFileSelect={handleFileSelect}
               disabled={uploading}
-              multiple={false}
+              multiple
               sx={{ minHeight: "200px", border: "2px dashed", borderColor: "primary.light" }}
               onClick={() => fileInputRef.current?.click()}
             >
