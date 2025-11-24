@@ -551,28 +551,30 @@ const MyTasksList = ({
     );
   };
 
+  
   return (
     <div 
-      className="border rounded-md h-full overflow-hidden" 
-      ref={tableRef}
+    className="border rounded-md h-full overflow-hidden" 
+    ref={tableRef}
       style={{ 
         height: filtersVisible 
-          ? 'calc(100vh - 105px - 60px - 48px - 40px - 240px)' 
+        ? 'calc(100vh - 105px - 60px - 48px - 40px - 240px)' 
           : 'calc(100vh - 105px - 60px - 48px - 40px - 180px)'
-      }}
-    >
+        }}
+        >
       <div className="relative w-full h-full overflow-auto overflow-x-auto">
         <Table 
           className="w-full"
           style={{ 
             minWidth: `${columnWidths.reduce((sum, width) => sum + width, 0)}px` 
           }}
-        >
+          >
           <TableHeader className="sticky top-0 z-10 bg-gray-50">
             <TableRow>
               <TableHead
                 style={{ width: `${columnWidths[0]}px`, position: 'relative' }}
                 className="cursor-pointer hover:bg-gray-100"
+                
               >
                 <div className="flex items-center justify-between">
                   <div 
@@ -774,6 +776,8 @@ const MyTasksList = ({
           </TableHeader>
           
           <TableBody>
+            {console.log('[MyTasksList] tasks:', tasks)}
+            {console.log('[MyTasksList] Verifica ProjectErpID:', tasks.map(t => ({ TaskID: t.TaskID, Title: t.Title, ProjectErpID: t.ProjectErpID, hasProjectErpID: !!t.ProjectErpID })))}
             {sortedTasks.map((task) => {
               const isPinned = pinnedTasks.has(task.TaskID);
               const canEdit = isOwnTask(task) || checkAdminPermission(task);
@@ -983,7 +987,7 @@ const MyTasksList = ({
                       className="h-8 w-8 p-0"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const prj = task.ProjectName || "";
+                        const prj = task.ProjectErpID || "";
                         const stp = task.TaskSequence != null ? task.TaskSequence : "";
                         const ute = user?.ERPUserId ?? 0;
                         const ope = task.Operation || "";

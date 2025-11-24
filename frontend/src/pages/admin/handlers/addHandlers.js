@@ -14,16 +14,16 @@ export const handleAddUser = (addUser, refreshData, companies = []) => {
     .fire({
       title: "Aggiungi Nuovo Utente",
       html: `
-      <input type="text" id="username" class="archa-input" placeholder="Username" autocomplete="off">
-      <input type="text" id="firstName" class="archa-input" placeholder="Nome" autocomplete="off">
-      <input type="text" id="lastName" class="archa-input" placeholder="Cognome" autocomplete="new-username" value="">
-      <input type="password" id="password" class="archa-input" placeholder="Password" autocomplete="new-password" value="">
-      <input type="email" id="email" class="archa-input" placeholder="Email" autocomplete="off">
-      <input type="text" id="userBadge" class="archa-input" placeholder="Badge" autocomplete="off">
-      <input type="text" id="role" class="archa-input" placeholder="Ruolo" autocomplete="off">
-      <input type="text" id="phoneNumber" class="archa-input" placeholder="Telefono" autocomplete="off">
+      <input type="text" id="username" name="username" class="archa-input" placeholder="Username" autocomplete="username">
+      <input type="text" id="firstName" name="firstName" class="archa-input" placeholder="Nome" autocomplete="given-name">
+      <input type="text" id="lastName" name="lastName" class="archa-input" placeholder="Cognome" autocomplete="family-name" value="">
+      <input type="password" id="password" name="password" class="archa-input" placeholder="Password" autocomplete="new-password" value="">
+      <input type="email" id="email" name="email" class="archa-input" placeholder="Email" autocomplete="email">
+      <input type="text" id="userBadge" name="userBadge" class="archa-input" placeholder="Badge" autocomplete="off">
+      <input type="text" id="role" name="role" class="archa-input" placeholder="Ruolo" autocomplete="organization-title">
+      <input type="text" id="phoneNumber" name="phoneNumber" class="archa-input" placeholder="Telefono" autocomplete="tel">
       <label for="companies">Aziende</label>
-      <select id="companies" class="archa-input" multiple>
+      <select id="companies" name="companies" class="archa-input" multiple>
         ${companyOptions}
       </select>
       <small>Tieni premuto CTRL per selezionare più aziende</small>
@@ -100,8 +100,8 @@ export const handleAddGroup = (addGroup, refreshData) => {
     .fire({
       title: "Aggiungi Nuovo Gruppo",
       html: `
-      <input type="text" id="groupName" class="archa-input" placeholder="Nome Gruppo">
-      <input type="text" id="description" class="archa-input" placeholder="Descrizione">
+      <input type="text" id="groupName" name="groupName" class="archa-input" placeholder="Nome Gruppo" autocomplete="off">
+      <input type="text" id="description" name="description" class="archa-input" placeholder="Descrizione" autocomplete="off">
     `,
       focusConfirm: false,
       showCancelButton: true,
@@ -140,17 +140,17 @@ export const handleAddNotificationChannel = (
     .fire({
       title: "Aggiungi nuovo canale di notifica",
       html: `
-      <input type="text" id="channelName" class="archa-input" placeholder="Nome Canale">
-      <input type="text" id="description" class="archa-input" placeholder="Descrizione">
-      <input type="color" id="color" class="archa-input" placeholder="Colore">
-      <select id="responseType" class="archa-input">
+      <input type="text" id="channelName" name="channelName" class="archa-input" placeholder="Nome Canale" autocomplete="off">
+      <input type="text" id="description" name="description" class="archa-input" placeholder="Descrizione" autocomplete="off">
+      <input type="color" id="color" name="color" class="archa-input" placeholder="Colore" autocomplete="off">
+      <select id="responseType" name="responseType" class="archa-input">
         <option value="1">Nessuna Risposta</option>
         <option value="2">Risposta SI/NO</option>
         <option value="3">Testo libero</option>
       </select>
-      <input type="text" id="defaultTitle" class="archa-input" placeholder="Titolo di Default">
+      <input type="text" id="defaultTitle" name="defaultTitle" class="archa-input" placeholder="Titolo di Default" autocomplete="off">
       <label for="intercompany">Canale Intercompany</label>
-      <input type="checkbox" id="intercompany" class="archa-input" placeholder="Intercompany">
+      <input type="checkbox" id="intercompany" name="intercompany" class="archa-input" placeholder="Intercompany">
     `,
       focusConfirm: false,
       showCancelButton: true,

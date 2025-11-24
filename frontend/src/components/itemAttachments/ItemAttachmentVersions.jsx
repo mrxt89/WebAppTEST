@@ -20,6 +20,9 @@ import {
   Tooltip,
   TextField,
   Grid,
+  Tabs,
+  Tab,
+  Alert,
 } from "@mui/material";
 import {
   CloudUpload as UploadIcon,
@@ -33,6 +36,8 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import useItemAttachmentsActions from "../../hooks/useItemAttachmentsActions";
 import { formatBytes } from "../../lib/common";
+import localAgentService from "@/services/localAgentService";
+import { config } from "@/config";
 
 /**
  * ItemAttachmentVersions - Componente per la gestione delle versioni di un allegato
@@ -56,6 +61,11 @@ function ItemAttachmentVersions({
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [changeNotes, setChangeNotes] = useState("");
+  const [creationMode, setCreationMode] = useState("upload"); // 'upload' | 'clone'
+  const [cloneNotes, setCloneNotes] = useState("");
+  const [cloneLoading, setCloneLoading] = useState(false);
+  const [agentAvailable, setAgentAvailable] = useState(false);
+  const hasVersions = versions.length > 0;
 
   // Ref per input file
   const fileInputRef = useRef(null);
@@ -66,6 +76,7 @@ function ItemAttachmentVersions({
     addAttachmentVersion,
     downloadAttachmentVersion,
     restoreAttachmentVersion,
+    getItemAttachmentById,
   } = useItemAttachmentsActions();
 
   // Carica le versioni dell'allegato
@@ -88,6 +99,14 @@ function ItemAttachmentVersions({
       loadVersions();
     }
   }, [attachment, open, inline, getAttachmentVersions]);
+
+  useEffect(() => {
+    const checkAgent = async () => {
+      const available = await localAgentService.checkAvailability();
+      setAgentAvailable(available);
+    };
+    checkAgent();
+  }, []);
 
   // Gestione selezione file
   const handleFileSelect = (event) => {
@@ -165,6 +184,105 @@ function ItemAttachmentVersions({
     }
   };
 
+  const downloadVersionBlob = async (version) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      throw new Error("Token di autenticazione mancante");
+    }
+
+    const url = version?.VersionID
+      ? `${config.API_BASE_URL}/item-attachments/versions/${version.VersionID}/download`
+      : `${config.API_BASE_URL}/item-attachments/${attachment.AttachmentID}/download`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(
+        `Download versione fallito (${response.status} ${response.statusText}) ${text}`,
+      );
+    }
+
+    return response.blob();
+  };
+
+  const openAttachmentWithAgent = async () => {
+    if (!attachment?.AttachmentID) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const freshAttachment = await getItemAttachmentById(attachment.AttachmentID);
+      const serverUrl = config.API_BASE_URL.startsWith("http")
+        ? config.API_BASE_URL.replace("/api", "")
+        : window.location.origin;
+
+      const fileData = {
+        attachmentId: freshAttachment?.AttachmentID || attachment.AttachmentID,
+        fileName: freshAttachment?.FileName || attachment.FileName,
+        filePath: freshAttachment?.FilePath || attachment.FilePath,
+        serverUrl,
+        token: `Bearer ${token}`,
+        companyId: user.CompanyId,
+        userId: user.userId,
+        projectId: freshAttachment?.ProjectID,
+        taskId: freshAttachment?.TaskID,
+        notificationId: freshAttachment?.NotificationID,
+        itemCode: freshAttachment?.ItemCode,
+        projectItemId: freshAttachment?.ProjectItemId,
+        lockFile: true,
+      };
+
+      await localAgentService.openFile(fileData);
+    } catch (error) {
+      console.error("Errore apertura con agent:", error);
+      const info = localAgentService.handleError?.(error);
+      alert(info?.message || error.message || "Impossibile aprire il file con Agent");
+    }
+  };
+
+  const handleCloneAndAgent = async () => {
+    if (!attachment || !versions.length) return;
+
+    const latestVersion = versions[0];
+    const notesText = cloneNotes.trim();
+    if (!notesText) {
+      alert("Inserisci una nota per tracciare la modifica.");
+      return;
+    }
+
+    try {
+      setCloneLoading(true);
+      const blob = await downloadVersionBlob(latestVersion);
+      const originalName = attachment.FileName || latestVersion.FileName || "allegato";
+      const clonedName = originalName.replace(/(\.[^.]+)?$/, "-copia$1");
+      const fileType = blob.type || "application/octet-stream";
+      const clonedFile = new File([blob], clonedName, { type: fileType });
+
+      await addAttachmentVersion(attachment.AttachmentID, clonedFile, notesText);
+      const refreshed = await getAttachmentVersions(attachment.AttachmentID);
+      setVersions(refreshed || []);
+      setSelectedFile(null);
+      setChangeNotes("");
+      setCloneNotes("");
+
+      if (agentAvailable) {
+        await openAttachmentWithAgent();
+      } else {
+        alert("Versione duplicata. Avvia Local Agent per modificare il file.");
+      }
+    } catch (error) {
+      console.error("Errore durante la duplicazione:", error);
+      alert(error.message || "Errore nella duplicazione della versione");
+    } finally {
+      setCloneLoading(false);
+    }
+  };
+
   // Render del form per nuova versione
   const renderUploadForm = () => (
     <Paper
@@ -178,73 +296,134 @@ function ItemAttachmentVersions({
       }}
     >
       <Typography variant="subtitle1" gutterBottom>
-        Carica una nuova versione
+        Crea nuova versione
       </Typography>
 
-      <Grid container spacing={2}>
-        <Grid item xs={12}>
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              mb: 2,
-            }}
-          >
-            <Button
-              variant="outlined"
-              component="label"
-              startIcon={<UploadIcon />}
-              disabled={uploading}
+      <Tabs
+        value={creationMode}
+        onChange={(_, val) => setCreationMode(val)}
+        sx={{ mb: 2 }}
+      >
+        <Tab label="Carica nuovo file" value="upload" />
+        <Tab
+          label="Duplica versione attuale"
+          value="clone"
+        />
+      </Tabs>
+
+      {creationMode === "upload" ? (
+        <Grid container spacing={2}>
+          <Grid item xs={12}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                mb: 2,
+              }}
             >
-              Seleziona file
-              <input
-                ref={fileInputRef}
-                type="file"
-                style={{ display: "none" }}
-                onChange={handleFileSelect}
-              />
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<UploadIcon />}
+                disabled={uploading}
+              >
+                Seleziona file
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  style={{ display: "none" }}
+                  onChange={handleFileSelect}
+                />
+              </Button>
+
+              {selectedFile && (
+                <Typography variant="body2" sx={{ ml: 2 }}>
+                  {selectedFile.name} ({formatBytes(selectedFile.size)})
+                </Typography>
+              )}
+            </Box>
+          </Grid>
+
+          <Grid item xs={12}>
+            <TextField
+              label="Note sulla modifica"
+              fullWidth
+              required
+              value={changeNotes}
+              onChange={(e) => setChangeNotes(e.target.value)}
+              disabled={uploading || !selectedFile}
+              placeholder="Descrivi le modifiche in questa versione (obbligatorio)"
+              multiline
+              rows={2}
+              error={selectedFile && !changeNotes}
+              helperText={
+                selectedFile && !changeNotes
+                  ? "Le note sono obbligatorie per nuove versioni"
+                  : "Descrivi cosa è cambiato rispetto alla versione precedente"
+              }
+            />
+          </Grid>
+
+          <Grid item xs={12} sx={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<UploadIcon />}
+              onClick={handleUploadVersion}
+              disabled={uploading || !selectedFile || !changeNotes.trim()}
+            >
+              {uploading ? "Caricamento..." : "Carica versione"}
             </Button>
-
-            {selectedFile && (
-              <Typography variant="body2" sx={{ ml: 2 }}>
-                {selectedFile.name} ({formatBytes(selectedFile.size)})
-              </Typography>
-            )}
-          </Box>
+          </Grid>
         </Grid>
+      ) : (
+        <Box>
+          <Alert severity={hasVersions ? "info" : "warning"} sx={{ mb: 2 }}>
+            {hasVersions
+              ? "Duplicherai la versione attuale e potrai modificarla subito con Local Agent."
+              : "Non esistono ancora versioni storiche: verrà duplicato direttamente il file corrente (versione 0)."}
+          </Alert>
 
-        <Grid item xs={12}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Inserisci sempre una nota per tracciare la modifica.
+          </Typography>
+
           <TextField
             label="Note sulla modifica"
             fullWidth
             required
-            value={changeNotes}
-            onChange={(e) => setChangeNotes(e.target.value)}
-            disabled={uploading || !selectedFile}
-            placeholder="Descrivi le modifiche in questa versione (obbligatorio)"
+            value={cloneNotes}
+            onChange={(e) => setCloneNotes(e.target.value)}
             multiline
             rows={2}
-            error={selectedFile && !changeNotes}
-            helperText={
-              selectedFile && !changeNotes
-                ? "Le note sono obbligatorie per nuove versioni"
-                : "Descrivi cosa è cambiato rispetto alla versione precedente"
-            }
+            placeholder="Esempio: Copia per modifica CAD"
           />
-        </Grid>
 
-        <Grid item xs={12} sx={{ display: "flex", justifyContent: "flex-end" }}>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<UploadIcon />}
-            onClick={handleUploadVersion}
-            disabled={uploading || !selectedFile || !changeNotes.trim()}
-          >
-            {uploading ? "Caricamento..." : "Carica versione"}
-          </Button>
-        </Grid>
-      </Grid>
+          {!agentAvailable && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              Local Agent non è attivo: la nuova versione verrà creata comunque e potrai aprirla manualmente più tardi.
+            </Alert>
+          )}
+
+          <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2, gap: 1 }}>
+            <Button
+              variant="outlined"
+              onClick={openAttachmentWithAgent}
+              disabled={!agentAvailable || cloneLoading || uploading}
+            >
+              Apri versione corrente
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<UploadIcon />}
+              onClick={handleCloneAndAgent}
+              disabled={cloneLoading || uploading || !cloneNotes.trim() || !attachment?.AttachmentID}
+            >
+              {cloneLoading ? "Preparazione..." : "Duplica e apri con Agent"}
+            </Button>
+          </Box>
+        </Box>
+      )}
     </Paper>
   );
 

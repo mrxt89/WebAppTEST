@@ -382,7 +382,7 @@ router.get('/DBNotificationsView', authenticateToken, async (req, res) => {
 const upload = multer({
   dest: 'temp/uploads/',
   limits: {
-      fileSize: 50 * 1024 * 1024 // 50MB
+    fileSize: 400 * 1024 * 1024 // 400MB limit
   },
   fileFilter: (req, file, cb) => {
       // Usa lo stesso filtro per i tipi MIME definito in attachmentRoutes.js

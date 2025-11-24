@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/use-toast";
 import {
   DndContext,
@@ -232,6 +233,8 @@ const SortableCycleItem = ({
   toggleExpand,
   workCenters,
   operations,
+  onToggleCheckOperation,
+  checkOperationSaving = false,
 }) => {
   const {
     attributes,
@@ -251,6 +254,8 @@ const SortableCycleItem = ({
 
   const isExpanded = expanded.includes(cycle.id || cycle.RtgStep);
   const isReadOnly = isInMago;
+  const isOperationChecked =
+    parseInt(cycle.CheckOperation, 10) === 1 || cycle.CheckOperation === true;
 
   // Gestione del cambio operazione con precompilazione del CdL
   const handleOperationChange = (operationCode) => {
@@ -304,9 +309,46 @@ const SortableCycleItem = ({
               ? ` - ${cycle.WorkCenterDescription}`
               : ""}
           </div>
+          <div className="mt-1 flex flex-wrap gap-2">
+            <Badge
+              className={
+                isOperationChecked
+                  ? "bg-green-100 text-green-700 border border-green-200"
+                  : "bg-amber-100 text-amber-800 border border-amber-200"
+              }
+            >
+              {isOperationChecked ? "Operazione controllata" : "Da verificare"}
+            </Badge>
+
+            {isInMago && (
+              <Badge className="bg-blue-100 text-blue-700 border border-blue-200">
+                ERP
+              </Badge>
+            )}
+          </div>
 
           {isInMago && (
-            <Badge className="mt-1 bg-blue-100 text-blue-700">ERP</Badge>
+            <p className="text-xs text-blue-600 mt-1">
+              Ciclo sincronizzato da ERP
+            </p>
+          )}
+
+          {onToggleCheckOperation && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-gray-600">
+              <Checkbox
+                checked={isOperationChecked}
+                onCheckedChange={(checked) =>
+                  onToggleCheckOperation(cycle, checked === true)
+                }
+                disabled={!onToggleCheckOperation || cycle.isNew || checkOperationSaving}
+                className="h-4 w-4 data-[state=checked]:bg-green-500 data-[state=checked]:text-white"
+              />
+              <span>
+                Operazione controllata
+                {cycle.isNew && " (salva la fase per attivare)"}
+                {checkOperationSaving && " (salvataggio...)"}
+              </span>
+            </div>
           )}
         </div>
 
@@ -359,10 +401,12 @@ const SortableCycleItem = ({
             {/* Prima riga: Numero Fase e Operazione */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium mb-1 block">
+                <label htmlFor={`rtg-step-${cycle.id || cycle.RtgStep}`} className="text-sm font-medium mb-1 block">
                   Numero Fase
                 </label>
                 <Input
+                  id={`rtg-step-${cycle.id || cycle.RtgStep}`}
+                  name={`rtg-step-${cycle.id || cycle.RtgStep}`}
                   value={cycle.RtgStep || ""}
                   onChange={(e) =>
                     handleCycleFieldChange(
@@ -375,6 +419,7 @@ const SortableCycleItem = ({
                   type="number"
                   min="1"
                   step="10"
+                  autoComplete="off"
                 />
               </div>
               
@@ -481,6 +526,27 @@ const SortableCycleItem = ({
                 />
               </div>
             </div>
+
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id={`check-${cycle.id || cycle.RtgStep}`}
+                checked={isOperationChecked}
+                onCheckedChange={(checked) =>
+                  onToggleCheckOperation &&
+                  onToggleCheckOperation(cycle, checked === true)
+                }
+                disabled={cycle.isNew || checkOperationSaving}
+                className="data-[state=checked]:bg-green-500 data-[state=checked]:text-white"
+              />
+              <label
+                htmlFor={`check-${cycle.id || cycle.RtgStep}`}
+                className="text-sm text-gray-700 select-none cursor-pointer"
+              >
+                Operazione controllata (richiesto per export ERP)
+                {cycle.isNew && " - salva prima la fase"}
+                {checkOperationSaving && " - salvataggio in corso"}
+              </label>
+            </div>
           </div>
         ) : (
           // Modalità visualizzazione
@@ -499,6 +565,26 @@ const SortableCycleItem = ({
                 </div>
                 <div className="pl-2">
                   {cycle.Operation} - {cycle.OperationDescription}
+                </div>
+
+                <div className="font-medium text-gray-700 mb-1 mt-3">
+                  Controllo Operazione:
+                </div>
+                <div className="pl-2 flex items-center gap-2">
+                  <Badge
+                    className={
+                      isOperationChecked
+                        ? "bg-green-100 text-green-700 border border-green-200"
+                        : "bg-amber-100 text-amber-800 border border-amber-200"
+                    }
+                  >
+                    {isOperationChecked ? "Verificata" : "Non verificata"}
+                  </Badge>
+                  {!isOperationChecked && (
+                    <span className="text-xs text-amber-700">
+                      Necessaria per export ERP
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mt-3">
@@ -561,6 +647,7 @@ const CyclesTab = () => {
     reorderBOMRoutings,
     pendingChanges,
     setPendingChanges,
+    updateRoutingCheckOperation,
   } = useBOMViewer();
 
   const [draftCycles, setDraftCycles] = useState([]);
@@ -569,6 +656,7 @@ const CyclesTab = () => {
   const [expandedCycles, setExpandedCycles] = useState([]);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [checkOperationSaving, setCheckOperationSaving] = useState({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -655,6 +743,10 @@ const CyclesTab = () => {
       )
     );
 
+    if (field === "CheckOperation") {
+      return;
+    }
+
     const cycle = draftCycles.find(
       (c) => c.RtgStep === rtgStep || c.id === rtgStep
     );
@@ -693,6 +785,11 @@ const CyclesTab = () => {
     }
   };
 
+  const handleToggleCheckOperation = (rtgStep, value) => {
+    const normalizedValue = value ? 1 : 0;
+    handleCycleFieldChange(rtgStep, "CheckOperation", normalizedValue);
+  };
+
   const handleAddCycle = () => {
     const lastStep =
       draftCycles.length > 0
@@ -712,6 +809,7 @@ const CyclesTab = () => {
       NoOfSetupWorkers: 1,
       Notes: "",
       isNew: true,
+      CheckOperation: 0,
     };
 
     setDraftCycles((prevDraft) => [...prevDraft, newCycle]);
@@ -794,6 +892,64 @@ const CyclesTab = () => {
         title: "Errore",
         description: "Errore durante l'operazione di eliminazione",
         variant: "destructive",
+      });
+    }
+  };
+
+  const handleCheckOperationToggle = async (cycle, checked) => {
+    if (!cycle || !cycle.RtgStep) return;
+
+    const rtgStep = cycle.RtgStep;
+    const bomId = cycle.BOMId || selectedNode?.data?.BOMId;
+    if (!bomId || cycle.isNew) {
+      return;
+    }
+
+    const previousValue =
+      parseInt(cycle.CheckOperation, 10) === 1 || cycle.CheckOperation === true
+        ? 1
+        : 0;
+    const nextValue = checked ? 1 : 0;
+
+    setDraftCycles((prevDraft) =>
+      prevDraft.map((c) =>
+        c.RtgStep === rtgStep || c.id === rtgStep
+          ? { ...c, CheckOperation: nextValue }
+          : c,
+      ),
+    );
+
+    setCheckOperationSaving((prev) => ({ ...prev, [rtgStep]: true }));
+
+    try {
+      await updateRoutingCheckOperation(bomId, rtgStep, nextValue);
+      toast({
+        title: "Operazione aggiornata",
+        description: `Fase ${rtgStep} ${
+          nextValue === 1 ? "verificata" : "marcata da verificare"
+        }`,
+        variant: nextValue === 1 ? "success" : "default",
+      });
+    } catch (error) {
+      console.error("Errore aggiornamento check operazione:", error);
+      setDraftCycles((prevDraft) =>
+        prevDraft.map((c) =>
+          c.RtgStep === rtgStep || c.id === rtgStep
+            ? { ...c, CheckOperation: previousValue }
+            : c,
+        ),
+      );
+      toast({
+        title: "Errore",
+        description:
+          "Impossibile aggiornare il flag Operazione controllata. Riprova.",
+        variant: "destructive",
+      });
+    } finally {
+      setCheckOperationSaving((prev) => {
+        const next = { ...prev };
+        delete next[rtgStep];
+        return next;
       });
     }
   };
@@ -981,7 +1137,9 @@ const CyclesTab = () => {
                       expanded={expandedCycles}
                       toggleExpand={toggleCycleExpansion}
                       workCenters={workCenters}
-                      operations={operations}
+                    operations={operations}
+                  onToggleCheckOperation={handleCheckOperationToggle}
+                  checkOperationSaving={!!checkOperationSaving[cycle.RtgStep]}
                     />
                   ))}
                 </SortableContext>
@@ -1001,6 +1159,8 @@ const CyclesTab = () => {
                   toggleExpand={toggleCycleExpansion}
                   workCenters={workCenters}
                   operations={operations}
+                onToggleCheckOperation={handleCheckOperationToggle}
+                checkOperationSaving={!!checkOperationSaving[cycle.RtgStep]}
                 />
               ))
             )}

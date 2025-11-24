@@ -407,6 +407,16 @@ router.get('/projects/tasks/user', authenticateToken, async (req, res) => {
     try {
       const userId = req.user.UserId;
         const tasks = await getUserTasks(userId);
+        
+        // Debug: verifica ProjectErpID prima di inviare
+        if (tasks && tasks.length > 0) {
+            console.log('[GET /projects/tasks/user] Prima task keys:', Object.keys(tasks[0]));
+            console.log('[GET /projects/tasks/user] ProjectErpID presente?', 'ProjectErpID' in tasks[0]);
+            if (tasks[0].ProjectErpID) {
+                console.log('[GET /projects/tasks/user] ProjectErpID value:', tasks[0].ProjectErpID);
+            }
+        }
+        
         res.json(tasks);
     } catch (err) {
         console.error('Error fetching user tasks:', err);

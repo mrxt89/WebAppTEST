@@ -1202,6 +1202,8 @@ const ChatBottomBar = ({
             {/* Input file nascosto */}
             <input
               type="file"
+              id={`chat-file-input-${notificationId || 'new'}`}
+              name={`chat-file-input-${notificationId || 'new'}`}
               ref={fileInputRef}
               onChange={handleFileSelect}
               className="hidden"

@@ -33,23 +33,79 @@ import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import MarkupDetailModal from './MarkupDetailModal';
 
-// Helper per ottenere un colore in base al livello
+const COLUMN_WIDTHS = {
+  name: "40%",
+  quantity: "6%",
+  uom: "5%",
+  lot: "7%",
+  unitCost: "8%",
+  fixedCost: "7%",
+  variableCost: "8%",
+  totalTime: "8%",
+  setupTime: "6%",
+  workCenter: "5%",
+};
+
 const getLevelColor = (level) => {
   const LEVEL_COLORS = [
-    "#1f2937", // Livello 0 - gray-800 (più scuro per il root)
-    "#3b82f6", // Livello 1 - blue-500
-    "#22c55e", // Livello 2 - green-500
-    "#f59e0b", // Livello 3 - amber-500
-    "#a855f7", // Livello 4 - purple-500
-    "#ec4899", // Livello 5 - pink-500
-    "#6366f1", // Livello 6 - indigo-500
-    "#ef4444", // Livello 7 - red-500
-    "#06b6d4", // Livello 8 - cyan-500
-    "#10b981", // Livello 9 - emerald-500
+    "#1f2937",
+    "#3b82f6",
+    "#22c55e",
+    "#f59e0b",
+    "#a855f7",
+    "#ec4899",
+    "#6366f1",
+    "#ef4444",
+    "#06b6d4",
+    "#10b981",
   ];
 
   const colorIndex = level < LEVEL_COLORS.length ? level : level % LEVEL_COLORS.length;
   return LEVEL_COLORS[colorIndex];
+};
+
+const parseSeconds = (value) => {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "string") {
+    if (value.includes(":")) {
+      const parts = value.split(":").map((p) => parseInt(p, 10) || 0);
+      if (parts.length === 3) {
+        return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      }
+    }
+    const parsed = parseFloat(value.replace(",", "."));
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  return Number.isFinite(value) ? value : 0;
+};
+
+const formatDurationHuman = (seconds) => {
+  const totalSeconds = Math.max(0, Math.round(seconds || 0));
+  if (totalSeconds === 0) return "-";
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${secs.toString().padStart(2, "0")}s`;
+  }
+  return `${secs}s`;
+};
+
+const formatDurationDigital = (seconds) => {
+  const totalSeconds = Math.max(0, Math.round(seconds || 0));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  return [
+    hours.toString().padStart(2, "0"),
+    minutes.toString().padStart(2, "0"),
+    secs.toString().padStart(2, "0"),
+  ].join(":");
 };
 
 // Component per l'icona del nodo
@@ -77,36 +133,31 @@ const NodeIcon = ({ node, isRootNode }) => {
 };
 
 // Componente per un nodo ciclo
-const CycleNode = ({ cycle, level, expanded, onToggle }) => {
-  // MIGLIORATO: Sistema di indentazione progressivo
-  // Calcola l'indentazione in base al livello del nodo
-  const baseIndent = 8; // Indentazione base in pixel
-  const indentPerLevel = 24; // Pixel di indentazione per ogni livello
+const CycleNode = ({ cycle, level }) => {
+  const baseIndent = 8;
+  const indentPerLevel = 24;
   const indent = level * indentPerLevel + baseIndent;
 
-  // Estrai i dati del ciclo
   const operationName = cycle.Operation || cycle.OperationDescription || `Fase ${cycle.RtgStep || ''}`;
-  const workCenter = cycle.WorkCenter || cycle.WC || '';
+  const workCenter = cycle.WorkCenterDescription || cycle.WorkCenter || cycle.WC || '';
   const quantity = cycle.Qty || 1;
   const unitCost = cycle.UnitCost || 0;
   const fixedCost = cycle.FixedCost || 0;
-  
-  // Calcola il costo variabile (solo parte variabile del ciclo)
+  const productionLot = Number(cycle.ProductionLot) || 1;
+  const processingSeconds = parseSeconds(cycle.ProcessingTime);
+  const setupSeconds = parseSeconds(cycle.SetupTime);
+  const totalProcessingSeconds = processingSeconds * productionLot;
   const variableCost = unitCost * quantity;
 
   return (
     <div>
       <div
-        className={cn(
-          "flex items-center py-1 px-2 rounded hover:bg-green-50 transition-colors",
-          "border-l-2"
-        )}
+        className={cn("flex items-center py-1 px-2 rounded hover:bg-green-50 transition-colors", "border-l-2")}
         style={{
           borderLeftColor: getLevelColor(level),
-          backgroundColor: level > 0 ? `${getLevelColor(level)}05` : undefined // Colore più tenue per la card
+          backgroundColor: level > 0 ? `${getLevelColor(level)}05` : undefined
         }}
       >
-        {/* NUOVO: Numero del livello a sinistra */}
         {level > 0 && (
           <div
             className="flex items-center justify-center w-4 h-4 mr-2 text-xs font-medium rounded-full flex-shrink-0"
@@ -121,19 +172,15 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
           </div>
         )}
 
-        {/* Spacer per allineamento (senza toggle icon) */}
         <div className="w-3 mr-1" />
 
-        {/* Cycle icon */}
         <Factory className="h-4 w-4 text-green-600 mr-2 flex-shrink-0" />
 
-        {/* Cycle info - Layout tabellare */}
         <div className="flex-1 flex items-center ml-2 min-w-0">
-          {/* Colonna 1: Operazione e Centro di Lavoro (55%) - CON INDENTAZIONE */}
-          <div 
-            className="flex items-center gap-2 min-w-0" 
-            style={{ 
-              width: '55%',
+          <div
+            className="flex items-center gap-2 min-w-0"
+            style={{
+              width: COLUMN_WIDTHS.name,
               paddingLeft: `${indent}px`
             }}
           >
@@ -145,46 +192,51 @@ const CycleNode = ({ cycle, level, expanded, onToggle }) => {
             )}
           </div>
 
-          {/* Colonna 2: Quantità (8%) */}
-          <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: '8%' }}>
+          <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: COLUMN_WIDTHS.quantity }}>
             {quantity}
           </div>
 
-          {/* Colonna 3: UM (5%) */}
-          <div className="text-xs text-gray-600 text-center flex-shrink-0" style={{ width: '5%' }}>
+          <div className="text-xs text-gray-600 text-center flex-shrink-0" style={{ width: COLUMN_WIDTHS.uom }}>
             -
           </div>
 
-          {/* Colonna 4: Lotto Produzione (8%) */}
-          <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: '8%' }}>
+          <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: COLUMN_WIDTHS.lot }}>
             {cycle.ProductionLot || '-'}
           </div>
 
-          {/* Colonna 5: Costo Unitario (8%) */}
-          <div className="text-xs font-medium text-gray-900 text-right flex-shrink-0" style={{ width: '8%' }}>
+          <div className="text-xs font-medium text-gray-900 text-right flex-shrink-0" style={{ width: COLUMN_WIDTHS.unitCost }}>
             {formatCurrency(unitCost)}
           </div>
 
-          {/* Colonna 6: Costo Fisso (8%) */}
-          <div className="text-xs font-medium text-orange-700 text-right flex-shrink-0" style={{ width: '8%' }}>
+          <div className="text-xs font-medium text-orange-700 text-right flex-shrink-0" style={{ width: COLUMN_WIDTHS.fixedCost }}>
             {fixedCost > 0 ? formatCurrency(fixedCost) : '-'}
           </div>
 
-          {/* Colonna 7: Costo Variabile (8%) */}
-          <div className="text-xs font-semibold text-green-900 text-right flex-shrink-0" style={{ width: '8%' }}>
+          <div className="text-xs font-semibold text-green-900 text-right flex-shrink-0" style={{ width: COLUMN_WIDTHS.variableCost }}>
             {formatCurrency(variableCost)}
+          </div>
+
+          <div className="text-xs text-gray-900 text-right flex-shrink-0" style={{ width: COLUMN_WIDTHS.totalTime }}>
+            {formatDurationHuman(totalProcessingSeconds)}
+          </div>
+
+          <div className="text-xs text-gray-900 text-right flex-shrink-0" style={{ width: COLUMN_WIDTHS.setupTime }}>
+            {formatDurationHuman(setupSeconds)}
+          </div>
+
+          <div
+            className="text-xs text-gray-700 text-left flex-shrink-0 truncate"
+            style={{ width: COLUMN_WIDTHS.workCenter }}
+            title={workCenter || ''}
+          >
+            {workCenter || '-'}
           </div>
         </div>
       </div>
-
     </div>
   );
 };
 
-// Funzione ricorsiva per calcolare il costo totale dei figli
-// Usa sempre i dati RAW (MaterialCost + OperationCost) non quelli calcolati per visualizzazione
-// parentLot: lotto di produzione del componente padre (per dividere i costi fissi)
-// Restituisce un oggetto con variableCost e fixedCostTotal
 const calculateChildrenCost = (node, parentLot = 100) => {
   if (!node.children || node.children.length === 0) {
     return { variableCost: 0, fixedCostTotal: 0 };
@@ -390,11 +442,10 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
 
         {/* Component info - Layout tabellare */}
         <div className="flex-1 flex items-center ml-2 min-w-0">
-          {/* Colonna 1: Codice e Descrizione (55%) - CON INDENTAZIONE */}
           <div 
             className="flex items-center gap-2 min-w-0" 
             style={{ 
-              width: '55%',
+              width: COLUMN_WIDTHS.name,
               paddingLeft: `${indent}px`
             }}
           >
@@ -412,8 +463,7 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
 
           </div>
 
-          {/* Colonna 2: Quantità (8%) */}
-          <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: '8%' }}>
+          <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: COLUMN_WIDTHS.quantity }}>
             {!isRootNode && node.data.Quantity > 0 ? (
               <>{node.data.Quantity.toFixed(3)}</>
             ) : (
@@ -421,32 +471,40 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
             )}
           </div>
 
-          {/* Colonna 3: UM (5%) */}
-          <div className="text-xs text-gray-600 text-center flex-shrink-0" style={{ width: '5%' }}>
+          <div className="text-xs text-gray-600 text-center flex-shrink-0" style={{ width: COLUMN_WIDTHS.uom }}>
             {uom}
           </div>
 
-          {/* Colonna 4: Lotto Produzione (8%) */}
-          <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: '8%' }}>
+          <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: COLUMN_WIDTHS.lot }}>
             {node.data.ProductionLot ?? node.data.BOMProductionLot ?? '-'}
           </div>
 
-          {/* Colonna 5: Costo Unitario (8%) */}
-          <div className="text-xs font-medium text-gray-900 text-right flex-shrink-0" style={{ width: '8%' }}>
+          <div className="text-xs font-medium text-gray-900 text-right flex-shrink-0" style={{ width: COLUMN_WIDTHS.unitCost }}>
             {formatCurrency(unitCost)}
           </div>
 
-          {/* Colonna 6: Costo Fisso (8%) */}
-          <div className="text-xs font-medium text-orange-700 text-right flex-shrink-0" style={{ width: '8%' }}>
+          <div className="text-xs font-medium text-orange-700 text-right flex-shrink-0" style={{ width: COLUMN_WIDTHS.fixedCost }}>
             {fixedCost > 0 ? formatCurrency(fixedCost) : '-'}
           </div>
 
-          {/* Colonna 7: Costo Variabile (8%) */}
+          {/* Colonna Costo Variabile */}
           <div className={cn(
             "text-xs font-semibold text-right flex-shrink-0",
             isRootNode ? "text-purple-900 text-sm" : "text-blue-900"
-          )} style={{ width: '8%' }}>
+          )} style={{ width: COLUMN_WIDTHS.variableCost }}>
             {formatCurrency(variableCost)}
+          </div>
+
+          <div className="text-xs text-gray-500 text-center flex-shrink-0" style={{ width: COLUMN_WIDTHS.totalTime }}>
+            -
+          </div>
+
+          <div className="text-xs text-gray-500 text-center flex-shrink-0" style={{ width: COLUMN_WIDTHS.setupTime }}>
+            -
+          </div>
+
+          <div className="text-xs text-gray-500 text-left flex-shrink-0" style={{ width: COLUMN_WIDTHS.workCenter }}>
+            -
           </div>
         </div>
       </div>
@@ -463,14 +521,7 @@ const TreeNode = ({ node, level = 0, expandedNodes, onToggle, searchQuery }) => 
   const isExpanded = expandedNodes.has(node.id);
 
   if (node.type === "cycle") {
-    return (
-      <CycleNode
-        cycle={node.data}
-        level={level}
-        expanded={isExpanded}
-        onToggle={() => onToggle(node.id)}
-      />
-    );
+    return <CycleNode cycle={node.data} level={level} />;
   }
 
   // Render component node con eventuali figli
@@ -612,7 +663,7 @@ const CostTreeView = ({ costingResult }) => {
             OperationDescription: route.OperationDescription,
             WorkCenter: route.WorkCenter,
             WorkCenterDescription: route.WorkCenterDescription,
-            Qty: 1,
+            Qty: route.Qty || 1,
             ProductionLot: componentProductionLot // Usa il lotto del componente, non quello principale
           },
           children: []
@@ -863,8 +914,11 @@ const CostTreeView = ({ costingResult }) => {
             'Quantità': quantity,
             'UM': uom,
             'Costo Unitario (€)': unitCost,
-            'Costi Fissi (€)': fixedCost > 0 ? fixedCost : null,
-            'Costo Variabile (€)': variableCost
+            'C. Fissi (€)': fixedCost > 0 ? fixedCost : null,
+            'Costo Variabile (€)': variableCost,
+            'Tempo Totale (hh:mm:ss)': '',
+            'Tempo Setup (hh:mm:ss)': '',
+            'CDL': ''
           });
 
           // Aggiungi i cicli (operazioni) del componente
@@ -872,11 +926,14 @@ const CostTreeView = ({ costingResult }) => {
             node.children.forEach(child => {
               if (child.type === 'cycle') {
                 const operation = child.data.Operation || child.data.OperationDescription || '';
-                const workCenter = child.data.WorkCenter || child.data.WC || '';
+                const workCenter = child.data.WorkCenterDescription || child.data.WorkCenter || child.data.WC || '';
                 const cycleQty = child.data.Qty || 1;
                 const cycleUnitCost = child.data.UnitCost || 0;
                 const cycleFixedCost = child.data.FixedCost || 0;
                 const cycleVariableCost = cycleUnitCost * cycleQty;
+                const productionLot = Number(child.data.ProductionLot) || 1;
+                const totalProcessingSeconds = parseSeconds(child.data.ProcessingTime) * productionLot;
+                const setupSeconds = parseSeconds(child.data.SetupTime);
 
                 rows.push({
                   'Livello': level + 1,
@@ -887,7 +944,10 @@ const CostTreeView = ({ costingResult }) => {
                   'UM': '-',
                   'Costo Unitario (€)': cycleUnitCost,
                   'Costi Fissi (€)': cycleFixedCost > 0 ? cycleFixedCost : null,
-                  'Costo Variabile (€)': cycleVariableCost
+                  'Costo Variabile (€)': cycleVariableCost,
+                  'Tempo Totale (hh:mm:ss)': formatDurationDigital(totalProcessingSeconds),
+                  'Tempo Setup (hh:mm:ss)': formatDurationDigital(setupSeconds),
+                  'CDL': workCenter
                 });
               }
             });
@@ -918,9 +978,12 @@ const CostTreeView = ({ costingResult }) => {
         'Quantità': null,
         'UM': '',
         'Costo Unitario (€)': null,
-        'Costi Fissi (€)': costing.fixed_costs_per_lot || 0,
-        'Costo Variabile (€)': costing.total_variable_costs ||
-          ((costing.variable_costs_material || 0) + (costing.variable_costs_operations || 0))
+        'C. Fissi (€)': costing.fixed_costs_per_lot || 0,
+        'C. Variabile (€)': costing.total_variable_costs ||
+          ((costing.variable_costs_material || 0) + (costing.variable_costs_operations || 0)),
+        'Tempo Totale (hh:mm:ss)': '',
+        'Tempo Setup (hh:mm:ss)': '',
+        'CDL': ''
       },
       {
         'Livello': 'Lotto Produzione',
@@ -930,8 +993,11 @@ const CostTreeView = ({ costingResult }) => {
         'Quantità': costing.production_lot || 100,
         'UM': 'PZ',
         'Costo Unitario (€)': null,
-        'Costi Fissi (€)': null,
-        'Costo Variabile (€)': null
+        'C. Fissi (€)': null,
+        'Costo Variabile (€)': null,
+        'Tempo Totale (hh:mm:ss)': '',
+        'Tempo Setup (hh:mm:ss)': '',
+        'CDL': ''
       },
       {
         'Livello': 'Materiali',
@@ -941,8 +1007,11 @@ const CostTreeView = ({ costingResult }) => {
         'Quantità': null,
         'UM': '',
         'Costo Unitario (€)': null,
-        'Costi Fissi (€)': null,
-        'Costo Variabile (€)': costing.variable_costs_material || 0
+        'C. Fissi (€)': null,
+        'C. Variabile (€)': costing.variable_costs_material || 0,
+        'Tempo Totale (hh:mm:ss)': '',
+        'Tempo Setup (hh:mm:ss)': '',
+        'CDL': ''
       },
       {
         'Livello': 'Operazioni',
@@ -952,8 +1021,11 @@ const CostTreeView = ({ costingResult }) => {
         'Quantità': null,
         'UM': '',
         'Costo Unitario (€)': null,
-        'Costi Fissi (€)': null,
-        'Costo Variabile (€)': costing.variable_costs_operations || 0
+        'C. Fissi (€)': null,
+        'C. Variabile (€)': costing.variable_costs_operations || 0,
+        'Tempo Totale (hh:mm:ss)': '',
+        'Tempo Setup (hh:mm:ss)': '',
+        'CDL': ''
       },
       {
         'Livello': 'Fissi',
@@ -963,8 +1035,11 @@ const CostTreeView = ({ costingResult }) => {
         'Quantità': null,
         'UM': '',
         'Costo Unitario (€)': null,
-        'Costi Fissi (€)': costing.fixed_costs_per_lot || 0,
-        'Costo Variabile (€)': null
+        'C. Fissi (€)': costing.fixed_costs_per_lot || 0,
+        'C. Variabile (€)': null,
+        'Tempo Totale (hh:mm:ss)': '',
+        'Tempo Setup (hh:mm:ss)': '',
+        'CDL': ''
       },
       {
         'Livello': 'Ricarichi',
@@ -975,12 +1050,15 @@ const CostTreeView = ({ costingResult }) => {
         'UM': '',
         'Costo Unitario (€)': null,
         'Costi Fissi (€)': null,
-        'Costo Variabile (€)': (costing.ricarico_mp_amount || 0) +
+        'C. Variabile (€)': (costing.ricarico_mp_amount || 0) +
           (costing.ricarico_ope_amount || 0) +
           (costing.ricarico_trasporto_amount || 0) +
           (costing.ricarico_scarto_amount || 0) +
           (costing.ricarico_totale_amount || 0) +
-          (costing.ricarico_sconto_amount || 0)
+          (costing.ricarico_sconto_amount || 0),
+        'Tempo Totale (hh:mm:ss)': '',
+        'Tempo Setup (hh:mm:ss)': '',
+        'CDL': ''
       },
       {}, // Riga vuota
       {
@@ -991,8 +1069,11 @@ const CostTreeView = ({ costingResult }) => {
         'Quantità': null,
         'UM': '',
         'Costo Unitario (€)': null,
-        'Costi Fissi (€)': null,
-        'Costo Variabile (€)': null
+        'C. Fissi (€)': null,
+        'C. Variabile (€)': null,
+        'Tempo Totale (hh:mm:ss)': '',
+        'Tempo Setup (hh:mm:ss)': '',
+        'CDL': ''
       },
       {
         'Livello': 'Livello',
@@ -1002,8 +1083,11 @@ const CostTreeView = ({ costingResult }) => {
         'Quantità': 'Quantità',
         'UM': 'UM',
         'Costo Unitario (€)': 'Costo Unitario (€)',
-        'Costi Fissi (€)': 'Costi Fissi (€)',
-        'Costo Variabile (€)': 'Costo Variabile (€)'
+        'C. Fissi (€)': 'C. Fissi (€)',
+        'C. Variabile (€)': 'C. Variabile (€)',
+        'Tempo Totale (hh:mm:ss)': 'Tempo Totale (hh:mm:ss)',
+        'Tempo Setup (hh:mm:ss)': 'Tempo Setup (hh:mm:ss)',
+        'CDL': 'CDL'
       }
     ];
 
@@ -1024,7 +1108,10 @@ const CostTreeView = ({ costingResult }) => {
       { wch: 5 },   // UM
       { wch: 18 },  // Costo Unitario
       { wch: 15 },  // Costi Fissi
-      { wch: 16 }   // Costo Variabile
+      { wch: 16 },  // Costo Variabile
+      { wch: 18 },  // Tempo Totale
+      { wch: 16 },  // Tempo Setup
+      { wch: 14 },  // CDL
     ];
     worksheet['!cols'] = colWidths;
 
@@ -1208,13 +1295,16 @@ const CostTreeView = ({ costingResult }) => {
           <div className="w-8"></div> {/* Spazio per toggle */}
           <div className="w-6"></div> {/* Spazio per icona */}
           <div className="flex-1 flex items-center ml-2">
-            <div style={{ width: '55%' }}>Componente / Operazione</div>
-            <div style={{ width: '8%' }} className="text-right">Q.tà</div>
-            <div style={{ width: '5%' }} className="text-center">UM</div>
-            <div style={{ width: '8%' }} className="text-right">Lotto</div>
-            <div style={{ width: '8%' }} className="text-right">Costo Unit.</div>
-            <div style={{ width: '8%' }} className="text-right">Costi Fissi</div>
-            <div style={{ width: '8%' }} className="text-right">Costo Variabile</div>
+            <div style={{ width: COLUMN_WIDTHS.name }}>Componente / Operazione</div>
+            <div style={{ width: COLUMN_WIDTHS.quantity }} className="text-right">Q.tà</div>
+            <div style={{ width: COLUMN_WIDTHS.uom }} className="text-center">UM</div>
+            <div style={{ width: COLUMN_WIDTHS.lot }} className="text-right">Lotto</div>
+            <div style={{ width: COLUMN_WIDTHS.unitCost }} className="text-right">Costo Unit.</div>
+            <div style={{ width: COLUMN_WIDTHS.fixedCost }} className="text-right">C. Fissi</div>
+            <div style={{ width: COLUMN_WIDTHS.variableCost }} className="text-right">C. Variabile</div>
+            <div style={{ width: COLUMN_WIDTHS.totalTime }} className="text-right">Tempo Totale</div>
+            <div style={{ width: COLUMN_WIDTHS.setupTime }} className="text-right">Setup</div>
+            <div style={{ width: COLUMN_WIDTHS.workCenter }} className="text-left">CDL</div>
           </div>
         </div>
 

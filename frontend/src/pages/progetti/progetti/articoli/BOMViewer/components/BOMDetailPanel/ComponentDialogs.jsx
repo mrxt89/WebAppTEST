@@ -409,12 +409,13 @@ export const ExistingCodeDialog = ({
   onSelect,
   title = "Seleziona codice esistente",
 }) => {
-  const { getERPItems, getAvailableItems } = useBOMViewer();
+  const { getERPItems, getAvailableItems, getERPBOMs } = useBOMViewer();
 
   const [activeTab, setActiveTab] = useState("erp");
   const [searchQuery, setSearchQuery] = useState("");
   const [erpItems, setErpItems] = useState([]);
   const [projectItems, setProjectItems] = useState([]);
+  const [erpBOMs, setErpBOMs] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Funzione per eseguire la ricerca in base alla tab attiva
@@ -428,6 +429,9 @@ export const ExistingCodeDialog = ({
       } else if (activeTab === "projects") {
         const items = await getAvailableItems(searchQuery);
         setProjectItems(Array.isArray(items) ? items : []);
+      } else if (activeTab === "boms") {
+        const result = await getERPBOMs(searchQuery, 1, 50);
+        setErpBOMs(result?.items && Array.isArray(result.items) ? result.items : []);
       }
     } catch (error) {
       console.error("Errore nella ricerca articoli:", error);
@@ -458,8 +462,9 @@ export const ExistingCodeDialog = ({
 
         <div className="py-4 space-y-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="erp">Codici ERP</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="erp">Articoli ERP</TabsTrigger>
+              <TabsTrigger value="boms">Distinte ERP</TabsTrigger>
               <TabsTrigger value="projects">Codici Progetti</TabsTrigger>
             </TabsList>
 
@@ -509,6 +514,60 @@ export const ExistingCodeDialog = ({
                           : item.Nature === 22413313
                             ? "Prodotto Finito"
                             : item.Nature === 22413314
+                              ? "Acquisto"
+                              : "Altro"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent
+              value="boms"
+              className="border rounded mt-2 max-h-[300px] overflow-auto"
+            >
+              {loading ? (
+                <div className="p-4 text-center">
+                  <p className="text-gray-500">Caricamento in corso...</p>
+                </div>
+              ) : erpBOMs.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">
+                  Nessun risultato trovato. Prova a cercare una distinta base.
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {erpBOMs.map((bom) => (
+                    <div
+                      key={bom.BOM}
+                      className="p-3 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => onSelect({
+                        Item: bom.BOM,
+                        Description: bom.Description,
+                        BaseUoM: bom.UoM,
+                        Nature: bom.Nature,
+                        ItemId: bom.ItemId,
+                        BOMId: bom.BOMId
+                      })}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium">{bom.BOM}</div>
+                        {bom.BOMId && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 text-[10px] px-1 py-0">
+                            MAGO
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {bom.Description}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        UoM: {bom.UoM || "PZ"} | Natura:{" "}
+                        {bom.Nature === 22413312
+                          ? "Semilavorato"
+                          : bom.Nature === 22413313
+                            ? "Prodotto Finito"
+                            : bom.Nature === 22413314
                               ? "Acquisto"
                               : "Altro"}
                       </div>

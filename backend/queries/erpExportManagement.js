@@ -406,11 +406,39 @@ const checkBOMExportability = async (companyId, bomId, version) => {
             };
         }
 
+        // Check routing verification (CheckOperation)
+        const unverifiedCyclesQuery = `
+            SELECT 
+                rtg.RtgStep,
+                rtg.Operation,
+                rtg.WC,
+                ISNULL(rtg.CheckOperation, 0) AS CheckOperation
+            FROM MA_ProjectArticles_BOMRouting rtg
+            WHERE rtg.CompanyId = @CompanyId
+              AND rtg.BOMId = @BOMId
+              AND ISNULL(rtg.CheckOperation, 0) = 0
+        `;
+
+        const unverifiedCyclesResult = await pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('BOMId', sql.BigInt, bomId)
+            .query(unverifiedCyclesQuery);
+
+        if (unverifiedCyclesResult.recordset.length > 0) {
+            return {
+                canExport: false,
+                reason: `${unverifiedCyclesResult.recordset.length} cicli non verificati (Operazione controllata)`,
+                componentsInfo: componentsInfo,
+                unverifiedCycles: unverifiedCyclesResult.recordset
+            };
+        }
+
         // BOM can be exported - the stored procedure will handle missing components
         return {
             canExport: true,
             reason: '',
             componentsInfo: componentsInfo,
+            unverifiedCycles: [],
             note: componentsInfo.ComponentsToExport > 0 ?
                 `Verranno esportati automaticamente ${componentsInfo.ComponentsToExport} componenti` : null
         };

@@ -247,6 +247,8 @@ const CreatePollForm = ({ notificationId, onSuccess, onCancel }) => {
             <div className="poll-input-group">
               <input
                 type="text"
+                id="poll-question"
+                name="poll-question"
                 value={question}
                 onChange={(e) => {
                   setQuestion(e.target.value);
@@ -269,6 +271,7 @@ const CreatePollForm = ({ notificationId, onSuccess, onCancel }) => {
                 placeholder="Es: Qual è il tuo colore preferito?"
                 disabled={isSubmitting}
                 maxLength={500}
+                autoComplete="off"
               />
               {errors.question && (
                 <div className="poll-error-icon">
@@ -319,6 +322,7 @@ const CreatePollForm = ({ notificationId, onSuccess, onCancel }) => {
                   <div className="poll-option-input-wrapper">
                     <input
                       type="text"
+                      id={`poll-option-${index}`}
                       name={`option_${index}`}
                       value={option}
                       onChange={(e) => updateOption(index, e.target.value)}
@@ -327,6 +331,7 @@ const CreatePollForm = ({ notificationId, onSuccess, onCancel }) => {
                       placeholder={`Opzione ${index + 1}`}
                       disabled={isSubmitting}
                       maxLength={200}
+                      autoComplete="off"
                     />
                     {errors[`option_${index}`] && (
                       <div className="poll-error-icon">
@@ -377,6 +382,7 @@ const CreatePollForm = ({ notificationId, onSuccess, onCancel }) => {
                 <input
                   type="checkbox"
                   id="multipleAnswers"
+                  name="multipleAnswers"
                   checked={allowMultipleAnswers}
                   onChange={(e) => setAllowMultipleAnswers(e.target.checked)}
                   onKeyDown={(e) => handleCheckboxKeyDown(e, 'hasExpiration')}
@@ -395,6 +401,7 @@ const CreatePollForm = ({ notificationId, onSuccess, onCancel }) => {
                   <input
                     type="checkbox"
                     id="hasExpiration"
+                    name="hasExpiration"
                     checked={hasExpiration}
                     onChange={(e) => {
                       setHasExpiration(e.target.checked);

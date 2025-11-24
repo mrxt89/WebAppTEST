@@ -5,10 +5,11 @@ import { useCompany } from "@/context/CompanyContext";
 import BOMCostingParameters from "./BOMCostingParameters";
 
 const TabCostingParameters = () => {
-  const { bom, canEdit } = useBOMViewer();
+  const { bom, loading, selectedBomId } = useBOMViewer();
   const { company } = useCompany();
+  const fallbackBomId = bom?.Id || selectedBomId || null;
 
-  if (!bom || !bom.Id) {
+  if (!fallbackBomId) {
     return (
       <div className="p-4 text-center text-gray-500">
         <p>Nessuna BOM selezionata</p>
@@ -16,14 +17,22 @@ const TabCostingParameters = () => {
     );
   }
 
+  if (loading && !bom?.Id) {
+    return (
+      <div className="p-4 text-center text-gray-500">
+        <p>Caricamento parametri di costificazione...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4">
       <BOMCostingParameters
-        bomId={bom.Id}
+        bomId={fallbackBomId}
         companyId={company?.CompanyId}
         bom={bom}
         initialParameters={{
-          productionLot: bom.ProductionLot || 1
+          productionLot: bom?.ProductionLot || 1
         }}
         readOnly={false}
       />

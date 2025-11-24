@@ -486,10 +486,20 @@ const BOMHeader = () => {
    }
  };
 
- // Gestisci modalità modifica
- const toggleEditMode = () => {
-   setEditMode(!editMode);
- };
+// Gestisci modalità modifica
+const toggleEditMode = () => {
+  // Blocca se la BOM è in ERP
+  if (bom?.stato_erp == "1" || bom?.stato_erp === 1) {
+    toast({
+      title: "Operazione non consentita",
+      description: "Non è possibile modificare una distinta presente in ERP (Mago). La distinta è di sola lettura.",
+      variant: "destructive",
+    });
+    return;
+  }
+  
+  setEditMode(!editMode);
+};
 
  // Gestisce l'apertura del dialogo per le opzioni di aggiunta componente
  const handleAddComponentOptions = () => {
@@ -734,24 +744,34 @@ const BOMHeader = () => {
    }
  };
 
- // Crea nuova versione
- const handleCreateVersion = async () => {
-   if (!item?.Id) return;
+// Crea nuova versione
+const handleCreateVersion = async () => {
+  if (!item?.Id) return;
+  console.log(bom);
+  // Blocca se la BOM è in ERP
+  if (bom?.stato_erp == "1" || bom?.stato_erp === 1) {
+    toast({
+      title: "Operazione non consentita",
+      description: "Non è possibile creare una nuova versione di una distinta presente in ERP (Mago). La distinta è di sola lettura.",
+      variant: "destructive",
+    });
+    return;
+  }
 
-   try {
-     // Swal di conferma - Uso corretto della libreria swal
-     const confirmed = await swal.fire({
-       title: "Crea nuova versione",
-       text: "Sei sicuro di voler creare una nuova versione della distinta base?",
-       icon: "warning",
-       showCancelButton: true,
-       confirmButtonText: "Crea",
-       cancelButtonText: "Annulla",
-       confirmButtonColor: "#3085d6",
-       cancelButtonColor: "#d33",
-     });
+  try {
+    // Swal di conferma - Uso corretto della libreria swal
+    const confirmed = await swal.fire({
+      title: "Crea nuova versione",
+      text: "Sei sicuro di voler creare una nuova versione della distinta base?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Crea",
+      cancelButtonText: "Annulla",
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+    });
 
-     if (!confirmed.isConfirmed) return;
+    if (!confirmed.isConfirmed) return;
 
      setIsCreating(true);
 
@@ -942,6 +962,21 @@ const BOMHeader = () => {
      {/* Header normale quando non siamo in modalità modifica */}
      {!editMode && (
        <div className="bg-gray-50 p-4 border-b">
+         {/* Avviso se la BOM è in ERP */}
+         {(bom?.stato_erp == "1" || bom?.stato_erp === 1) && (
+           <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-2">
+             <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+             <div className="flex-1">
+               <p className="text-sm font-medium text-amber-800">
+                 Distinta presente in ERP (Mago) - Modalità sola lettura
+               </p>
+               <p className="text-xs text-amber-700 mt-1">
+                 Non è possibile modificare questa distinta, creare nuove versioni o aggiungere/rimuovere componenti.
+               </p>
+             </div>
+           </div>
+         )}
+         
          <div className="flex flex-wrap items-center gap-4">
            {/* Sezione codice e descrizione */}
            <div className="flex-1 min-w-0">
@@ -1011,16 +1046,16 @@ const BOMHeader = () => {
                </SelectContent>
              </Select>
 
-             <Button
-               size="icon"
-               variant="outline"
-               className="h-8 w-8"
-               title="Crea nuova versione"
-               onClick={handleCreateVersion}
-               disabled={isCreating || loading}
-             >
-               <Plus className="h-4 w-4" />
-             </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              title="Crea nuova versione"
+              onClick={handleCreateVersion}
+              disabled={isCreating || loading || bom?.stato_erp == "1" || bom?.stato_erp === 1}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
            </div>
 
            {/* Pulsanti di azione */}

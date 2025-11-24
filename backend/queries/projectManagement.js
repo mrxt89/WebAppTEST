@@ -495,6 +495,15 @@ const getUserTasks = async (userId) => {
             .input('UserId', sql.Int, userId)
             .execute('MA_GetUserTasks');
 
+        // Debug: verifica se ProjectErpID è presente
+        if (result.recordset && result.recordset.length > 0) {
+            console.log('[getUserTasks] Prima task keys:', Object.keys(result.recordset[0]));
+            console.log('[getUserTasks] ProjectErpID presente?', 'ProjectErpID' in result.recordset[0]);
+            if (result.recordset[0].ProjectErpID) {
+                console.log('[getUserTasks] ProjectErpID value:', result.recordset[0].ProjectErpID);
+            }
+        }
+
         return result.recordset;
     } catch (err) {
         console.error('Error in getUserTasks:', err);

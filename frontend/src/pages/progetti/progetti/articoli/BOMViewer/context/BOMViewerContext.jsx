@@ -45,6 +45,7 @@ export const BOMViewerProvider = ({
   const [selectedBomVersion, setSelectedBomVersion] = useState(1);
   const [availableVersions, setAvailableVersions] = useState([1]);
   const [selectedComponents, setSelectedComponents] = useState([]);
+  const [intercompanyRefreshKey, setIntercompanyRefreshKey] = useState(0);
 
   // Stato per unità di misura
   const [unitsOfMeasure, setUnitsOfMeasure] = useState([]);
@@ -804,6 +805,9 @@ export const BOMViewerProvider = ({
         setActiveTab(currentState.activeTab);
       }
 
+      if (isMounted.current) {
+        setIntercompanyRefreshKey((prev) => prev + 1);
+      }
       return true;
     } catch (error) {
       console.error("Error during smart refresh:", error);
@@ -883,13 +887,13 @@ export const BOMViewerProvider = ({
 
   // Get ERP BOMs function
   const getERPBOMs = useCallback(
-    async (search = "") => {
+    async (search = "", page = 1, pageSize = 50) => {
       try {
-        const data = await projectArticlesActions.getERPBOMs(search);
+        const data = await projectArticlesActions.getERPBOMs(search, page, pageSize);
         return data;
       } catch (error) {
         console.error("Error getting ERP BOMs:", error);
-        return [];
+        return { items: [], pagination: { currentPage: 1, totalPages: 1, totalItems: 0 } };
       }
     },
     [projectArticlesActions],
@@ -1276,6 +1280,7 @@ export const BOMViewerProvider = ({
 
     pendingChanges,
     setPendingChanges,
+    intercompanyRefreshKey,
   };
 
   return (

@@ -1,6 +1,6 @@
 // src/pages/progetti/progetti/articoli/BOMViewer/components/BOMHeaderEdit.jsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useBOMViewer } from "../context/BOMViewerContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +52,7 @@ const BOMHeaderEdit = () => {
     reorderBOMRoutings,
     selectedComponents,
     project,
+    updateRoutingCheckOperation,
   } = useBOMViewer();
 
   // Hook per export ERP
@@ -66,6 +67,7 @@ const BOMHeaderEdit = () => {
     code: "",
     description: "",
     status: "BOZZA",
+    notes: "",
   });
 
   const [showCancelConfirmDialog, setShowCancelConfirmDialog] = useState(false);
@@ -93,6 +95,7 @@ const BOMHeaderEdit = () => {
         code: bom.BOM || "",
         description: bom.Description || "",
         status: bom.BOMStatus || "BOZZA",
+        notes: bom.Notes || "",
       });
     }
   }, [bom]);
@@ -238,6 +241,41 @@ const BOMHeaderEdit = () => {
       const checkResult = await checkBOMExportability(bom.Id, bom.Version);
       
       if (!checkResult.canExport) {
+        const unverifiedCycles = checkResult.unverifiedCycles || [];
+
+        if (unverifiedCycles.length > 0) {
+          const cycleList = unverifiedCycles
+            .map(
+              (c) =>
+                `• Fase ${c.RtgStep} - ${c.Operation || "N/D"} (CdL: ${
+                  c.WC || "-"
+                })`,
+            )
+            .join("\n");
+
+          await swal.fire({
+            title: "Cicli non verificati",
+            html: `
+              <div class="text-left">
+                <p class="mb-3">
+                  Tutti i cicli devono essere marcati come <strong>Operazione controllata</strong> prima di esportare.
+                </p>
+                <div class="bg-amber-50 border border-amber-200 rounded p-3">
+                  <p class="font-semibold text-amber-800 mb-2">Fasi da verificare:</p>
+                  <pre class="text-sm text-amber-800 whitespace-pre-wrap">${cycleList}</pre>
+                </div>
+                <p class="mt-3 text-xs text-gray-500">
+                  Apri la tab Cicli del componente interessato e attiva il checkbox "Operazione controllata".
+                </p>
+              </div>
+            `,
+            icon: "warning",
+            confirmButtonText: "OK",
+            confirmButtonColor: "#d97706",
+          });
+          return;
+        }
+
         // Se ci sono componenti mancanti, mostra dettagli
         if (checkResult.missingComponents?.length > 0) {
           const missingList = checkResult.missingComponents
@@ -431,6 +469,10 @@ const BOMHeaderEdit = () => {
               Description: pendingChanges.header.description || bomData.description,
               BOMStatus: pendingChanges.header.status || bomData.status,
               Version: bom.Version,
+              Notes:
+                pendingChanges.header.notes !== undefined
+                  ? pendingChanges.header.notes
+                  : bomData.notes,
             });
 
             if (result.success) {
@@ -594,21 +636,37 @@ const BOMHeaderEdit = () => {
     // Gestisci aggiunte
     if (cycleChanges.newCycles && cycleChanges.newCycles.length > 0) {
       for (const cycle of cycleChanges.newCycles) {
+        const desiredCheckOperation = cycle.CheckOperation;
         const cycleData = {
           Id: bomId,
           ...cycle,
           ProcessingTime: parseTimeToSeconds(cycle.ProcessingTime),
           SetupTime: parseTimeToSeconds(cycle.SetupTime),
         };
+        delete cycleData.CheckOperation;
         await addUpdateBOM("ADD_ROUTING", cycleData);
+
+        if (desiredCheckOperation !== undefined) {
+          await updateRoutingCheckOperation(
+            bomId,
+            cycle.RtgStep,
+            parseInt(desiredCheckOperation, 10) === 1 ? 1 : 0,
+          );
+        }
       }
     }
 
     // Gestisci modifiche
     if (cycleChanges.cycleChanges && Object.keys(cycleChanges.cycleChanges).length > 0) {
       for (const rtgStep in cycleChanges.cycleChanges) {
-        const changes = cycleChanges.cycleChanges[rtgStep].changes;
+        const originalChanges = cycleChanges.cycleChanges[rtgStep].changes;
         const original = cycleChanges.cycleChanges[rtgStep].original;
+        const changes = { ...originalChanges };
+        const checkOperationChange = changes.CheckOperation;
+
+        if (checkOperationChange !== undefined) {
+          delete changes.CheckOperation;
+        }
 
         if (Object.keys(changes).length > 0) {
           const updatedCycle = { ...original, ...changes };
@@ -626,6 +684,14 @@ const BOMHeaderEdit = () => {
             RtgStep: parseInt(rtgStep, 10),
             ...updatedCycle
           });
+        }
+
+        if (checkOperationChange !== undefined) {
+          await updateRoutingCheckOperation(
+            bomId,
+            parseInt(rtgStep, 10),
+            parseInt(checkOperationChange, 10) === 1 ? 1 : 0,
+          );
         }
       }
     }
@@ -692,18 +758,36 @@ const BOMHeaderEdit = () => {
     }
   };
 
-  // Conta le modifiche per tipo
-  const getChangesCount = () => {
+  // Debug: monitora i cambiamenti di pendingChanges
+  useEffect(() => {
+    console.log('[BOMHeaderEdit] pendingChanges changed via useEffect:', pendingChanges);
+  }, [pendingChanges]);
+
+  // Conta le modifiche per tipo - useMemo per ricalcolare quando pendingChanges cambia
+  const changesCount = useMemo(() => {
+    console.log('[BOMHeaderEdit] Recalculating changesCount, pendingChanges:', pendingChanges);
+
     const count = {
-      header: pendingChanges.header ? 1 : 0,
+      header: 0,
       components: 0,
       items: 0,
       cycles: 0,
     };
 
+    // Conta le modifiche dell'header verificando se ci sono campi effettivamente modificati
+    if (pendingChanges.header && Object.keys(pendingChanges.header).length > 0) {
+      console.log('[BOMHeaderEdit] Header changes detected:', pendingChanges.header);
+      count.header = 1;
+    } else {
+      console.log('[BOMHeaderEdit] No header changes:', {
+        hasHeader: !!pendingChanges.header,
+        headerKeys: pendingChanges.header ? Object.keys(pendingChanges.header) : []
+      });
+    }
+
     for (const key in pendingChanges) {
       if (key === "header") continue;
-      
+
       if (key.startsWith("cycle-")) {
         count.cycles++;
       } else {
@@ -718,17 +802,34 @@ const BOMHeaderEdit = () => {
     }
 
     return count;
-  };
+  }, [pendingChanges]);
+
+  const totalChanges = useMemo(() => {
+    const total = changesCount.header + changesCount.components + changesCount.items + changesCount.cycles;
+    console.log('[BOMHeaderEdit] Total changes:', total, changesCount);
+    return total;
+  }, [changesCount]);
 
   if (!editMode) return null;
 
-  const changesCount = getChangesCount();
-  const totalChanges = changesCount.header + changesCount.components + changesCount.items + changesCount.cycles;
+  // Controlla se la BOM è in ERP
+  const isInERP = bom?.stato_erp == "1" || bom?.stato_erp === 1;
 
   return (
     <>
       <div className="bg-amber-50 p-2 border-b border-amber-200">
         <div className="space-y-2">
+          {/* Avviso se la BOM è in ERP */}
+          {isInERP && (
+            <Alert className="bg-red-50 border-red-200">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-800 text-sm">
+                <strong>Distinta bloccata:</strong> Questa distinta è presente in ERP (Mago) e non può essere modificata.
+                Solo sincronizzazione da ERP disponibile.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Form di modifica header */}
           <div className="grid grid-cols-3 gap-2">
             <div>
@@ -737,30 +838,36 @@ const BOMHeaderEdit = () => {
                 id="bomCode"
                 value={bomData.code}
                 onChange={(e) => handleHeaderChange("code", e.target.value)}
-                className="bg-white"
-                disabled={loading}
+                className={isInERP ? "bg-gray-100" : "bg-white"}
+                disabled={loading || isInERP}
+                title={isInERP ? "Distinta presente in ERP - Campo non modificabile" : ""}
               />
             </div>
-            
+
             <div>
               <Label htmlFor="bomDescription">Descrizione</Label>
               <Input
                 id="bomDescription"
                 value={bomData.description}
                 onChange={(e) => handleHeaderChange("description", e.target.value)}
-                className="bg-white"
-                disabled={loading}
+                className={isInERP ? "bg-gray-100" : "bg-white"}
+                disabled={loading || isInERP}
+                title={isInERP ? "Distinta presente in ERP - Campo non modificabile" : ""}
               />
             </div>
-            
+
             <div>
               <Label htmlFor="bomStatus">Stato</Label>
-              <Select 
-                value={bomData.status} 
+              <Select
+                value={bomData.status}
                 onValueChange={(value) => handleHeaderChange("status", value)}
-                disabled={loading}
+                disabled={loading || isInERP}
               >
-                <SelectTrigger id="bomStatus" className="bg-white">
+                <SelectTrigger
+                  id="bomStatus"
+                  className={isInERP ? "bg-gray-100" : "bg-white"}
+                  title={isInERP ? "Distinta presente in ERP - Campo non modificabile" : ""}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -774,57 +881,62 @@ const BOMHeaderEdit = () => {
             </div>
           </div>
 
+          {/* Note BOM rimosse dall'header - ora gestite nella scheda Composizione */}
+
           {/* Pulsanti ricodifica e export */}
           <div className="flex items-center gap-2 pt-2 border-t border-amber-200">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRecodeRoot}
-              disabled={item?.stato_erp == 1 || loading}
-              className="bg-white"
-            >
-              <Code className="h-4 w-4 mr-1" />
-              Ricodifica principale
-            </Button>
+            {/* Pulsanti ricodifica - nascosti se BOM in ERP */}
+            {!isInERP && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRecodeRoot}
+                  disabled={item?.stato_erp == 1 || loading}
+                  className="bg-white"
+                >
+                  <Code className="h-4 w-4 mr-1" />
+                  Ricodifica principale
+                </Button>
 
-            {selectedComponents && selectedComponents.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRecodeSelected}
-                disabled={loading}
-                className="bg-white"
-              >
-                <Code className="h-4 w-4 mr-1" />
-                Ricodifica selezionati ({selectedComponents.length})
-              </Button>
-            )}
-
-            {/* Export in ERP - solo se non già esportato */}
-            {bom?.stato_erp != 1 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportBOM}
-                disabled={loading || isExporting || exportLoading}
-                className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300"
-              >
-                {isExporting ? (
-                  <>
-                    <span className="animate-spin h-4 w-4 mr-1">⏳</span>
-                    Esportazione...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-1" />
-                    Esporta in ERP
-                  </>
+                {selectedComponents && selectedComponents.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRecodeSelected}
+                    disabled={loading}
+                    className="bg-white"
+                  >
+                    <Code className="h-4 w-4 mr-1" />
+                    Ricodifica selezionati ({selectedComponents.length})
+                  </Button>
                 )}
-              </Button>
+
+                {/* Export in ERP - solo se non già esportato */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportBOM}
+                  disabled={loading || isExporting || exportLoading}
+                  className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300"
+                >
+                  {isExporting ? (
+                    <>
+                      <span className="animate-spin h-4 w-4 mr-1">⏳</span>
+                      Esportazione...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-1" />
+                      Esporta in ERP
+                    </>
+                  )}
+                </Button>
+              </>
             )}
 
             {/* Sync da ERP - solo se già esportato */}
-            {bom?.stato_erp == 1 && (
+            {isInERP && (
               <Button
                 variant="outline"
                 size="sm"
@@ -908,10 +1020,11 @@ const BOMHeaderEdit = () => {
                 <X className="h-4 w-4 mr-1" />
                 Annulla
               </Button>
-              
+
               <Button
                 onClick={handleSaveAllChanges}
-                disabled={loading || totalChanges === 0}
+                disabled={loading || totalChanges === 0 || isInERP}
+                title={isInERP ? "Impossibile salvare: distinta presente in ERP" : ""}
               >
                 <Save className="h-4 w-4 mr-1" />
                 Salva tutto ({totalChanges})

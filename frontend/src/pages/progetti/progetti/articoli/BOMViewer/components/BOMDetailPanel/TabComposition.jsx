@@ -215,6 +215,7 @@ const TabComposition = () => {
         await deleteComponent(
           selectedNode.data.ParentBOMId || selectedBomId,
           selectedNode.data.Line,
+          selectedNode.data.ComponentId, // Passa ComponentId per controllo intercompany
         );
       } else if (selectedNode.type === "cycle") {
         await deleteRouting(selectedNode.data.RtgStep);
@@ -225,6 +226,16 @@ const TabComposition = () => {
       await smartRefresh();
     } catch (error) {
       console.error("Errore nell'eliminazione:", error);
+
+      // Mostra messaggio di errore con toast
+      toast({
+        title: error.message?.includes('ATTENZIONE') ? "⚠️ Componente Intercompany Approvato" : "Errore",
+        description: error.message || "Errore durante l'eliminazione",
+        variant: "destructive",
+        duration: 10000, // Mostra per 10 secondi perché il messaggio è importante
+      });
+
+      setShowDeleteConfirmDialog(false);
     }
   };
 

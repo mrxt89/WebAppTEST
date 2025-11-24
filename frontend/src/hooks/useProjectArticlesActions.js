@@ -752,10 +752,11 @@ const useProjectArticlesActions = () => {
 
   // Elimina componente da una distinta
   const deleteComponent = useCallback(
-    async (bomId, line) => {
+    async (bomId, line, componentId = null) => {
       return addUpdateBOM("DELETE_COMPONENT", {
         Id: bomId,
         Line: line,
+        ComponentId: componentId, // Passa il ComponentId per controllo intercompany
       });
     },
     [addUpdateBOM],
@@ -823,6 +824,26 @@ const useProjectArticlesActions = () => {
       }
     },
     [addUpdateBOM],
+  );
+
+  const updateRoutingCheckOperation = useCallback(
+    async (bomId, rtgStep, checkOperation) => {
+      try {
+        const data = await makeRequest(
+          `${config.API_BASE_URL}/projectArticles/boms/${bomId}/routing/${rtgStep}/check`,
+          {
+            method: "POST",
+            body: JSON.stringify({ checkOperation }),
+          },
+        );
+        return data;
+      } catch (err) {
+        setError(err.message);
+        console.error("Error updating routing check flag:", err);
+        throw err;
+      }
+    },
+    [makeRequest],
   );
 
   // Helper per tradurre nature articoli
@@ -1781,6 +1802,7 @@ const searchSimilarArticles = useCallback(
     addRouting,
     updateRouting,
     deleteRouting,
+    updateRoutingCheckOperation,
 
     // Funzioni riferimenti
     manageReferences,

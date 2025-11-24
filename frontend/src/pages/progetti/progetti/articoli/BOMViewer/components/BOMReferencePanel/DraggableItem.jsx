@@ -87,6 +87,13 @@ const DraggableItem = ({ item, expanded = false, onToggle }) => {
   
   const natureAcronym = getNatureAcronym(itemNature);
 
+  const secondaryDescription =
+    item.data.ComponentItemDescription ||
+    item.data.ItemDescription ||
+    item.data.Description ||
+    item.data.ComponentDescription ||
+    "";
+
   return (
     <div>
       <div
@@ -134,10 +141,10 @@ const DraggableItem = ({ item, expanded = false, onToggle }) => {
             </div>
           </div>
 
-          {/* Show additional info if available */}
-          {(item.data.Description || item.data.ComponentDescription) && (
+          {/* Mostra sempre la descrizione più significativa disponibile */}
+          {secondaryDescription && (
             <div className="text-xs text-gray-500 truncate mt-1">
-              {item.data.Description || item.data.ComponentDescription}
+              {secondaryDescription}
             </div>
           )}
         </div>

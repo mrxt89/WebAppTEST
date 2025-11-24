@@ -100,7 +100,7 @@ const TaskCard = ({
 
   const openExternalLink = (e) => {
     e.stopPropagation();
-    const prj = task.ProjectName || "";
+    const prj = task.ProjectErpID || "";
     const stp = task.TaskSequence != null ? task.TaskSequence : "";
     const ute = user?.ERPUserId ?? 0;
     const ope = task.Operation || "";

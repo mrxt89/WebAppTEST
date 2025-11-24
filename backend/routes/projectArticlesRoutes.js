@@ -53,7 +53,8 @@ const {
     approveIntercompanyReferenceWithProject,
     getTemporaryIntercompanyItems,
     replaceTemporaryItem,
-    getReferenceWithProjects
+    getReferenceWithProjects,
+    updateRoutingCheckOperation
 } = require('../queries/projectArticlesManagement');
 
 // Ottieni stati degli articoli di progetto
@@ -423,6 +424,54 @@ router.post('/projectArticles/boms/:id/reorder', authenticateToken, async (req, 
         res.json(result);
     } catch (err) {
         console.error(`Error reordering components:`, err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Aggiorna flag CheckOperation per un ciclo
+router.post('/projectArticles/boms/:id/routing/:rtgStep/check', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const userId = req.user.UserId;
+        const bomId = parseInt(req.params.id);
+        const rtgStep = parseInt(req.params.rtgStep);
+        const { checkOperation } = req.body;
+
+        if (isNaN(bomId) || isNaN(rtgStep)) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Parametri bomId o rtgStep non validi'
+            });
+        }
+
+        if (checkOperation === undefined) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Valore checkOperation mancante'
+            });
+        }
+
+        const normalizedValue = parseInt(checkOperation, 10) === 1 ? 1 : 0;
+
+        const result = await updateRoutingCheckOperation(
+            companyId,
+            bomId,
+            rtgStep,
+            normalizedValue,
+            userId
+        );
+
+        if (result.success === 0) {
+            return res.status(400).json(result);
+        }
+
+        res.json({
+            success: 1,
+            updated: result.updated,
+            checkOperation: normalizedValue
+        });
+    } catch (err) {
+        console.error(`Error updating routing check flag:`, err);
         res.status(500).json({ success: 0, msg: err.message });
     }
 });

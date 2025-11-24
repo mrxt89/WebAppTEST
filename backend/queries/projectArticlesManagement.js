@@ -248,7 +248,7 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
 
                 // ComponentDescription (opzionale)
                 if (bomData.ComponentDescription) {
-                    request.input('ComponentDescription', sql.VarChar(128), bomData.Description);
+                    request.input('ComponentDescription', sql.VarChar(128), bomData.ComponentDescription);
                 }
 
                 // Natura del componente (opzionale)
@@ -299,8 +299,11 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
                 if (bomData.Details) {
                     request.input('ComponentDetails', sql.NVarChar(sql.MAX), bomData.Details);
                 }
-                
-                if (bomData.Notes) {
+
+                // Supporta sia Notes che ComponentNotes (per retrocompatibilità e chiarezza)
+                if (bomData.ComponentNotes !== undefined) {
+                    request.input('ComponentNotes', sql.NVarChar(sql.MAX), bomData.ComponentNotes);
+                } else if (bomData.Notes) {
                     request.input('ComponentNotes', sql.NVarChar(sql.MAX), bomData.Notes);
                 }
 
@@ -323,7 +326,46 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
                 }
             }
 
-            if (action === 'UPDATE_COMPONENT' || action === 'DELETE_COMPONENT') {
+            if (action === 'DELETE_COMPONENT') {
+                // 🔍 CONTROLLO INTERCOMPANY: Verifica se il componente ha una reference approvata
+                if (bomData.ComponentId) {
+                    const refCheck = await pool.request()
+                        .input('ComponentId', sql.BigInt, bomData.ComponentId)
+                        .input('CompanyId', sql.Int, companyId)
+                        .query(`
+                            SELECT TOP 1
+                                r.ReferenceID,
+                                r.Status,
+                                r.ResponseDate,
+                                tc.Description AS TargetCompanyName
+                            FROM MA_ProjectArticles_References r
+                            INNER JOIN AR_Companies tc ON r.TargetCompanyId = tc.CompanyId
+                            WHERE r.SourceProjectItemId = @ComponentId
+                              AND r.SourceCompanyId = @CompanyId
+                              AND r.Status IN ('ACCEPTED', 'APPROVED')
+                            ORDER BY r.ResponseDate DESC
+                        `);
+
+                    if (refCheck.recordset.length > 0) {
+                        const ref = refCheck.recordset[0];
+                        const responseDate = ref.ResponseDate ? new Date(ref.ResponseDate).toLocaleDateString('it-IT') : 'N/A';
+
+                        throw new Error(
+                            `⚠️ ATTENZIONE: Impossibile eliminare il componente.\n\n` +
+                            `Questo componente è già stato approvato dall'azienda Intercompany "${ref.TargetCompanyName}" ` +
+                            `in data ${responseDate}.\n\n` +
+                            `Azioni consigliate:\n` +
+                            `• Contatta ${ref.TargetCompanyName} per comunicare la modifica\n` +
+                            `• Oppure mantieni il componente nella distinta base\n\n` +
+                            `IMPORTANTE: Ricordati di avvisare il fornitore che questo componente non è più necessario!`
+                        );
+                    }
+                }
+
+                request.input('ComponentLine', sql.Int, bomData.Line);
+            }
+
+            if (action === 'UPDATE_COMPONENT') {
                 request.input('ComponentLine', sql.Int, bomData.Line);
             }
         }
@@ -451,6 +493,47 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
     } catch (err) {
         console.error(`Error in BOM ${action} operation:`, err);
         throw err;
+    }
+};
+
+const updateRoutingCheckOperation = async (companyId, bomId, rtgStep, checkOperation, userId) => {
+    try {
+        let pool = await sql.connect(config.database);
+
+        const normalizedValue = parseInt(checkOperation, 10) === 1 ? 1 : 0;
+
+        const result = await pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('BOMId', sql.BigInt, bomId)
+            .input('RtgStep', sql.SmallInt, rtgStep)
+            .input('CheckOperation', sql.Int, normalizedValue)
+            .input('UserId', sql.Int, userId ?? null)
+            .query(`
+                UPDATE dbo.MA_ProjectArticles_BOMRouting
+                SET CheckOperation = @CheckOperation,
+                    TBModified = GETDATE(),
+                    TBModifiedID = CASE 
+                        WHEN @UserId IS NULL THEN ISNULL(TBModifiedID, 1)
+                        ELSE @UserId 
+                    END
+                WHERE CompanyId = @CompanyId
+                  AND BOMId = @BOMId
+                  AND RtgStep = @RtgStep
+            `);
+
+        const updated = result.rowsAffected && result.rowsAffected[0] > 0;
+
+        return {
+            success: updated ? 1 : 0,
+            updated
+        };
+    } catch (err) {
+        console.error('Error updating routing CheckOperation:', err);
+        return {
+            success: 0,
+            updated: false,
+            msg: err.message || 'Errore aggiornando il flag di verifica'
+        };
     }
 };
 
@@ -1149,7 +1232,8 @@ const getReferenceBOMs = async (companyId, filters = {}, pagination = { page: 1,
             SELECT 
                 bom.Id,
                 bom.BOM,
-                bom.Description,
+                itm.Description AS Description,
+                bom.Description AS BomDescription,
                 bom.ItemId,
                 bom.Version,
                 bom.UoM,
@@ -1405,15 +1489,14 @@ const getERPItems = async (companyId, search = '') => {
         
         // Query di base per articoli dal gestionale
         let query = `
-            SELECT TOP	*
-                        T0.Item
+            SELECT		T0.Item
                         , T0.Description
                         , T0.Nature
                         , T0.BaseUoM
                         , T0.Department
                         , T1.Id AS ItemId
             FROM		dbo.MA_Items T0
-            LEFT JOIN	MA_ProjectArticles_Items T1 ON T1.Item = T0.Item AND T1.CompanyId = T0.CompanyId 
+            LEFT JOIN	MA_ProjectArticles_Items T1 ON T1.Item = T0.Item AND T1.CompanyId = T0.CompanyId
             WHERE		T0.CompanyId = @CompanyId
             AND			T0.Disabled = 0
         `;
@@ -2355,6 +2438,7 @@ const updateItemDetails = async (itemId, itemData) => {
       if (itemData.Length !== undefined) request.input('Length', sql.Float, itemData.Length);
       if (itemData.MediumRadius !== undefined) request.input('MediumRadius', sql.Float, itemData.MediumRadius);
       if (itemData.CustomerItemReference !== undefined) request.input('CustomerItemReference', sql.VarChar(64), itemData.CustomerItemReference);
+      if (itemData.Notes !== undefined) request.input('Notes', sql.NVarChar(sql.MAX), itemData.Notes);
       
       
       // Costruisci la query di aggiornamento in base ai campi forniti
@@ -2369,6 +2453,7 @@ const updateItemDetails = async (itemId, itemData) => {
       if (itemData.Length !== undefined) updateFields.push('Length = @Length');
       if (itemData.MediumRadius !== undefined) updateFields.push('MediumRadius = @MediumRadius');
       if (itemData.CustomerItemReference !== undefined) updateFields.push('CustomerItemReference = @CustomerItemReference');
+      if (itemData.Notes !== undefined) updateFields.push('Notes = @Notes');
 
       
       // Se non ci sono campi da aggiornare, esci
@@ -2537,8 +2622,8 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         console.log('DEBUG: Messaggi PRINT ricevuti dalla SP:', spPrintMessages.length);
 
         // Estrai i valori di output
-        const returnItemId = request.parameters.ReturnItemId.value;
-        const returnBOMId = request.parameters.ReturnBOMId.value;
+        let returnItemId = request.parameters.ReturnItemId.value;
+        let returnBOMId = request.parameters.ReturnBOMId.value;
         const importedComponents = request.parameters.ImportedComponents.value || 0;
         const errorCode = request.parameters.ErrorCode.value || 0;
         const errorMessage = request.parameters.ErrorMessage.value || '';
@@ -2582,8 +2667,8 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         //    - returnItemId è valorizzato (articolo creato)
         //    - returnBOMId è valorizzato (BOM creata)
         const selectedComponentsCount = importData.components?.length || 0;
-        const hasItemId = returnItemId !== null && returnItemId !== undefined;
-        const hasBOMId = returnBOMId !== null && returnBOMId !== undefined;
+        let hasItemId = returnItemId !== null && returnItemId !== undefined;
+        let hasBOMId = returnBOMId !== null && returnBOMId !== undefined;
         const hasImportedComponents = importedComponents > 0;
 
         console.log('DEBUG: Controllo successo importazione:', {
@@ -2594,7 +2679,49 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
             importazioneRiuscita: hasItemId || hasBOMId
         });
 
-        // SOLO se NIENTE è stato creato, allora fallisci
+        // TENTATIVO DI RECOVERY: Se i parametri OUTPUT sono NULL ma la SP ha stampato messaggi di successo,
+        // prova a recuperare l'articolo e la BOM appena creati dal database
+        if (!hasItemId && spPrintMessages.some(msg => msg.includes('Codice articolo principale generato'))) {
+            console.log('DEBUG: Tentativo di recovery - parametri OUTPUT NULL ma SP indica successo');
+
+            try {
+                // Cerca l'ultimo articolo creato per questo progetto
+                const recoverQuery = `
+                    SELECT TOP 1
+                        i.Id AS ItemId,
+                        b.Id AS BOMId
+                    FROM dbo.MA_ProjectArticles_Items i
+                    INNER JOIN dbo.MA_ProjectsItems pi ON pi.ItemId = i.Id AND pi.CompanyId = i.CompanyId
+                    LEFT JOIN dbo.MA_ProjectArticles_BillOfMaterials b ON b.ItemId = i.Id AND b.CompanyId = i.CompanyId
+                    WHERE i.CompanyId = @CompanyId
+                    AND pi.ProjectID = @ProjectId
+                    ORDER BY i.Id DESC`;
+
+                const recoverRequest = pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('ProjectId', sql.Int, projectId);
+
+                const recoverResult = await recoverRequest.query(recoverQuery);
+
+                if (recoverResult.recordset && recoverResult.recordset.length > 0) {
+                    const recovered = recoverResult.recordset[0];
+                    returnItemId = recovered.ItemId;
+                    returnBOMId = recovered.BOMId;
+                    hasItemId = returnItemId !== null;
+                    hasBOMId = returnBOMId !== null;
+
+                    console.log('DEBUG: Recovery riuscito!', {
+                        recoveredItemId: returnItemId,
+                        recoveredBOMId: returnBOMId
+                    });
+                }
+            } catch (recoveryError) {
+                console.error('Errore durante il recovery degli ID:', recoveryError);
+                // Continua con i valori NULL
+            }
+        }
+
+        // SOLO se NIENTE è stato creato E il recovery non ha funzionato, allora fallisci
         if (selectedComponentsCount > 0 && !hasItemId && !hasBOMId && errorCode === 0) {
             console.error('ATTENZIONE: Importazione fallita silenziosamente!', {
                 componenteSelezionati: selectedComponentsCount,
@@ -2732,7 +2859,7 @@ async function completeImportResult(pool, companyId, itemId, bomId, importedComp
         bomId: bomId,
         importedComponents: importedComponents,
         components: componentsDetails,
-        msg: `Articolo ${itemDetails?.Item || sourceItemCode} e ${importedComponents} componenti importati con successo`
+        msg: `Importazione completata con successo`
     };
 }
 
@@ -3079,6 +3206,7 @@ const updateItemDetailsWithValidation = async (itemId, itemData) => {
         if (itemData.Length !== undefined) request.input('Length', sql.Float, itemData.Length);
         if (itemData.MediumRadius !== undefined) request.input('MediumRadius', sql.Float, itemData.MediumRadius);
         if (itemData.CustomerItemReference !== undefined) request.input('CustomerItemReference', sql.VarChar(64), itemData.CustomerItemReference);
+        if (itemData.Notes !== undefined) request.input('Notes', sql.NVarChar(sql.MAX), itemData.Notes);
         
         // Costruisci la query di aggiornamento in base ai campi forniti
         let updateFields = [];
@@ -3092,6 +3220,7 @@ const updateItemDetailsWithValidation = async (itemId, itemData) => {
         if (itemData.Length !== undefined) updateFields.push('Length = @Length');
         if (itemData.MediumRadius !== undefined) updateFields.push('MediumRadius = @MediumRadius');
         if (itemData.CustomerItemReference !== undefined) updateFields.push('CustomerItemReference = @CustomerItemReference');
+        if (itemData.Notes !== undefined) updateFields.push('Notes = @Notes');
         
         // Se non ci sono campi da aggiornare, esci
         if (updateFields.length === 0) {
@@ -4480,5 +4609,6 @@ module.exports = {
     approveIntercompanyReferenceWithProject,
     getTemporaryIntercompanyItems,
     replaceTemporaryItem,
-    getReferenceWithProjects
+    getReferenceWithProjects,
+    updateRoutingCheckOperation
 };

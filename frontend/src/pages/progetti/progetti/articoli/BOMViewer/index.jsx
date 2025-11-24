@@ -23,6 +23,7 @@ const BOMViewerContent = () => {
     getBOMIntercompanySummary,
     syncIntercompanySharing,
     smartRefresh,
+    intercompanyRefreshKey,
   } = useBOMViewer();
 
   const [intercompanySidebarCollapsed, setIntercompanySidebarCollapsed] = useState(false);
@@ -103,6 +104,7 @@ const BOMViewerContent = () => {
                 onSyncClick={() => setSyncModalOpen(true)}
                 isCollapsed={intercompanySidebarCollapsed}
                 onToggleCollapse={() => setIntercompanySidebarCollapsed(!intercompanySidebarCollapsed)}
+                refreshKey={intercompanyRefreshKey}
               />
             </div>
 

@@ -13,6 +13,7 @@ import {
 import ERPBOMs from "./ERPBOMs";
 import ProjectBOMs from "./ProjectBOMs";
 import ReferenceBOMs from "./ReferenceBOMs";
+import CurrentBOMCodes from "./CurrentBOMCodes";
 import { useBOMViewer } from "../../context/BOMViewerContext";
 
 const BOMReferencePanel = ({ activeItem = null, setDragSettings = null }) => {
@@ -130,18 +131,18 @@ const BOMReferencePanel = ({ activeItem = null, setDragSettings = null }) => {
               Mago
             </TabsTrigger>
             <TabsTrigger
-              value="projects"
-              className="flex-1 flex items-center justify-center d-none"
-            >
-              <Folder className="h-4 w-4 mr-2" />
-              Progetti
-            </TabsTrigger>
-            <TabsTrigger
               value="reference"
               className="flex-1 flex items-center justify-center"
             >
               <ClipboardList className="h-4 w-4 mr-2" />
-              Rif.
+              Progetti
+            </TabsTrigger>
+            <TabsTrigger
+              value="current"
+              className="flex-1 flex items-center justify-center"
+            >
+              <InfoIcon className="h-4 w-4 mr-2" />
+              Correnti
             </TabsTrigger>
           </TabsList>
         </div>
@@ -162,6 +163,13 @@ const BOMReferencePanel = ({ activeItem = null, setDragSettings = null }) => {
           className="flex-1 p-0 m-0 overflow-hidden"
         >
           <ReferenceBOMs importOptions={importOptions} />
+        </TabsContent>
+
+        <TabsContent
+          value="current"
+          className="flex-1 p-0 m-0 overflow-hidden"
+        >
+          <CurrentBOMCodes importOptions={importOptions} />
         </TabsContent>
       </Tabs>
     </div>

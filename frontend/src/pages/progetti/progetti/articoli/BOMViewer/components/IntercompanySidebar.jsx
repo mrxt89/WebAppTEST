@@ -12,6 +12,7 @@ const IntercompanySidebar = ({
   isCollapsed,
   onToggleCollapse,
   className = '',
+  refreshKey = 0,
 }) => {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -39,7 +40,7 @@ const IntercompanySidebar = ({
 
   useEffect(() => {
     loadSummary();
-  }, [bomId]);
+  }, [bomId, refreshKey]);
 
   const toggleCompany = (companyId) => {
     const newExpanded = new Set(expandedCompanies);

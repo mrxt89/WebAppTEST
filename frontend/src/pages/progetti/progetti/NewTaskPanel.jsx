@@ -774,20 +774,30 @@ const NewTaskPanel = ({
                                             <CommandEmpty>Nessun utente trovato.</CommandEmpty>
                                             <CommandGroup className="max-h-[200px] overflow-auto">
                                               
-                                              {filterUsers.map((user) => (
-                                                <CommandItem
-                                                  key={user.userId}
-                                                  value={user.userId.toString()}
-                                                  onSelect={(value) => {
-                                                    setTaskData(prev => ({
-                                                      ...prev,
-                                                      AssignedTo: value,
-                                                      DefaultGroupId: null,
-                                                    }));
-                                                    setOpenCombobox(false);
-                                                    setSearchValue("");
-                                                  }}
-                                                >
+                                              {filterUsers.map((user) => {
+                                                const itemValue = [
+                                                  user.firstName,
+                                                  user.lastName,
+                                                  user.role,
+                                                ]
+                                                  .filter(Boolean)
+                                                  .join(" ")
+                                                  .toLowerCase();
+
+                                                return (
+                                                  <CommandItem
+                                                    key={user.userId}
+                                                    value={itemValue}
+                                                    onSelect={() => {
+                                                      setTaskData((prev) => ({
+                                                        ...prev,
+                                                        AssignedTo: user.userId.toString(),
+                                                        DefaultGroupId: null,
+                                                      }));
+                                                      setOpenCombobox(false);
+                                                      setSearchValue("");
+                                                    }}
+                                                  >
                                                   <CheckIcon
                                                     className={cn(
                                                       "mr-2 h-4 w-4",
@@ -797,8 +807,9 @@ const NewTaskPanel = ({
                                                     )}
                                                   />
                                                   {user.firstName} {user.lastName}
-                                                </CommandItem>
-                                              ))}
+                                                  </CommandItem>
+                                                );
+                                              })}
                                             </CommandGroup>
                                           </Command>
                                         </PopoverContent>

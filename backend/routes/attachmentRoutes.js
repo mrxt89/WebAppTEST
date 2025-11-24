@@ -132,7 +132,7 @@ const ALLOWED_MIME_TYPES = [
 const upload = multer({ 
     storage: storage,  // IMPORTANTE: usa lo storage definito sopra
     limits: {
-        fileSize: 50 * 1024 * 1024 // 50MB
+        fileSize: 400 * 1024 * 1024 // 400MB limit
     },
     fileFilter: (req, file, cb) => {
         // Check MIME type

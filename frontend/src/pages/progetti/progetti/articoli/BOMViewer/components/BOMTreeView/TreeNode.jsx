@@ -78,6 +78,45 @@ const NodeIcon = ({ node, isRootNode }) => {
   }
 };
 
+// Helper function to get nature badge for components
+const getNatureBadge = (node) => {
+  if (node.type === "cycle") return null;
+
+  const nature = node.data.ComponentNature || node.data.Nature;
+
+  switch (Number(nature)) {
+    case 22413312: // Semi-finished
+      return (
+        <Badge
+          variant="outline"
+          className="ml-1.5 px-1 py-0 h-4 text-[10px] bg-blue-50 text-blue-700 border-blue-300 font-semibold"
+        >
+          SML
+        </Badge>
+      );
+    case 22413313: // Finished product
+      return (
+        <Badge
+          variant="outline"
+          className="ml-1.5 px-1 py-0 h-4 text-[10px] bg-green-50 text-green-700 border-green-300 font-semibold"
+        >
+          PF
+        </Badge>
+      );
+    case 22413314: // Purchase
+      return (
+        <Badge
+          variant="outline"
+          className="ml-1.5 px-1 py-0 h-4 text-[10px] bg-amber-50 text-amber-700 border-amber-300 font-semibold"
+        >
+          ACQ
+        </Badge>
+      );
+    default:
+      return null;
+  }
+};
+
 // Funzione helper al componente TreeNode
 const generateUniqueNodeId = (node) => {
   if (!node || node.type !== "component" || !node.data) {
@@ -295,6 +334,8 @@ const TreeNode = ({
     }
   };
 
+  let latestComponentCode = null;
+
   // Get text for the node
   const getNodeText = () => {
     if (node.type === "component") {
@@ -316,6 +357,8 @@ const TreeNode = ({
           }
         }
       }
+
+      latestComponentCode = code;
 
       // If there's a code, show "Code - Description"
       if (code) {
@@ -491,6 +534,15 @@ const TreeNode = ({
     );
   };
 
+  const nodeLabel = getNodeText();
+  const hasInvalidCodeLength =
+    node.type === "component" &&
+    latestComponentCode &&
+    latestComponentCode.length !== 15;
+  const invalidCodeLengthValue = latestComponentCode
+    ? latestComponentCode.length
+    : 0;
+
   // NUOVO: Indicatore di modifiche pendenti
   const getModifiedIndicator = () => {
     if (!hasPendingChanges || !editMode) return null;
@@ -581,10 +633,17 @@ const TreeNode = ({
                   "truncate max-w-[280px]",
                   isRootNode && "font-semibold text-gray-800",
                   hasPendingChanges && editMode && "text-amber-700 font-medium", // NUOVO: Testo ambra per componenti modificati
+                  hasInvalidCodeLength && "text-rose-600 font-semibold",
                 )}
               >
-                {getNodeText()}
+                {nodeLabel}
               </span>
+              {node.type === "component" && !isRootNode && getNatureBadge(node)}
+              {hasInvalidCodeLength && (
+                <Badge className="ml-2 bg-rose-100 text-rose-700 border border-rose-200 text-[10px]">
+                  {invalidCodeLengthValue}/15
+                </Badge>
+              )}
               {getModifiedIndicator()}
               {(isLocked || (isRootNode && !canRecodeRoot)) && getLockedTooltip()}
               {hasMagoBOM && getMagoBadge()}

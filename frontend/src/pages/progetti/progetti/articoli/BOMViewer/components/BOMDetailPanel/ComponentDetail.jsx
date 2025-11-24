@@ -22,9 +22,11 @@ import {
   AlertTriangle,
   Building2,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const ComponentDetail = ({ component, editMode }) => {
   const {
+    bom,
     unitsOfMeasure,
     pendingChanges,
     setPendingChanges,
@@ -42,6 +44,9 @@ const ComponentDetail = ({ component, editMode }) => {
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
 
   // Stato per i valori attualmente visualizzati nei campi
+  const isRootComponent =
+    component?.Level === 0 || component?.IsRoot || component?.isRoot;
+
   const [formData, setFormData] = useState({
     // Campi BOM Component
     ComponentId: component?.ComponentId,
@@ -50,11 +55,16 @@ const ComponentDetail = ({ component, editMode }) => {
     UoM: component?.UoM || "PZ",
     UnitCost: component?.UnitCost || 0,
     FixedCost: component?.FixedCost || 0,
+    ComponentNotes: isRootComponent ? bom?.Notes || "" : component?.Notes || "",
 
     // Campi Item
     Code: component?.ComponentItemCode || component?.ComponentCode || "",
     Description: component?.ComponentItemDescription || component?.Description || "",
-    Notes: component?.Notes || "",
+    ItemNotes:
+      component?.ItemNotes ||
+      component?.ComponentItemNotes ||
+      component?.Item?.Notes ||
+      "",
     Nature: component?.ComponentNature || component?.Nature || 22413312,
     Diameter: component?.Diameter || 0,
     Bxh: component?.Bxh || "",
@@ -111,6 +121,20 @@ const ComponentDetail = ({ component, editMode }) => {
     findParentComponent();
   }, [component, bomComponents]);
 
+  // Aggiorna le note della BOM quando cambiano header o pendingChanges
+  useEffect(() => {
+    if (isRootComponent) {
+      const pendingHeaderNotes = pendingChanges.header?.notes;
+      const sourceNotes =
+        pendingHeaderNotes !== undefined ? pendingHeaderNotes : bom?.Notes || "";
+
+      setFormData((prev) => ({
+        ...prev,
+        ComponentNotes: sourceNotes,
+      }));
+    }
+  }, [isRootComponent, bom?.Notes, pendingChanges.header?.notes]);
+
   // Aggiorna i dati quando cambia il componente
   useEffect(() => {
     if (component) {
@@ -122,12 +146,17 @@ const ComponentDetail = ({ component, editMode }) => {
         UoM: component.UoM || "PZ",
         UnitCost: component.UnitCost || 0,
         FixedCost: component.FixedCost || 0,
+        ComponentNotes: isRootComponent ? bom?.Notes || "" : component.Notes || "",
 
         // Campi Item
         Code: component.ComponentItemCode || component.ComponentCode || "",
         Description:
           component.Description || component.ComponentItemDescription || "",
-        Notes: component.Notes || "",
+        ItemNotes:
+          component.ItemNotes ||
+          component.ComponentItemNotes ||
+          component.Item?.Notes ||
+          "",
         Nature: component.ComponentNature || component.Nature || 22413312,
         Diameter: component.Diameter || 0,
         Bxh: component.Bxh || "",
@@ -151,8 +180,15 @@ const ComponentDetail = ({ component, editMode }) => {
 
   // Ripristina i dati del form quando le modifiche pendenti vengono cancellate
   useEffect(() => {
-    if (component && !pendingChanges[component.ComponentId]) {
-      // Se non ci sono più modifiche pendenti per questo componente, ripristina i dati originali
+    if (!component) return;
+
+    // Controlla se ci sono modifiche pendenti per questo componente
+    const hasComponentChanges = pendingChanges[component.ComponentId];
+    // Per il root component, controlla anche se ci sono modifiche all'header
+    const hasHeaderChanges = isRootComponent && pendingChanges.header;
+
+    // Se non ci sono modifiche pendenti, ripristina i dati originali
+    if (!hasComponentChanges && !hasHeaderChanges) {
       const originalData = {
         // Campi BOM Component
         ComponentId: component.ComponentId,
@@ -161,12 +197,17 @@ const ComponentDetail = ({ component, editMode }) => {
         UoM: component.UoM || "PZ",
         UnitCost: component.UnitCost || 0,
         FixedCost: component.FixedCost || 0,
+        ComponentNotes: isRootComponent ? bom?.Notes || "" : component.Notes || "",
 
         // Campi Item
         Code: component.ComponentItemCode || component.ComponentCode || "",
         Description:
           component.Description || component.ComponentItemDescription || "",
-        Notes: component.Notes || "",
+        ItemNotes:
+          component.ItemNotes ||
+          component.ComponentItemNotes ||
+          component.Item?.Notes ||
+          "",
         Nature: component.ComponentNature || component.Nature || 22413312,
         Diameter: component.Diameter || 0,
         Bxh: component.Bxh || "",
@@ -183,7 +224,7 @@ const ComponentDetail = ({ component, editMode }) => {
 
       setFormData(originalData);
     }
-  }, [component, pendingChanges]);
+  }, [component?.ComponentId, pendingChanges[component?.ComponentId], pendingChanges.header, isRootComponent, bom?.Notes]);
 
   // Carica fornitori quando il componente viene montato o cambia
   useEffect(() => {
@@ -240,7 +281,7 @@ const ComponentDetail = ({ component, editMode }) => {
       // Aggiorna le modifiche in sospeso per questo componente
       setPendingChanges((prev) => {
         const newChanges = { ...prev };
-        
+
         // Se non ci sono modifiche precedenti per questo componente, inizializza
         if (!newChanges[componentId]) {
           newChanges[componentId] = {
@@ -258,8 +299,56 @@ const ComponentDetail = ({ component, editMode }) => {
 
         // Determina se il campo appartiene ai componenti BOM o ai dettagli dell'articolo
         // IMPORTANTE: TempSupplier* vanno in bomComponentChanges perché vengono gestiti da UPDATE_COMPONENT
-        const bomFields = ["ComponentType", "Quantity", "UoM", "UnitCost", "FixedCost", "TempSupplierId", "TempIntercompanyTargetId", "TempSupplierNotes"];
-        const itemFields = ["Code", "Description", "Notes", "Nature", "Diameter", "Bxh", "Depth", "Length", "MediumRadius", "CustomerItemReference"];
+        // Gestione speciale per le note della BOM di livello 0
+        if (isRootComponent && field === "ComponentNotes") {
+          console.log('[ComponentDetail] Root notes change:', {
+            newValue: value,
+            originalNotes: bom?.Notes,
+            isDifferent: value !== (bom?.Notes || "")
+          });
+
+          const originalNotes = bom?.Notes || "";
+
+          if (value !== originalNotes) {
+            console.log('[ComponentDetail] Setting header.notes in pendingChanges');
+            newChanges.header = {
+              ...(newChanges.header || {}),
+              notes: value,
+            };
+          } else if (newChanges.header) {
+            console.log('[ComponentDetail] Removing header.notes from pendingChanges');
+            delete newChanges.header.notes;
+            if (Object.keys(newChanges.header).length === 0) {
+              delete newChanges.header;
+            }
+          }
+
+          console.log('[ComponentDetail] Updated pendingChanges:', newChanges);
+          return newChanges;
+        }
+
+        const bomFields = [
+          "ComponentType",
+          "Quantity",
+          "UoM",
+          "UnitCost",
+          "FixedCost",
+          "ComponentNotes",
+          "TempSupplierId",
+          "TempIntercompanyTargetId",
+          "TempSupplierNotes",
+        ];
+        const itemFields = [
+          "Code",
+          "Description",
+          "Nature",
+          "Diameter",
+          "Bxh",
+          "Depth",
+          "Length",
+          "MediumRadius",
+          "CustomerItemReference",
+        ];
 
         if (bomFields.includes(field)) {
           // Controlla se il valore è diverso dall'originale
@@ -391,8 +480,23 @@ const ComponentDetail = ({ component, editMode }) => {
     </div>
   ) : null;
 
+  // Controlla se il componente è in ERP
+  const isComponentInERP = component?.stato_erp == "1" || component?.stato_erp === 1;
+  const isParentInERP = parentComponent?.stato_erp == "1" || parentComponent?.stato_erp === 1;
+console.log(component);
   return (
     <div className="space-y-4">
+      {/* Avviso se il componente è in ERP */}
+      {isComponentInERP && (
+        <Alert className="bg-amber-50 border-amber-200">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800 text-sm">
+            <strong>Componente presente in ERP (Mago):</strong> Questo articolo è bloccato e non può essere modificato.
+            È possibile solo copiarlo per creare un nuovo codice.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Mostriamo le informazioni sul componente padre se disponibili */}
       {parentInfo}
 
@@ -408,22 +512,25 @@ const ComponentDetail = ({ component, editMode }) => {
           <div className="flex items-center gap-2">
             <Input
               id="componentCode"
+              name="componentCode"
               value={formData.Code || ""}
               onChange={(e) => handleChange("Code", e.target.value)}
-              disabled={!editMode || component?.stato_erp == "1"}
+              disabled={!editMode || isComponentInERP}
               className={cn(
-                component?.stato_erp == "1" ? "bg-gray-200" : "bg-white",
+                isComponentInERP ? "bg-gray-100" : "bg-white",
                 hasFieldChange("Code") && "ring-2 ring-amber-500"
               )}
+              title={isComponentInERP ? "Articolo presente in ERP - Campo non modificabile" : ""}
+              autoComplete="off"
             />
-            {component.stato_erp == "1" && (
+            {isComponentInERP && (
               <Badge className="ml-1 bg-blue-100 text-blue-700">ERP</Badge>
             )}
           </div>
         </div>
 
         <div className="w-full">
-          <Label htmlFor="Description">
+          <Label htmlFor="description">
             Descrizione
             {hasFieldChange("Description") && (
               <span className="ml-1 text-amber-600">*</span>
@@ -431,13 +538,17 @@ const ComponentDetail = ({ component, editMode }) => {
           </Label>
           <Textarea
             id="description"
+            name="description"
             value={formData.Description || ""}
             onChange={(e) => handleChange("Description", e.target.value)}
             rows={3}
-            disabled={!editMode || component?.stato_erp == "1"}
+            disabled={!editMode || isComponentInERP}
             className={cn(
+              isComponentInERP ? "bg-gray-100" : "bg-white",
               hasFieldChange("Description") && "ring-2 ring-amber-500"
             )}
+            title={isComponentInERP ? "Articolo presente in ERP - Campo non modificabile" : ""}
+            autoComplete="off"
           />
         </div>
       </div>
@@ -480,17 +591,18 @@ const ComponentDetail = ({ component, editMode }) => {
               <span className="ml-1 text-amber-600">*</span>
             )}
           </Label>
-          {editMode && !component?.stato_erp == "1" ? (
+          {editMode && !isComponentInERP ? (
             <Select
               value={String(formData.Nature)}
               onValueChange={(v) => handleChange("Nature", parseInt(v, 10))}
-              disabled={!editMode || component?.stato_erp == "1"}
+              disabled={!editMode || isComponentInERP}
             >
-              <SelectTrigger 
+              <SelectTrigger
                 id="nature"
                 className={cn(
                   hasFieldChange("Nature") && "ring-2 ring-amber-500"
                 )}
+                title={isComponentInERP ? "Articolo presente in ERP - Campo non modificabile" : ""}
               >
                 <SelectValue placeholder="Natura articolo" />
               </SelectTrigger>
@@ -516,6 +628,7 @@ const ComponentDetail = ({ component, editMode }) => {
           </Label>
           <Input
             id="quantity"
+            name="quantity"
             type="number"
             step="0.1"
             value={formData.Quantity}
@@ -526,6 +639,7 @@ const ComponentDetail = ({ component, editMode }) => {
             className={cn(
               hasFieldChange("Quantity") && "ring-2 ring-amber-500"
             )}
+            autoComplete="off"
           />
         </div>
 
@@ -561,35 +675,39 @@ const ComponentDetail = ({ component, editMode }) => {
           ) : (
             <Input
               id="uom"
+              name="uom"
               value={formData.UoM}
               onChange={(e) => handleChange("UoM", e.target.value)}
               disabled={!editMode || component?.parentBOMStato_erp == "1"}
               className={cn(
                 hasFieldChange("UoM") && "ring-2 ring-amber-500"
               )}
+              autoComplete="off"
             />
           )}
         </div>
       </div>
 
-      {/* Note */}
+      {/* Note componente o BOM */}
       <div>
-        <Label htmlFor="notes">
-          Note
-          {hasFieldChange("Notes") && (
+        <Label htmlFor="componentNotes">
+          {isRootComponent ? "Note BOM" : "Note componente (BOM)"}
+          {hasFieldChange("ComponentNotes") && (
             <span className="ml-1 text-amber-600">*</span>
           )}
         </Label>
-        <Textarea
-          id="notes"
-          value={formData.Notes || ""}
-          onChange={(e) => handleChange("Notes", e.target.value)}
-          rows={3}
-          disabled={!editMode || component?.parentBOMStato_erp == "1"}
-          className={cn(
-            hasFieldChange("Notes") && "ring-2 ring-amber-500"
-          )}
-        />
+          <Textarea
+            id="componentNotes"
+            name="componentNotes"
+            value={formData.ComponentNotes || ""}
+            onChange={(e) => handleChange("ComponentNotes", e.target.value)}
+            rows={3}
+            disabled={!editMode || component?.parentBOMStato_erp == "1"}
+            className={cn(
+              hasFieldChange("ComponentNotes") && "ring-2 ring-amber-500"
+            )}
+            autoComplete="off"
+          />
       </div>
 
       {/* Dimensions */}
@@ -605,6 +723,7 @@ const ComponentDetail = ({ component, editMode }) => {
             </Label>
             <Input
               id="diameter"
+              name="diameter"
               type="number"
               step="0.10"
               min="0"
@@ -613,10 +732,12 @@ const ComponentDetail = ({ component, editMode }) => {
                 handleChange("Diameter", parseFloat(e.target.value))
               }
               className={cn(
-                "bg-white h-8 text-sm",
+                isComponentInERP ? "bg-gray-100 h-8 text-sm" : "bg-white h-8 text-sm",
                 hasFieldChange("Diameter") && "ring-2 ring-amber-500"
               )}
-              disabled={!editMode || component?.stato_erp == "1"}
+              disabled={!editMode || isComponentInERP}
+              title={isComponentInERP ? "Articolo presente in ERP - Campo non modificabile" : ""}
+              autoComplete="off"
             />
           </div>
 
@@ -629,13 +750,16 @@ const ComponentDetail = ({ component, editMode }) => {
             </Label>
             <Input
               id="bxh"
+              name="bxh"
               value={formData.Bxh || ""}
               onChange={(e) => handleChange("Bxh", e.target.value)}
               className={cn(
-                "bg-white h-8 text-sm",
+                isComponentInERP ? "bg-gray-100 h-8 text-sm" : "bg-white h-8 text-sm",
                 hasFieldChange("Bxh") && "ring-2 ring-amber-500"
               )}
-              disabled={!editMode || component?.stato_erp == "1"}
+              disabled={!editMode || isComponentInERP}
+              title={isComponentInERP ? "Articolo presente in ERP - Campo non modificabile" : ""}
+              autoComplete="off"
             />
           </div>
 
@@ -648,6 +772,7 @@ const ComponentDetail = ({ component, editMode }) => {
             </Label>
             <Input
               id="depth"
+              name="depth"
               type="number"
               step="0.10"
               min="0"
@@ -656,10 +781,12 @@ const ComponentDetail = ({ component, editMode }) => {
                 handleChange("Depth", parseFloat(e.target.value))
               }
               className={cn(
-                "bg-white h-8 text-sm",
+                isComponentInERP ? "bg-gray-100 h-8 text-sm" : "bg-white h-8 text-sm",
                 hasFieldChange("Depth") && "ring-2 ring-amber-500"
               )}
-              disabled={!editMode || component?.stato_erp == "1"}
+              disabled={!editMode || isComponentInERP}
+              title={isComponentInERP ? "Articolo presente in ERP - Campo non modificabile" : ""}
+              autoComplete="off"
             />
           </div>
 
@@ -672,6 +799,7 @@ const ComponentDetail = ({ component, editMode }) => {
             </Label>
             <Input
               id="length"
+              name="length"
               type="number"
               step="0.10"
               min="0"
@@ -680,10 +808,12 @@ const ComponentDetail = ({ component, editMode }) => {
                 handleChange("Length", parseFloat(e.target.value))
               }
               className={cn(
-                "bg-white h-8 text-sm",
+                isComponentInERP ? "bg-gray-100 h-8 text-sm" : "bg-white h-8 text-sm",
                 hasFieldChange("Length") && "ring-2 ring-amber-500"
               )}
-              disabled={!editMode || component?.stato_erp == "1"}
+              disabled={!editMode || isComponentInERP}
+              title={isComponentInERP ? "Articolo presente in ERP - Campo non modificabile" : ""}
+              autoComplete="off"
             />
           </div>
 
@@ -696,6 +826,7 @@ const ComponentDetail = ({ component, editMode }) => {
             </Label>
             <Input
               id="radius"
+              name="radius"
               type="number"
               step="0.10"
               min="0"
@@ -704,10 +835,12 @@ const ComponentDetail = ({ component, editMode }) => {
                 handleChange("MediumRadius", parseFloat(e.target.value))
               }
               className={cn(
-                "bg-white h-8 text-sm",
+                isComponentInERP ? "bg-gray-100 h-8 text-sm" : "bg-white h-8 text-sm",
                 hasFieldChange("MediumRadius") && "ring-2 ring-amber-500"
               )}
-              disabled={!editMode || component?.stato_erp == "1"}
+              disabled={!editMode || isComponentInERP}
+              title={isComponentInERP ? "Articolo presente in ERP - Campo non modificabile" : ""}
+              autoComplete="off"
             />
           </div>
         </div>
@@ -728,6 +861,7 @@ const ComponentDetail = ({ component, editMode }) => {
             </Label>
             <Input
               id="unitCost"
+              name="unitCost"
               type="number"
               step="0.01"
               min="0"
@@ -740,6 +874,7 @@ const ComponentDetail = ({ component, editMode }) => {
                 hasFieldChange("UnitCost") && "ring-2 ring-amber-500"
               )}
               disabled={!editMode || component?.parentBOMStato_erp == "1"}
+              autoComplete="off"
             />
           </div>
 
@@ -752,6 +887,7 @@ const ComponentDetail = ({ component, editMode }) => {
             </Label>
             <Input
               id="fixedCost"
+              name="fixedCost"
               type="number"
               step="0.01"
               min="0"
@@ -764,6 +900,7 @@ const ComponentDetail = ({ component, editMode }) => {
                 hasFieldChange("FixedCost") && "ring-2 ring-amber-500"
               )}
               disabled={!editMode || component?.parentBOMStato_erp == "1"}
+              autoComplete="off"
             />
           </div>
 
@@ -807,11 +944,12 @@ const ComponentDetail = ({ component, editMode }) => {
               onChange={(e) =>
                 handleChange("CustomerItemReference", e.target.value)
               }
-              disabled={!editMode || component?.stato_erp == "1"}
+              disabled={!editMode || isComponentInERP}
               className={cn(
-                "bg-white h-8 text-sm",
+                isComponentInERP ? "bg-gray-100 h-8 text-sm" : "bg-white h-8 text-sm",
                 hasFieldChange("CustomerItemReference") && "ring-2 ring-amber-500"
               )}
+              title={isComponentInERP ? "Articolo presente in ERP - Campo non modificabile" : ""}
             />
           </div>
         </div>
@@ -948,11 +1086,6 @@ const ComponentDetail = ({ component, editMode }) => {
       )}
     </div>
   );
-};
-
-// Helper function
-const cn = (...classes) => {
-  return classes.filter(Boolean).join(' ');
 };
 
 export default ComponentDetail;

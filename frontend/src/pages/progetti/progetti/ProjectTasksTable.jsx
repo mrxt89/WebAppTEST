@@ -533,7 +533,7 @@ const ProjectTasksTableImproved = ({
                         className="h-8 w-8 p-0"
                         onClick={(e) => {
                           e.stopPropagation();
-                          const prj = project?.Name || task.ProjectName || "";
+                          const prj = project?.ProjectErpID || task.ProjectErpID || "";
                           const stp = task.TaskSequence != null ? task.TaskSequence : "";
                           const ute = user?.ERPUserId ?? 0;
                           const ope = task.Operation || "";

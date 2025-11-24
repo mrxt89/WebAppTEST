@@ -6,23 +6,31 @@ import {
   FilePresent as FileIcon,
 } from "@mui/icons-material";
 
+const formatFileSize = (bytes) => {
+  if (!bytes && bytes !== 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const index = Math.floor(Math.log(bytes) / Math.log(1024));
+  const value = bytes / Math.pow(1024, index);
+  return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+};
+
 /**
- * Componente per il caricamento di file tramite drag and drop
- *
- * @param {Function} onFileSelect - Callback quando i file vengono selezionati
- * @param {boolean} disabled - Flag per disabilitare il componente
- * @param {boolean} multiple - Flag per permettere la selezione di più file
- * @param {string[]} acceptedFileTypes - Array di tipi MIME accettati
- * @param {ReactNode} children - Contenuto aggiuntivo da mostrare dentro il dropzone
- * @param {number} maxSize - Dimensione massima in bytes (default: 50MB)
- */
+* Componente per il caricamento di file tramite drag and drop
+*
+* @param {Function} onFileSelect - Callback quando i file vengono selezionati
+* @param {boolean} disabled - Flag per disabilitare il componente
+* @param {boolean} multiple - Flag per permettere la selezione di più file
+* @param {string[]} acceptedFileTypes - Array di tipi MIME accettati
+* @param {ReactNode} children - Contenuto aggiuntivo da mostrare dentro il dropzone
+ * @param {number} maxSize - Dimensione massima in bytes (default: 800MB)
+*/
 const FileDropZone = ({
   onFileSelect,
   disabled = false,
   multiple = false,
   acceptedFileTypes = [],
   children,
-  maxSize = 50 * 1024 * 1024, // 50MB default
+  maxSize = 800 * 1024 * 1024, // 800MB default (coerente con gli altri uploader)
   ...props
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -103,7 +111,7 @@ const FileDropZone = ({
       // Verifica dimensione
       if (file.size > maxSize) {
         console.warn(
-          `File "${file.name}" troppo grande (${file.size} bytes). Dimensione massima: ${maxSize} bytes.`,
+          `File "${file.name}" troppo grande (${formatFileSize(file.size)}). Dimensione massima: ${formatFileSize(maxSize)}.`,
         );
         return false;
       }
