@@ -35,8 +35,9 @@ import useProjectArticlesActions from "@/hooks/useProjectArticlesActions";
  * ProjectArticlesTab - Componente principale per la gestione degli articoli di progetto
  * @param {Object} project - Oggetto contenente i dati del progetto corrente
  * @param {boolean} canEdit - Flag che indica se l'utente ha i permessi di modifica
+ * @param {Function} refreshProject - Funzione per aggiornare l'intero progetto
  */
-const ProjectArticlesTab = ({ project, canEdit }) => {
+const ProjectArticlesTab = ({ project, canEdit, refreshProject }) => {
   // Stati base
   const [loading, setLoading] = useState(false);
   const [articles, setArticles] = useState([]);
@@ -519,6 +520,7 @@ const handleItemSelection = async (
                 project={project}
                 canEdit={canEdit}
                 onRefresh={loadArticles}
+                refreshProject={refreshProject}
               />
             ) : (
               <div className="p-6 text-center text-muted-foreground">

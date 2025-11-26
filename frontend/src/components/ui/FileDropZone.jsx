@@ -1,5 +1,5 @@
 // Frontend/src/components/ui/FileDropZone.jsx
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Box, Typography, Paper } from "@mui/material";
 import {
   CloudUpload as UploadIcon,
@@ -34,79 +34,12 @@ const FileDropZone = ({
   ...props
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [dragCounter, setDragCounter] = useState(0);
+  const dragCounterRef = useRef(0);
   const fileInputRef = useRef(null);
   const dropZoneRef = useRef(null);
 
-  // Gestione drag enter
-  const handleDragEnter = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (disabled) return;
-
-    setDragCounter((prev) => prev + 1);
-    setIsDragging(true);
-  };
-
-  // Gestione drag over
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (disabled) return;
-
-    e.dataTransfer.dropEffect = "copy";
-  };
-
-  // Gestione drag leave
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (disabled) return;
-
-    setDragCounter((prev) => prev - 1);
-
-    if (dragCounter <= 1) {
-      setDragCounter(0);
-      setIsDragging(false);
-    }
-  };
-
-  // Gestione drop
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    setDragCounter(0);
-    setIsDragging(false);
-
-    if (disabled) return;
-
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFiles(e.dataTransfer.files);
-    }
-  };
-
-  // Gestione click
-  const handleClick = () => {
-    if (disabled) return;
-
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  // Gestione cambio input file
-  const handleFileInputChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      handleFiles(e.target.files);
-    }
-  };
-
-  // Gestione validazione e output dei file
-  const handleFiles = (files) => {
+  // Gestione validazione e output dei file (definito prima per essere usato in handleDrop)
+  const handleFiles = useCallback((files) => {
     const validFiles = Array.from(files).filter((file) => {
       // Verifica dimensione
       if (file.size > maxSize) {
@@ -158,33 +91,172 @@ const FileDropZone = ({
         fileInputRef.current.value = "";
       }
     }
+  }, [maxSize, acceptedFileTypes, multiple, onFileSelect]);
+
+  // Gestione drag enter
+  const handleDragEnter = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (disabled) return;
+    
+    // Verifica che sia un file drag
+    if (!e.dataTransfer?.types?.includes('Files')) {
+      return;
+    }
+
+    dragCounterRef.current += 1;
+    if (dragCounterRef.current === 1) {
+      setIsDragging(true);
+    }
+  }, [disabled]);
+
+  // Gestione drag over
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (disabled) return;
+    
+    // Verifica che sia un file drag
+    if (!e.dataTransfer?.types?.includes('Files')) {
+      return;
+    }
+
+    e.dataTransfer.dropEffect = "copy";
+  }, [disabled]);
+
+  // Gestione drag leave
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (disabled) return;
+
+    // Controlla se stiamo uscendo effettivamente dal dropzone
+    // (non solo passando su un elemento figlio)
+    const currentTarget = e.currentTarget;
+    const relatedTarget = e.relatedTarget;
+    
+    if (!currentTarget.contains(relatedTarget)) {
+      dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+      if (dragCounterRef.current === 0) {
+        setIsDragging(false);
+      }
+    }
+  }, [disabled]);
+
+  // Reset dello stato quando il drag viene interrotto (es. ESC o uscita dalla finestra)
+  useEffect(() => {
+    const handleGlobalDragEnd = () => {
+      dragCounterRef.current = 0;
+      setIsDragging(false);
+    };
+
+    // Aggiungi listener globale per il dragend
+    document.addEventListener('dragend', handleGlobalDragEnd);
+    
+    // Aggiungi anche listener per quando si esce dalla finestra
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        dragCounterRef.current = 0;
+        setIsDragging(false);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('dragend', handleGlobalDragEnd);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Gestione drop
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+
+    if (disabled) return;
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  }, [disabled, handleFiles]);
+
+  // Gestione click
+  const handleClick = () => {
+    if (disabled) return;
+
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Gestione cambio input file
+  const handleFileInputChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFiles(e.target.files);
+    }
   };
 
   // Registrazione eventi drag and drop
   useEffect(() => {
     const currentDropZone = dropZoneRef.current;
 
-    if (currentDropZone) {
-      currentDropZone.addEventListener("dragenter", handleDragEnter);
-      currentDropZone.addEventListener("dragover", handleDragOver);
-      currentDropZone.addEventListener("dragleave", handleDragLeave);
-      currentDropZone.addEventListener("drop", handleDrop);
+    if (currentDropZone && !disabled) {
+      currentDropZone.addEventListener("dragenter", handleDragEnter, false);
+      currentDropZone.addEventListener("dragover", handleDragOver, false);
+      currentDropZone.addEventListener("dragleave", handleDragLeave, false);
+      currentDropZone.addEventListener("drop", handleDrop, false);
     }
 
     return () => {
       if (currentDropZone) {
-        currentDropZone.removeEventListener("dragenter", handleDragEnter);
-        currentDropZone.removeEventListener("dragover", handleDragOver);
-        currentDropZone.removeEventListener("dragleave", handleDragLeave);
-        currentDropZone.removeEventListener("drop", handleDrop);
+        currentDropZone.removeEventListener("dragenter", handleDragEnter, false);
+        currentDropZone.removeEventListener("dragover", handleDragOver, false);
+        currentDropZone.removeEventListener("dragleave", handleDragLeave, false);
+        currentDropZone.removeEventListener("drop", handleDrop, false);
       }
     };
-  }, [disabled, dragCounter]);
+  }, [disabled, handleDragEnter, handleDragOver, handleDragLeave, handleDrop]);
+
+  // Reset quando si clicca fuori dal dropzone durante un drag
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleClickOutside = (e) => {
+      if (dropZoneRef.current && !dropZoneRef.current.contains(e.target)) {
+        // Se c'è un drag in corso e si clicca fuori, resetta
+        dragCounterRef.current = 0;
+        setIsDragging(false);
+      }
+    };
+
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isDragging) {
+        dragCounterRef.current = 0;
+        setIsDragging(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isDragging]);
 
   return (
     <Paper
       ref={dropZoneRef}
       onClick={handleClick}
+      data-dropzone="true"
       sx={{
         position: "relative",
         p: 3,

@@ -1245,7 +1245,11 @@ const handleDisableProject = async (projectId) => {
 
             {/* Articles Tab */}
             <TabsContent value="articles" className="h-full overflow-auto" id="articles-tab">
-              <ProjectArticlesTab project={project} canEdit={true} />
+              <ProjectArticlesTab 
+                project={project} 
+                canEdit={true} 
+                refreshProject={(callback) => loadProject(true, callback)}
+              />
             </TabsContent>
 
             {/* Analytics Tab */}

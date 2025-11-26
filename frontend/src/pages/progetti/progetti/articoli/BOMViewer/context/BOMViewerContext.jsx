@@ -24,6 +24,7 @@ export const BOMViewerProvider = ({
   project,
   canEdit = false,
   onRefresh,
+  refreshProject,
 }) => {
   // Import API actions
   const projectArticlesActions = useProjectArticlesActions();
@@ -1198,6 +1199,7 @@ export const BOMViewerProvider = ({
     project,
     canEdit,
     onRefresh,
+    refreshProject,
 
     // BOM data
     loading,

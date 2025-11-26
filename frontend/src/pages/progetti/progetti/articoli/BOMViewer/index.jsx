@@ -127,7 +127,7 @@ const BOMViewerContent = () => {
 /**
  * BOMViewer - Componente wrapper esterno
  */
-const BOMViewer = ({ item, project, canEdit = false, onRefresh }) => {
+const BOMViewer = ({ item, project, canEdit = false, onRefresh, refreshProject }) => {
   // Ref per tracciare l'ultimo item renderizzato e prevenire re-render inutili
   const lastItemIdRef = useRef(null);
 
@@ -161,6 +161,7 @@ const BOMViewer = ({ item, project, canEdit = false, onRefresh }) => {
       project={project}
       canEdit={canEdit}
       onRefresh={onRefresh}
+      refreshProject={refreshProject}
     >
       <BOMViewerContent />
     </BOMViewerProvider>

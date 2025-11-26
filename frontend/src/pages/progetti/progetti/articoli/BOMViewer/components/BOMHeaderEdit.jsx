@@ -53,6 +53,7 @@ const BOMHeaderEdit = () => {
     selectedComponents,
     project,
     updateRoutingCheckOperation,
+    refreshProject,
   } = useBOMViewer();
 
   // Hook per export ERP
@@ -370,8 +371,18 @@ const BOMHeaderEdit = () => {
         // Disattiva modalità modifica dopo export riuscito
         setEditMode(false);
         
-        // Refresh completo
+        // Refresh completo della BOM
         await smartRefresh();
+        
+        // Refresh automatico dell'intero progetto
+        if (refreshProject) {
+          await refreshProject();
+        }
+      } else if (confirmResult.isConfirmed) {
+        // Anche in caso di errore, aggiorna il progetto
+        if (refreshProject) {
+          await refreshProject();
+        }
       }
     } catch (error) {
       console.error("Errore export BOM:", error);
@@ -381,6 +392,11 @@ const BOMHeaderEdit = () => {
         icon: "error",
         confirmButtonColor: "#d33",
       });
+      
+      // Refresh automatico del progetto anche in caso di errore
+      if (refreshProject) {
+        await refreshProject();
+      }
     } finally {
       setIsExporting(false);
     }

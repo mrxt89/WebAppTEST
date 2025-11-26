@@ -223,8 +223,27 @@ const ArticleBOMExpansion = ({
     }
   }, [downloadAllAttachmentsByItemCode, downloadAllAttachmentsByProjectItemId]);
 
-  const handleViewPreview = useCallback((attachment) => {
-    setSelectedAttachment(attachment);
+  const handleViewPreview = useCallback((attachment, componentContext = null) => {
+    if (!attachment) return;
+
+    const projectItemId =
+      attachment.ProjectItemId ||
+      attachment.ProjectItemID ||
+      componentContext?.ComponentId ||
+      null;
+
+    const itemCode =
+      attachment.ItemCode ||
+      attachment.ComponentItemCode ||
+      componentContext?.ComponentItemCode ||
+      componentContext?.Item ||
+      null;
+
+    setSelectedAttachment({
+      ...attachment,
+      ProjectItemId: projectItemId,
+      ItemCode: itemCode,
+    });
     setIsPreviewOpen(true);
   }, []);
 
@@ -426,7 +445,7 @@ const ArticleBOMExpansion = ({
                     size="sm" 
                     variant="ghost" 
                     className="h-4 w-4 p-0"
-                    onClick={() => handleViewPreview(attachment)}
+                    onClick={() => handleViewPreview(attachment, component)}
                     title="Visualizza"
                   >
                     <Eye className="h-3 w-3" />
@@ -723,6 +742,11 @@ const ArticleBOMExpansion = ({
             FileType: selectedAttachment.FileType,
             FilePath: selectedAttachment.FilePath,
             ItemCode: selectedAttachment.ItemCode,
+            ProjectItemId:
+              selectedAttachment.ProjectItemId ||
+              selectedAttachment.ProjectItemID ||
+              selectedAttachment.ComponentId ||
+              null,
           }}
           isOpen={isPreviewOpen}
           onClose={() => {
