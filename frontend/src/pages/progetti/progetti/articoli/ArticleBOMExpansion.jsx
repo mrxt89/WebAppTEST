@@ -23,7 +23,8 @@ import {
   MoreVertical,
   Upload,
   Info,
-  FileText
+  FileText,
+  History
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -35,6 +36,7 @@ import { swal } from '@/lib/common';
 import useItemAttachmentsActions from '@/hooks/useItemAttachmentsActions';
 import ItemAttachmentUploader from '@/components/itemAttachments/ItemAttachmentUploader';
 import ItemAttachmentDetails from '@/components/itemAttachments/ItemAttachmentDetails';
+import ItemAttachmentVersions from '@/components/itemAttachments/ItemAttachmentVersions';
 import FileViewer from '@/components/ui/fileViewer';
 
 /**
@@ -67,6 +69,7 @@ const ArticleBOMExpansion = ({
   const [selectedAttachment, setSelectedAttachment] = useState(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
 
   // Hook per le azioni sugli allegati
   const {
@@ -250,6 +253,11 @@ const ArticleBOMExpansion = ({
   const handleViewDetails = useCallback((attachment) => {
     setSelectedAttachment(attachment);
     setDetailsOpen(true);
+  }, []);
+
+  const handleViewVersions = useCallback((attachment) => {
+    setSelectedAttachment(attachment);
+    setVersionsOpen(true);
   }, []);
 
   const handleDeleteAttachment = useCallback(async (attachment, component) => {
@@ -467,13 +475,20 @@ const ArticleBOMExpansion = ({
                             <MoreVertical className="h-3 w-3" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-32">
+                        <DropdownMenuContent align="end" className="w-40">
                           <DropdownMenuItem 
                             className="text-xs py-1"
                             onClick={() => handleViewDetails(attachment)}
                           >
                             <Info className="h-3 w-3 mr-2" />
                             Dettagli
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-xs py-1"
+                            onClick={() => handleViewVersions(attachment)}
+                          >
+                            <History className="h-3 w-3 mr-2" />
+                            Versioni
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             className="text-xs py-1 text-red-600"
@@ -493,7 +508,7 @@ const ArticleBOMExpansion = ({
         </div>
         </div>
       );
-    }, [formatBytes, handleUploadOpen, handleDownloadAttachment, handleDownloadAllAttachments, handleViewPreview, handleViewDetails, handleDeleteAttachment]);
+    }, [formatBytes, handleUploadOpen, handleDownloadAttachment, handleDownloadAllAttachments, handleViewPreview, handleViewDetails, handleViewVersions, handleDeleteAttachment]);
 
   // Componente per renderizzare un singolo componente della BOM
   const BOMComponent = useCallback(({ component, level = 0 }) => {
@@ -727,6 +742,19 @@ const ArticleBOMExpansion = ({
           attachment={selectedAttachment}
           onClose={() => {
             setDetailsOpen(false);
+            setSelectedAttachment(null);
+          }}
+          readOnly={!canEdit}
+        />
+      )}
+
+      {/* Dialog versioni allegato */}
+      {versionsOpen && selectedAttachment && (
+        <ItemAttachmentVersions
+          open={versionsOpen}
+          attachment={selectedAttachment}
+          onClose={() => {
+            setVersionsOpen(false);
             setSelectedAttachment(null);
           }}
           readOnly={!canEdit}
