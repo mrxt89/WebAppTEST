@@ -132,6 +132,11 @@ backend/downloads/
 backend/downloads/*
 !backend/downloads/.gitkeep
 
+# Frontend downloads
+frontend/public/downloads/
+frontend/public/downloads/*
+!frontend/public/downloads/.gitkeep
+
 # IDE
 .vscode/
 .idea/
