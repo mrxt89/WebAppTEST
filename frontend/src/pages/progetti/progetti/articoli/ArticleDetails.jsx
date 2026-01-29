@@ -651,14 +651,14 @@ const ArticleDetails = ({
                 {isEditing ? (
                   <Input
                     id="uom"
-                    value={articleData.BaseUoM || "PZ"}
+                    value={articleData.BaseUoM || "NR"}
                     onChange={(e) => handleChange("BaseUoM", e.target.value)}
                     maxLength={3}
                     disabled={isFromERP} // Disabilita se è un articolo ERP
                   />
                 ) : (
                   <div className="border rounded-md p-2 bg-slate-50">
-                    {articleData.BaseUoM || "PZ"}
+                    {articleData.BaseUoM || "NR"}
                   </div>
                 )}
               </div>

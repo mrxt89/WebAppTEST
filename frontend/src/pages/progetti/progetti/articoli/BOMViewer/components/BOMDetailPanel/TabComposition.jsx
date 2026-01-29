@@ -75,7 +75,7 @@ const TabComposition = () => {
     ComponentCode: "",
     ComponentType: "7798784", // Articolo
     Quantity: 1,
-    UoM: "PZ",
+    UoM: "NR",
     Details: "",
     Notes: "",
   });
@@ -100,7 +100,7 @@ const TabComposition = () => {
     code: "",
     description: "",
     nature: "22413312", // Semilavorato di default
-    uom: "PZ",
+    uom: "NR",
   });
 
   // NUOVO: Stato per i dati del componente da aggiungere sotto
@@ -108,7 +108,7 @@ const TabComposition = () => {
     code: "",
     description: "",
     nature: "22413312",
-    uom: "PZ",
+    uom: "NR",
     quantity: 1,
   });
 
@@ -163,7 +163,7 @@ const TabComposition = () => {
         ComponentCode: "",
         ComponentType: "7798784",
         Quantity: 1,
-        UoM: "PZ",
+        UoM: "NR",
         Details: "",
         Notes: "",
       });
@@ -181,7 +181,7 @@ const TabComposition = () => {
       ...newComponentData,
       ComponentCode: item.Item,
       Details: item.Description,
-      UoM: item.BaseUoM || "PZ",
+      UoM: item.BaseUoM || "NR",
     });
   };
 
@@ -272,7 +272,7 @@ const TabComposition = () => {
           code: "",
           description: "",
           nature: "22413312",
-          uom: "PZ",
+          uom: "NR",
           copyBOM: true, // Aggiungi il nuovo campo
         });
         setShowManualCodeDialog(true);
@@ -330,7 +330,7 @@ const TabComposition = () => {
           code: "",
           description: "",
           nature: "22413312",
-          uom: "PZ",
+          uom: "NR",
           quantity: 1,
         });
         setShowAddUnderManualDialog(true);
@@ -371,7 +371,7 @@ const TabComposition = () => {
           Description: `Temporaneo per ${selectedNode.data.ComponentItemCode || "componente"}`,
           Quantity: selectedNode.data.Quantity || 1,
           Nature: 22413312, // Semilavorato
-          BaseUoM: selectedNode.data.UoM || "PZ",
+          BaseUoM: selectedNode.data.UoM || "NR",
           CopyBOM: tempReplaceCopyBOM, // Passa il parametro CopyBOM
         },
       );
@@ -438,7 +438,7 @@ const TabComposition = () => {
           code: "",
           description: "",
           nature: "22413312",
-          uom: "PZ",
+          uom: "NR",
           copyBOM: false,
         });
 
@@ -478,7 +478,7 @@ const TabComposition = () => {
         componentDescription: `Temporaneo sotto ${selectedNode.data.ComponentItemCode || "componente"}`,
         quantity: 1,
         nature: 22413312, // Semilavorato
-        uom: selectedNode.data.UoM || "PZ",
+        uom: selectedNode.data.UoM || "NR",
         parentComponentId: selectedNode.data.ComponentId, // Questo è il collegamento al padre
         importBOM: true, // Importa anche la distinta se presente
       });
@@ -547,7 +547,7 @@ const TabComposition = () => {
           code: "",
           description: "",
           nature: "22413312",
-          uom: "PZ",
+          uom: "NR",
           quantity: 1,
         });
 
@@ -597,6 +597,7 @@ const TabComposition = () => {
       const result = await addComponent(selectedBomId, {
         ComponentId: componentId,
         ComponentCode: componentCode,
+        ComponentBOMId: item.BOMId || null,  // NUOVO: passa BOMId se disponibile per specificare versione
         ComponentType: 7798784, // Articolo
         Quantity: 1,
         ParentComponentId: selectedNode.data.ComponentId, // Collegamento al padre
@@ -999,7 +1000,7 @@ const TabComposition = () => {
                       uom: e.target.value,
                     })
                   }
-                  placeholder="PZ"
+                  placeholder="NR"
                 />
               </div>
 
@@ -1151,7 +1152,7 @@ const TabComposition = () => {
                       uom: e.target.value,
                     })
                   }
-                  placeholder="PZ"
+                  placeholder="NR"
                 />
               </div>
 
@@ -1240,7 +1241,7 @@ const TabComposition = () => {
                           {item.Description}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
-                          UoM: {item.BaseUoM || "PZ"} | Natura:{" "}
+                          UoM: {item.BaseUoM || "NR"} | Natura:{" "}
                           {item.Nature === 22413312
                             ? "Semilavorato"
                             : item.Nature === 22413313
@@ -1277,7 +1278,7 @@ const TabComposition = () => {
                           {item.Description}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
-                          UoM: {item.BaseUoM || "PZ"} | Natura:{" "}
+                          UoM: {item.BaseUoM || "NR"} | Natura:{" "}
                           {item.Nature === 22413312
                             ? "Semilavorato"
                             : item.Nature === 22413313
@@ -1358,7 +1359,7 @@ const TabComposition = () => {
                           {item.Description}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
-                          UoM: {item.BaseUoM || "PZ"} | Natura:{" "}
+                          UoM: {item.BaseUoM || "NR"} | Natura:{" "}
                           {item.Nature === 22413312
                             ? "Semilavorato"
                             : item.Nature === 22413313
@@ -1395,7 +1396,7 @@ const TabComposition = () => {
                           {item.Description}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
-                          UoM: {item.BaseUoM || "PZ"} | Natura:{" "}
+                          UoM: {item.BaseUoM || "NR"} | Natura:{" "}
                           {item.Nature === 22413312
                             ? "Semilavorato"
                             : item.Nature === 22413313

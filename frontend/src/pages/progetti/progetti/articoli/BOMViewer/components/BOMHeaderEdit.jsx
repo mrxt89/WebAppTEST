@@ -147,7 +147,7 @@ const BOMHeaderEdit = () => {
         Level: 0,
         IsRoot: true,
         Nature: item.Nature || 22413312,
-        BaseUoM: item.BaseUoM || "PZ",
+        BaseUoM: item.BaseUoM || "NR",
         stato_erp: item.stato_erp || 0
       }
     };

@@ -650,7 +650,7 @@ const DndContextProvider = ({ children }) => {
         sourceItem.Nature || sourceItem.ComponentNature || 22413312; // Default to Semi-finished
 
       // Use source component UoM if available
-      const uom = sourceItem.BaseUoM || sourceItem.UoM || "PZ";
+      const uom = sourceItem.BaseUoM || sourceItem.UoM || "NR";
 
       // CORREZIONE: Determinare correttamente parentComponentId in base al livello del nodo
       let parentComponentId = null;
@@ -710,6 +710,7 @@ const DndContextProvider = ({ children }) => {
       const payload = {
         ComponentId: componentId,
         ComponentCode: componentCode,
+        ComponentBOMId: sourceItem.BOMId || null,  // NUOVO: passa BOMId se disponibile per specificare versione
         ComponentType: 7798784, // Articolo
         Quantity: 1,
         // Use correct ParentComponentId
@@ -747,7 +748,7 @@ const DndContextProvider = ({ children }) => {
             `Temporaneo da ${sourceItem.ItemCode || sourceItem.BOM || sourceItem.Item || "componente"}`,
           quantity: 1,
           nature: sourceItem.Nature || sourceItem.ComponentNature || 22413312, // Default to Semi-finished
-          uom: sourceItem.BaseUoM || sourceItem.UoM || "PZ",
+          uom: sourceItem.BaseUoM || sourceItem.UoM || "NR",
           importBOM: copyBOM, // Pass option to copy BOM
           // Pass source component ID to copy BOM
           sourceComponentId:
@@ -765,6 +766,7 @@ const DndContextProvider = ({ children }) => {
         const payload = {
           ComponentId: componentId,
           ComponentCode: componentCode,
+          ComponentBOMId: sourceItem.BOMId || null,  // NUOVO: passa BOMId se disponibile per specificare versione
           ComponentType: 7798784, // Articolo
           Quantity: 1,
           ImportBOM: true, // Always import BOM for existing components
@@ -864,7 +866,7 @@ const DndContextProvider = ({ children }) => {
             `Temporaneo per ${sourceItem.ItemCode || sourceItem.BOM || sourceItem.Item || "componente"}`,
           Quantity: target.data.Quantity || 1,
           Nature: sourceItem.Nature || sourceItem.ComponentNature || 22413312, // Default to Semi-finished
-          BaseUoM: sourceItem.BaseUoM || target.data.UoM || "PZ",
+          BaseUoM: sourceItem.BaseUoM || target.data.UoM || "NR",
           CopyBOM: copyBOM, // Pass option to copy BOM
           // Pass source component ID to copy BOM
           SourceComponentId:
@@ -979,7 +981,7 @@ const DndContextProvider = ({ children }) => {
         sourceItem.Nature || sourceItem.ComponentNature || 22413312; // Default to Semi-finished
 
       // Use source component UoM if available
-      const uom = sourceItem.BaseUoM || sourceItem.UoM || "PZ";
+      const uom = sourceItem.BaseUoM || sourceItem.UoM || "NR";
 
       // Call API to add new temporary component
       const payload = {
@@ -1009,6 +1011,7 @@ const DndContextProvider = ({ children }) => {
       const payload = {
         ComponentId: componentId,
         ComponentCode: componentCode,
+        ComponentBOMId: sourceItem.BOMId || null,  // NUOVO: passa BOMId se disponibile per specificare versione
         ComponentType: 7798784, // Articolo
         Quantity: 1,
         ParentComponentId: target.data.ComponentId, // Important: pass parent component ID

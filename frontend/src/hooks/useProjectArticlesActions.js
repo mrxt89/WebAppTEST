@@ -531,7 +531,7 @@ const useProjectArticlesActions = () => {
 
   // NUOVO: Ottieni distinte dal gestionale ERP (Mago)
   const getERPBOMs = useCallback(
-    async (search = "", page = 1, pageSize = 50) => {
+    async (search = "", page = 1, pageSize = 50, nature = null) => {
       try {
         setLoading(true);
         let url = `${config.API_BASE_URL}/projectArticles/erp-boms`;
@@ -542,6 +542,9 @@ const useProjectArticlesActions = () => {
         params.append("pageSize", pageSize);
 
         if (search) params.append("search", search);
+        if (nature !== null && nature !== undefined) {
+          params.append("nature", nature);
+        }
 
         if (params.toString()) {
           url += `?${params.toString()}`;
@@ -552,6 +555,83 @@ const useProjectArticlesActions = () => {
       } catch (err) {
         setError(err.message);
         console.error("Error fetching ERP BOMs:", err);
+        return {
+          items: [],
+          pagination: { currentPage: 1, totalPages: 1, totalItems: 0 },
+        };
+      } finally {
+        setLoading(false);
+      }
+    },
+    [makeRequest],
+  );
+
+  // NUOVO: Ottieni BOM e Item unificati dal gestionale ERP (Mago)
+  const getERPItemsAndBOMs = useCallback(
+    async (search = "", page = 1, pageSize = 50, nature = null, type = "all") => {
+      try {
+        setLoading(true);
+        let url = `${config.API_BASE_URL}/projectArticles/erp-items-and-boms`;
+
+        // Aggiungi parametri di query
+        const params = new URLSearchParams();
+        params.append("page", page);
+        params.append("pageSize", pageSize);
+
+        if (search) params.append("search", search);
+        if (nature !== null && nature !== undefined) {
+          params.append("nature", nature);
+        }
+        if (type) params.append("type", type);
+
+        if (params.toString()) {
+          url += `?${params.toString()}`;
+        }
+
+        const data = await makeRequest(url);
+        return data;
+      } catch (err) {
+        setError(err.message);
+        console.error("Error fetching ERP items and BOMs:", err);
+        return {
+          items: [],
+          pagination: { currentPage: 1, totalPages: 1, totalItems: 0 },
+        };
+      } finally {
+        setLoading(false);
+      }
+    },
+    [makeRequest],
+  );
+
+  // NUOVO: Ottieni BOM e Item unificati dai progetti
+  const getProjectItemsAndBOMs = useCallback(
+    async (projectId, search = "", page = 1, pageSize = 50, nature = null, type = "all") => {
+      try {
+        setLoading(true);
+        let url = `${config.API_BASE_URL}/projectArticles/project-items-and-boms`;
+
+        // Aggiungi parametri di query
+        const params = new URLSearchParams();
+        params.append("projectId", projectId);
+        params.append("page", page);
+        params.append("pageSize", pageSize);
+
+        if (search) params.append("search", search);
+        if (nature !== null && nature !== undefined) {
+          params.append("nature", nature);
+        }
+        if (type) params.append("type", type);
+
+        if (params.toString()) {
+          url += `?${params.toString()}`;
+        }
+
+        const data = await makeRequest(url);
+        return data;
+      } catch (err) {
+        setError(err.message);
+        console.error("Error fetching project items and BOMs:", err);
         return {
           items: [],
           pagination: { currentPage: 1, totalPages: 1, totalItems: 0 },
@@ -1031,7 +1111,7 @@ const useProjectArticlesActions = () => {
             Description:
               newComponentData.Description || "Componente temporaneo",
             Nature: newComponentData.Nature || 22413312, // Default: Semilavorato
-            BaseUoM: newComponentData.BaseUoM || "PZ",
+            BaseUoM: newComponentData.BaseUoM || "NR",
             Quantity: newComponentData.Quantity || 1,
             CopyBOM: newComponentData.CopyBOM || false, // Supporto per copiare la distinta
           };
@@ -1790,6 +1870,8 @@ const searchSimilarArticles = useCallback(
 
     // Nuove funzioni BOM
     getERPBOMs,
+    getERPItemsAndBOMs,
+    getProjectItemsAndBOMs,
     getReferenceBOMs,
     reorderBOMComponents,
 

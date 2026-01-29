@@ -55,6 +55,7 @@ const MyTasksPage = () => {
     dueDate: "all",
     projectId: "all",
     involvedUser: null, // Nuovo filtro per utente coinvolto
+    showDisabledTasks: false, // Flag per mostrare attività disabilitate
     sortBy: "dueDate",
     sortDirection: "asc",
   });
@@ -176,6 +177,11 @@ const MyTasksPage = () => {
             return false;
           }
         });
+      }
+
+      // Filtro per attività disabilitate
+      if (!mainFilters.showDisabledTasks) {
+        result = result.filter((task) => !task.TaskDisabled);
       }
 
       if (mainFilters.dueDate !== "all") {
@@ -393,6 +399,7 @@ const MyTasksPage = () => {
       filters.dueDate !== "all" ||
       filters.projectId !== "all" ||
       filters.involvedUser !== null ||
+      filters.showDisabledTasks ||
       Object.keys(columnFilters).length > 0
     );
   };

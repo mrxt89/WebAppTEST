@@ -127,7 +127,7 @@ const BOMTreeView = ({
     code: "",
     description: "",
     nature: "22413312", // Semilavorato di default
-    uom: "PZ",
+    uom: "NR",
     quantity: 1,
     copyBOM: false, // Campo per l'opzione di copia distinta
   });
@@ -593,7 +593,7 @@ const BOMTreeView = ({
         componentDescription: `Nuovo componente temporaneo`,
         quantity: 1,
         nature: 22413312, // Semilavorato
-        uom: "PZ",
+        uom: "NR",
         importBOM: true,
       });
 
@@ -1059,7 +1059,7 @@ const BOMTreeView = ({
                   code: "",
                   description: "",
                   nature: "22413312",
-                  uom: "PZ",
+                  uom: "NR",
                   copyBOM: true,
                 });
                 setShowManualDialog(true);
@@ -1198,7 +1198,7 @@ const BOMTreeView = ({
                         Description: `Temporaneo per ${component.data.ComponentItemCode || "componente"}`,
                         Quantity: component.data.Quantity || 1,
                         Nature: 22413312,
-                        BaseUoM: component.data.UoM || "PZ",
+                        BaseUoM: component.data.UoM || "NR",
                         CopyBOM: tempReplaceCopyBOM,
                       },
                     );
@@ -1301,7 +1301,7 @@ const BOMTreeView = ({
                   onChange={(e) =>
                     setManualData({ ...manualData, uom: e.target.value })
                   }
-                  placeholder="PZ"
+                  placeholder="NR"
                 />
               </div>
 
@@ -1614,7 +1614,7 @@ const BOMTreeView = ({
                           {item.Description}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
-                          UoM: {item.BaseUoM || "PZ"} | Natura:{" "}
+                          UoM: {item.BaseUoM || "NR"} | Natura:{" "}
                           {item.Nature === 22413312
                             ? "Semilavorato"
                             : item.Nature === 22413313
@@ -1658,7 +1658,7 @@ const BOMTreeView = ({
                           {item.Description}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
-                          UoM: {item.BaseUoM || "PZ"} | Natura:{" "}
+                          UoM: {item.BaseUoM || "NR"} | Natura:{" "}
                           {item.Nature === 22413312
                             ? "Semilavorato"
                             : item.Nature === 22413313
@@ -1738,7 +1738,7 @@ const BOMTreeView = ({
                       componentDescription: `Temporaneo sotto ${component.data.ComponentItemCode || "componente"}`,
                       quantity: 1,
                       nature: 22413312, // Semilavorato
-                      uom: component.data.UoM || "PZ",
+                      uom: component.data.UoM || "NR",
                       parentComponentId: component.data.ComponentId, // Collegamento al padre
                       importBOM: true,
                     });
@@ -1788,7 +1788,7 @@ const BOMTreeView = ({
                   code: "",
                   description: "",
                   nature: "22413312",
-                  uom: "PZ",
+                  uom: "NR",
                   quantity: 1,
                 });
               }}
@@ -1912,7 +1912,7 @@ const BOMTreeView = ({
                   onChange={(e) =>
                     setManualData({ ...manualData, uom: e.target.value })
                   }
-                  placeholder="PZ"
+                  placeholder="NR"
                 />
               </div>
 
@@ -2106,6 +2106,7 @@ const BOMTreeView = ({
                               await addComponent(selectedBomId, {
                                 ComponentId: item.Id || 0,
                                 ComponentCode: item.Item || "",
+                                ComponentBOMId: item.BOMId || null,  // NUOVO: passa BOMId se disponibile per specificare versione
                                 ComponentType: 7798784, // Articolo
                                 Quantity: 1,
                                 ParentComponentId: component.data.ComponentId, // Collegamento al padre
@@ -2144,7 +2145,7 @@ const BOMTreeView = ({
                           {item.Description}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
-                          UoM: {item.BaseUoM || "PZ"} | Natura:{" "}
+                          UoM: {item.BaseUoM || "NR"} | Natura:{" "}
                           {item.Nature === 22413312
                             ? "Semilavorato"
                             : item.Nature === 22413313
@@ -2188,7 +2189,7 @@ const BOMTreeView = ({
                           {item.Description}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
-                          UoM: {item.BaseUoM || "PZ"} | Natura:{" "}
+                          UoM: {item.BaseUoM || "NR"} | Natura:{" "}
                           {item.Nature === 22413312
                             ? "Semilavorato"
                             : item.Nature === 22413313

@@ -423,31 +423,9 @@ const getAttachmentLockInfo = async (attachmentId) => {
     }
 };
 
-/**
- * Pulisce i lock scaduti (più di 2 ore)
- */
-const cleanupExpiredLocks = async () => {
-    try {
-        let pool = await sql.connect(config.database);
-        
-        const result = await pool.request()
-            .query(`
-                UPDATE MA_AttachmentLocks 
-                SET ReleasedAt = GETDATE()
-                WHERE ReleasedAt IS NULL 
-                AND LockedAt < DATEADD(HOUR, -2, GETDATE())
-            `);
-        
-        return { 
-            success: true, 
-            rowsAffected: result.rowsAffected[0],
-            message: `${result.rowsAffected[0]} lock scaduti puliti`
-        };
-    } catch (err) {
-        console.error('Error in cleanupExpiredLocks:', err);
-        throw err;
-    }
-};
+// cleanupExpiredLocks RIMOSSA - Ridondante con SP_CleanupOldLocks
+// La stored procedure viene chiamata automaticamente ogni ora da server.js
+// e gestisce il cleanup con timeout di 120 minuti + supporto heartbeat
 
 module.exports = {
     getProjectIdByTaskId,
@@ -464,6 +442,5 @@ module.exports = {
     createAttachmentLock,
     releaseAttachmentLock,
     forceReleaseAttachmentLock,
-    getAttachmentLockInfo,
-    cleanupExpiredLocks
+    getAttachmentLockInfo
 };

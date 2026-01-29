@@ -1,6 +1,6 @@
 // src/pages/progetti/progetti/articoli/BOMViewer/components/codingRules/CodingHierarchySelector.jsx
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
  Select,
  SelectTrigger,
@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import useRecodingRules from "@/hooks/useRecodingRules";
 import ArticleSuggestions from "./ArticleSuggestions";
 import CreateElementDialog from "./CreateElementDialog";
+import TechnicalCharacteristicsSelector from "./TechnicalCharacteristicsSelector";
+import { config } from "@/config";
 
 const CodingHierarchySelector = ({
  companyId,
@@ -67,6 +69,16 @@ const CodingHierarchySelector = ({
    newDescription: value.newDescription || currentDescription || "",
    useExistingArticle: value.useExistingArticle || false,
    existingArticleId: value.existingArticleId || null
+ });
+
+ // Stato per i dati tecnici (Diameter, Bxh, Depth, Length, MediumRadius, Thickness)
+ const [technicalData, setTechnicalData] = useState({
+   Diameter: value.Diameter || null,
+   Bxh: value.Bxh || null,
+   Depth: value.Depth || null,
+   Length: value.Length || null,
+   MediumRadius: value.MediumRadius || null,
+   Thickness: value.Thickness || null,
  });
 
  // Stati per validazione
@@ -137,31 +149,156 @@ const CodingHierarchySelector = ({
    return parts.filter(p => p).join(" - ");
  }, [macroFamilies, families, types, aliases]);
 
+ // Funzione per generare descrizione normalizzata con caratteristiche tecniche
+ const generateNormalizedDescription = useCallback(async (baseDescription, techData, hierarchyData) => {
+   try {
+     const response = await fetch(`${config.API_BASE_URL}/codingRules/description/generate`, {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json',
+         Authorization: `Bearer ${localStorage.getItem("token")}`,
+       },
+       body: JSON.stringify({
+         baseDescription,
+         technicalData: techData,
+         hierarchyData: {
+           MacroFamilyId: hierarchyData.macroFamilyId || null,
+           FamilyId: hierarchyData.familyId || null,
+           TypeId: hierarchyData.typeId || null,
+         },
+       }),
+     });
+
+    const data = await response.json();
+    console.log('generateNormalizedDescription response:', data);
+    if (data.success && data.data?.normalizedDescription) {
+      const normalizedDesc = data.data.normalizedDescription;
+      console.log('Returning normalized description:', normalizedDesc);
+      return normalizedDesc;
+    }
+    console.log('No normalized description, returning base:', baseDescription);
+    return baseDescription;
+   } catch (error) {
+     console.error('Errore nella generazione descrizione normalizzata:', error);
+     return baseDescription;
+   }
+ }, []);
+
  // Funzione helper per aggiornare descrizione e stato
- const updateDescriptionAndState = useCallback((newValues, skipDescriptionUpdate = false) => {
+ const updateDescriptionAndState = useCallback(async (newValues, skipDescriptionUpdate = false, techDataOverride = null) => {
+   const techDataToUse = techDataOverride !== null ? techDataOverride : technicalData;
+   
    if (!skipDescriptionUpdate && !isEditingDescription && !newValues.useExistingArticle) {
-     const newDescription = generateDescription(newValues);
-     const updatedValues = { ...newValues, newDescription };
-     setSelectedValues(updatedValues);
-     onChange(updatedValues);
-     if (onDescriptionChange) {
-       onDescriptionChange(newDescription);
-     }
+     // Genera descrizione base dalla gerarchia
+     const baseDescription = generateDescription(newValues);
+     
+     // Se abbiamo dati tecnici e almeno una parte della gerarchia, genera descrizione normalizzata
+     const hasTechnicalData = Object.values(techDataToUse).some(v => v !== null && v !== '' && v !== undefined);
+     const hasHierarchy = newValues.macroFamilyId || newValues.familyId || newValues.typeId;
+     
+     let finalDescription = baseDescription;
+     
+    if (hasTechnicalData && hasHierarchy) {
+      console.log('Generating normalized description with:', { baseDescription, techDataToUse, hierarchyData: {
+        macroFamilyId: newValues.macroFamilyId,
+        familyId: newValues.familyId,
+        typeId: newValues.typeId,
+      }});
+      finalDescription = await generateNormalizedDescription(
+        baseDescription,
+        techDataToUse,
+        {
+          macroFamilyId: newValues.macroFamilyId,
+          familyId: newValues.familyId,
+          typeId: newValues.typeId,
+        }
+      );
+      console.log('Generated description:', finalDescription);
+    }
+    
+    const updatedValues = { ...newValues, newDescription: finalDescription };
+    console.log('Updating selectedValues with newDescription:', finalDescription);
+    setSelectedValues(updatedValues);
+    // Passa sia i valori aggiornati che i dati tecnici completi
+    onChange({ ...updatedValues, ...techDataToUse });
+    if (onDescriptionChange) {
+      onDescriptionChange(finalDescription);
+    }
    } else {
      setSelectedValues(newValues);
-     onChange(newValues);
+     onChange({ ...newValues, ...techDataToUse });
    }
- }, [generateDescription, isEditingDescription, onChange, onDescriptionChange]);
+ }, [generateDescription, isEditingDescription, onChange, onDescriptionChange, technicalData, generateNormalizedDescription]);
 
- // Aggiorna stato quando cambiano le props
- useEffect(() => {
-   if (value && Object.keys(value).length > 0) {
-     setSelectedValues(prev => ({
-       ...prev,
-       ...value
-     }));
-   }
- }, [value]);
+// Aggiorna stato quando cambiano le props e carica le liste corrispondenti
+useEffect(() => {
+  if (value && Object.keys(value).length > 0) {
+    // Aggiorna selectedValues ma preserva newDescription se è stata generata automaticamente
+    setSelectedValues(prev => {
+      // Se abbiamo una newDescription in prev e non in value, preservala
+      const updated = {
+        ...prev,
+        ...value
+      };
+      // Se prev ha una descrizione generata e value non la ha, preserva quella di prev
+      if (prev.newDescription && !value.newDescription && prev.newDescription !== prev.newDescription) {
+        // Mantieni la descrizione di prev solo se è diversa dalla base
+        // (significa che è stata generata)
+      }
+      return updated;
+    });
+    
+    // Inizializza i dati tecnici se presenti nel value (include Thickness)
+    if (value.Diameter !== undefined || value.Bxh !== undefined || value.Depth !== undefined || 
+        value.Length !== undefined || value.MediumRadius !== undefined || value.Thickness !== undefined) {
+      setTechnicalData({
+        Diameter: value.Diameter || null,
+        Bxh: value.Bxh || null,
+        Depth: value.Depth || null,
+        Length: value.Length || null,
+        MediumRadius: value.MediumRadius || null,
+        Thickness: value.Thickness || null,
+      });
+    }
+    
+    // Carica le liste in base ai valori inizializzati
+    const loadInitialData = async () => {
+      setIsLoadingData(true);
+      
+      try {
+        // Se abbiamo categoryId, carica le macroFamilies
+        if (value.categoryId) {
+          const macroFamiliesData = await loadMacroFamilies(companyId, value.categoryId);
+          setMacroFamilies(macroFamiliesData);
+          
+          // Se abbiamo anche macroFamilyId, carica le families
+          if (value.macroFamilyId) {
+            const familiesData = await loadFamilies(companyId, value.macroFamilyId);
+            setFamilies(familiesData);
+            
+            // Se abbiamo anche familyId, carica i types
+            if (value.familyId) {
+              const typesData = await loadTypes(companyId, value.familyId);
+              setTypes(typesData);
+              
+              // Se abbiamo anche typeId, carica gli aliases
+              if (value.typeId) {
+                const aliasesData = await loadAliases(companyId, value.typeId);
+                setAliases(aliasesData);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Errore nel caricamento dati iniziali:", error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+    
+    loadInitialData();
+  }
+}, [value, companyId, loadMacroFamilies, loadFamilies, loadTypes, loadAliases]);
 
  // Carica categorie iniziali
  const loadInitialCategories = async () => {
@@ -336,8 +473,8 @@ const CodingHierarchySelector = ({
    
    // Carica macrofamiglie
    if (categoryId) {
-     const data = await loadMacroFamilies(companyId, categoryId);
-     setMacroFamilies(data);
+    const data = await loadMacroFamilies(companyId, categoryId);
+    setMacroFamilies(data);
    }
    
    setIsLoadingData(false);
@@ -604,30 +741,120 @@ const CodingHierarchySelector = ({
    };
    
    setSelectedValues(newValues);
-   onChange(newValues);
+   onChange({ ...newValues, ...technicalData });
    
    if (onDescriptionChange) {
      onDescriptionChange(description);
    }
  };
 
- // Genera descrizione automatica
- const handleGenerateDescription = () => {
-   const newDescription = generateDescription();
-   const newValues = {
-     ...selectedValues,
-     newDescription
-   };
-   
-   setSelectedValues(newValues);
-   onChange(newValues);
-   
-   if (onDescriptionChange) {
-     onDescriptionChange(newDescription);
-   }
-   
-   setIsEditingDescription(false);
+// Gestisce cambio dati tecnici
+const handleTechnicalDataChange = useCallback(async (newTechnicalData) => {
+  console.log('handleTechnicalDataChange called with:', newTechnicalData);
+  
+  // Assicurati che tutti i campi siano presenti (incluso Thickness)
+  // Mantieni i valori stringa come stringhe, non convertirli in null se sono stringhe non vuote
+  const completeTechnicalData = {
+    Diameter: newTechnicalData.Diameter !== undefined && newTechnicalData.Diameter !== '' ? newTechnicalData.Diameter : null,
+    Bxh: newTechnicalData.Bxh !== undefined && newTechnicalData.Bxh !== '' ? newTechnicalData.Bxh : null,
+    Depth: newTechnicalData.Depth !== undefined && newTechnicalData.Depth !== '' ? newTechnicalData.Depth : null,
+    Length: newTechnicalData.Length !== undefined && newTechnicalData.Length !== '' ? newTechnicalData.Length : null,
+    MediumRadius: newTechnicalData.MediumRadius !== undefined && newTechnicalData.MediumRadius !== '' ? newTechnicalData.MediumRadius : null,
+    Thickness: newTechnicalData.Thickness !== undefined && newTechnicalData.Thickness !== '' ? newTechnicalData.Thickness : null,
+  };
+  
+  console.log('Complete technical data:', completeTechnicalData);
+  
+  // Aggiorna i ref PRIMA di aggiornare lo stato per evitare che il useEffect si attivi
+  prevTechnicalDataRef.current = { ...completeTechnicalData };
+  setTechnicalData(completeTechnicalData);
+  
+  // Rigenera la descrizione con i nuovi dati tecnici
+  if (!isEditingDescription && !selectedValues.useExistingArticle) {
+    console.log('handleTechnicalDataChange: calling updateDescriptionAndState');
+    // Imposta flag per evitare che useEffect si attivi
+    isUpdatingFromHandler.current = true;
+    // Aggiorna i ref PRIMA di chiamare updateDescriptionAndState per evitare che il useEffect si attivi
+    prevTechnicalDataRef.current = { ...completeTechnicalData };
+    await updateDescriptionAndState(selectedValues, false, completeTechnicalData);
+    // Reset flag dopo un breve delay per permettere a setTechnicalData di completare
+    setTimeout(() => {
+      isUpdatingFromHandler.current = false;
+    }, 100);
+  } else {
+    // Aggiorna solo i dati tecnici senza rigenerare la descrizione
+    prevTechnicalDataRef.current = { ...completeTechnicalData };
+    onChange({ ...selectedValues, ...completeTechnicalData });
+  }
+}, [selectedValues, isEditingDescription, updateDescriptionAndState, onChange]);
+
+ // Genera descrizione automatica (forza aggiornamento)
+ const handleGenerateDescription = async () => {
+   setIsEditingDescription(false); // Reset flag modifica manuale
+   await updateDescriptionAndState(selectedValues, false, technicalData);
  };
+
+ // Ref per tracciare i valori precedenti e evitare loop infiniti
+ const prevHierarchyRef = useRef({ macroFamilyId: null, familyId: null, typeId: null });
+ const prevTechnicalDataRef = useRef({});
+ const isInitialMount = useRef(true);
+ const isUpdatingFromHandler = useRef(false); // Flag per evitare che useEffect si attivi durante handleTechnicalDataChange
+
+ // Aggiorna descrizione quando cambia la gerarchia o i dati tecnici
+ useEffect(() => {
+   // Skip al primo mount (i dati vengono già inizializzati)
+   if (isInitialMount.current) {
+     isInitialMount.current = false;
+     prevHierarchyRef.current = {
+       macroFamilyId: selectedValues.macroFamilyId,
+       familyId: selectedValues.familyId,
+       typeId: selectedValues.typeId
+     };
+     prevTechnicalDataRef.current = { ...technicalData };
+     return;
+   }
+
+   // Verifica se la gerarchia è cambiata
+   const hierarchyChanged = 
+     prevHierarchyRef.current.macroFamilyId !== selectedValues.macroFamilyId ||
+     prevHierarchyRef.current.familyId !== selectedValues.familyId ||
+     prevHierarchyRef.current.typeId !== selectedValues.typeId;
+
+  // Verifica se i dati tecnici sono cambiati
+  const technicalDataChanged = JSON.stringify(prevTechnicalDataRef.current) !== JSON.stringify(technicalData);
+  
+  console.log('useEffect check:', {
+    hierarchyChanged,
+    technicalDataChanged,
+    prevTechnicalData: prevTechnicalDataRef.current,
+    currentTechnicalData: technicalData,
+    isEditingDescription,
+    useExistingArticle: selectedValues.useExistingArticle
+  });
+
+  // Aggiorna solo se qualcosa è cambiato e non stiamo modificando manualmente
+  // IMPORTANTE: Non aggiornare se handleTechnicalDataChange ha appena aggiornato i dati
+  // (per evitare chiamate duplicate)
+  if ((hierarchyChanged || technicalDataChanged) && !isEditingDescription && !selectedValues.useExistingArticle && selectedValues.macroFamilyId && !isUpdatingFromHandler.current) {
+    const hasTechnicalData = Object.values(technicalData).some(v => v !== null && v !== '' && v !== undefined);
+    const hasHierarchy = selectedValues.macroFamilyId || selectedValues.familyId || selectedValues.typeId;
+    
+    if (hasHierarchy) {
+      console.log('useEffect calling updateDescriptionAndState with:', technicalData);
+      updateDescriptionAndState(selectedValues, false, technicalData);
+    }
+  }
+
+  // Aggiorna i ref dopo il controllo (ma solo se non è il mount iniziale)
+  if (!isInitialMount.current) {
+    prevHierarchyRef.current = {
+      macroFamilyId: selectedValues.macroFamilyId,
+      familyId: selectedValues.familyId,
+      typeId: selectedValues.typeId
+    };
+    prevTechnicalDataRef.current = { ...technicalData };
+  }
+}, [selectedValues.macroFamilyId, selectedValues.familyId, selectedValues.typeId, technicalData, isEditingDescription, selectedValues.useExistingArticle, updateDescriptionAndState]);
 
  // Calcola il sequenziale
  const calculateSequential = async (values) => {
@@ -937,11 +1164,19 @@ const CodingHierarchySelector = ({
              <SelectValue placeholder="Seleziona..." />
            </SelectTrigger>
            <SelectContent>
-             {macroFamilies.map(mf => (
-               <SelectItem key={mf.Id} value={String(mf.Id)}>
-                 {mf.Code} - {mf.Description}
-               </SelectItem>
-             ))}
+             {macroFamilies.map(mf => {
+               const isUniversal = mf.IsUniversal === true || mf.IsUniversal === 1;
+               return (
+                 <SelectItem key={mf.Id} value={String(mf.Id)}>
+                   <div className="flex items-center gap-2">
+                     <span>{mf.Code} - {mf.Description}</span>
+                     {isUniversal && (
+                       <Badge variant="outline" className="text-xs">Universale</Badge>
+                     )}
+                   </div>
+                 </SelectItem>
+               );
+             })}
            </SelectContent>
          </Select>
        </div>
@@ -976,11 +1211,19 @@ const CodingHierarchySelector = ({
            </SelectTrigger>
            <SelectContent>
              {families.length > 0 ? (
-               families.map(fam => (
-                 <SelectItem key={fam.Id} value={String(fam.Id)}>
-                   {fam.Code} - {fam.Description}
-                 </SelectItem>
-               ))
+               families.map(fam => {
+                 const isUniversal = fam.IsUniversal === true || fam.IsUniversal === 1;
+                 return (
+                   <SelectItem key={fam.Id} value={String(fam.Id)}>
+                     <div className="flex items-center gap-2">
+                       <span>{fam.Code} - {fam.Description}</span>
+                       {isUniversal && (
+                         <Badge variant="outline" className="text-xs">Universale</Badge>
+                       )}
+                     </div>
+                   </SelectItem>
+                 );
+               })
              ) : selectedValues.macroFamilyId ? (
                <SelectItem value="0" disabled>
                  000 - Nessuna famiglia disponibile
@@ -1020,11 +1263,19 @@ const CodingHierarchySelector = ({
            </SelectTrigger>
            <SelectContent>
              {types.length > 0 ? (
-               types.map(type => (
-                 <SelectItem key={type.Id} value={String(type.Id)}>
-                   {type.Code} - {type.Description}
-                 </SelectItem>
-               ))
+               types.map(type => {
+                 const isUniversal = type.IsUniversal === true || type.IsUniversal === 1;
+                 return (
+                   <SelectItem key={type.Id} value={String(type.Id)}>
+                     <div className="flex items-center gap-2">
+                       <span>{type.Code} - {type.Description}</span>
+                       {isUniversal && (
+                         <Badge variant="outline" className="text-xs">Universale</Badge>
+                       )}
+                     </div>
+                   </SelectItem>
+                 );
+               })
              ) : (selectedValues.familyId || families.length === 0) ? (
                <SelectItem value="0" disabled>
                  000 - Nessun tipo disponibile
@@ -1064,11 +1315,19 @@ const CodingHierarchySelector = ({
            </SelectTrigger>
            <SelectContent>
              {aliases.length > 0 ? (
-               aliases.map(alias => (
-                 <SelectItem key={alias.Id} value={String(alias.Id)}>
-                   {alias.Code} - {alias.Description}
-                 </SelectItem>
-               ))
+               aliases.map(alias => {
+                 const isUniversal = alias.IsUniversal === true || alias.IsUniversal === 1;
+                 return (
+                   <SelectItem key={alias.Id} value={String(alias.Id)}>
+                     <div className="flex items-center gap-2">
+                       <span>{alias.Code} - {alias.Description}</span>
+                       {isUniversal && (
+                         <Badge variant="outline" className="text-xs">Universale</Badge>
+                       )}
+                     </div>
+                   </SelectItem>
+                 );
+               })
              ) : (selectedValues.typeId || types.length === 0) ? (
                <SelectItem value="0" disabled>
                  000 - Nessun alias disponibile
@@ -1185,6 +1444,22 @@ const CodingHierarchySelector = ({
        </div>
      )}
 
+     {/* Selettore Caratteristiche Tecniche */}
+     {!selectedValues.useExistingArticle && selectedValues.macroFamilyId && (
+       <div className="space-y-2">
+         <Label className="text-xs">Caratteristiche Tecniche</Label>
+         <TechnicalCharacteristicsSelector
+           companyId={companyId}
+           macroFamilyId={selectedValues.macroFamilyId}
+           familyId={selectedValues.familyId}
+           typeId={selectedValues.typeId}
+           currentTechnicalData={technicalData}
+           onTechnicalDataChange={handleTechnicalDataChange}
+           disabled={disabled}
+         />
+       </div>
+     )}
+
      {/* Nuova Descrizione */}
      <div className="space-y-2">
        <div className="flex items-center justify-between">
@@ -1198,18 +1473,18 @@ const CodingHierarchySelector = ({
                  size="sm"
                  onClick={handleGenerateDescription}
                  className="h-7 px-2"
-                 title="Genera descrizione automatica"
+                 title="Aggiorna descrizione automaticamente"
                >
-                 <Wand2 className="h-3 w-3 mr-1" />
-                 Genera
+                 <RefreshCw className="h-3 w-3 mr-1" />
+                 Aggiorna
                </Button>
                <Button
                  type="button"
                  variant="ghost"
                  size="sm"
                  onClick={() => setIsEditingDescription(!isEditingDescription)}
-                 className="h-7 px-2"
-                 title="Modifica manualmente"
+                 className={`h-7 px-2 ${isEditingDescription ? 'bg-blue-100' : ''}`}
+                 title={isEditingDescription ? "Descrizione in modifica manuale" : "Modifica manualmente"}
                >
                  <Edit2 className="h-3 w-3" />
                </Button>
@@ -1227,6 +1502,12 @@ const CodingHierarchySelector = ({
          className="h-9"
          disabled={disabled || selectedValues.useExistingArticle}
        />
+       {isEditingDescription && (
+         <div className="text-xs text-blue-600 flex items-center gap-1">
+           <Edit2 className="h-3 w-3" />
+           Modifica manuale attiva - la descrizione non si aggiornerà automaticamente
+         </div>
+       )}
        <div className="text-xs text-gray-500">
          Descrizione attuale: {currentDescription}
        </div>

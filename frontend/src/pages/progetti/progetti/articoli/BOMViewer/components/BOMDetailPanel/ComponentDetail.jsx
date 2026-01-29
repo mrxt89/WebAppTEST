@@ -1,6 +1,6 @@
 // ComponentDetail.jsx - Aggiornato per supportare il tracciamento delle modifiche
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useBOMViewer } from "../../context/BOMViewerContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,10 @@ const ComponentDetail = ({ component, editMode }) => {
   const [codeCheckResult, setCodeCheckResult] = useState(null);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
 
+  // Ref per tracciare se l'utente sta modificando un campo
+  const isUserEditingRef = useRef(false);
+  const editingFieldRef = useRef(null);
+
   // Stato per i valori attualmente visualizzati nei campi
   const isRootComponent =
     component?.Level === 0 || component?.IsRoot || component?.isRoot;
@@ -52,7 +56,7 @@ const ComponentDetail = ({ component, editMode }) => {
     ComponentId: component?.ComponentId,
     ComponentType: component?.ComponentType || 7798784,
     Quantity: component?.Quantity || 1,
-    UoM: component?.UoM || "PZ",
+    UoM: component?.UoM || "NR",
     UnitCost: component?.UnitCost || 0,
     FixedCost: component?.FixedCost || 0,
     ComponentNotes: isRootComponent ? bom?.Notes || "" : component?.Notes || "",
@@ -119,6 +123,9 @@ const ComponentDetail = ({ component, editMode }) => {
   // Eseguiamo la ricerca del componente padre quando cambia il componente selezionato
   useEffect(() => {
     findParentComponent();
+    // Reset del flag di modifica quando cambia il componente
+    isUserEditingRef.current = false;
+    editingFieldRef.current = null;
   }, [component, bomComponents]);
 
   // Aggiorna le note della BOM quando cambiano header o pendingChanges
@@ -137,33 +144,52 @@ const ComponentDetail = ({ component, editMode }) => {
 
   // Aggiorna i dati quando cambia il componente
   useEffect(() => {
-    if (component) {
-      const newData = {
-        // Campi BOM Component
-        ComponentId: component.ComponentId,
-        ComponentType: component.ComponentType || 7798784,
-        Quantity: component.Quantity || 1,
-        UoM: component.UoM || "PZ",
-        UnitCost: component.UnitCost || 0,
-        FixedCost: component.FixedCost || 0,
-        ComponentNotes: isRootComponent ? bom?.Notes || "" : component.Notes || "",
+    // Non aggiornare se l'utente sta modificando un campo
+    if (isUserEditingRef.current) {
+      return;
+    }
 
-        // Campi Item
+    if (component) {
+      const componentId = component.ComponentId;
+      
+      // Controlla se ci sono modifiche pendenti per questo componente
+      const componentChanges = pendingChanges[componentId];
+      const bomComponentChanges = componentChanges?.bomComponentChanges || {};
+      const itemChanges = componentChanges?.itemChanges || {};
+      
+      const newData = {
+        // Campi BOM Component - usa valori modificati se presenti, altrimenti originali
+        ComponentId: component.ComponentId,
+        ComponentType: bomComponentChanges.ComponentType !== undefined ? bomComponentChanges.ComponentType : (component.ComponentType || 7798784),
+        Quantity: bomComponentChanges.Quantity !== undefined ? bomComponentChanges.Quantity : (component.Quantity || 1),
+        UoM: bomComponentChanges.UoM !== undefined ? bomComponentChanges.UoM : (component.UoM || "NR"),
+        UnitCost: bomComponentChanges.UnitCost !== undefined ? bomComponentChanges.UnitCost : (component.UnitCost || 0),
+        FixedCost: bomComponentChanges.FixedCost !== undefined ? bomComponentChanges.FixedCost : (component.FixedCost || 0),
+        ComponentNotes: isRootComponent 
+          ? (pendingChanges.header?.notes !== undefined ? pendingChanges.header.notes : (bom?.Notes || ""))
+          : (bomComponentChanges.ComponentNotes !== undefined ? bomComponentChanges.ComponentNotes : (component.Notes || "")),
+
+        // Campi Item - usa valori modificati se presenti, altrimenti originali
         Code: component.ComponentItemCode || component.ComponentCode || "",
         Description:
-          component.Description || component.ComponentItemDescription || "",
+          itemChanges.Description !== undefined 
+            ? itemChanges.Description 
+            : (component.Description || component.ComponentItemDescription || ""),
         ItemNotes:
-          component.ItemNotes ||
-          component.ComponentItemNotes ||
-          component.Item?.Notes ||
-          "",
-        Nature: component.ComponentNature || component.Nature || 22413312,
-        Diameter: component.Diameter || 0,
-        Bxh: component.Bxh || "",
-        Depth: component.Depth || 0,
-        Length: component.Length || 0,
-        MediumRadius: component.MediumRadius || 0,
-        CustomerItemReference: component.CustomerItemReference || "",
+          itemChanges.ItemNotes !== undefined
+            ? itemChanges.ItemNotes
+            : (component.ItemNotes ||
+                component.ComponentItemNotes ||
+                component.Item?.Notes ||
+                ""),
+        Nature: itemChanges.Nature !== undefined ? itemChanges.Nature : (component.ComponentNature || component.Nature || 22413312),
+        Diameter: itemChanges.Diameter !== undefined ? itemChanges.Diameter : (component.Diameter || 0),
+        Bxh: itemChanges.Bxh !== undefined ? itemChanges.Bxh : (component.Bxh || ""),
+        Depth: itemChanges.Depth !== undefined ? itemChanges.Depth : (component.Depth || 0),
+        Length: itemChanges.Length !== undefined ? itemChanges.Length : (component.Length || 0),
+        MediumRadius: itemChanges.MediumRadius !== undefined ? itemChanges.MediumRadius : (component.MediumRadius || 0),
+        Thickness: itemChanges.Thickness !== undefined ? itemChanges.Thickness : (component.Thickness || 0),
+        CustomerItemReference: itemChanges.CustomerItemReference !== undefined ? itemChanges.CustomerItemReference : (component.CustomerItemReference || ""),
 
         // Campi Fornitore Intercompany
         TempSupplierId: component.TempSupplierId || null,
@@ -172,11 +198,8 @@ const ComponentDetail = ({ component, editMode }) => {
       };
 
       setFormData(newData);
-
-      // NON rimuovere le modifiche pendenti quando cambia il componente
-      // Questo permette di mantenere le modifiche mentre si naviga tra i componenti
     }
-  }, [component]);
+  }, [component, pendingChanges, bom]);
 
   // Ripristina i dati del form quando le modifiche pendenti vengono cancellate
   useEffect(() => {
@@ -194,7 +217,7 @@ const ComponentDetail = ({ component, editMode }) => {
         ComponentId: component.ComponentId,
         ComponentType: component.ComponentType || 7798784,
         Quantity: component.Quantity || 1,
-        UoM: component.UoM || "PZ",
+        UoM: component.UoM || "NR",
         UnitCost: component.UnitCost || 0,
         FixedCost: component.FixedCost || 0,
         ComponentNotes: isRootComponent ? bom?.Notes || "" : component.Notes || "",
@@ -214,6 +237,7 @@ const ComponentDetail = ({ component, editMode }) => {
         Depth: component.Depth || 0,
         Length: component.Length || 0,
         MediumRadius: component.MediumRadius || 0,
+        Thickness: component.Thickness || 0,
         CustomerItemReference: component.CustomerItemReference || "",
 
         // Campi Fornitore Intercompany
@@ -266,8 +290,23 @@ const ComponentDetail = ({ component, editMode }) => {
     checkCode();
   }, [component?.ComponentItemCode, checkItemInGestionale]);
 
+  // Gestisce il blur (quando l'utente esce dal campo)
+  const handleBlur = (field) => {
+    // Reset del flag dopo un breve delay per permettere al handleChange di completare
+    setTimeout(() => {
+      if (editingFieldRef.current === field) {
+        isUserEditingRef.current = false;
+        editingFieldRef.current = null;
+      }
+    }, 100);
+  };
+
   // Gestisce il cambiamento nei campi del form
   const handleChange = (field, value) => {
+    // Segna che l'utente sta modificando questo campo
+    isUserEditingRef.current = true;
+    editingFieldRef.current = field;
+
     // Aggiorna lo stato locale per riflettere il cambiamento nell'UI
     setFormData((prev) => ({
       ...prev,
@@ -541,6 +580,7 @@ console.log(component);
             name="description"
             value={formData.Description || ""}
             onChange={(e) => handleChange("Description", e.target.value)}
+            onBlur={() => handleBlur("Description")}
             rows={3}
             disabled={!editMode || isComponentInERP}
             className={cn(
@@ -713,7 +753,7 @@ console.log(component);
       {/* Dimensions */}
       <div className="border rounded-md p-3 bg-gray-50">
         <h4 className="text-sm font-medium mb-2">Dimensioni</h4>
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-6 gap-3">
           <div>
             <Label htmlFor="diameter" className="text-xs">
               Diametro
@@ -810,6 +850,33 @@ console.log(component);
               className={cn(
                 isComponentInERP ? "bg-gray-100 h-8 text-sm" : "bg-white h-8 text-sm",
                 hasFieldChange("Length") && "ring-2 ring-amber-500"
+              )}
+              disabled={!editMode || isComponentInERP}
+              title={isComponentInERP ? "Articolo presente in ERP - Campo non modificabile" : ""}
+              autoComplete="off"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="thickness" className="text-xs">
+              Spessore
+              {hasFieldChange("Thickness") && (
+                <span className="ml-1 text-amber-600">*</span>
+              )}
+            </Label>
+            <Input
+              id="thickness"
+              name="thickness"
+              type="number"
+              step="0.10"
+              min="0"
+              value={formData.Thickness || 0}
+              onChange={(e) =>
+                handleChange("Thickness", parseFloat(e.target.value))
+              }
+              className={cn(
+                isComponentInERP ? "bg-gray-100 h-8 text-sm" : "bg-white h-8 text-sm",
+                hasFieldChange("Thickness") && "ring-2 ring-amber-500"
               )}
               disabled={!editMode || isComponentInERP}
               title={isComponentInERP ? "Articolo presente in ERP - Campo non modificabile" : ""}

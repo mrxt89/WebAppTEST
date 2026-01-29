@@ -23,7 +23,8 @@ const authenticateToken = require('../authenticateToken');
 /* Gestione dei gruppi */
 router.get('/groups', authenticateToken, async (req, res) => {
   try {
-    const CompanyId = req.user.CompanyId;
+    // Se viene passato companyId come query parameter, usalo, altrimenti usa quello dell'utente corrente
+    const CompanyId = req.query.companyId ? parseInt(req.query.companyId) : req.user.CompanyId;
     const groups = await getAllGroups(CompanyId);
     res.json(groups);
   } catch (err) {
@@ -34,7 +35,8 @@ router.get('/groups', authenticateToken, async (req, res) => {
 
 router.get('/users', authenticateToken, async (req, res) => {
   try {
-    const CompanyId = req.user.CompanyId;
+    // Se viene passato companyId come query parameter, usalo, altrimenti usa quello dell'utente corrente
+    const CompanyId = req.query.companyId ? parseInt(req.query.companyId) : req.user.CompanyId;
     const users = await getAllUsers(CompanyId);
     res.json(users);
   } catch (err) {

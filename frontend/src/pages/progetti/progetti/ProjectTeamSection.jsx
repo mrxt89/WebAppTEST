@@ -126,6 +126,9 @@ const ProjectTeamSection = ({
   const [groupMembers, setGroupMembers] = useState([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
   const [openUserSelect, setOpenUserSelect] = useState(false);
+  const [companies, setCompanies] = useState([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(null);
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
 
   // Reset selected members when group changes
   useEffect(() => {
@@ -156,19 +159,63 @@ const ProjectTeamSection = ({
     });
   }, [groupMembers]);
 
-  // Carica i gruppi quando si apre il dialog
+  // Carica la company dell'utente corrente come default
   useEffect(() => {
-    if (isAddMemberDialogOpen) {
-      fetchGroups();
+    try {
+      const userString = localStorage.getItem("user");
+      if (userString) {
+        const userData = JSON.parse(userString);
+        if (userData.CompanyId) {
+          setSelectedCompanyId(userData.CompanyId);
+        }
+      }
+    } catch (error) {
+      console.error("Error parsing user data from localStorage:", error);
     }
-  }, [isAddMemberDialogOpen]);
+    fetchCompanies();
+  }, []);
+
+  // Carica i gruppi quando si apre il dialog o cambia la company
+  useEffect(() => {
+    if (isAddMemberDialogOpen && selectedCompanyId) {
+      fetchGroups(selectedCompanyId);
+    }
+  }, [isAddMemberDialogOpen, selectedCompanyId]);
+
+  // Funzione per caricare le companies
+  const fetchCompanies = useCallback(async () => {
+    try {
+      setIsLoadingCompanies(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${config.API_BASE_URL}/companies`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Error fetching companies");
+      }
+
+      const data = await response.json();
+      setCompanies(data);
+    } catch (error) {
+      console.error("Error fetching companies:", error);
+    } finally {
+      setIsLoadingCompanies(false);
+    }
+  }, []);
 
   // Funzione per caricare i gruppi
-  const fetchGroups = useCallback(async () => {
+  const fetchGroups = useCallback(async (companyId = null) => {
     try {
       setIsLoadingGroups(true);
       const token = localStorage.getItem("token");
-      const response = await fetch(`${config.API_BASE_URL}/groups`, {
+      const url = companyId 
+        ? `${config.API_BASE_URL}/groups?companyId=${companyId}`
+        : `${config.API_BASE_URL}/groups`;
+      const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -341,6 +388,43 @@ const ProjectTeamSection = ({
                   onValueChange={setAssignmentType}
                   className="w-full"
                 >
+                  {/* Selettore Company */}
+                  <div className="mb-4">
+                    <Label htmlFor="companySelect" className="flex items-center text-sm mb-2">
+                      <Users className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                      Azienda
+                    </Label>
+                    <Select
+                      value={selectedCompanyId?.toString() || ""}
+                      onValueChange={(value) => {
+                        const companyId = value ? parseInt(value) : null;
+                        setSelectedCompanyId(companyId);
+                        // Reset selezioni quando cambia company
+                        setSelectedGroupId(null);
+                        setGroupMembers([]);
+                        setSelectedMemberIds([]);
+                        setNewMember({ ...newMember, userId: "" });
+                      }}
+                      disabled={isLoadingCompanies}
+                    >
+                      <SelectTrigger className="w-full" id="companySelect">
+                        <SelectValue placeholder={isLoadingCompanies ? "Caricamento..." : "Seleziona azienda"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.CompanyId} value={company.CompanyId.toString()}>
+                            {company.Description || company.CompanyCode}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!selectedCompanyId && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Seleziona un'azienda per vedere i suoi utenti e gruppi
+                      </p>
+                    )}
+                  </div>
+                  
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="individual" className="flex items-center gap-2">
                       <User className="h-4 w-4" />
@@ -353,12 +437,17 @@ const ProjectTeamSection = ({
                   </TabsList>
 
                   <TabsContent value="individual" className="mt-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Colonna sinistra - Lista utenti */}
-                      <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                        <h3 className="text-sm font-medium text-gray-700">
-                          Seleziona utente
-                        </h3>
+                    {!selectedCompanyId ? (
+                      <div className="p-4 text-center text-sm text-gray-500 bg-yellow-50 border border-yellow-200 rounded-md">
+                        Seleziona un'azienda per aggiungere un utente al progetto
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Colonna sinistra - Lista utenti */}
+                        <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                          <h3 className="text-sm font-medium text-gray-700">
+                            Seleziona utente
+                          </h3>
                         <div>
                           <Label htmlFor="userId" className="flex items-center text-sm">
                             <User className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
@@ -466,15 +555,21 @@ const ProjectTeamSection = ({
                         </div>
                       </div>
                     </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="group" className="mt-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Colonna sinistra - Lista utenti del gruppo */}
-                      <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                        <h3 className="text-sm font-medium text-gray-700">
-                          Seleziona gruppo
-                        </h3>
+                    {!selectedCompanyId ? (
+                      <div className="p-4 text-center text-sm text-gray-500 bg-yellow-50 border border-yellow-200 rounded-md">
+                        Seleziona un'azienda per aggiungere un gruppo al progetto
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Colonna sinistra - Lista utenti del gruppo */}
+                        <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                          <h3 className="text-sm font-medium text-gray-700">
+                            Seleziona gruppo
+                          </h3>
                         <div>
                           <Label htmlFor="groupId" className="flex items-center text-sm">
                             <Users className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
@@ -580,6 +675,7 @@ const ProjectTeamSection = ({
                         </div>
                       </div>
                     </div>
+                    )}
                   </TabsContent>
                 </Tabs>
                 

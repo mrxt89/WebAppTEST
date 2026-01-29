@@ -6,6 +6,14 @@ import { selectUnreadCount } from "@/redux/features/notifications/notificationsS
 import CompanyLogo from "./CompanyLogo";
 import { WikiButton } from "@/components/wiki";
 import { AgentStatusBadge, openAgentWindow } from "@/components/LocalAgentMonitor";
+import { Button } from "@/components/ui/button";
+import { ListTodo } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Componente memoizzato per il pulsante notifiche
 const NotificationButton = memo(({ unreadCount, toggleSidebar }) => {
@@ -141,6 +149,31 @@ const Header = ({
 
             {/* Wiki Button (old system) */}
             <WikiButton />
+
+            {/* Tasto rapido Lista Attività */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setIsPageComponent(true);
+                      setPageTitle("Lista Attività");
+                      setBreadcrumb([]);
+                      navigate("/progetti/attivita");
+                    }}
+                    className="text-white hover:bg-[var(--secondary)] px-3 py-2 rounded-lg transition-colors"
+                    title="Lista Attività (Tasto rapido)"
+                  >
+                    <ListTodo className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Lista Attività</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             {/* Notifications Section */}
             <div className="flex items-center space-x-4">

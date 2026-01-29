@@ -139,6 +139,31 @@ const DraggableItem = ({ item, expanded = false, onToggle }) => {
             <div className="truncate text-sm font-medium flex-1">
               {item.data.BOM || item.data.Item || item.data.ItemCode || item.data.Component || "Item"}
             </div>
+            
+            {/* Badge per tipo (BOM/ITEM) */}
+            {item.data.ItemType && (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs flex-shrink-0 ml-1",
+                  item.data.ItemType === "BOM" 
+                    ? "bg-purple-50 text-purple-700 border-purple-200" 
+                    : "bg-orange-50 text-orange-700 border-orange-200"
+                )}
+              >
+                {item.data.ItemType}
+              </Badge>
+            )}
+            
+            {/* Mostra versione se disponibile */}
+            {item.data.Version !== undefined && item.data.Version !== null && (
+              <Badge
+                variant="outline"
+                className="text-xs bg-gray-50 text-gray-600 border-gray-200 flex-shrink-0 ml-1"
+              >
+                v{item.data.Version}
+              </Badge>
+            )}
           </div>
 
           {/* Mostra sempre la descrizione più significativa disponibile */}

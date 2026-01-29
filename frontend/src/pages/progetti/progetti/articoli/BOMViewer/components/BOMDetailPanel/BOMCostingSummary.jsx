@@ -155,10 +155,8 @@ const BOMCostingSummary = ({ bomId, bomCode, bomVersion }) => {
       <div className="space-y-4">
         <div className="flex flex-wrap gap-4">
           <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Quantità ordine</p>
-            <p className="text-sm font-semibold">
-              {formatValue(summary.ProductionLot, (value) => Number(value).toFixed(2))}
-            </p>
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Lotto (ProductionLot)</p>
+            <p className="text-sm font-semibold">{formatValue(summary.ProductionLot, (value) => Number(value).toFixed(0))}</p>
           </div>
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wide">Costo totale</p>
@@ -198,6 +196,26 @@ const BOMCostingSummary = ({ bomId, bomCode, bomVersion }) => {
             <p className="font-medium">{formatValue(summary.LastWasteRefillCost, formatCurrency)}</p>
           </div>
         </div>
+
+        {/* Parametri di calcolo “verificabili” (se presenti in Details JSON) */}
+        {(costingDetails?.ricarico_mp_pct != null ||
+          costingDetails?.ricarico_ope_pct != null ||
+          costingDetails?.ricarico_trasporto_pct != null ||
+          costingDetails?.ricarico_scarto_pct != null ||
+          costingDetails?.ricarico_totale_pct != null ||
+          costingDetails?.ricarico_sconto_pct != null) && (
+          <div className="rounded-md bg-slate-50 border text-xs p-3 text-gray-700">
+            <p className="font-medium text-gray-800 mb-2">Parametri calcolo (ultimo salvataggio)</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div><span className="text-gray-500">Ricarico MP:</span> {formatValue(costingDetails?.ricarico_mp_pct, (v) => `${Number(v).toFixed(2)}%`)}</div>
+              <div><span className="text-gray-500">Ricarico OPE:</span> {formatValue(costingDetails?.ricarico_ope_pct, (v) => `${Number(v).toFixed(2)}%`)}</div>
+              <div><span className="text-gray-500">Trasporto:</span> {formatValue(costingDetails?.ricarico_trasporto_pct, (v) => `${Number(v).toFixed(2)}%`)}</div>
+              <div><span className="text-gray-500">Scarto:</span> {formatValue(costingDetails?.ricarico_scarto_pct, (v) => `${Number(v).toFixed(2)}%`)}</div>
+              <div><span className="text-gray-500">Totale:</span> {formatValue(costingDetails?.ricarico_totale_pct, (v) => `${Number(v).toFixed(2)}%`)}</div>
+              <div><span className="text-gray-500">Sconto:</span> {formatValue(costingDetails?.ricarico_sconto_pct, (v) => `${Number(v).toFixed(2)}%`)}</div>
+            </div>
+          </div>
+        )}
 
         {summary.Notes && (
           <div className="rounded-md bg-gray-50 border text-xs p-3 text-gray-600">
@@ -370,11 +388,11 @@ const BOMCostingSummary = ({ bomId, bomCode, bomVersion }) => {
       </CardContent>
 
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="sm:max-w-[90vw] h-[80vh]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[90vw] h-[80vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Dettaglio costi {bomCode}</DialogTitle>
           </DialogHeader>
-          <div className="h-full overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             {detailLoading ? (
               <div className="flex items-center justify-center h-full text-sm text-gray-500">
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />

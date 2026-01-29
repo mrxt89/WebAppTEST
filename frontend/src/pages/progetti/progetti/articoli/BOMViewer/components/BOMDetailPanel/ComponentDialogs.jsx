@@ -111,7 +111,7 @@ export const ManualCodeDialog = ({
     code: "",
     description: "",
     nature: "22413312", // Semilavorato di default
-    uom: "PZ",
+    uom: "NR",
     quantity: 1,
     supplierId: null,
     intercompanyTargetId: null,
@@ -311,7 +311,7 @@ export const ManualCodeDialog = ({
                 onChange={(e) =>
                   setFormData({ ...formData, uom: e.target.value })
                 }
-                placeholder="PZ"
+                placeholder="NR"
               />
             </div>
 
@@ -508,7 +508,7 @@ export const ExistingCodeDialog = ({
                         {item.Description}
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
-                        UoM: {item.BaseUoM || "PZ"} | Natura:{" "}
+                        UoM: {item.BaseUoM || "NR"} | Natura:{" "}
                         {item.Nature === 22413312
                           ? "Semilavorato"
                           : item.Nature === 22413313
@@ -562,7 +562,7 @@ export const ExistingCodeDialog = ({
                         {bom.Description}
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
-                        UoM: {bom.UoM || "PZ"} | Natura:{" "}
+                        UoM: {bom.UoM || "NR"} | Natura:{" "}
                         {bom.Nature === 22413312
                           ? "Semilavorato"
                           : bom.Nature === 22413313
@@ -602,7 +602,7 @@ export const ExistingCodeDialog = ({
                         {item.Description}
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
-                        UoM: {item.BaseUoM || "PZ"} | Natura:{" "}
+                        UoM: {item.BaseUoM || "NR"} | Natura:{" "}
                         {item.Nature === 22413312
                           ? "Semilavorato"
                           : item.Nature === 22413313

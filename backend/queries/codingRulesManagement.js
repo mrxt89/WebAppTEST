@@ -1234,6 +1234,376 @@ const reconstructDescriptionFromCode = async (companyId, codePrefix, charactersT
 };
 
 /**
+ * Estrae le componenti di un codice articolo (MacroFamily, Family, Type, Alias, ecc.)
+ * @param {number} companyId - Company ID
+ * @param {string} itemCode - Codice articolo da analizzare
+ * @returns {Promise<Object>} Oggetto con le componenti estratte e i relativi ID
+ */
+const extractCodeComponents = async (companyId, itemCode) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('ItemCode', sql.VarChar(64), itemCode);
+
+        const result = await request.execute('MA_CodingRules_ExtractCodeComponents');
+        
+        if (result.recordset && result.recordset.length > 0) {
+            return result.recordset[0];
+        }
+        
+        return {
+            CategoryId: null,
+            MacroFamilyId: null,
+            MacroFamilyCode: null,
+            FamilyId: null,
+            FamilyCode: null,
+            TypeId: null,
+            TypeCode: null,
+            AliasId: null,
+            AliasCode: null,
+            Measures: null,
+            Sequential: null
+        };
+    } catch (err) {
+        console.error('Error extracting code components:', err);
+        throw err;
+    }
+};
+
+// =====================================================
+// DESCRIPTION NORMALIZATION FUNCTIONS
+// =====================================================
+
+/**
+ * Get technical characteristics for a company
+ */
+const getTechnicalCharacteristics = async (companyId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+        request.input('CompanyId', sql.Int, companyId);
+        const result = await request.execute('MA_ArticleDescription_GetCharacteristics');
+        return result.recordset;
+    } catch (err) {
+        console.error('Error getting technical characteristics:', err);
+        throw err;
+    }
+};
+
+/**
+ * Create a new technical characteristic
+ */
+const createTechnicalCharacteristic = async (companyId, characteristicData, userId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+        
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('CharacteristicCode', sql.VarChar(50), characteristicData.CharacteristicCode);
+        request.input('CharacteristicName', sql.NVarChar(100), characteristicData.CharacteristicName);
+        request.input('FormatTemplate', sql.NVarChar(50), characteristicData.FormatTemplate);
+        request.input('UnitOfMeasure', sql.VarChar(10), characteristicData.UnitOfMeasure || null);
+        request.input('DisplayOrder', sql.Int, characteristicData.DisplayOrder || 0);
+        request.input('IsActive', sql.Bit, characteristicData.IsActive !== false);
+        request.input('CreateUser', sql.VarChar(64), userId || 'SYSTEM');
+        
+        const result = await request.query(`
+            INSERT INTO MA_ArticleTechnicalCharacteristics 
+                (CompanyId, CharacteristicCode, CharacteristicName, FormatTemplate, UnitOfMeasure, DisplayOrder, IsActive, CreateUser, CreateDate)
+            VALUES 
+                (@CompanyId, @CharacteristicCode, @CharacteristicName, @FormatTemplate, @UnitOfMeasure, @DisplayOrder, @IsActive, @CreateUser, GETDATE());
+            SELECT SCOPE_IDENTITY() AS Id;
+        `);
+        
+        return { success: 1, id: result.recordset[0].Id };
+    } catch (err) {
+        console.error('Error creating technical characteristic:', err);
+        throw err;
+    }
+};
+
+/**
+ * Update a technical characteristic
+ */
+const updateTechnicalCharacteristic = async (id, companyId, characteristicData, userId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+        
+        request.input('Id', sql.BigInt, id);
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('CharacteristicName', sql.NVarChar(100), characteristicData.CharacteristicName);
+        request.input('FormatTemplate', sql.NVarChar(50), characteristicData.FormatTemplate);
+        request.input('UnitOfMeasure', sql.VarChar(10), characteristicData.UnitOfMeasure || null);
+        request.input('DisplayOrder', sql.Int, characteristicData.DisplayOrder || 0);
+        request.input('IsActive', sql.Bit, characteristicData.IsActive !== false);
+        request.input('EditUser', sql.VarChar(64), userId || 'SYSTEM');
+        
+        await request.query(`
+            UPDATE MA_ArticleTechnicalCharacteristics 
+            SET CharacteristicName = @CharacteristicName,
+                FormatTemplate = @FormatTemplate,
+                UnitOfMeasure = @UnitOfMeasure,
+                DisplayOrder = @DisplayOrder,
+                IsActive = @IsActive,
+                EditUser = @EditUser,
+                EditDate = GETDATE()
+            WHERE Id = @Id AND CompanyId = @CompanyId;
+        `);
+        
+        return { success: 1 };
+    } catch (err) {
+        console.error('Error updating technical characteristic:', err);
+        throw err;
+    }
+};
+
+/**
+ * Delete a technical characteristic
+ */
+const deleteTechnicalCharacteristic = async (id, companyId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+        
+        request.input('Id', sql.BigInt, id);
+        request.input('CompanyId', sql.Int, companyId);
+        
+        await request.query(`
+            DELETE FROM MA_ArticleTechnicalCharacteristics 
+            WHERE Id = @Id AND CompanyId = @CompanyId;
+        `);
+        
+        return { success: 1 };
+    } catch (err) {
+        console.error('Error deleting technical characteristic:', err);
+        throw err;
+    }
+};
+
+// Funzioni rimosse: getTechnicalCharacteristicsByHierarchy, getCharacteristicHierarchyAssociations, updateCharacteristicHierarchyAssociations
+// Le caratteristiche sono ora disponibili per tutte le gerarchie senza associazioni
+
+/**
+ * Get description rules for a company and hierarchy
+ */
+const getDescriptionRules = async (companyId, macroFamilyId = null, familyId = null, typeId = null) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+        
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('MacroFamilyId', sql.BigInt, macroFamilyId);
+        request.input('FamilyId', sql.BigInt, familyId);
+        request.input('TypeId', sql.BigInt, typeId);
+        
+        const result = await request.execute('MA_ArticleDescription_GetRules');
+        return result.recordset;
+    } catch (err) {
+        console.error('Error getting description rules:', err);
+        throw err;
+    }
+};
+
+/**
+ * Create a new description rule
+ */
+const createDescriptionRule = async (companyId, ruleData, userId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+        
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('MacroFamilyId', sql.BigInt, ruleData.MacroFamilyId || null);
+        request.input('FamilyId', sql.BigInt, ruleData.FamilyId || null);
+        request.input('TypeId', sql.BigInt, ruleData.TypeId || null);
+        request.input('CharacteristicCode', sql.VarChar(50), ruleData.CharacteristicCode);
+        request.input('AppendOrder', sql.Int, ruleData.AppendOrder);
+        request.input('Separator', sql.VarChar(10), ruleData.Separator || ' - ');
+        request.input('IsActive', sql.Bit, ruleData.IsActive !== false);
+        request.input('CreateUser', sql.VarChar(64), userId || 'SYSTEM');
+        
+        const result = await request.query(`
+            INSERT INTO MA_ArticleDescriptionRules 
+                (CompanyId, MacroFamilyId, FamilyId, TypeId, CharacteristicCode, AppendOrder, Separator, IsActive, CreateUser, CreateDate)
+            VALUES 
+                (@CompanyId, @MacroFamilyId, @FamilyId, @TypeId, @CharacteristicCode, @AppendOrder, @Separator, @IsActive, @CreateUser, GETDATE());
+            SELECT SCOPE_IDENTITY() AS Id;
+        `);
+        
+        return { success: 1, id: result.recordset[0].Id };
+    } catch (err) {
+        console.error('Error creating description rule:', err);
+        throw err;
+    }
+};
+
+/**
+ * Update a description rule
+ */
+const updateDescriptionRule = async (id, companyId, ruleData, userId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+        
+        request.input('Id', sql.BigInt, id);
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('MacroFamilyId', sql.BigInt, ruleData.MacroFamilyId || null);
+        request.input('FamilyId', sql.BigInt, ruleData.FamilyId || null);
+        request.input('TypeId', sql.BigInt, ruleData.TypeId || null);
+        request.input('CharacteristicCode', sql.VarChar(50), ruleData.CharacteristicCode);
+        request.input('AppendOrder', sql.Int, ruleData.AppendOrder);
+        request.input('Separator', sql.VarChar(10), ruleData.Separator || ' - ');
+        request.input('IsActive', sql.Bit, ruleData.IsActive !== false);
+        request.input('EditUser', sql.VarChar(64), userId || 'SYSTEM');
+        
+        await request.query(`
+            UPDATE MA_ArticleDescriptionRules 
+            SET MacroFamilyId = @MacroFamilyId,
+                FamilyId = @FamilyId,
+                TypeId = @TypeId,
+                CharacteristicCode = @CharacteristicCode,
+                AppendOrder = @AppendOrder,
+                Separator = @Separator,
+                IsActive = @IsActive,
+                EditUser = @EditUser,
+                EditDate = GETDATE()
+            WHERE Id = @Id AND CompanyId = @CompanyId;
+        `);
+        
+        return { success: 1 };
+    } catch (err) {
+        console.error('Error updating description rule:', err);
+        throw err;
+    }
+};
+
+/**
+ * Delete a description rule
+ */
+const deleteDescriptionRule = async (id, companyId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        const request = pool.request();
+        
+        request.input('Id', sql.BigInt, id);
+        request.input('CompanyId', sql.Int, companyId);
+        
+        await request.query(`
+            DELETE FROM MA_ArticleDescriptionRules 
+            WHERE Id = @Id AND CompanyId = @CompanyId;
+        `);
+        
+        return { success: 1 };
+    } catch (err) {
+        console.error('Error deleting description rule:', err);
+        throw err;
+    }
+};
+
+/**
+ * Generate normalized description
+ */
+const generateNormalizedDescription = async (companyId, baseDescription, technicalData, hierarchyData) => {
+    try {
+        let pool = await sql.connect(config.database);
+        
+        // Carica tutte le caratteristiche attive per questa company per creare il mapping dinamico
+        const charRequest = pool.request();
+        charRequest.input('CompanyId', sql.Int, companyId);
+        const charResult = await charRequest.query(`
+            SELECT CharacteristicCode 
+            FROM MA_ArticleTechnicalCharacteristics 
+            WHERE CompanyId = @CompanyId AND IsActive = 1
+        `);
+        
+        // Crea un mapping dinamico: CharacteristicCode -> valore
+        // Il frontend passa i valori con i nomi dei campi (Diameter, Thickness, etc.)
+        // Dobbiamo mapparli ai CharacteristicCode (DIAMETRO, SPESSORE, etc.)
+        // Mapping per compatibilità con i nomi campo esistenti
+        const fieldToCodeMap = {
+            'Diameter': ['DIAMETER', 'DIAMETRO'],
+            'Bxh': ['BxH', 'BXH'],
+            'Depth': ['DEPTH', 'PROFONDITA'],
+            'Length': ['LENGTH', 'LUNGHEZZA'],
+            'MediumRadius': ['RADIUS', 'RAGGIO', 'RAGGIO_MEDIO'],
+            'Thickness': ['THICKNESS', 'SPESSORE']
+        };
+        
+        const characteristicMapping = {};
+        
+        // Per ogni caratteristica nel database, cerca il valore corrispondente
+        charResult.recordset.forEach(char => {
+            const code = char.CharacteristicCode;
+            
+            // Cerca il valore nel technicalData usando il mapping
+            for (const [fieldName, codes] of Object.entries(fieldToCodeMap)) {
+                if (codes.includes(code)) {
+                    const value = technicalData?.[fieldName];
+                    // Includi anche valori stringa non vuoti (es. "18", "44")
+                    // Converti in stringa per il JSON
+                    if (value !== null && value !== undefined && value !== '') {
+                        characteristicMapping[code] = String(value);
+                        break;
+                    }
+                }
+            }
+        });
+        
+        // Debug: log del mapping creato
+        console.log('Technical data received:', JSON.stringify(technicalData));
+        console.log('Characteristic mapping:', characteristicMapping);
+        
+        // Converti in JSON per passarlo alla stored procedure
+        const technicalDataJSON = JSON.stringify(characteristicMapping);
+        console.log('JSON sent to SP:', technicalDataJSON);
+        console.log('JSON length:', technicalDataJSON.length);
+        
+        const request = pool.request();
+        request.input('CompanyId', sql.Int, companyId);
+        request.input('BaseDescription', sql.NVarChar(512), baseDescription || '');
+        request.input('MacroFamilyId', sql.BigInt, hierarchyData?.MacroFamilyId || null);
+        request.input('FamilyId', sql.BigInt, hierarchyData?.FamilyId || null);
+        request.input('TypeId', sql.BigInt, hierarchyData?.TypeId || null);
+        request.input('TechnicalDataJSON', sql.NVarChar(sql.MAX), technicalDataJSON || '{}');
+        request.output('NormalizedDescription', sql.NVarChar(512));
+        
+        console.log('Executing SP with params:', {
+            CompanyId: companyId,
+            BaseDescription: baseDescription,
+            MacroFamilyId: hierarchyData?.MacroFamilyId,
+            FamilyId: hierarchyData?.FamilyId,
+            TypeId: hierarchyData?.TypeId,
+            TechnicalDataJSON: technicalDataJSON
+        });
+        
+        await request.execute('MA_ArticleDescription_GenerateNormalized');
+        
+        // Leggi l'output - verifica che esista
+        const outputParam = request.parameters.NormalizedDescription;
+        console.log('Output parameter:', {
+            exists: !!outputParam,
+            value: outputParam?.value,
+            type: typeof outputParam?.value
+        });
+        
+        const normalizedDescription = outputParam?.value || baseDescription;
+        console.log('SP returned description:', normalizedDescription);
+        console.log('Final normalized description length:', normalizedDescription?.length);
+        
+        return { 
+            success: 1, 
+            normalizedDescription: normalizedDescription
+        };
+    } catch (err) {
+        console.error('Error generating normalized description:', err);
+        throw err;
+    }
+};
+
+/**
  * Generate simplified code preview
  * @param {number} companyId - Company ID
  * @param {string} originalCode - Original article code
@@ -1421,5 +1791,16 @@ module.exports = {
     generateSimplifiedBatchPreview,
     applySimplifiedBatchRecoding,
     buildSimplifiedCode,
-    reconstructDescriptionFromCode
+    reconstructDescriptionFromCode,
+    extractCodeComponents,
+    // Description normalization functions
+    getTechnicalCharacteristics,
+    createTechnicalCharacteristic,
+    updateTechnicalCharacteristic,
+    deleteTechnicalCharacteristic,
+    getDescriptionRules,
+    createDescriptionRule,
+    updateDescriptionRule,
+    deleteDescriptionRule,
+    generateNormalizedDescription
 };

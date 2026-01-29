@@ -20,7 +20,18 @@ const {
     getNextSimplifiedSequential,
     generateSimplifiedPreview,
     generateSimplifiedBatchPreview,
-    applySimplifiedBatchRecoding
+    applySimplifiedBatchRecoding,
+    extractCodeComponents,
+    // Description normalization functions
+    getTechnicalCharacteristics,
+    createTechnicalCharacteristic,
+    updateTechnicalCharacteristic,
+    deleteTechnicalCharacteristic,
+    getDescriptionRules,
+    createDescriptionRule,
+    updateDescriptionRule,
+    deleteDescriptionRule,
+    generateNormalizedDescription
 } = require('../queries/codingRulesManagement');
 
 // Get coding configuration for company
@@ -786,5 +797,161 @@ router.post('/codingRules/simplified/apply', authenticateToken, async (req, res)
         });
     }
 });
+
+// Estrai componenti da un codice articolo (per precompilare modale ricodifica)
+router.post('/codingRules/extractComponents', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { itemCode } = req.body;
+        
+        if (!itemCode || typeof itemCode !== 'string') {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Codice articolo richiesto'
+            });
+        }
+        
+        const components = await extractCodeComponents(companyId, itemCode);
+        
+        res.json({
+            success: 1,
+            data: components,
+            msg: 'Componenti estratte con successo'
+        });
+    } catch (err) {
+        console.error('Error extracting code components:', err);
+        res.status(500).json({
+            success: 0,
+            msg: err.message || 'Errore nell\'estrazione delle componenti'
+        });
+    }
+});
+
+// =====================================================
+// DESCRIPTION NORMALIZATION ROUTES
+// =====================================================
+
+// Get technical characteristics
+router.get('/codingRules/description/characteristics', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const characteristics = await getTechnicalCharacteristics(companyId);
+        res.json({ success: 1, data: characteristics });
+    } catch (err) {
+        console.error('Error getting technical characteristics:', err);
+        res.status(500).json({ success: 0, msg: err.message || 'Errore nel recupero delle caratteristiche tecniche' });
+    }
+});
+
+// Create technical characteristic
+router.post('/codingRules/description/characteristics', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const userId = req.user.Id;
+        const result = await createTechnicalCharacteristic(companyId, req.body, userId);
+        res.json({ success: 1, data: result });
+    } catch (err) {
+        console.error('Error creating technical characteristic:', err);
+        res.status(500).json({ success: 0, msg: err.message || 'Errore nella creazione della caratteristica tecnica' });
+    }
+});
+
+// Update technical characteristic
+router.put('/codingRules/description/characteristics/:id', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const userId = req.user.Id;
+        const id = parseInt(req.params.id);
+        await updateTechnicalCharacteristic(id, companyId, req.body, userId);
+        res.json({ success: 1, msg: 'Caratteristica tecnica aggiornata con successo' });
+    } catch (err) {
+        console.error('Error updating technical characteristic:', err);
+        res.status(500).json({ success: 0, msg: err.message || 'Errore nell\'aggiornamento della caratteristica tecnica' });
+    }
+});
+
+// Delete technical characteristic
+router.delete('/codingRules/description/characteristics/:id', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const id = parseInt(req.params.id);
+        await deleteTechnicalCharacteristic(id, companyId);
+        res.json({ success: 1, msg: 'Caratteristica tecnica eliminata con successo' });
+    } catch (err) {
+        console.error('Error deleting technical characteristic:', err);
+        res.status(500).json({ success: 0, msg: err.message || 'Errore nell\'eliminazione della caratteristica tecnica' });
+    }
+});
+
+// Get description rules
+router.get('/codingRules/description/rules', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const macroFamilyId = req.query.macroFamilyId ? parseInt(req.query.macroFamilyId) : null;
+        const familyId = req.query.familyId ? parseInt(req.query.familyId) : null;
+        const typeId = req.query.typeId ? parseInt(req.query.typeId) : null;
+        const rules = await getDescriptionRules(companyId, macroFamilyId, familyId, typeId);
+        res.json({ success: 1, data: rules });
+    } catch (err) {
+        console.error('Error getting description rules:', err);
+        res.status(500).json({ success: 0, msg: err.message || 'Errore nel recupero delle regole di descrizione' });
+    }
+});
+
+// Create description rule
+router.post('/codingRules/description/rules', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const userId = req.user.Id;
+        const result = await createDescriptionRule(companyId, req.body, userId);
+        res.json({ success: 1, data: result });
+    } catch (err) {
+        console.error('Error creating description rule:', err);
+        res.status(500).json({ success: 0, msg: err.message || 'Errore nella creazione della regola di descrizione' });
+    }
+});
+
+// Update description rule
+router.put('/codingRules/description/rules/:id', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const userId = req.user.Id;
+        const id = parseInt(req.params.id);
+        await updateDescriptionRule(id, companyId, req.body, userId);
+        res.json({ success: 1, msg: 'Regola di descrizione aggiornata con successo' });
+    } catch (err) {
+        console.error('Error updating description rule:', err);
+        res.status(500).json({ success: 0, msg: err.message || 'Errore nell\'aggiornamento della regola di descrizione' });
+    }
+});
+
+// Delete description rule
+router.delete('/codingRules/description/rules/:id', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const id = parseInt(req.params.id);
+        await deleteDescriptionRule(id, companyId);
+        res.json({ success: 1, msg: 'Regola di descrizione eliminata con successo' });
+    } catch (err) {
+        console.error('Error deleting description rule:', err);
+        res.status(500).json({ success: 0, msg: err.message || 'Errore nell\'eliminazione della regola di descrizione' });
+    }
+});
+
+// Generate normalized description (preview)
+router.post('/codingRules/description/generate', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const { baseDescription, technicalData, hierarchyData } = req.body;
+        const result = await generateNormalizedDescription(companyId, baseDescription, technicalData, hierarchyData);
+        res.json({ success: 1, data: result });
+    } catch (err) {
+        console.error('Error generating normalized description:', err);
+        res.status(500).json({ success: 0, msg: err.message || 'Errore nella generazione della descrizione normata' });
+    }
+});
+
+// Endpoint rimossi: /byHierarchy, /:id/hierarchy (GET e PUT)
+// Le caratteristiche sono ora disponibili per tutte le gerarchie senza associazioni
 
 module.exports = router;

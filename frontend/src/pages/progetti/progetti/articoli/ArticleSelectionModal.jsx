@@ -73,7 +73,8 @@ const ArticleSelectionModal = ({
   const [temporaryFiltered, setTemporaryFiltered] = useState([]);
   const [definedFiltered, setDefinedFiltered] = useState([]);
 
-  // Stato per opzione importazione distinta base (per articoli temporanei)
+  // Stato per opzione wizard BOM (per articoli temporanei)
+  // Default true: più frequente importare/copiare distinta che collegare solo l'item
   const [importBOM, setImportBOM] = useState(true);
 
   // Stati per la paginazione
@@ -93,8 +94,10 @@ const ArticleSelectionModal = ({
     getAvailableItems, 
     getERPItemsPaginated, 
     getBOMByItemId, 
+    getItemById,
     loading,
     linkItemToProject,
+    importERPItem,
     importERPItemWithSelection
   } = useProjectArticlesActions();
 
@@ -214,26 +217,94 @@ const ArticleSelectionModal = ({
 
   // Gestione della selezione di un articolo temporaneo
   const handleSelectTemporary = async (item) => {
-    // Verifica se l'articolo ha una distinta base
+    // IMPORTANTE: Le BOM sono legate all'ItemId, non al ProjectID.
+    // Se l'articolo ha già una BOM associata, sarà automaticamente disponibile
+    // nel nuovo progetto perché manteniamo lo stesso ItemId.
+    
+    // Se importBOM è false, collega direttamente l'articolo
+    // La BOM (se esiste) sarà già disponibile automaticamente
+    if (!importBOM) {
+      // Collega solo l'articolo al progetto (inserisce record in MA_ProjectsItems)
+      // La BOM associata all'ItemId sarà già accessibile
+      onSelectItem(item, "temporary", false);
+      return;
+    }
+    
+    // Se importBOM è true, apri il wizard per importare componenti dalla BOM esistente
+    // (utile se vuoi selezionare quali componenti importare o modificare la struttura)
     const hasBOM = await checkHasBOM(item);
     
-    if (hasBOM && importBOM) {
-      // Se ha una distinta e vogliamo importarla, apri il wizard
+    if (hasBOM) {
+      // Se ha una distinta, apri il wizard per gestire l'importazione componenti
       setSelectedItemForWizard(item);
       setWizardSource('temporary');
       setShowBOMWizard(true);
     } else {
-      // Altrimenti procedi con l'importazione semplice
+      // Altrimenti procedi con il collegamento semplice (senza distinta)
       onSelectItem(item, "temporary", false);
     }
   };
 
-  // Gestione della selezione di un articolo definito (da ERP)
+  // Gestione della selezione di un articolo definito (da ERP) con wizard
   const handleSelectDefined = (item) => {
     // Per gli articoli da ERP, apri sempre il wizard
     setSelectedItemForWizard(item);
     setWizardSource('defined');
     setShowBOMWizard(true);
+  };
+
+  // Gestione del collegamento diretto di un articolo dal gestionale senza distinta
+  const handleLinkDefined = async (item) => {
+    try {
+      // Importa l'articolo senza distinta base
+      const result = await importERPItem(
+        project.ProjectID,
+        item.Item,
+        false, // importBOM = false
+        false, // processMultilevelBOM = false
+        0      // maxLevels = 0
+      );
+
+      if (result && result.success) {
+        toast({
+          title: "Successo",
+          description: result.msg || "Articolo collegato al progetto con successo",
+          variant: "success",
+        });
+
+        // Chiudi il modal
+        onClose();
+        
+        // Notifica il parent per aggiornare la lista
+        if (onSelectItem && result.itemId) {
+          // Prova a recuperare l'articolo completo, altrimenti usa i dati disponibili
+          let linkedItem;
+          try {
+            linkedItem = await getItemById(result.itemId);
+          } catch (err) {
+            console.warn("Impossibile recuperare l'articolo completo, uso i dati disponibili:", err);
+            // Crea un oggetto item minimo per la notifica
+            linkedItem = {
+              Id: result.itemId,
+              Item: item.Item,
+              Description: item.Description,
+              Nature: item.Nature,
+              BaseUoM: item.BaseUoM
+            };
+          }
+          onSelectItem(linkedItem, "already_imported", false);
+        }
+      } else {
+        throw new Error(result?.msg || "Errore durante il collegamento dell'articolo");
+      }
+    } catch (error) {
+      console.error("Errore nel collegamento dell'articolo:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Si è verificato un errore durante il collegamento",
+        variant: "destructive",
+      });
+    }
   };
 
   // Gestione conferma dal wizard
@@ -368,7 +439,7 @@ const ArticleSelectionModal = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl h-[80vh] w-full flex flex-col overflow-hidden">
+        <DialogContent className="max-w-7xl h-[80vh] w-full flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>
               Seleziona un Articolo Esistente o Crea Nuovo
@@ -411,10 +482,12 @@ const ArticleSelectionModal = ({
               <div className="grid gap-1.5 leading-none">
                 <Label htmlFor="import-bom" className="flex items-center gap-2">
                   <ListFilter className="h-4 w-4 text-blue-600" />
-                  <span>Importa anche la distinta base (se disponibile)</span>
+                  <span>Apri wizard per gestire componenti BOM</span>
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Se l'articolo ha una distinta, potrai selezionare quali componenti importare
+                  {importBOM 
+                    ? "Se l'articolo ha una distinta, apri il wizard per selezionare quali componenti importare o modificare"
+                    : "Se disabilitato, collega solo l'articolo. La BOM esistente (se presente) sarà già disponibile automaticamente"}
                 </p>
               </div>
             </div>
@@ -477,7 +550,7 @@ const ArticleSelectionModal = ({
                             {item.Description}
                           </TableCell>
                           <TableCell>{getNatureBadge(item.Nature)}</TableCell>
-                          <TableCell>{item.BaseUoM || "PZ"}</TableCell>
+                          <TableCell>{item.BaseUoM || "NR"}</TableCell>
                           <TableCell className="text-right">
                             <Button
                               variant="outline"
@@ -554,17 +627,30 @@ const ArticleSelectionModal = ({
                             {item.Description}
                           </TableCell>
                           <TableCell>{getNatureBadge(item.Nature)}</TableCell>
-                          <TableCell>{item.BaseUoM || "PZ"}</TableCell>
+                          <TableCell>{item.BaseUoM || "NR"}</TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleSelectDefined(item)}
-                              className="gap-1"
-                            >
-                              <Layers className="h-4 w-4" />
-                              Seleziona e Configura
-                            </Button>
+                            <div className="flex gap-2 justify-end">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleLinkDefined(item)}
+                                className="gap-1"
+                                title="Collega l'articolo al progetto senza importare la distinta base"
+                              >
+                                <Package className="h-4 w-4" />
+                                Collega Articolo
+                              </Button>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleSelectDefined(item)}
+                                className="gap-1"
+                                title="Importa l'articolo e configura la distinta base"
+                              >
+                                <Layers className="h-4 w-4" />
+                                Seleziona e Configura
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

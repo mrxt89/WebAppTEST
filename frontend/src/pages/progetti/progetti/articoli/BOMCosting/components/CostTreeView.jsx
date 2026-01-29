@@ -991,7 +991,7 @@ const CostTreeView = ({ costingResult }) => {
         'Codice': '',
         'Descrizione': '',
         'Quantità': costing.production_lot || 100,
-        'UM': 'PZ',
+        'UM': 'NR',
         'Costo Unitario (€)': null,
         'C. Fissi (€)': null,
         'Costo Variabile (€)': null,

@@ -10,6 +10,8 @@ const {
     getPaginatedItems,
     getItemById,
     getERPBOMs,
+    getERPItemsAndBOMs,
+    getProjectItemsAndBOMs,
     getReferenceBOMs,
     reorderBOMComponents,
     getAvailableItems,
@@ -250,15 +252,32 @@ router.post('/projectArticles/boms', authenticateToken, async (req, res) => {
         }
         
         // Caso speciale per ADD_COMPONENT con creazione automatica di componente temporaneo
-        if (action === 'ADD_COMPONENT' && bomData.createTempComponent === true) {
-            // Converti i nomi dei parametri in camelCase a quelli attesi dalla funzione
+        // Supporta sia createTempComponent (camelCase) che CreateTempComponent (PascalCase)
+        if (action === 'ADD_COMPONENT' && (bomData.createTempComponent === true || bomData.CreateTempComponent === true)) {
+            // Normalizza i parametri per la funzione
             const processedData = {
                 ...bomData,
                 CreateTempComponent: true
             };
             
-            if (bomData.tempComponentPrefix) {
-                processedData.TempComponentPrefix = bomData.tempComponentPrefix;
+            // Mappa i parametri dal payload al formato atteso
+            if (bomData.ComponentNatureValue !== undefined) {
+                processedData.Nature = bomData.ComponentNatureValue;
+            }
+            
+            if (bomData.ComponentUoM !== undefined) {
+                processedData.UoM = bomData.ComponentUoM;
+            }
+            
+            // Converte ParentComponentId da stringa a numero se necessario
+            if (bomData.ParentComponentId !== undefined) {
+                processedData.ParentComponentId = typeof bomData.ParentComponentId === 'string' 
+                    ? parseInt(bomData.ParentComponentId, 10) 
+                    : bomData.ParentComponentId;
+            }
+            
+            if (bomData.tempComponentPrefix || bomData.TempComponentPrefix) {
+                processedData.TempComponentPrefix = bomData.TempComponentPrefix || bomData.tempComponentPrefix;
             }
             
             // Chiama la funzione con il flag di creazione componente temporaneo
@@ -356,10 +375,88 @@ router.get('/projectArticles/erp-boms', authenticateToken, async (req, res) => {
             pageSize: parseInt(req.query.pageSize) || 50
         };
         
-        const result = await getERPBOMs(companyId, search, pagination);
+        // Filtro per natura (opzionale)
+        let natureFilter = null;
+        if (req.query.nature) {
+            const natureValue = parseInt(req.query.nature);
+            if (!isNaN(natureValue)) {
+                natureFilter = natureValue;
+            }
+        }
+        
+        const result = await getERPBOMs(companyId, search, pagination, natureFilter);
         res.json(result);
     } catch (err) {
         console.error(`Error fetching ERP BOMs:`, err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Ottieni BOM e Item unificati dal gestionale ERP (Mago)
+router.get('/projectArticles/erp-items-and-boms', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const search = req.query.search || '';
+        
+        // Parametri di paginazione
+        const pagination = {
+            page: parseInt(req.query.page) || 1,
+            pageSize: parseInt(req.query.pageSize) || 50
+        };
+        
+        // Filtro per natura (opzionale)
+        let natureFilter = null;
+        if (req.query.nature) {
+            const natureValue = parseInt(req.query.nature);
+            if (!isNaN(natureValue)) {
+                natureFilter = natureValue;
+            }
+        }
+        
+        // Filtro per tipo (all, bom, item)
+        const typeFilter = req.query.type || 'all';
+        
+        const result = await getERPItemsAndBOMs(companyId, search, pagination, natureFilter, typeFilter);
+        res.json(result);
+    } catch (err) {
+        console.error(`Error fetching ERP items and BOMs:`, err);
+        res.status(500).json({ success: 0, msg: err.message });
+    }
+});
+
+// Ottieni BOM e Item unificati dai progetti
+router.get('/projectArticles/project-items-and-boms', authenticateToken, async (req, res) => {
+    try {
+        const companyId = req.user.CompanyId;
+        const projectId = parseInt(req.query.projectId);
+        const search = req.query.search || '';
+        
+        if (!projectId || isNaN(projectId)) {
+            return res.status(400).json({ success: 0, msg: 'ProjectId richiesto e valido' });
+        }
+        
+        // Parametri di paginazione
+        const pagination = {
+            page: parseInt(req.query.page) || 1,
+            pageSize: parseInt(req.query.pageSize) || 50
+        };
+        
+        // Filtro per natura (opzionale)
+        let natureFilter = null;
+        if (req.query.nature) {
+            const natureValue = parseInt(req.query.nature);
+            if (!isNaN(natureValue)) {
+                natureFilter = natureValue;
+            }
+        }
+        
+        // Filtro per tipo (all, bom, item)
+        const typeFilter = req.query.type || 'all';
+        
+        const result = await getProjectItemsAndBOMs(companyId, projectId, search, pagination, natureFilter, typeFilter);
+        res.json(result);
+    } catch (err) {
+        console.error(`Error fetching project items and BOMs:`, err);
         res.status(500).json({ success: 0, msg: err.message });
     }
 });

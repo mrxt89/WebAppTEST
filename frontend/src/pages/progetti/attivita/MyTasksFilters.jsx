@@ -9,6 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Search, RotateCcw, Calendar, ArrowUpDown, Users, Filter, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -217,6 +219,26 @@ const MyTasksFilters = ({
                         <ArrowUpDown className="h-3 w-3" />
                       </Button>
                     </div>
+                  </div>
+                </div>
+
+                {/* Checkbox per mostrare attività disabilitate */}
+                <div className="mt-4 pt-4 border-t">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="showDisabledTasks"
+                      checked={filters.showDisabledTasks || false}
+                      className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500" 
+                      onCheckedChange={(checked) =>
+                        onFilterChange({ showDisabledTasks: checked })
+                      }
+                    />
+                    <Label
+                      htmlFor="showDisabledTasks"
+                      className="text-sm font-medium cursor-pointer"
+                    >
+                      Mostra attività disabilitate
+                    </Label>
                   </div>
                 </div>
 

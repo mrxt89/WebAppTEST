@@ -509,7 +509,7 @@ const BOMImportWizard = ({
 
             {/* Quantità */}
             <div className="text-sm text-gray-500 min-w-[80px] text-right">
-              Qtà: {node.data.Quantity || 1} {node.data.UoM || 'PZ'}
+              Qtà: {node.data.Quantity || 1} {node.data.UoM || 'NR'}
             </div>
           </div>
 
@@ -564,7 +564,7 @@ const BOMImportWizard = ({
             Quantity: node.data.Quantity || 1,
             ComponentType: node.data.ComponentType || 7798784,
             Nature: node.data.Nature || node.data.ComponentNature || 22413312,
-            UoM: node.data.UoM || 'PZ',
+            UoM: node.data.UoM || 'NR',
             // Dati aggiuntivi per debug/riferimento
             nodeId: node.id,
             OriginalData: node.data

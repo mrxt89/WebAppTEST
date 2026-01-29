@@ -717,7 +717,7 @@ const ArticleSuggestions = ({
                     </div>
                     <div>
                       <span className="text-gray-500">Unità di misura:</span>
-                      <span className="ml-2">{selectedArticle.BaseUoM || "PZ"}</span>
+                      <span className="ml-2">{selectedArticle.BaseUoM || "NR"}</span>
                     </div>
                   </div>
                 </div>

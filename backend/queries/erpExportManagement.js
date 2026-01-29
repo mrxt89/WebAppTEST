@@ -330,12 +330,43 @@ const checkBOMExportability = async (companyId, bomId, version) => {
             };
         }
 
+        // NUOVO: Blocca l'esportazione se questa versione è già esportata
         if (bom.stato_erp === 1) {
             return {
                 canExport: false,
                 reason: 'Distinta già esportata',
                 componentsInfo: {},
                 alreadyExported: true
+            };
+        }
+
+        // NUOVO: Blocca l'esportazione se esiste almeno una versione già esportata per lo stesso ItemId
+        const exportedVersionCheckQuery = `
+            SELECT TOP 1
+                b.Id,
+                b.Version,
+                b.stato_erp
+            FROM MA_ProjectArticles_BillOfMaterials b
+            WHERE b.CompanyId = @CompanyId
+                AND b.ItemId = @ItemId
+                AND b.stato_erp = 1
+                AND b.Id != @BOMId  -- Escludi la versione corrente
+        `;
+
+        const exportedVersionResult = await pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('ItemId', sql.BigInt, bom.ItemId)
+            .input('BOMId', sql.BigInt, bomId)
+            .query(exportedVersionCheckQuery);
+
+        if (exportedVersionResult.recordset.length > 0) {
+            const exportedVersion = exportedVersionResult.recordset[0];
+            return {
+                canExport: false,
+                reason: `Non è possibile esportare questa versione. Esiste già una versione esportata (versione ${exportedVersion.Version}) per questo articolo.`,
+                componentsInfo: {},
+                alreadyExported: false,
+                exportedVersion: exportedVersion.Version
             };
         }
 
@@ -406,17 +437,52 @@ const checkBOMExportability = async (companyId, bomId, version) => {
             };
         }
 
-        // Check routing verification (CheckOperation)
+        // Check routing verification (CheckOperation) - RICORSIVO: controlla tutti i livelli
+        // Usa una CTE ricorsiva per trovare tutti i BOMId dei componenti (anche multilivello)
         const unverifiedCyclesQuery = `
-            SELECT 
+            WITH BOMHierarchy AS (
+                -- Ancoraggio: BOM principale
+                SELECT 
+                    @BOMId AS BOMId,
+                    @BOMId AS RootBOMId,
+                    0 AS Level
+                WHERE @BOMId IS NOT NULL
+                
+                UNION ALL
+                
+                -- Ricorsione: trova le BOM dei componenti
+                SELECT 
+                    bom.Id AS BOMId,
+                    bh.RootBOMId,
+                    bh.Level + 1 AS Level
+                FROM BOMHierarchy bh
+                INNER JOIN MA_ProjectArticles_BOMComponents comp 
+                    ON comp.BOMId = bh.BOMId AND comp.CompanyId = @CompanyId
+                INNER JOIN MA_ProjectArticles_BillOfMaterials bom 
+                    ON bom.ItemId = comp.ComponentId 
+                    AND bom.CompanyId = @CompanyId
+                    AND bom.Version = 1  -- Controlla sempre la versione 1
+                WHERE bh.Level < 10  -- Limite di sicurezza per evitare loop infiniti
+            )
+            SELECT DISTINCT
                 rtg.RtgStep,
                 rtg.Operation,
                 rtg.WC,
-                ISNULL(rtg.CheckOperation, 0) AS CheckOperation
-            FROM MA_ProjectArticles_BOMRouting rtg
-            WHERE rtg.CompanyId = @CompanyId
-              AND rtg.BOMId = @BOMId
-              AND ISNULL(rtg.CheckOperation, 0) = 0
+                rtg.BOMId,
+                bh.Level,
+                ISNULL(rtg.CheckOperation, 0) AS CheckOperation,
+                bom.BOM AS BOMCode,
+                bom.Description AS BOMDescription,
+                item.Item AS ItemCode,
+                item.Description AS ItemDescription
+            FROM BOMHierarchy bh
+            INNER JOIN MA_ProjectArticles_BOMRouting rtg 
+                ON rtg.BOMId = bh.BOMId AND rtg.CompanyId = @CompanyId
+            INNER JOIN MA_ProjectArticles_BillOfMaterials bom 
+                ON bom.Id = rtg.BOMId AND bom.CompanyId = @CompanyId
+            INNER JOIN MA_ProjectArticles_Items item 
+                ON item.Id = bom.ItemId AND item.CompanyId = @CompanyId
+            WHERE ISNULL(rtg.CheckOperation, 0) = 0
         `;
 
         const unverifiedCyclesResult = await pool.request()
@@ -425,9 +491,31 @@ const checkBOMExportability = async (companyId, bomId, version) => {
             .query(unverifiedCyclesQuery);
 
         if (unverifiedCyclesResult.recordset.length > 0) {
+            // Raggruppa per livello per dare un messaggio più dettagliato
+            const cyclesByLevel = {};
+            unverifiedCyclesResult.recordset.forEach(cycle => {
+                const level = cycle.Level || 0;
+                if (!cyclesByLevel[level]) {
+                    cyclesByLevel[level] = [];
+                }
+                cyclesByLevel[level].push(cycle);
+            });
+
+            // Crea un messaggio dettagliato
+            const levelMessages = Object.keys(cyclesByLevel).sort((a, b) => parseInt(a) - parseInt(b)).map(level => {
+                const count = cyclesByLevel[level].length;
+                const levelName = level === '0' ? 'distinta principale' : `livello ${level}`;
+                return `${count} cicli non verificati alla ${levelName}`;
+            });
+
+            const totalUnverified = unverifiedCyclesResult.recordset.length;
+            const reason = totalUnverified === 1 
+                ? `1 ciclo non verificato (Operazione controllata)`
+                : `${totalUnverified} cicli non verificati (Operazione controllata): ${levelMessages.join(', ')}`;
+
             return {
                 canExport: false,
-                reason: `${unverifiedCyclesResult.recordset.length} cicli non verificati (Operazione controllata)`,
+                reason: reason,
                 componentsInfo: componentsInfo,
                 unverifiedCycles: unverifiedCyclesResult.recordset
             };

@@ -283,6 +283,7 @@ const ReferenceBOMs = ({ importOptions }) => {
       const componentData = {
         ComponentId: item.id || item.Id || 0,
         ComponentCode: item.BOM || item.Code || "",
+        ComponentBOMId: item.BOMId || null,  // NUOVO: passa BOMId se disponibile per specificare versione
         Quantity: 1,
         ImportBOM: importOptions.copyBOM,
         createTempComponent: importOptions.createTempComponent,

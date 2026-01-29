@@ -9,6 +9,8 @@ const fs = require('fs').promises;
 const { simpleParser } = require('mailparser');
 const { getEmailWorkerPool } = require('../workers/emailWorker');
 const MsgReader = require('@kenjiuno/msgreader').default;
+const sql = require('mssql');
+const config = require('../config');
 
 const {
     getProjectIdByTaskId,
@@ -23,8 +25,7 @@ const {
     createAttachmentLock,
     releaseAttachmentLock,
     forceReleaseAttachmentLock,
-    getAttachmentLockInfo,
-    cleanupExpiredLocks
+    getAttachmentLockInfo
 } = require('../queries/attachmentQueries');
 
 const fileService = new FileService();
@@ -1376,6 +1377,80 @@ router.get('/attachment-locks/:attachmentId', authenticateToken, async (req, res
     }
 });
 
+// HEARTBEAT: Rinnova lock per mantenere sessione attiva
+router.post('/attachment-locks/:attachmentId/keepalive', authenticateToken, async (req, res) => {
+    try {
+        const attachmentId = parseInt(req.params.attachmentId);
+        const userId = req.user.userId;
+
+        // Verifica se è un ItemAttachment (non ha lock)
+        const attachment = await getAttachmentById(attachmentId);
+        const isItemAttachment = attachment && (attachment.ItemCode || attachment.ProjectItemId);
+
+        if (isItemAttachment) {
+            return res.json({
+                success: true,
+                message: 'ItemAttachment non richiede keepalive',
+                isItemAttachment: true
+            });
+        }
+
+        let pool = await sql.connect(config.database);
+
+        // Verifica che il lock appartenga a questo utente
+        const lockCheck = await pool.request()
+            .input('AttachmentID', sql.Int, attachmentId)
+            .input('UserID', sql.Int, userId)
+            .query(`
+                SELECT LockID, LockedAt
+                FROM MA_AttachmentLocks
+                WHERE AttachmentID = @AttachmentID
+                  AND LockedBy = @UserID
+                  AND ReleasedAt IS NULL
+            `);
+
+        if (lockCheck.recordset.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Lock non trovato o non di tua proprietà',
+                code: 'LOCK_NOT_FOUND'
+            });
+        }
+
+        const lockId = lockCheck.recordset[0].LockID;
+        const previousLockedAt = lockCheck.recordset[0].LockedAt;
+
+        // Rinnova il lock aggiornando LockedAt (HEARTBEAT!)
+        await pool.request()
+            .input('LockID', sql.Int, lockId)
+            .query(`
+                UPDATE MA_AttachmentLocks
+                SET LockedAt = GETDATE()
+                WHERE LockID = @LockID
+            `);
+
+        const renewedAt = new Date();
+
+        console.log(`Lock keepalive: AttachmentID=${attachmentId}, UserID=${userId}, LockID=${lockId}`);
+
+        res.json({
+            success: true,
+            message: 'Lock rinnovato con successo',
+            lockId: lockId,
+            previousLockedAt: previousLockedAt,
+            renewedAt: renewedAt
+        });
+
+    } catch (error) {
+        console.error('Error in keepalive:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Errore nel rinnovo del lock',
+            error: error.message
+        });
+    }
+});
+
 // Force release di un lock (solo per admin)
 router.delete('/attachment-locks/:attachmentId/force', authenticateToken, async (req, res) => {
     try {
@@ -1411,14 +1486,7 @@ router.delete('/attachment-locks/:attachmentId/force', authenticateToken, async 
     }
 });
 
-// Pulisci lock scaduti (job periodico)
-router.post('/attachment-locks/cleanup', authenticateToken, async (req, res) => {
-    try {
-        const result = await cleanupExpiredLocks();
-        res.json(result);
-        
-    } catch (error) {
-        console.error('Error cleaning up expired locks:', error);
-        res.status(500).json({ success: 0, message: 'Errore nella pulizia dei lock scaduti' });
-    }
-});
+// Endpoint cleanup manuale RIMOSSO - Ridondante con SP_CleanupOldLocks
+// La SP viene chiamata automaticamente ogni ora da server.js (linea 578)
+// Timeout: 120 minuti + supporto heartbeat
+// Se serve cleanup manuale, usare force release su lock specifici

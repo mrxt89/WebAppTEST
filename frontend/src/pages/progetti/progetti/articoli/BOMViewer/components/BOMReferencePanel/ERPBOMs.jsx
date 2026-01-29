@@ -17,7 +17,7 @@ const ERPBOMs = ({ importOptions }) => {
   const {
     erpBOMs,
     setErpBOMs,
-    getERPBOMs,
+    getERPItemsAndBOMs,
     loading,
     setLoading,
     addComponent,
@@ -26,6 +26,7 @@ const ERPBOMs = ({ importOptions }) => {
 
   const [searchText, setSearchText] = useState("");
   const [natureFilter, setNatureFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all"); // all, bom, item
   const [expandedItems, setExpandedItems] = useState({});
   const [pageSize, setPageSize] = useState(50);
   const [allItems, setAllItems] = useState([]);
@@ -42,6 +43,20 @@ const ERPBOMs = ({ importOptions }) => {
   const scrollTimeoutRef = useRef(null);
   const [autoLoadEnabled, setAutoLoadEnabled] = useState(true);
 
+  // Converti il filtro natura in valore numerico
+  const getNatureValue = () => {
+    switch (natureFilter) {
+      case "semifinished":
+        return 22413312;
+      case "finished":
+        return 22413313;
+      case "purchased":
+        return 22413314;
+      default:
+        return null;
+    }
+  };
+
   // Load ERP BOMs
   useEffect(() => {
     const loadERPBOMs = async (reset = true) => {
@@ -54,7 +69,8 @@ const ERPBOMs = ({ importOptions }) => {
         }
 
         const currentPage = reset ? 1 : Math.floor(allItems.length / pageSize) + 1;
-        const data = await getERPBOMs(searchText, currentPage, pageSize);
+        const natureValue = getNatureValue();
+        const data = await getERPItemsAndBOMs(searchText, currentPage, pageSize, natureValue, typeFilter);
 
         if (data && data.items) {
           if (reset) {
@@ -83,7 +99,7 @@ const ERPBOMs = ({ importOptions }) => {
     };
 
     loadERPBOMs(true);
-  }, [getERPBOMs, setErpBOMs, setLoading, searchText, pageSize]);
+  }, [getERPItemsAndBOMs, setErpBOMs, setLoading, searchText, pageSize, natureFilter, typeFilter]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -122,7 +138,8 @@ const ERPBOMs = ({ importOptions }) => {
       const currentScrollHeight = scrollContainer ? scrollContainer.scrollHeight : 0;
 
       const nextPage = Math.floor(allItems.length / pageSize) + 1;
-      const data = await getERPBOMs(searchText, nextPage, pageSize);
+      const natureValue = getNatureValue();
+      const data = await getERPItemsAndBOMs(searchText, nextPage, pageSize, natureValue, typeFilter);
 
       if (data && data.items && data.items.length > 0) {
         const newItems = [...allItems, ...data.items];
@@ -185,24 +202,8 @@ const ERPBOMs = ({ importOptions }) => {
     }));
   };
 
-  // Filter BOMs by nature
-  const filteredBOMs =
-    natureFilter === "all"
-      ? allItems
-      : allItems.filter((bom) => {
-          const bomNature = bom.Nature || bom.ComponentNature || 0;
-
-          switch (natureFilter) {
-            case "semifinished":
-              return bomNature === 22413312;
-            case "finished":
-              return bomNature === 22413313;
-            case "purchased":
-              return bomNature === 22413314;
-            default:
-              return true;
-          }
-        });
+  // Non serve più filtrare lato client, il filtro è applicato lato server
+  const filteredBOMs = allItems;
 
   // Handle double-click or add button
   const handleAddItem = async (item) => {
@@ -215,6 +216,7 @@ const ERPBOMs = ({ importOptions }) => {
       const componentData = {
         ComponentId: item.Id || 0,
         ComponentCode: item.BOM || item.Item || "",
+        ComponentBOMId: item.BOMId || null,  // NUOVO: passa BOMId se disponibile per specificare versione
         Quantity: 1,
         ImportBOM: importOptions.copyBOM,
         createTempComponent: importOptions.createTempComponent,
@@ -249,7 +251,7 @@ const ERPBOMs = ({ importOptions }) => {
           <Button onClick={handleSearch}>
             <Search className="h-4 " />
           </Button>
-                    {/* Page size selector */}
+          {/* Page size selector */}
           <Select value={pageSize.toString()} onValueChange={(value) => handlePageSizeChange(parseInt(value))}>
             <SelectTrigger className="w-15">
               <SelectValue />
@@ -262,6 +264,46 @@ const ERPBOMs = ({ importOptions }) => {
               <SelectItem value="200">200</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Nature and Type filters */}
+        <div className="flex gap-2">
+          <Select value={natureFilter} onValueChange={setNatureFilter}>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="Filtra per natura" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutte le nature</SelectItem>
+              <SelectItem value="semifinished">Semilavorati</SelectItem>
+              <SelectItem value="finished">Prodotti Finiti</SelectItem>
+              <SelectItem value="purchased">Acquisti</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutti</SelectItem>
+              <SelectItem value="bom">BOM</SelectItem>
+              <SelectItem value="item">Item</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            size="icon"
+            title="Reimposta filtri"
+            onClick={() => {
+              setNatureFilter("all");
+              setTypeFilter("all");
+              setSearchText("");
+              setAllItems([]);
+            }}
+          >
+            <Filter className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 

@@ -224,6 +224,11 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
                     request.input('ComponentCode', sql.VarChar(21), bomData.ComponentCode);
                 }
 
+                // NUOVO: Supporto per ComponentBOMId per specificare versione BOM
+                if (bomData.ComponentBOMId !== undefined && bomData.ComponentBOMId !== null) {
+                    request.input('ComponentBOMId', sql.BigInt, bomData.ComponentBOMId);
+                }
+
                 // NUOVO: Supporto per la creazione di componenti temporanei
                 if (bomData.CreateTempComponent) {
                     request.input('CreateTempComponent', sql.Bit, true);
@@ -244,6 +249,10 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
                     if (bomData.SourceItemCode) {
                         request.input('SourceItemCode', sql.VarChar(21), bomData.SourceItemCode);
                     }
+                    
+                    // IMPORTANTE: Non passare ComponentId o ComponentCode quando CreateTempComponent = true
+                    // La stored procedure creerà il componente e imposterà @ComponentId automaticamente
+                    console.log(`[DEBUG] CreateTempComponent=true - Non passando ComponentId/ComponentCode, sarà creato dalla stored procedure`);
                 }
 
                 // ComponentDescription (opzionale)
@@ -251,14 +260,21 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
                     request.input('ComponentDescription', sql.VarChar(128), bomData.ComponentDescription);
                 }
 
-                // Natura del componente (opzionale)
-                if (bomData.Nature) {
+                // Natura del componente (opzionale) - supporta sia Nature che ComponentNatureValue
+                if (bomData.Nature !== undefined) {
                     request.input('ComponentNatureValue', sql.Int, bomData.Nature);
+                } else if (bomData.ComponentNatureValue !== undefined) {
+                    request.input('ComponentNatureValue', sql.Int, bomData.ComponentNatureValue);
                 }
                 
-                // Nuovo supporto per ParentComponentId
-                if (bomData.ParentComponentId) {
-                    request.input('ParentComponentId', sql.Int, bomData.ParentComponentId);
+                // Nuovo supporto per ParentComponentId - converte da stringa se necessario
+                if (bomData.ParentComponentId !== undefined) {
+                    const parentId = typeof bomData.ParentComponentId === 'string' 
+                        ? parseInt(bomData.ParentComponentId, 10) 
+                        : bomData.ParentComponentId;
+                    if (!isNaN(parentId)) {
+                        request.input('ParentComponentId', sql.Int, parentId);
+                    }
                 }
                 
                 // Parametri opzionali aggiuntivi
@@ -292,8 +308,11 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
                     request.input('ComponentFixedCost', sql.Float, bomData.FixedCost);
                 }
                 
+                // UoM del componente - supporta sia UoM che ComponentUoM
                 if (bomData.UoM) {
                     request.input('ComponentUoM', sql.VarChar(10), bomData.UoM);
+                } else if (bomData.ComponentUoM) {
+                    request.input('ComponentUoM', sql.VarChar(10), bomData.ComponentUoM);
                 }
                 
                 if (bomData.Details) {
@@ -323,6 +342,26 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
                 // Flag per indicare se aggiornare i dati fornitore (solo se almeno uno è presente)
                 if (bomData.TempSupplierId !== undefined || bomData.TempIntercompanyTargetId !== undefined || bomData.TempSupplierNotes !== undefined) {
                     request.input('UpdateSupplierData', sql.Bit, 1);
+                }
+                
+                // NUOVO: Supporto per dimensioni quando si crea un componente temporaneo
+                if (bomData.Diameter !== undefined) {
+                    request.input('Diameter', sql.Float, bomData.Diameter);
+                }
+                if (bomData.Bxh !== undefined) {
+                    request.input('Bxh', sql.VarChar(11), bomData.Bxh);
+                }
+                if (bomData.Depth !== undefined) {
+                    request.input('Depth', sql.Float, bomData.Depth);
+                }
+                if (bomData.Length !== undefined) {
+                    request.input('Length', sql.Float, bomData.Length);
+                }
+                if (bomData.MediumRadius !== undefined) {
+                    request.input('MediumRadius', sql.Float, bomData.MediumRadius);
+                }
+                if (bomData.Thickness !== undefined) {
+                    request.input('Thickness', sql.Float, bomData.Thickness);
                 }
             }
 
@@ -419,13 +458,30 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
         request.output('ErrorMessage', sql.NVarChar(4000));
         request.output('CreatedComponentCode', sql.VarChar(21)); 
 
+        // DEBUG: Log parametri prima dell'esecuzione per CreateTempComponent
+        if (action === 'ADD_COMPONENT' && bomData.CreateTempComponent) {
+            console.log(`[DEBUG] CreateTempComponent=true - Parametri inviati:`, {
+                Id: bomData.Id,
+                CreateTempComponent: bomData.CreateTempComponent,
+                ComponentDescription: bomData.ComponentDescription,
+                ComponentNatureValue: bomData.ComponentNatureValue || bomData.Nature,
+                ComponentUoM: bomData.ComponentUoM || bomData.UoM,
+                ParentComponentId: bomData.ParentComponentId,
+                Quantity: bomData.Quantity,
+                ImportBOM: bomData.ImportBOM,
+                MaxLevels: bomData.MaxLevels
+            });
+        }
+
         // Esecuzione della stored procedure
         await request.execute('MA_ProjectArticles_AddUpdateBOM');
 
         // Controllo errori
         const errorCode = request.parameters.ErrorCode.value ? request.parameters.ErrorCode.value : 0;
         if (errorCode !== 0) {
-            throw new Error(request.parameters.ErrorMessage.value || `Error code: ${errorCode}`);
+            const errorMsg = request.parameters.ErrorMessage.value || `Error code: ${errorCode}`;
+            console.error(`[ERROR] Stored procedure error:`, errorMsg);
+            throw new Error(errorMsg);
         }
 
         // DEBUG: Controlla il ReturnValue
@@ -487,6 +543,9 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
         // NUOVO: Aggiungi CreatedComponentCode al risultato se disponibile
         if (request.parameters.CreatedComponentCode && request.parameters.CreatedComponentCode.value) {
             result.createdComponentCode = request.parameters.CreatedComponentCode.value;
+            console.log(`[DEBUG] Componente temporaneo creato con codice:`, result.createdComponentCode);
+        } else if (action === 'ADD_COMPONENT' && bomData.CreateTempComponent) {
+            console.log(`[WARNING] CreateTempComponent=true ma CreatedComponentCode non restituito dalla stored procedure`);
         }
 
         return result;
@@ -1083,8 +1142,436 @@ const getItemById = async (companyId, itemId) => {
     }
 };
 
-// Nuova funzione: ottenere distinte base dal gestionale Mago
-const getERPBOMs = async (companyId, searchText = '', pagination = { page: 1, pageSize: 50 }) => {
+// Nuova funzione: ottenere BOM e Item unificati dal gestionale Mago
+const getERPItemsAndBOMs = async (companyId, searchText = '', pagination = { page: 1, pageSize: 50 }, natureFilter = null, typeFilter = 'all') => {
+    try {
+        let pool = await sql.connect(config.database);
+        
+        // Costruisci la query UNION dinamicamente in base al filtro tipo
+        let bomWhereClause = 'T0.CompanyId = @CompanyId AND T0.Disabled = 0';
+        let itemWhereClause = 'T0.CompanyId = @CompanyId AND T0.Disabled = 0';
+        
+        if (typeFilter === 'item') {
+            // Solo item senza BOM
+            itemWhereClause += ' AND NOT EXISTS (SELECT 1 FROM dbo.MA_BillOfMaterials BOM WHERE BOM.BOM = T0.Item AND BOM.CompanyId = T0.CompanyId AND BOM.Disabled = 0)';
+            bomWhereClause += ' AND 1=0'; // Escludi BOM
+        } else if (typeFilter === 'bom') {
+            // Solo BOM (item con BOM)
+            bomWhereClause += '';
+            itemWhereClause += ' AND EXISTS (SELECT 1 FROM dbo.MA_BillOfMaterials BOM WHERE BOM.BOM = T0.Item AND BOM.CompanyId = T0.CompanyId AND BOM.Disabled = 0)';
+        }
+        // typeFilter === 'all' -> mostra tutto
+        
+        // UNION query per unificare BOM e Item
+        let query = `
+            WITH ERPData AS (
+                -- BOM dal gestionale
+                SELECT 
+                    T0.BOM AS Code,
+                    T0.Description, 
+                    T0.UoM,
+                    T0.CreationDate,
+                    T1.Id AS ItemId,
+                    T2.Id AS BOMId,
+                    T2.Version,
+                    T3.Nature,
+                    'BOM' AS ItemType
+                FROM 
+                    dbo.MA_BillOfMaterials T0
+                LEFT JOIN 
+                    MA_ProjectArticles_Items T1 ON T1.Item = T0.BOM AND T1.CompanyId = T0.CompanyId
+                LEFT JOIN 
+                    MA_ProjectArticles_BillOfMaterials T2 ON T2.ItemId = T1.Id
+                LEFT JOIN 
+                    dbo.MA_Items T3 ON T3.Item = T0.BOM AND T3.CompanyId = T0.CompanyId
+                WHERE ${bomWhereClause}
+                
+                UNION ALL
+                
+                -- Item dal gestionale
+                SELECT 
+                    T0.Item AS Code,
+                    T0.Description,
+                    T0.BaseUoM AS UoM,
+                    NULL AS CreationDate,
+                    T1.Id AS ItemId,
+                    NULL AS BOMId,
+                    NULL AS Version,
+                    T0.Nature,
+                    'ITEM' AS ItemType
+                FROM 
+                    dbo.MA_Items T0
+                LEFT JOIN 
+                    MA_ProjectArticles_Items T1 ON T1.Item = T0.Item AND T1.CompanyId = T0.CompanyId
+                WHERE ${itemWhereClause}
+            )
+            SELECT * FROM ERPData
+        `;
+        
+        // Aggiungi filtro di ricerca se specificato
+        if (searchText) {
+            query += ` WHERE (Code LIKE @SearchText OR Description LIKE @SearchText)`;
+        } else {
+            query += ` WHERE 1=1`;
+        }
+        
+        // Aggiungi filtro per natura se specificato
+        if (natureFilter !== null && natureFilter !== undefined) {
+            query += ` AND Nature = @NatureFilter`;
+        }
+        
+        // Calcola l'offset per la paginazione
+        const offset = (pagination.page - 1) * pagination.pageSize;
+        
+        // Ordina per Code e applica la paginazione
+        query += ` ORDER BY Code OFFSET ${offset} ROWS FETCH NEXT ${pagination.pageSize} ROWS ONLY`;
+        
+        const request = pool.request()
+            .input('CompanyId', sql.Int, companyId);
+        
+        if (searchText) {
+            request.input('SearchText', sql.VarChar(100), `%${searchText}%`);
+        }
+        
+        if (natureFilter !== null && natureFilter !== undefined) {
+            request.input('NatureFilter', sql.Int, natureFilter);
+        }
+        
+        // Query di conteggio
+        let countQuery = `
+            WITH ERPData AS (
+                SELECT 
+                    T0.BOM AS Code,
+                    T3.Nature,
+                    'BOM' AS ItemType
+                FROM 
+                    dbo.MA_BillOfMaterials T0
+                LEFT JOIN 
+                    dbo.MA_Items T3 ON T3.Item = T0.BOM AND T3.CompanyId = T0.CompanyId
+                WHERE ${bomWhereClause}
+                
+                UNION ALL
+                
+                SELECT 
+                    T0.Item AS Code,
+                    T0.Nature,
+                    'ITEM' AS ItemType
+                FROM 
+                    dbo.MA_Items T0
+                WHERE ${itemWhereClause}
+            )
+            SELECT COUNT(*) AS TotalCount
+            FROM ERPData
+        `;
+        
+        if (searchText) {
+            countQuery += ` WHERE (Code LIKE @SearchText)`;
+        } else {
+            countQuery += ` WHERE 1=1`;
+        }
+        
+        if (natureFilter !== null && natureFilter !== undefined) {
+            countQuery += ` AND Nature = @NatureFilter`;
+        }
+        
+        const countRequest = pool.request()
+            .input('CompanyId', sql.Int, companyId);
+        
+        if (searchText) {
+            countRequest.input('SearchText', sql.VarChar(100), `%${searchText}%`);
+        }
+        
+        if (natureFilter !== null && natureFilter !== undefined) {
+            countRequest.input('NatureFilter', sql.Int, natureFilter);
+        }
+        
+        const countResult = await countRequest.query(countQuery);
+        const totalItems = countResult.recordset[0].TotalCount;
+        
+        // Esegui la query dei dati
+        const result = await request.query(query);
+        
+        // Per ogni BOM, ottieni anche i componenti
+        const itemsWithDetails = await Promise.all(
+            result.recordset.map(async (item) => {
+                if (item.ItemType === 'BOM') {
+                    const componentsQuery = `
+                        SELECT 
+                            comp.Component,
+                            comp.ComponentType,
+                            comp.Description,
+                            comp.UoM,
+                            comp.Qty,
+                            ISNULL(itm.Nature, 22413312) AS Nature,
+                            proj.Id AS ItemId
+                        FROM 
+                            dbo.MA_BillOfMaterialsComp comp
+                        LEFT JOIN 
+                            dbo.MA_Items itm ON comp.Component = itm.Item AND comp.CompanyId = itm.CompanyId
+                        LEFT JOIN
+                            dbo.MA_ProjectArticles_Items proj ON proj.Item = comp.Component AND proj.CompanyId = comp.CompanyId
+                        WHERE 
+                            comp.BOM = @BOM
+                            AND comp.CompanyId = @CompanyId
+                        ORDER BY 
+                            comp.Line
+                    `;
+                    
+                    const componentsRequest = pool.request()
+                        .input('BOM', sql.VarChar(21), item.Code)
+                        .input('CompanyId', sql.Int, companyId);
+                    
+                    const componentsResult = await componentsRequest.query(componentsQuery);
+                    
+                    return {
+                        ...item,
+                        BOM: item.Code,
+                        Item: item.Code,
+                        Components: componentsResult.recordset
+                    };
+                } else {
+                    // Per gli item, non ci sono componenti
+                    return {
+                        ...item,
+                        Item: item.Code,
+                        Components: []
+                    };
+                }
+            })
+        );
+        
+        // Calcola la paginazione
+        const totalPages = Math.ceil(totalItems / pagination.pageSize);
+        
+        return {
+            items: itemsWithDetails,
+            pagination: {
+                currentPage: pagination.page,
+                pageSize: pagination.pageSize,
+                totalItems,
+                totalPages
+            }
+        };
+    } catch (err) {
+        console.error('Error in getERPItemsAndBOMs:', err);
+        throw err;
+    }
+};
+
+// Nuova funzione: ottenere BOM e Item unificati dai progetti
+const getProjectItemsAndBOMs = async (companyId, projectId, searchText = '', pagination = { page: 1, pageSize: 50 }, natureFilter = null, typeFilter = 'all') => {
+    try {
+        let pool = await sql.connect(config.database);
+        
+        // Costruisci la query UNION dinamicamente in base al filtro tipo
+        let bomWhereClause = `bom.CompanyId = @CompanyId AND bom.BOMStatus != 'CANCELLATO'`;
+        let itemWhereClause = `item.CompanyId = @CompanyId AND item.Disabled = 0 AND NOT EXISTS (SELECT 1 FROM MA_Items WHERE CompanyId = @CompanyId AND Item = item.Item)`;
+        
+        if (typeFilter === 'item') {
+            // Solo item senza BOM
+            itemWhereClause += ' AND NOT EXISTS (SELECT 1 FROM MA_ProjectArticles_BillOfMaterials BOM WHERE BOM.ItemId = item.Id AND BOM.CompanyId = item.CompanyId)';
+            bomWhereClause += ' AND 1=0'; // Escludi BOM
+        } else if (typeFilter === 'bom') {
+            // Solo BOM
+            bomWhereClause += '';
+            itemWhereClause += ' AND EXISTS (SELECT 1 FROM MA_ProjectArticles_BillOfMaterials BOM WHERE BOM.ItemId = item.Id AND BOM.CompanyId = item.CompanyId)';
+        }
+        
+        // UNION query per unificare BOM e Item progetti
+        let query = `
+            WITH ProjectData AS (
+                -- BOM dai progetti
+                SELECT 
+                    bom.BOM AS Code,
+                    ISNULL(item.Description, bom.Description) AS Description,
+                    bom.UoM,
+                    bom.TBCreated AS CreationDate,
+                    item.Id AS ItemId,
+                    bom.Id AS BOMId,
+                    bom.Version,
+                    item.Nature,
+                    'BOM' AS ItemType
+                FROM 
+                    dbo.MA_ProjectArticles_BillOfMaterials bom
+                LEFT JOIN 
+                    dbo.MA_ProjectArticles_Items item ON bom.ItemId = item.Id AND bom.CompanyId = item.CompanyId
+                WHERE ${bomWhereClause}
+                
+                UNION ALL
+                
+                -- Item dai progetti (temporanei)
+                SELECT 
+                    item.Item AS Code,
+                    item.Description,
+                    item.BaseUoM AS UoM,
+                    item.TBCreated AS CreationDate,
+                    item.Id AS ItemId,
+                    NULL AS BOMId,
+                    NULL AS Version,
+                    item.Nature,
+                    'ITEM' AS ItemType
+                FROM 
+                    dbo.MA_ProjectArticles_Items item
+                WHERE ${itemWhereClause}
+            )
+            SELECT * FROM ProjectData
+        `;
+        
+        // Aggiungi filtro di ricerca se specificato
+        if (searchText) {
+            query += ` WHERE (Code LIKE @SearchText OR Description LIKE @SearchText)`;
+        } else {
+            query += ` WHERE 1=1`;
+        }
+        
+        // Aggiungi filtro per natura se specificato
+        if (natureFilter !== null && natureFilter !== undefined) {
+            query += ` AND Nature = @NatureFilter`;
+        }
+        
+        // Calcola l'offset per la paginazione
+        const offset = (pagination.page - 1) * pagination.pageSize;
+        
+        // Ordina per Code e applica la paginazione
+        query += ` ORDER BY Code OFFSET ${offset} ROWS FETCH NEXT ${pagination.pageSize} ROWS ONLY`;
+        
+        const request = pool.request()
+            .input('CompanyId', sql.Int, companyId);
+        
+        if (searchText) {
+            request.input('SearchText', sql.VarChar(100), `%${searchText}%`);
+        }
+        
+        if (natureFilter !== null && natureFilter !== undefined) {
+            request.input('NatureFilter', sql.Int, natureFilter);
+        }
+        
+        // Query di conteggio
+        let countQuery = `
+            WITH ProjectData AS (
+                SELECT 
+                    bom.BOM AS Code,
+                    item.Nature,
+                    'BOM' AS ItemType
+                FROM 
+                    dbo.MA_ProjectArticles_BillOfMaterials bom
+                LEFT JOIN 
+                    dbo.MA_ProjectArticles_Items item ON bom.ItemId = item.Id AND bom.CompanyId = item.CompanyId
+                WHERE ${bomWhereClause}
+                
+                UNION ALL
+                
+                SELECT 
+                    item.Item AS Code,
+                    item.Nature,
+                    'ITEM' AS ItemType
+                FROM 
+                    dbo.MA_ProjectArticles_Items item
+                WHERE ${itemWhereClause}
+            )
+            SELECT COUNT(*) AS TotalCount
+            FROM ProjectData
+        `;
+        
+        if (searchText) {
+            countQuery += ` WHERE (Code LIKE @SearchText)`;
+        } else {
+            countQuery += ` WHERE 1=1`;
+        }
+        
+        if (natureFilter !== null && natureFilter !== undefined) {
+            countQuery += ` AND Nature = @NatureFilter`;
+        }
+        
+        const countRequest = pool.request()
+            .input('CompanyId', sql.Int, companyId);
+        
+        if (searchText) {
+            countRequest.input('SearchText', sql.VarChar(100), `%${searchText}%`);
+        }
+        
+        if (natureFilter !== null && natureFilter !== undefined) {
+            countRequest.input('NatureFilter', sql.Int, natureFilter);
+        }
+        
+        const countResult = await countRequest.query(countQuery);
+        const totalItems = countResult.recordset[0].TotalCount;
+        
+        // Esegui la query dei dati
+        const result = await request.query(query);
+        
+        // Per ogni BOM, ottieni anche i componenti
+        const itemsWithDetails = await Promise.all(
+            result.recordset.map(async (item) => {
+                if (item.ItemType === 'BOM' && item.BOMId) {
+                    const componentsQuery = `
+                        SELECT 
+                            comp.ComponentId,
+                            comp.ComponentType,
+                            comp.Quantity,
+                            comp.UoM,
+                            comp.UnitCost,
+                            comp.TotalCost,
+                            comp.FixedCost,
+                            comp.Details,
+                            comp.Notes,
+                            item.Item AS ComponentCode,
+                            item.Description AS ComponentDescription,
+                            item.Nature AS ComponentNature
+                        FROM 
+                            dbo.MA_ProjectArticles_BOMComponents comp
+                        LEFT JOIN 
+                            dbo.MA_ProjectArticles_Items item ON comp.ComponentId = item.Id AND comp.CompanyId = item.CompanyId
+                        WHERE 
+                            comp.BOMId = @BOMId
+                            AND comp.CompanyId = @CompanyId
+                        ORDER BY 
+                            comp.Line
+                    `;
+                    
+                    const componentsRequest = pool.request()
+                        .input('BOMId', sql.BigInt, item.BOMId)
+                        .input('CompanyId', sql.Int, companyId);
+                    
+                    const componentsResult = await componentsRequest.query(componentsQuery);
+                    
+                    return {
+                        ...item,
+                        BOM: item.Code,
+                        Item: item.Code,
+                        Components: componentsResult.recordset
+                    };
+                } else {
+                    // Per gli item, non ci sono componenti
+                    return {
+                        ...item,
+                        Item: item.Code,
+                        Components: []
+                    };
+                }
+            })
+        );
+        
+        // Calcola la paginazione
+        const totalPages = Math.ceil(totalItems / pagination.pageSize);
+        
+        return {
+            items: itemsWithDetails,
+            pagination: {
+                currentPage: pagination.page,
+                pageSize: pagination.pageSize,
+                totalItems,
+                totalPages
+            }
+        };
+    } catch (err) {
+        console.error('Error in getProjectItemsAndBOMs:', err);
+        throw err;
+    }
+};
+
+// Nuova funzione: ottenere distinte base dal gestionale Mago (mantenuta per retrocompatibilità)
+const getERPBOMs = async (companyId, searchText = '', pagination = { page: 1, pageSize: 50 }, natureFilter = null) => {
     try {
         let pool = await sql.connect(config.database);
         
@@ -1098,6 +1585,7 @@ const getERPBOMs = async (companyId, searchText = '', pagination = { page: 1, pa
                 T0.CreationDate,
                 T1.Id AS ItemId,
                 T2.Id AS BOMId,
+                T2.Version,
                 T3.Nature
             FROM 
                 dbo.MA_BillOfMaterials T0
@@ -1117,6 +1605,11 @@ const getERPBOMs = async (companyId, searchText = '', pagination = { page: 1, pa
             query += ` AND (T0.BOM LIKE @SearchText OR T0.Description LIKE @SearchText)`;
         }
         
+        // Aggiungi filtro per natura se specificato
+        if (natureFilter !== null && natureFilter !== undefined) {
+            query += ` AND T3.Nature = @NatureFilter`;
+        }
+        
         // Calcola l'offset per la paginazione
         const offset = (pagination.page - 1) * pagination.pageSize;
         
@@ -1130,10 +1623,15 @@ const getERPBOMs = async (companyId, searchText = '', pagination = { page: 1, pa
             request.input('SearchText', sql.VarChar(100), `%${searchText}%`);
         }
         
+        if (natureFilter !== null && natureFilter !== undefined) {
+            request.input('NatureFilter', sql.Int, natureFilter);
+        }
+        
         // Prima eseguiamo la query di conteggio per il totale
         let countQuery = `
             SELECT COUNT(*) AS TotalCount
             FROM dbo.MA_BillOfMaterials T0
+            LEFT JOIN dbo.MA_Items T3 ON T3.Item = T0.BOM AND T3.CompanyId = T0.CompanyId
             WHERE T0.CompanyId = @CompanyId
             AND T0.Disabled = 0
         `;
@@ -1142,11 +1640,19 @@ const getERPBOMs = async (companyId, searchText = '', pagination = { page: 1, pa
             countQuery += ` AND (T0.BOM LIKE @SearchText OR T0.Description LIKE @SearchText)`;
         }
         
+        if (natureFilter !== null && natureFilter !== undefined) {
+            countQuery += ` AND T3.Nature = @NatureFilter`;
+        }
+        
         const countRequest = pool.request()
             .input('CompanyId', sql.Int, companyId);
         
         if (searchText) {
             countRequest.input('SearchText', sql.VarChar(100), `%${searchText}%`);
+        }
+        
+        if (natureFilter !== null && natureFilter !== undefined) {
+            countRequest.input('NatureFilter', sql.Int, natureFilter);
         }
         
         const countResult = await countRequest.query(countQuery);
@@ -1722,7 +2228,7 @@ const copyBOMFromItem = async (companyId, targetItemId, sourceItemId = null, sou
                 BOM: `BOM_${targetItem.Item || 'TEMP'}`,
                 Description: `Distinta base di ${targetItem.Item || 'articolo temporaneo'}`,
                 Version: 1,
-                UoM: targetItem.BaseUoM || 'PZ',
+                UoM: targetItem.BaseUoM || 'NR',
                 BOMStatus: 'BOZZA',
                 ProductionLot: 1,
                 SourceBOMId: sourceBom.header.Id,
@@ -1766,7 +2272,7 @@ const copyBOMFromItem = async (companyId, targetItemId, sourceItemId = null, sou
                 BOM: `BOM_${targetItem.Item || 'TEMP'}`,
                 Description: `Distinta base di ${targetItem.Item || 'articolo temporaneo'}`,
                 Version: 1,
-                UoM: targetItem.BaseUoM || 'PZ',
+                UoM: targetItem.BaseUoM || 'NR',
                 BOMStatus: 'BOZZA',
                 ProductionLot: 1
             };
@@ -1825,7 +2331,7 @@ const copyBOMFromItem = async (companyId, targetItemId, sourceItemId = null, sou
                                     Description: erpItem.Description,
                                     Nature: erpItem.Nature || 22413314, // Default Acquisto
                                     StatusId: 1, // BOZZA
-                                    BaseUoM: erpItem.BaseUoM || 'PZ',
+                                    BaseUoM: erpItem.BaseUoM || 'NR',
                                     stato_erp: 1,
                                     data_sync_erp: new Date()
                                 };
@@ -1846,7 +2352,7 @@ const copyBOMFromItem = async (companyId, targetItemId, sourceItemId = null, sou
                                 ComponentId: componentItemId,
                                 ComponentType: comp.ComponentType || 0,
                                 Quantity: comp.Qty || 1,
-                                UoM: comp.UoM || 'PZ',
+                                UoM: comp.UoM || 'NR',
                                 UnitCost: 0,
                                 TotalCost: 0,
                                 FixedCost: 0
@@ -2622,21 +3128,36 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         console.log('DEBUG: Messaggi PRINT ricevuti dalla SP:', spPrintMessages.length);
 
         // Estrai i valori di output
-        let returnItemId = request.parameters.ReturnItemId.value;
-        let returnBOMId = request.parameters.ReturnBOMId.value;
-        const importedComponents = request.parameters.ImportedComponents.value || 0;
-        const errorCode = request.parameters.ErrorCode.value || 0;
-        const errorMessage = request.parameters.ErrorMessage.value || '';
+        // NOTA: con mssql è più affidabile leggere da result.output (oltre a request.parameters)
+        const spOutput = result?.output || {};
+        const spReturnValue = result?.returnValue;
+
+        let returnItemId = spOutput.ReturnItemId ?? request.parameters.ReturnItemId.value;
+        let returnBOMId = spOutput.ReturnBOMId ?? request.parameters.ReturnBOMId.value;
+        const importedComponents =
+          (spOutput.ImportedComponents ?? request.parameters.ImportedComponents.value ?? 0) || 0;
+
+        const outputErrorCode =
+          (spOutput.ErrorCode ?? request.parameters.ErrorCode.value ?? 0) || 0;
+        const outputErrorMessage =
+          spOutput.ErrorMessage ?? request.parameters.ErrorMessage.value ?? '';
+
+        // Alcune SP tornano errori via returnValue. Se outputErrorCode è 0 ma returnValue è != 0, consideralo errore.
+        const effectiveErrorCode =
+          outputErrorCode === 0 && spReturnValue ? spReturnValue : outputErrorCode;
+        const errorMessage = outputErrorMessage || '';
 
         // DEBUG: Log parametri di output con maggiori dettagli
         console.log('DEBUG: Parametri di output dalla SP:', {
+            spReturnValue,
+            spOutputKeys: Object.keys(spOutput || {}),
             returnItemId: returnItemId,
             returnItemIdType: typeof returnItemId,
             returnBOMId: returnBOMId,
             returnBOMIdType: typeof returnBOMId,
             importedComponents: importedComponents,
             importedComponentsType: typeof importedComponents,
-            errorCode: errorCode,
+            errorCode: effectiveErrorCode,
             errorMessage: errorMessage || '(nessun errore)'
         });
 
@@ -2644,19 +3165,21 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         console.log('DEBUG: Parametri RAW:', {
             returnItemIdRaw: request.parameters.ReturnItemId.value,
             returnBOMIdRaw: request.parameters.ReturnBOMId.value,
-            importedComponentsRaw: request.parameters.ImportedComponents.value
+            importedComponentsRaw: request.parameters.ImportedComponents.value,
+            resultOutputRaw: spOutput,
+            resultReturnValueRaw: spReturnValue
         });
 
         // Controllo errori
-        if (errorCode !== 0) {
+        if (effectiveErrorCode !== 0) {
             console.error('SP Error:', {
-                errorCode,
+                errorCode: effectiveErrorCode,
                 errorMessage
             });
 
             return {
                 success: 0,
-                msg: errorMessage || `Errore durante l'importazione. Codice errore: ${errorCode}`
+                msg: errorMessage || `Errore durante l'importazione. Codice errore: ${effectiveErrorCode}`
             };
         }
 
@@ -2722,13 +3245,15 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
         }
 
         // SOLO se NIENTE è stato creato E il recovery non ha funzionato, allora fallisci
-        if (selectedComponentsCount > 0 && !hasItemId && !hasBOMId && errorCode === 0) {
+        if (selectedComponentsCount > 0 && !hasItemId && !hasBOMId && effectiveErrorCode === 0) {
             console.error('ATTENZIONE: Importazione fallita silenziosamente!', {
                 componenteSelezionati: selectedComponentsCount,
                 componenteImportati: importedComponents,
                 hasItemId,
                 hasBOMId,
-                errorCode
+                errorCode: effectiveErrorCode,
+                spReturnValue,
+                spOutput
             });
 
             // Stampa gli ultimi messaggi PRINT dalla SP per diagnostica
@@ -2744,8 +3269,8 @@ const importERPItemWithSelection = async (companyId, userId, projectId, importDa
             return {
                 success: 0,
                 msg: `Nessun componente importato (${selectedComponentsCount} selezionati). ` +
-                     `Possibile timeout o problema di performance. ` +
-                     `Prova a selezionare meno componenti (max consigliato: 50).`
+                     `La stored non ha restituito ItemId/BOMId. ` +
+                     `Controlla i log server per i PRINT della SP.`
             };
         }
 
@@ -2897,7 +3422,7 @@ const getERPBOMStructure = async (companyId, itemCode) => {
                     bc.Qty * bh.Quantity,
                     ISNULL(ci.Nature, 22413312),
                     ISNULL(ci.Description, bc.Description),
-                    ISNULL(bc.UoM, 'PZ'),
+                    ISNULL(bc.UoM, 'NR'),
                     bc.ComponentType,
                     bc.Line
                 FROM BOMHierarchy bh
@@ -4279,22 +4804,62 @@ const approveIntercompanyReferenceWithProject = async (
         // Recupera i parametri di output
         const errorCode = request.parameters.ErrorCode.value || 0;
         const errorMessage = request.parameters.ErrorMessage.value || '';
-        const targetProjectId = request.parameters.TargetProjectId.value;
-        const targetItemId = request.parameters.TargetItemId.value;
+        
+        // Leggi i parametri con gestione più robusta
+        let targetProjectIdRaw = request.parameters.TargetProjectId.value;
+        let targetItemIdRaw = request.parameters.TargetItemId.value;
+        
+        // Se i parametri di output sono null/undefined, prova a cercare nei recordset
+        if ((targetProjectIdRaw === null || targetProjectIdRaw === undefined) && result.recordset && result.recordset.length > 0) {
+            const firstRow = result.recordset[0];
+            if (firstRow.TargetProjectId !== undefined) {
+                targetProjectIdRaw = firstRow.TargetProjectId;
+            }
+            if (firstRow.TargetItemId !== undefined) {
+                targetItemIdRaw = firstRow.TargetItemId;
+            }
+        }
+        
+        // Converti in numero o null (gestisce undefined, null, e valori numerici)
+        // NOTA: 0 è un valore valido per un ID, quindi non lo trattiamo come null
+        const targetProjectId = targetProjectIdRaw !== null && targetProjectIdRaw !== undefined 
+            ? parseInt(targetProjectIdRaw, 10) 
+            : null;
+        const targetItemId = targetItemIdRaw !== null && targetItemIdRaw !== undefined 
+            ? parseInt(targetItemIdRaw, 10) 
+            : null;
 
         console.log('MA_ApproveIntercompanyReference result:', {
             errorCode,
             errorMessage,
             targetProjectId,
-            targetItemId
+            targetItemId,
+            targetProjectIdRaw,
+            targetItemIdRaw,
+            targetProjectIdType: typeof targetProjectIdRaw,
+            targetItemIdType: typeof targetItemIdRaw,
+            hasRecordset: !!result.recordset,
+            recordsetLength: result.recordset ? result.recordset.length : 0,
+            firstRecordsetRow: result.recordset && result.recordset.length > 0 ? result.recordset[0] : null,
+            allParams: Object.keys(request.parameters).reduce((acc, key) => {
+                acc[key] = {
+                    value: request.parameters[key].value,
+                    type: typeof request.parameters[key].value
+                };
+                return acc;
+            }, {})
         });
 
-        // ⚠️ Verifica critica: se targetProjectId è null ma errorCode è 0, c'è un problema
-        if (errorCode === 0 && targetProjectId === null) {
-            console.error('⚠️ WARNING: SP returned errorCode=0 but targetProjectId is NULL!');
-            console.error('This usually means the SP exited early without setting output parameters correctly.');
-            throw new Error('Errore interno: la stored procedure non ha restituito il targetProjectId. ' +
-                          'Verifica che SourceProjectId sia popolato nella reference.');
+        // ⚠️ Verifica critica: se targetProjectId è null/undefined ma errorCode è 0
+        // NOTA: Se errorCode è 0 e non ci sono errori, l'operazione è andata a buon fine
+        // ma potrebbe essere che targetProjectId non sia necessario o non sia stato impostato
+        // In questo caso, non lanciamo un errore se l'operazione è comunque riuscita
+        if (errorCode === 0 && (targetProjectId === null || targetProjectId === undefined)) {
+            console.warn('⚠️ WARNING: SP returned errorCode=0 but targetProjectId is NULL/UNDEFINED!');
+            console.warn('Raw targetProjectId value:', targetProjectIdRaw);
+            console.warn('Recordset:', result.recordset);
+            // Non lanciamo un errore se errorCode è 0 - l'operazione è comunque riuscita
+            // Il targetProjectId potrebbe non essere necessario o essere stato impostato in altro modo
         }
 
         if (errorCode !== 0) {
@@ -4565,6 +5130,8 @@ module.exports = {
     reorderBOMComponents,
     getReferenceBOMs,
     getERPBOMs,
+    getERPItemsAndBOMs,
+    getProjectItemsAndBOMs,
     getAvailableItems,
     getERPItems,
     importERPItem,

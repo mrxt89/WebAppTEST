@@ -10,6 +10,7 @@ import UsersTab from "./tabs/UsersTab";
 import GroupsTab from "./tabs/GroupsTab";
 import PagesTab from "./tabs/PagesTab";
 import NotificationsTab from "./tabs/NotificationsTab";
+import DescriptionRulesTab from "./tabs/DescriptionRulesTab";
 
 // Dialog components
 import {
@@ -160,6 +161,9 @@ const AdminDashboard = () => {
                 <TabsTrigger value="notificationsChannel">
                   Notifiche
                 </TabsTrigger>
+                <TabsTrigger value="descriptionRules">
+                  Regole Descrizioni
+                </TabsTrigger>
               </TabsList>
             </div>
             <div className="flex items-center justify-center gap-4 w-full">
@@ -241,6 +245,11 @@ const AdminDashboard = () => {
               refreshData={() => refreshData("notificationsChannel")}
               handleOpenChat={handleOpenChat}
             />
+          </TabsContent>
+
+          {/* Description Rules Tab */}
+          <TabsContent value="descriptionRules">
+            <DescriptionRulesTab />
           </TabsContent>
         </Tabs>
       </main>

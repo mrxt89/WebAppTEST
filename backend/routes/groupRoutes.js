@@ -5,15 +5,26 @@ const sql = require('mssql');
 const config = require('../config');
 const authenticateToken = require('../authenticateToken');
 
-// Get all groups for the current user's company
+// Get all groups for the current user's company or a specific company
 router.get('/groups', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.UserId;
+        // Se viene passato companyId come query parameter, usalo, altrimenti usa quello dell'utente corrente
+        const companyId = req.query.companyId ? parseInt(req.query.companyId) : null;
         
         let pool = await sql.connect(config.database);
-        const result = await pool.request()
-            .input('UserId', sql.Int, userId)
-            .query(`
+        const query = companyId 
+            ? `
+                SELECT 
+                    g.groupId,
+                    g.groupName,
+                    g.description
+                FROM AR_Groups g
+                WHERE g.disabled = 0
+                AND g.CompanyId = @CompanyId
+                ORDER BY g.groupName
+            `
+            : `
                 SELECT 
                     g.groupId,
                     g.groupName,
@@ -22,7 +33,13 @@ router.get('/groups', authenticateToken, async (req, res) => {
                 WHERE g.disabled = 0
                 AND g.CompanyId = (SELECT CompanyId FROM AR_Users WHERE userId = @UserId)
                 ORDER BY g.groupName
-            `);
+            `;
+        
+        const request = pool.request().input('UserId', sql.Int, userId);
+        if (companyId) {
+            request.input('CompanyId', sql.Int, companyId);
+        }
+        const result = await request.query(query);
 
         res.json(result.recordset);
     } catch (err) {

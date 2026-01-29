@@ -6,12 +6,15 @@ const useUsers = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (companyId = null) => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
 
-      const response = await fetch(`${config.API_BASE_URL}/users`, {
+      const url = companyId 
+        ? `${config.API_BASE_URL}/users?companyId=${companyId}`
+        : `${config.API_BASE_URL}/users`;
+      const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",

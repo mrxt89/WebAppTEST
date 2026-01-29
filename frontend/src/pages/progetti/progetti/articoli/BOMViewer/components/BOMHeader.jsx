@@ -1,4 +1,4 @@
-﻿// BOMViewer/components/BOMHeader.jsx - Versione con ricodifica diretta
+// BOMViewer/components/BOMHeader.jsx - Versione con ricodifica diretta
 import React, { useEffect, useState, useRef } from "react";
 import { useBOMViewer } from "../context/BOMViewerContext";
 import BOMHeaderEdit from "./BOMHeaderEdit";
@@ -99,7 +99,7 @@ const BOMHeader = () => {
     code: "",
     description: "",
     nature: "22413312",
-    uom: "PZ",
+    uom: "NR",
     quantity: 1,
   });
 
@@ -147,7 +147,7 @@ const BOMHeader = () => {
         Level: 0,
         IsRoot: true,
         Nature: item.Nature || 22413312,
-        BaseUoM: item.BaseUoM || "PZ",
+        BaseUoM: item.BaseUoM || "NR",
         stato_erp: item.stato_erp || 0
       }
     };
@@ -190,7 +190,7 @@ const BOMHeader = () => {
           Level: 0,
           IsRoot: true,
           Nature: item.Nature || 22413312,
-          BaseUoM: item.BaseUoM || "PZ",
+          BaseUoM: item.BaseUoM || "NR",
           stato_erp: item.stato_erp || 0
         }
       };
@@ -532,7 +532,7 @@ const toggleEditMode = () => {
          code: "",
          description: "",
          nature: "22413312",
-         UoM: "PZ",
+         UoM: "NR",
          quantity: 1,
        });
        setShowAddManualDialog(true);
@@ -592,7 +592,7 @@ const toggleEditMode = () => {
        componentDescription: `Nuovo componente temporaneo`,
        quantity: 1,
        nature: 22413312, // Semilavorato
-       UoM: "PZ",
+       UoM: "NR",
        importBOM: true,
      });
 
@@ -659,7 +659,7 @@ const toggleEditMode = () => {
          code: "",
          description: "",
          nature: "22413312",
-         UoM: "PZ",
+         UoM: "NR",
          quantity: 1,
        });
 
@@ -708,9 +708,10 @@ const toggleEditMode = () => {
      const result = await addComponent({
        ComponentId: componentId,
        ComponentCode: componentCode,
+       ComponentBOMId: item.BOMId || null,  // NUOVO: passa BOMId se disponibile per specificare versione
        ComponentType: 7798784, // Articolo
        Quantity: 1,
-      UoM: item.BaseUoM || "PZ", // Usa l'unità di misura dell'articolo
+      UoM: item.BaseUoM || "NR", // Usa l'unità di misura dell'articolo
        ImportBOM: true, // Importa anche la distinta se presente
        createTempComponent: false, // Non creiamo un codice temporaneo
      });
@@ -748,15 +749,9 @@ const toggleEditMode = () => {
 const handleCreateVersion = async () => {
   if (!item?.Id) return;
   console.log(bom);
-  // Blocca se la BOM è in ERP
-  if (bom?.stato_erp == "1" || bom?.stato_erp === 1) {
-    toast({
-      title: "Operazione non consentita",
-      description: "Non è possibile creare una nuova versione di una distinta presente in ERP (Mago). La distinta è di sola lettura.",
-      variant: "destructive",
-    });
-    return;
-  }
+  // NOTA: Permettiamo la creazione di nuove versioni anche da BOM esportate
+  // per permettere simulazioni. La versione esportata rimane bloccata, ma
+  // le nuove versioni possono essere modificate.
 
   try {
     // Swal di conferma - Uso corretto della libreria swal
@@ -790,13 +785,13 @@ const handleCreateVersion = async () => {
      const newVersion = Math.max(...versionNumbers) + 1;
 
      // Crea nuova versione usando COPY
+     // Non passiamo Description - la stored procedure la gestirà automaticamente
      const result = await addUpdateBOM("COPY", {
        ItemId: item.Id,
        SourceBOMId: selectedBomId,
        Version: newVersion,
        CopyComponents: true,
        CopyRouting: true,
-       Description: `${bom?.Description || ""} - Versione ${newVersion}`,
      });
 
      if (result.success) {
@@ -877,7 +872,7 @@ const handleCreateVersion = async () => {
        ItemId: item.Id,
        Description: `Distinta per ${item.Description || item.Item}`,
        Version: 1,
-       UoM: item.BaseUoM || "PZ",
+       UoM: item.BaseUoM || "NR",
        BOMStatus: "BOZZA",
      });
 
@@ -1234,7 +1229,7 @@ const handleCreateVersion = async () => {
                  onChange={(e) =>
                    setManualData({ ...manualData, uom: e.target.value })
                  }
-                 placeholder="PZ"
+                 placeholder="NR"
                />
              </div>
 
@@ -1324,7 +1319,7 @@ const handleCreateVersion = async () => {
                          {item.Description}
                        </div>
                        <div className="text-xs text-gray-400 mt-1">
-                         UoM: {item.BaseUoM || "PZ"} | Natura:{" "}
+                         UoM: {item.BaseUoM || "NR"} | Natura:{" "}
                          {item.Nature === 22413312
                            ? "Semilavorato"
                            : item.Nature === 22413313
@@ -1365,7 +1360,7 @@ const handleCreateVersion = async () => {
                          {item.Description}
                        </div>
                        <div className="text-xs text-gray-400 mt-1">
-                         UoM: {item.BaseUoM || "PZ"} | Natura:{" "}
+                         UoM: {item.BaseUoM || "NR"} | Natura:{" "}
                          {item.Nature === 22413312
                            ? "Semilavorato"
                            : item.Nature === 22413313

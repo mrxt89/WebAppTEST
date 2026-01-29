@@ -589,6 +589,30 @@ const useRecodingRules = () => {
     }
   }, [makeRequest]);
 
+  /**
+   * Estrae le componenti di un codice articolo (per precompilare modale ricodifica)
+   */
+  const extractCodeComponents = useCallback(async (itemCode) => {
+    try {
+      setLoading(true);
+      const url = `${config.API_BASE_URL}/codingRules/extractComponents`;
+      const response = await makeRequest(url, {
+        method: 'POST',
+        body: JSON.stringify({ itemCode })
+      });
+      if (response && response.success) {
+        return response.data;
+      }
+      throw new Error(response?.msg || 'Errore estrazione componenti');
+    } catch (err) {
+      setError(err.message);
+      console.error("Error extracting code components:", err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [makeRequest]);
+
   return {
     // Stati
     loading,
@@ -621,6 +645,9 @@ const useRecodingRules = () => {
     generateSimplifiedPreview,
     generateSimplifiedBatchPreview,
     applySimplifiedBatchRecoding,
+    
+    // Estrazione componenti
+    extractCodeComponents,
   };
 };
 

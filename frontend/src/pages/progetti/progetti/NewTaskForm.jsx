@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -37,7 +38,9 @@ import {
   Clock,
   AlertTriangle,
   Flag,
-  Search
+  Search,
+  X,
+  ChevronDown
 } from "lucide-react";
 import { config } from "../../../config";
 import useUsers from "../../../hooks/useUsersActions";
@@ -48,6 +51,8 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [openCombobox, setOpenCombobox] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const [isParticipantDropdownOpen, setIsParticipantDropdownOpen] = useState(false);
+  const [participantSearch, setParticipantSearch] = useState("");
   const [assignmentType, setAssignmentType] = useState("individual"); // 'individual' o 'group'
   const [availableGroups, setAvailableGroups] = useState([]);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
@@ -55,6 +60,9 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
   const [availableOperations, setAvailableOperations] = useState([]);
   const [isLoadingOperations, setIsLoadingOperations] = useState(false);
   const [operationSearch, setOperationSearch] = useState("");
+  const [companies, setCompanies] = useState([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(null);
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
 
   // Ottieni l'utente loggato dal localStorage
   const [currentUserId, setCurrentUserId] = useState(() => {
@@ -85,18 +93,75 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
     Operation: null, // Codice operazione
   });
 
+  // Carica la company dell'utente corrente come default
   useEffect(() => {
-    fetchUsers();
-    fetchGroups();
+    const initializeCompany = async () => {
+      try {
+        const userString = localStorage.getItem("user");
+        if (userString) {
+          const userData = JSON.parse(userString);
+          if (userData.CompanyId) {
+            setSelectedCompanyId(userData.CompanyId);
+            // Carica immediatamente utenti e gruppi per la company dell'utente
+            await fetchUsers(userData.CompanyId);
+            await fetchGroups(userData.CompanyId);
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing user data from localStorage:", error);
+      }
+      await fetchCompanies();
+    };
+    initializeCompany();
+  }, []);
+
+  // Carica utenti e gruppi quando cambia la company selezionata
+  useEffect(() => {
+    if (selectedCompanyId) {
+      fetchUsers(selectedCompanyId);
+      fetchGroups(selectedCompanyId);
+    }
+  }, [selectedCompanyId]);
+
+  useEffect(() => {
     fetchOperations();
-  }, [fetchUsers]);
+  }, []);
+
+
+  // Funzione per caricare le companies
+  const fetchCompanies = useCallback(async () => {
+    try {
+      setIsLoadingCompanies(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${config.API_BASE_URL}/companies`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Error fetching companies");
+      }
+
+      const data = await response.json();
+      setCompanies(data);
+    } catch (error) {
+      console.error("Error fetching companies:", error);
+    } finally {
+      setIsLoadingCompanies(false);
+    }
+  }, []);
 
   // Funzione per caricare i gruppi
-  const fetchGroups = useCallback(async () => {
+  const fetchGroups = useCallback(async (companyId = null) => {
     try {
       setIsLoadingGroups(true);
       const token = localStorage.getItem("token");
-      const response = await fetch(`${config.API_BASE_URL}/groups`, {
+      const url = companyId 
+        ? `${config.API_BASE_URL}/groups?companyId=${companyId}`
+        : `${config.API_BASE_URL}/groups`;
+      const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -252,15 +317,21 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
     );
   });
 
-  // Filtra i partecipanti in base a showSelectedOnly
+  // Filtra i partecipanti in base a showSelectedOnly e ricerca
   const filteredParticipants = users.filter((user) => {
     const isNotLeader = user.userId.toString() !== taskData.AssignedTo;
+    const matchesSearch = participantSearch
+      ? `${user.firstName} ${user.lastName}`.toLowerCase().includes(participantSearch.toLowerCase())
+      : true;
+    
     if (showSelectedOnly) {
       return (
-        isNotLeader && taskData.Participants.includes(user.userId.toString())
+        isNotLeader && 
+        taskData.Participants.includes(user.userId.toString()) &&
+        matchesSearch
       );
     }
-    return isNotLeader;
+    return isNotLeader && matchesSearch;
   });
 
   const getSelectedUser = (userId) => {
@@ -539,8 +610,48 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
           </div>
 
           {/* Assegnazione */}
-          <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+          <div className="bg-gray-50 p-3 rounded-lg space-y-2" style={{ position: 'relative', zIndex: 1 }}>
             <h3 className="text-xs font-medium text-gray-500">Assegnazione</h3>
+            
+            {/* Selettore Company */}
+            <div>
+              <Label htmlFor="companySelect" className="flex items-center text-sm">
+                <Users className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                Azienda
+              </Label>
+              <Select
+                value={selectedCompanyId?.toString() || ""}
+                onValueChange={(value) => {
+                  const companyId = value ? parseInt(value) : null;
+                  setSelectedCompanyId(companyId);
+                  // Reset assegnazioni quando cambia company
+                  setTaskData((prev) => ({
+                    ...prev,
+                    AssignedTo: currentUserId,
+                    Participants: [],
+                    DefaultGroupId: null,
+                  }));
+                  setSelectedGroupId(null);
+                }}
+                disabled={isLoadingCompanies}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder={isLoadingCompanies ? "Caricamento..." : "Seleziona azienda"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.CompanyId} value={company.CompanyId.toString()}>
+                      {company.Description || company.CompanyCode}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!selectedCompanyId && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Seleziona un'azienda per vedere i suoi utenti e gruppi
+                </p>
+              )}
+            </div>
             
             {/* Tabs per la selezione dell'assegnazione */}
             <div>
@@ -561,6 +672,12 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
                 </TabsList>
 
                 <TabsContent value="individual" className="pt-3 space-y-2">
+                  {!selectedCompanyId ? (
+                    <div className="p-4 text-center text-sm text-gray-500 bg-yellow-50 border border-yellow-200 rounded-md">
+                      Seleziona un'azienda per assegnare un utente
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
                   <div>
                     <Label htmlFor="taskAssignedTo" className="flex items-center text-sm">
                       <User className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
@@ -584,106 +701,290 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
                       </PopoverTrigger>
                       <PopoverContent
                         className="w-full p-0"
-                        style={{ maxHeight: "250px" }}
+                        style={{ maxHeight: "400px" }}
                       >
-                        <Command>
-                          <CommandInput
-                            placeholder="Cerca per nome, cognome o ruolo..."
-                            value={searchValue}
-                            onValueChange={setSearchValue}
-                          />
-                          <CommandEmpty>Nessun utente trovato.</CommandEmpty>
-                          <CommandGroup className="max-h-[200px] overflow-auto">
-                            {filterUsers.map((user) => (
-                              <CommandItem
-                                key={user.userId}
-                                value={user.userId.toString()}
-                                onSelect={(value) => {
-                                  setTaskData((prev) => ({
-                                    ...prev,
-                                    AssignedTo: value,
-                                    DefaultGroupId: null,
-                                  }));
-                                  setOpenCombobox(false);
-                                  setSearchValue("");
-                                }}
-                              >
-                                <CheckIcon
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    taskData.AssignedTo === user.userId.toString()
-                                      ? "opacity-100"
-                                      : "opacity-0",
-                                  )}
-                                />
-                                {user.firstName} {user.lastName} - {user.role}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </Command>
+                        <div className="bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden">
+                          {/* Header con ricerca */}
+                          <div className="p-3 border-b border-gray-200 bg-gray-50">
+                            <div className="flex items-center gap-2">
+                              <Search className="h-4 w-4 text-gray-400" />
+                              <Input
+                                placeholder="Cerca responsabile..."
+                                value={searchValue}
+                                onChange={(e) => setSearchValue(e.target.value)}
+                                className="flex-1"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Lista utenti */}
+                          <div className="max-h-[240px] overflow-y-auto">
+                            <div className="p-2 space-y-1">
+                              {filterUsers.length > 0 ? (
+                                filterUsers.map((user) => {
+                                  const isSelected = taskData.AssignedTo === user.userId.toString();
+                                  return (
+                                    <div
+                                      key={user.userId}
+                                      className={`flex items-center space-x-3 hover:bg-gray-50 p-2 rounded-md transition-colors cursor-pointer ${
+                                        isSelected ? "bg-blue-50 border border-blue-200" : ""
+                                      }`}
+                                      onClick={() => {
+                                        setTaskData((prev) => ({
+                                          ...prev,
+                                          AssignedTo: user.userId.toString(),
+                                          DefaultGroupId: null,
+                                        }));
+                                        setOpenCombobox(false);
+                                        setSearchValue("");
+                                      }}
+                                    >
+                                      <Avatar className="h-6 w-6">
+                                        <AvatarFallback className="text-xs">
+                                          {user.firstName?.charAt(0) || ""}{user.lastName?.charAt(0) || ""}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1">
+                                        <span className="text-sm font-normal">
+                                          {user.firstName} {user.lastName}
+                                        </span>
+                                        {user.role && (
+                                          <span className="text-xs text-gray-500 ml-2">
+                                            - {user.role}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {isSelected && (
+                                        <CheckIcon className="h-4 w-4 text-blue-600" />
+                                      )}
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <div className="text-center py-8 text-sm text-gray-500">
+                                  {searchValue
+                                    ? "Nessun utente trovato"
+                                    : "Nessun utente disponibile"}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </PopoverContent>
                     </Popover>
                   </div>
 
                   <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <Label className="flex items-center text-sm">
-                        <Users className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
-                        Partecipanti
-                      </Label>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="showSelected"
-                          className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
-                          checked={showSelectedOnly}
-                          onCheckedChange={(checked) => setShowSelectedOnly(checked)}
-                        />
-                        <Label
-                          htmlFor="showSelected"
-                          className="text-xs text-gray-500 cursor-pointer"
+                    <Label className="flex items-center text-sm mb-2">
+                      <Users className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                      Partecipanti ({taskData.Participants.length})
+                    </Label>
+                    <Popover open={isParticipantDropdownOpen} onOpenChange={setIsParticipantDropdownOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={isParticipantDropdownOpen}
+                          className="w-full justify-between mt-1"
+                          onClick={async () => {
+                            // Se si apre il dropdown e non ci sono utenti caricati, caricali
+                            if (!isParticipantDropdownOpen && selectedCompanyId && users.length === 0 && !loadingUsers) {
+                              await fetchUsers(selectedCompanyId);
+                            }
+                          }}
+                          disabled={!selectedCompanyId || isLoadingCompanies}
                         >
-                          Mostra solo selezionati
-                        </Label>
-                      </div>
-                    </div>
-                    <ScrollArea className="h-[80px] border rounded-md bg-white">
-                      <div className="p-2">
-                        {filteredParticipants.map((user) => (
-                          <div
-                            key={user.userId}
-                            className="flex items-center space-x-2 hover:bg-gray-100 p-1 rounded"
-                          >
-                            <Checkbox
-                              className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
-                              checked={taskData.Participants.includes(
-                                user.userId.toString(),
-                              )}
-                              onCheckedChange={(checked) => {
-                                setTaskData((prev) => ({
-                                  ...prev,
-                                  Participants: checked
-                                    ? [...prev.Participants, user.userId.toString()]
-                                    : prev.Participants.filter(
-                                        (id) => id !== user.userId.toString(),
-                                      ),
-                                }));
-                              }}
-                              id={`user-${user.userId}`}
-                            />
-                            <Label
-                              htmlFor={`user-${user.userId}`}
-                              className="flex-grow cursor-pointer text-xs"
-                            >
-                              {user.firstName} {user.lastName} - {user.role}
-                            </Label>
+                          {taskData.Participants.length > 0
+                            ? `${taskData.Participants.length} partecipante${taskData.Participants.length > 1 ? 'i' : ''} selezionato${taskData.Participants.length > 1 ? 'i' : ''}`
+                            : "Seleziona partecipanti..."}
+                          <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-full p-0"
+                        style={{ maxHeight: "400px" }}
+                      >
+                        <div className="bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden">
+                          {/* Header con ricerca e filtri */}
+                          <div className="p-3 border-b border-gray-200 bg-gray-50">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Search className="h-4 w-4 text-gray-400" />
+                              <Input
+                                placeholder="Cerca partecipante..."
+                                value={participantSearch}
+                                onChange={(e) => setParticipantSearch(e.target.value)}
+                                className="flex-1"
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id="showSelected"
+                                checked={showSelectedOnly}
+                                onCheckedChange={setShowSelectedOnly}
+                                className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500 border-primary"
+                              />
+                              <Label htmlFor="showSelected" className="text-sm text-gray-600 cursor-pointer">
+                                Solo selezionati
+                              </Label>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
+
+                          {/* Lista partecipanti */}
+                          <div className="max-h-[240px] overflow-y-auto">
+                            <div className="p-2 space-y-1">
+                              {loadingUsers ? (
+                                <div className="text-center py-8 text-sm text-gray-500">
+                                  Caricamento utenti...
+                                </div>
+                              ) : !selectedCompanyId ? (
+                                <div className="text-center py-8 text-sm text-gray-500">
+                                  Seleziona un'azienda per vedere i partecipanti
+                                </div>
+                              ) : filteredParticipants.length > 0 ? (
+                                filteredParticipants.map((user) => {
+                                  const isChecked = taskData.Participants.includes(user.userId.toString());
+                                  return (
+                                    <div
+                                      key={user.userId}
+                                      className={`flex items-center space-x-3 hover:bg-gray-50 p-2 rounded-md transition-colors cursor-pointer ${
+                                        isChecked ? "bg-blue-50 border border-blue-200" : ""
+                                      }`}
+                                      onClick={() => {
+                                        setTaskData((prev) => ({
+                                          ...prev,
+                                          Participants: prev.Participants.includes(user.userId.toString())
+                                            ? prev.Participants.filter((id) => id !== user.userId.toString())
+                                            : [...prev.Participants, user.userId.toString()],
+                                        }));
+                                      }}
+                                    >
+                                      <Checkbox
+                                        checked={isChecked}
+                                        onCheckedChange={(checked) => {
+                                          setTaskData((prev) => ({
+                                            ...prev,
+                                            Participants: checked
+                                              ? [...prev.Participants, user.userId.toString()]
+                                              : prev.Participants.filter(
+                                                  (id) => id !== user.userId.toString(),
+                                                ),
+                                          }));
+                                        }}
+                                        className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                      <Avatar className="h-6 w-6">
+                                        <AvatarFallback className="text-xs">
+                                          {user.firstName?.charAt(0) || ""}{user.lastName?.charAt(0) || ""}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1">
+                                        <span className="text-sm font-normal">
+                                          {user.firstName} {user.lastName}
+                                        </span>
+                                        {user.role && (
+                                          <span className="text-xs text-gray-500 ml-2">
+                                            - {user.role}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {isChecked && (
+                                        <CheckIcon className="h-4 w-4 text-blue-600" />
+                                      )}
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <div className="text-center py-8 text-sm text-gray-500">
+                                  {participantSearch
+                                    ? "Nessun partecipante trovato"
+                                    : "Nessun partecipante disponibile"}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Footer con azioni rapide */}
+                          {taskData.Participants.length > 0 && (
+                            <div className="p-2 border-t border-gray-200 bg-gray-50">
+                              <div className="flex justify-between items-center text-xs text-gray-600">
+                                <span>{taskData.Participants.length} selezionati</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setTaskData((prev) => ({ ...prev, Participants: [] }));
+                                  }}
+                                  className="h-6 px-2 text-red-600 hover:text-red-700"
+                                >
+                                  Deseleziona tutti
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
+
+                  {/* Visualizzazione partecipanti selezionati */}
+                  <div className="min-h-[80px] bg-gray-50 rounded-lg p-3 border border-gray-200 mt-2">
+                    {taskData.Participants.length > 0 ? (
+                      <div className="space-y-2">
+                        {taskData.Participants.map((participantId) => {
+                          const user = users.find((u) => u.userId.toString() === participantId);
+                          if (!user) return null;
+                          return (
+                            <div
+                              key={participantId}
+                              className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-md border border-gray-200 shadow-sm w-full"
+                            >
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {user.firstName?.charAt(0) || ""}{user.lastName?.charAt(0) || ""}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm font-medium flex-1">
+                                {user.firstName} {user.lastName}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setTaskData((prev) => ({
+                                    ...prev,
+                                    Participants: prev.Participants.filter((id) => id !== participantId),
+                                  }));
+                                }}
+                                className="h-4 w-4 p-0 text-gray-400 hover:text-red-500"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <span className="text-sm text-gray-500 italic">
+                          Nessun partecipante selezionato
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                    </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="group" className="pt-3 space-y-2">
+                  {!selectedCompanyId ? (
+                    <div className="p-4 text-center text-sm text-gray-500 bg-yellow-50 border border-yellow-200 rounded-md">
+                      Seleziona un'azienda per assegnare un gruppo
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
                   <div>
                     <Label htmlFor="taskGroupId" className="flex items-center text-sm">
                       <Users className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
@@ -793,6 +1094,8 @@ const NewTaskForm = ({ onSubmit, onCancel, projectTasks = [] }) => {
                       </PopoverContent>
                     </Popover>
                   </div>
+                    </div>
+                  )}
                 </TabsContent>
               </Tabs>
             </div>

@@ -757,18 +757,38 @@ const getBOMCostingDetails = async (companyId, bomId, options = {}) => {
         
         const result = await request.execute('SP_GetBOMCostingDetails');
         
-        // La stored procedure restituisce multiple recordset
-        const [bomInfo, components, routing, parameters, logs] = result.recordsets;
+        // La stored procedure restituisce multiple recordset.
+        // Compatibilità:
+        // - vecchio formato: [bomInfo, components, routing, parameters, logs]
+        // - nuovo formato (post-fix trasparenza): [bomInfo, components, routing, effectiveMarkups, parameters, logs]
+        const rs = result.recordsets || [];
+        const bomInfoRs = rs[0] || [];
+        const componentsRs = rs[1] || [];
+        const routingRs = rs[2] || [];
+        
+        let effectiveMarkupsRs = [];
+        let parametersRs = [];
+        let logsRs = [];
+        
+        if (rs.length >= 6) {
+            effectiveMarkupsRs = rs[3] || [];
+            parametersRs = rs[4] || [];
+            logsRs = rs[5] || [];
+        } else {
+            parametersRs = rs[3] || [];
+            logsRs = rs[4] || [];
+        }
         
         return {
             success: true,
             message: 'Dettaglio costi recuperato con successo',
             data: {
-                bomInfo: bomInfo[0] || null,
-                components: components || [],
-                routing: routing || [],
-                parameters: parameters || [],
-                logs: logs || []
+                bomInfo: bomInfoRs[0] || null,
+                components: componentsRs || [],
+                routing: routingRs || [],
+                effectiveMarkups: effectiveMarkupsRs || [],
+                parameters: parametersRs || [],
+                logs: logsRs || []
             }
         };
     } catch (err) {

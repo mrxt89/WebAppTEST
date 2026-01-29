@@ -17,7 +17,7 @@ const ProjectBOMs = ({ importOptions }) => {
   const {
     projectBOMs,
     setProjectBOMs,
-    getBOMByItemId,
+    getProjectItemsAndBOMs,
     loading,
     setLoading,
     project,
@@ -27,78 +27,89 @@ const ProjectBOMs = ({ importOptions }) => {
 
   const [searchText, setSearchText] = useState("");
   const [natureFilter, setNatureFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all"); // all, bom, item
   const [expandedItems, setExpandedItems] = useState({});
+  const [pageSize, setPageSize] = useState(50);
+  const [allItems, setAllItems] = useState([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    pageSize: 50,
+    totalItems: 0,
+    totalPages: 1,
+  });
 
-  // Load project BOMs
+  // Converti il filtro natura in valore numerico
+  const getNatureValue = () => {
+    switch (natureFilter) {
+      case "semifinished":
+        return 22413312;
+      case "finished":
+        return 22413313;
+      case "purchased":
+        return 22413314;
+      default:
+        return null;
+    }
+  };
+
+  // Load project BOMs and Items
   useEffect(() => {
-    const loadProjectBOMs = async () => {
+    const loadProjectBOMs = async (reset = true) => {
       if (!project?.ProjectID) return;
 
       try {
-        setLoading(true);
+        if (reset) {
+          setLoading(true);
+          setAllItems([]);
+        } else {
+          setLoadingMore(true);
+        }
 
-        // In una implementazione reale, chiameresti un'API per ottenere le distinte dal progetto
-        // Qui stiamo simulando con dati di esempio
-        const dummyBOMs = [
-          {
-            id: "project-bom-1",
-            BOM: "TBOM_001",
-            Description: "Distinta Progetto 1",
-            ItemCode: "ITEM001",
-            Nature: 22413312, // Semilavorato
-            Components: [],
-          },
-          {
-            id: "project-bom-2",
-            BOM: "TBOM_002",
-            Description: "Distinta Progetto 2",
-            ItemCode: "ITEM002",
-            Nature: 22413313, // Prodotto finito
-            Components: [],
-          },
-          {
-            id: "project-bom-3",
-            BOM: "TBOM_003",
-            Description: "Distinta Progetto 3",
-            ItemCode: "ITEM003",
-            Nature: 22413314, // Acquisto
-            Components: [],
-          },
-        ];
+        const currentPage = reset ? 1 : Math.floor(allItems.length / pageSize) + 1;
+        const natureValue = getNatureValue();
+        const data = await getProjectItemsAndBOMs(
+          project.ProjectID,
+          searchText,
+          currentPage,
+          pageSize,
+          natureValue,
+          typeFilter
+        );
 
-        setProjectBOMs(dummyBOMs);
+        if (data && data.items) {
+          if (reset) {
+            setAllItems(data.items);
+            setProjectBOMs(data.items);
+          } else {
+            const newItems = [...allItems, ...data.items];
+            setAllItems(newItems);
+            setProjectBOMs(newItems);
+          }
+          
+          setHasMore(data.items.length === pageSize);
+          setPagination({
+            currentPage: data.pagination?.currentPage || 1,
+            pageSize: data.pagination?.pageSize || pageSize,
+            totalItems: data.pagination?.totalItems || 0,
+            totalPages: data.pagination?.totalPages || 1,
+          });
+        }
       } catch (error) {
-        console.error("Error loading project BOMs:", error);
+        console.error("Error loading project BOMs and items:", error);
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 
-    loadProjectBOMs();
-  }, [project, setProjectBOMs, setLoading]);
+    loadProjectBOMs(true);
+  }, [project, getProjectItemsAndBOMs, setProjectBOMs, setLoading, searchText, pageSize, natureFilter, typeFilter]);
 
   // Handle search
   const handleSearch = () => {
-    // Filtra le distinte per testo di ricerca
-    // In un'implementazione reale, chiameresti un'API con il parametro di ricerca
-    if (!searchText.trim()) {
-      // Se non c'è testo di ricerca, resetta il filtro
-      loadProjectBOMs();
-      return;
-    }
-
-    // Filtra localmente (simulazione)
-    const filteredBOMs = projectBOMs.filter((bom) => {
-      const searchLower = searchText.toLowerCase();
-      return (
-        (bom.BOM && bom.BOM.toLowerCase().includes(searchLower)) ||
-        (bom.Description &&
-          bom.Description.toLowerCase().includes(searchLower)) ||
-        (bom.ItemCode && bom.ItemCode.toLowerCase().includes(searchLower))
-      );
-    });
-
-    setProjectBOMs(filteredBOMs);
+    // La ricerca viene gestita automaticamente dal useEffect
   };
 
   // Toggle item expansion
@@ -109,24 +120,8 @@ const ProjectBOMs = ({ importOptions }) => {
     }));
   };
 
-  // Filter BOMs by nature
-  const filteredBOMs =
-    natureFilter === "all"
-      ? projectBOMs
-      : projectBOMs.filter((bom) => {
-          const bomNature = bom.Nature || bom.ComponentNature || 0;
-
-          switch (natureFilter) {
-            case "semifinished":
-              return bomNature === 22413312;
-            case "finished":
-              return bomNature === 22413313;
-            case "purchased":
-              return bomNature === 22413314;
-            default:
-              return true;
-          }
-        });
+  // Non serve più filtrare lato client, il filtro è applicato lato server
+  const filteredBOMs = allItems;
 
   // Handle double-click or add button
   const handleAddItem = async (item) => {
@@ -139,6 +134,8 @@ const ProjectBOMs = ({ importOptions }) => {
       const componentData = {
         ComponentId: item.id || 0,
         ComponentCode: item.BOM || item.ItemCode || "",
+
+        ComponentBOMId: item.BOMId || null,  // NUOVO: passa BOMId se disponibile per specificare versione
         Quantity: 1,
         ImportBOM: importOptions.copyBOM,
         createTempComponent: importOptions.createTempComponent,
@@ -175,7 +172,7 @@ const ProjectBOMs = ({ importOptions }) => {
           </Button>
         </div>
 
-        {/* Nature filter */}
+        {/* Nature and Type filters */}
         <div className="flex gap-2">
           <Select value={natureFilter} onValueChange={setNatureFilter}>
             <SelectTrigger className="flex-1">
@@ -189,14 +186,26 @@ const ProjectBOMs = ({ importOptions }) => {
             </SelectContent>
           </Select>
 
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutti</SelectItem>
+              <SelectItem value="bom">BOM</SelectItem>
+              <SelectItem value="item">Item</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Button
             variant="outline"
             size="icon"
             title="Reimposta filtri"
             onClick={() => {
               setNatureFilter("all");
+              setTypeFilter("all");
               setSearchText("");
-              loadProjectBOMs();
+              setAllItems([]);
             }}
           >
             <Filter className="h-4 w-4" />
@@ -212,21 +221,23 @@ const ProjectBOMs = ({ importOptions }) => {
           </div>
         ) : filteredBOMs.length > 0 ? (
           <div className="space-y-1 p-3 h-10">
-            {filteredBOMs.map((bom) => (
-              <div
-                key={bom.id}
-                className="relative group"
-                onDoubleClick={() => handleAddItem(bom)}
-              >
-                <DraggableItem
-                  item={{
-                    id: `project-${bom.id}`,
-                    type: "bom",
-                    data: bom,
-                  }}
-                  expanded={!!expandedItems[`project-${bom.id}`]}
-                  onToggle={() => handleToggleItem(`project-${bom.id}`)}
-                />
+            {filteredBOMs.map((bom) => {
+              const itemId = bom.BOMId || bom.ItemId || bom.Code || `project-${bom.id || Math.random()}`;
+              return (
+                <div
+                  key={itemId}
+                  className="relative group"
+                  onDoubleClick={() => handleAddItem(bom)}
+                >
+                  <DraggableItem
+                    item={{
+                      id: `project-${itemId}`,
+                      type: bom.ItemType === 'BOM' ? "bom" : "item",
+                      data: bom,
+                    }}
+                    expanded={!!expandedItems[`project-${itemId}`]}
+                    onToggle={() => handleToggleItem(`project-${itemId}`)}
+                  />
 
                 {/* Quick add button */}
                 <Button
@@ -238,7 +249,8 @@ const ProjectBOMs = ({ importOptions }) => {
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
-            ))}
+            );
+            })}
           </div>
         ) : (
           <div className="text-center py-8 text-gray-500">

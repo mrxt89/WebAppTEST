@@ -55,7 +55,7 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
     StatusId: 1, // Default: BOZZA
     fscodice: "",
     DescriptionExtension: "",
-    BaseUoM: "PZ",
+    BaseUoM: "NR",
     offset_acquisto: "",
     offset_autoconsumo: "",
     offset_vendita: "",
@@ -119,7 +119,7 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
               StatusId: itemData.StatusId || 1,
               fscodice: itemData.fscodice || "",
               DescriptionExtension: itemData.DescriptionExtension || "",
-              BaseUoM: itemData.BaseUoM || "PZ",
+              BaseUoM: itemData.BaseUoM || "NR",
               offset_acquisto: itemData.offset_acquisto || "",
               offset_autoconsumo: itemData.offset_autoconsumo || "",
               offset_vendita: itemData.offset_vendita || "",
@@ -399,7 +399,7 @@ const ArticleForm = ({ mode, projectId, itemId, onCancel, onSave }) => {
                     id="uom"
                     value={formData.BaseUoM}
                     onChange={(e) => handleChange("BaseUoM", e.target.value)}
-                    placeholder="PZ"
+                    placeholder="NR"
                     maxLength={3}
                     disabled={isLoading}
                   />

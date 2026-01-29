@@ -281,21 +281,22 @@ const CreateElementDialog = ({
             />
           </div>
 
-          {/* Switch universale - nascosto per ora */}
-          <div className="flex items-center justify-between py-2 hidden">
+          {/* Switch universale */}
+          <div className="flex items-center justify-between py-2">
             <div className="space-y-0.5">
               <Label htmlFor="universal">Elemento universale</Label>
               <p className="text-sm text-gray-500">
-                Disponibile per tutte le aziende del gruppo
+                {elementType === "alias" && "Disponibile per tutti i tipi"}
+                {elementType === "type" && "Disponibile per tutte le famiglie"}
+                {elementType === "family" && "Disponibile per tutte le macrofamiglie"}
+                {elementType === "macroFamily" && "Disponibile per tutte le categorie"}
               </p>
             </div>
-            <input
-              type="checkbox"
+            <Switch
               id="universal"
               checked={formData.isUniversal}
-              onChange={e => setFormData({ ...formData, isUniversal: e.target.checked })}
+              onCheckedChange={(checked) => setFormData({ ...formData, isUniversal: checked })}
               disabled={loading}
-              className="w-5 h-5 accent-primary rounded border-gray-300 focus:ring-2 focus:ring-primary"
             />
           </div>
 

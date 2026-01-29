@@ -888,12 +888,40 @@ export const BOMViewerProvider = ({
 
   // Get ERP BOMs function
   const getERPBOMs = useCallback(
-    async (search = "", page = 1, pageSize = 50) => {
+    async (search = "", page = 1, pageSize = 50, nature = null) => {
       try {
-        const data = await projectArticlesActions.getERPBOMs(search, page, pageSize);
+        const data = await projectArticlesActions.getERPBOMs(search, page, pageSize, nature);
         return data;
       } catch (error) {
         console.error("Error getting ERP BOMs:", error);
+        return { items: [], pagination: { currentPage: 1, totalPages: 1, totalItems: 0 } };
+      }
+    },
+    [projectArticlesActions],
+  );
+
+  // Get ERP Items and BOMs unified function
+  const getERPItemsAndBOMs = useCallback(
+    async (search = "", page = 1, pageSize = 50, nature = null, type = "all") => {
+      try {
+        const data = await projectArticlesActions.getERPItemsAndBOMs(search, page, pageSize, nature, type);
+        return data;
+      } catch (error) {
+        console.error("Error getting ERP items and BOMs:", error);
+        return { items: [], pagination: { currentPage: 1, totalPages: 1, totalItems: 0 } };
+      }
+    },
+    [projectArticlesActions],
+  );
+
+  // Get Project Items and BOMs unified function
+  const getProjectItemsAndBOMs = useCallback(
+    async (projectId, search = "", page = 1, pageSize = 50, nature = null, type = "all") => {
+      try {
+        const data = await projectArticlesActions.getProjectItemsAndBOMs(projectId, search, page, pageSize, nature, type);
+        return data;
+      } catch (error) {
+        console.error("Error getting project items and BOMs:", error);
         return { items: [], pagination: { currentPage: 1, totalPages: 1, totalItems: 0 } };
       }
     },
@@ -1074,7 +1102,7 @@ export const BOMViewerProvider = ({
           ComponentCode: newComponentCode,
           ComponentType: 7798784, // Articolo
           Quantity: 1,
-          UoM: "PZ",
+          UoM: "NR",
           ParentComponentId: component.data.ComponentId, // Indica che questo è un figlio del componente selezionato
         });
 
@@ -1251,6 +1279,8 @@ export const BOMViewerProvider = ({
     loadBOMData,
     getBOMByItemId,
     getERPBOMs,
+    getERPItemsAndBOMs,
+    getProjectItemsAndBOMs,
     getReferenceBOMs,
     refreshReferenceLists,
     smartRefresh,

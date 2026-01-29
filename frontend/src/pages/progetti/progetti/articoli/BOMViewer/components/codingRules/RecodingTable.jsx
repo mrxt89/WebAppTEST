@@ -33,6 +33,7 @@ import {
 import CodingHierarchySelector from "./CodingHierarchySelector";
 import SimplifiedRecodingSelector from "./SimplifiedRecodingSelector";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import useRecodingRules from "@/hooks/useRecodingRules";
 
 const RecodingTable = ({
   items = [],
@@ -49,14 +50,21 @@ const RecodingTable = ({
   const [selectedRows, setSelectedRows] = useState({});
   const [editingMode, setEditingMode] = useState({}); // 'hierarchy' o 'manual' per ogni riga
 
+  // Hook per estrarre componenti codice
+  const { extractCodeComponents } = useRecodingRules();
+
   // Inizializza i dati della tabella quando cambiano gli items
   useEffect(() => {
-    const initialData = {};
-    items.forEach(item => {
-      const itemId = item.data?.ComponentId || item.data?.Id || item.id;
-      initialData[itemId] = {
-        ...item.data,
-        recodingData: {
+    const initializeData = async () => {
+      const initialData = {};
+      
+      // Estrai componenti per ogni item con codice esistente
+      for (const item of items) {
+        const itemId = item.data?.ComponentId || item.data?.Id || item.id;
+        const itemCode = item.data?.ComponentItemCode || item.data?.Item || item.data?.ItemCode || "";
+        
+        // Inizializza con valori vuoti
+        let recodingData = {
           categoryId: "",
           categoryCode: "",
           macroFamilyId: "",
@@ -73,13 +81,51 @@ const RecodingTable = ({
           newDescription: item.data?.Description || "",
           isValid: false,
           validationMessage: ""
-        },
-        isModified: false,
-        isManualEdit: false
-      };
-    });
-    setTableData(initialData);
-  }, [items]);
+        };
+        
+        // Se c'è un codice esistente, estrai le componenti
+        if (itemCode && itemCode.length > 0) {
+          try {
+            const components = await extractCodeComponents(itemCode);
+            
+            if (components) {
+              // Precompila i campi con i valori estratti
+              recodingData = {
+                ...recodingData,
+                categoryId: components.CategoryId ? String(components.CategoryId) : "",
+                categoryCode: components.CategoryCode || "",
+                macroFamilyId: components.MacroFamilyId ? String(components.MacroFamilyId) : "",
+                macroFamilyCode: components.MacroFamilyCode || "",
+                familyId: components.FamilyId ? String(components.FamilyId) : "",
+                familyCode: components.FamilyCode || "",
+                typeId: components.TypeId ? String(components.TypeId) : "",
+                typeCode: components.TypeCode || "",
+                aliasId: components.AliasId ? String(components.AliasId) : "",
+                aliasCode: components.AliasCode || "",
+                measures: components.Measures || "",
+                sequential: components.Sequential || "",
+                newCode: itemCode, // Mantieni il codice originale come punto di partenza
+              };
+            }
+          } catch (error) {
+            console.error(`Errore estrazione componenti per codice ${itemCode}:`, error);
+            // Continua con valori vuoti se l'estrazione fallisce
+          }
+        }
+        
+        initialData[itemId] = {
+          ...item.data,
+          recodingData,
+          isModified: false,
+          isManualEdit: false
+        };
+      }
+      
+      setTableData(initialData);
+    };
+    
+    initializeData();
+  }, [items, extractCodeComponents]);
 
   // Callback per aggiornamenti dai selettori
   const handleSelectorChange = (itemId, newData) => {

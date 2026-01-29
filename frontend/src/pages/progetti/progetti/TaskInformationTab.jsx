@@ -30,7 +30,8 @@ import {
   X,
   ChevronDown,
   Search,
-  ListTodo
+  ListTodo,
+  Check
 } from "lucide-react";
 import { config } from "../../../config";
 
@@ -59,6 +60,13 @@ const TaskInformationTab = ({
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [participantSearch, setParticipantSearch] = useState("");
   const [isParticipantDropdownOpen, setIsParticipantDropdownOpen] = useState(false);
+  const [assignedToSearch, setAssignedToSearch] = useState("");
+  const [isAssignedToDropdownOpen, setIsAssignedToDropdownOpen] = useState(false);
+  const [companies, setCompanies] = useState([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(null);
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
+  const [usersFromCompany, setUsersFromCompany] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
   // Stati per operations
   const [availableOperations, setAvailableOperations] = useState([]);
@@ -96,12 +104,70 @@ const TaskInformationTab = ({
     }
   };
 
+  // Funzione per caricare le companies
+  const fetchCompanies = useCallback(async () => {
+    try {
+      setIsLoadingCompanies(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${config.API_BASE_URL}/companies`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Error fetching companies");
+      }
+
+      const data = await response.json();
+      setCompanies(data);
+    } catch (error) {
+      console.error("Error fetching companies:", error);
+    } finally {
+      setIsLoadingCompanies(false);
+    }
+  }, []);
+
+  // Funzione per caricare gli utenti di una company
+  const fetchUsersByCompany = useCallback(async (companyId) => {
+    if (!companyId) {
+      setUsersFromCompany([]);
+      return;
+    }
+    try {
+      setIsLoadingUsers(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${config.API_BASE_URL}/users?companyId=${companyId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Error fetching users");
+      }
+
+      const data = await response.json();
+      const activeUsers = data.filter((user) => !user.userDisabled);
+      setUsersFromCompany(activeUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  }, []);
+
   // Funzione per caricare i gruppi
-  const fetchGroups = useCallback(async () => {
+  const fetchGroups = useCallback(async (companyId = null) => {
     try {
       setIsLoadingGroups(true);
       const token = localStorage.getItem("token");
-      const response = await fetch(`${config.API_BASE_URL}/groups`, {
+      const url = companyId 
+        ? `${config.API_BASE_URL}/groups?companyId=${companyId}`
+        : `${config.API_BASE_URL}/groups`;
+      const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -125,6 +191,30 @@ const TaskInformationTab = ({
       setIsLoadingGroups(false);
     }
   }, [task]);
+
+  // Carica la company dell'utente corrente come default
+  useEffect(() => {
+    try {
+      const userString = localStorage.getItem("user");
+      if (userString) {
+        const userData = JSON.parse(userString);
+        if (userData.CompanyId) {
+          setSelectedCompanyId(userData.CompanyId);
+        }
+      }
+    } catch (error) {
+      console.error("Error parsing user data from localStorage:", error);
+    }
+    fetchCompanies();
+  }, [fetchCompanies]);
+
+  // Carica utenti e gruppi quando cambia la company selezionata
+  useEffect(() => {
+    if (selectedCompanyId) {
+      fetchUsersByCompany(selectedCompanyId);
+      fetchGroups(selectedCompanyId);
+    }
+  }, [selectedCompanyId, fetchUsersByCompany, fetchGroups]);
 
   // Effetto per inizializzare i dati del task
   useEffect(() => {
@@ -263,8 +353,13 @@ const TaskInformationTab = ({
     onSave(saveData);
   };
 
+  // Usa gli utenti della company selezionata se disponibili, altrimenti usa assignableUsers
+  const availableUsers = selectedCompanyId && usersFromCompany.length > 0 
+    ? usersFromCompany 
+    : assignableUsers;
+
   // Filtra gli utenti disponibili per i partecipanti
-  const filteredAssignableUsers = assignableUsers.filter((user) => {
+  const filteredAssignableUsers = availableUsers.filter((user) => {
     const isNotLeader = user.userId.toString() !== editedData.AssignedTo;
     const matchesSearch = participantSearch
       ? `${user.firstName} ${user.lastName}`
@@ -290,7 +385,7 @@ const TaskInformationTab = ({
 
     return selectedParticipants
       .map((participantId) => {
-        const user = assignableUsers.find(
+        const user = availableUsers.find(
           (u) => u.userId.toString() === participantId,
         );
         return user
@@ -444,6 +539,43 @@ const TaskInformationTab = ({
             <h3 className="text-lg font-semibold">Assegnazioni</h3>
           </div>
 
+          {/* Selettore Company */}
+          {isEditing && (
+            <div className="mb-4">
+              <Label htmlFor="companySelect" className="flex items-center text-sm mb-2">
+                <Users className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                Azienda
+              </Label>
+              <Select
+                value={selectedCompanyId?.toString() || ""}
+                onValueChange={(value) => {
+                  const companyId = value ? parseInt(value) : null;
+                  setSelectedCompanyId(companyId);
+                  // Reset assegnazioni quando cambia company
+                  setSelectedParticipants([]);
+                  setSelectedGroupId(null);
+                }}
+                disabled={isLoadingCompanies}
+              >
+                <SelectTrigger className="w-full" id="companySelect">
+                  <SelectValue placeholder={isLoadingCompanies ? "Caricamento..." : "Seleziona azienda"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.CompanyId} value={company.CompanyId.toString()}>
+                      {company.Description || company.CompanyCode}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!selectedCompanyId && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Seleziona un'azienda per vedere i suoi utenti e gruppi
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Colonna sinistra - Partecipanti */}
             <div className="space-y-2">
@@ -453,6 +585,11 @@ const TaskInformationTab = ({
               </Label>
 
               {isEditing ? (
+                !selectedCompanyId ? (
+                  <div className="p-4 text-center text-sm text-gray-500 bg-yellow-50 border border-yellow-200 rounded-md">
+                    Seleziona un'azienda per aggiungere partecipanti
+                  </div>
+                ) : (
                 <div className="relative">
                   {/* Trigger del dropdown */}
                   <Button
@@ -460,10 +597,15 @@ const TaskInformationTab = ({
                     variant="outline"
                     className="w-full justify-between"
                     onClick={() => setIsParticipantDropdownOpen(!isParticipantDropdownOpen)}
+                    disabled={isLoadingUsers}
                   >
                     <span className="flex items-center gap-2">
                       <Search className="h-4 w-4" />
-                      {participantSearch ? `Cerca: ${participantSearch}` : "Seleziona partecipanti..."}
+                      {isLoadingUsers 
+                        ? "Caricamento utenti..." 
+                        : participantSearch 
+                          ? `Cerca: ${participantSearch}` 
+                          : "Seleziona partecipanti..."}
                     </span>
                     <ChevronDown className={`h-4 w-4 transition-transform ${isParticipantDropdownOpen ? 'rotate-180' : ''}`} />
                   </Button>
@@ -496,7 +638,7 @@ const TaskInformationTab = ({
                       </div>
 
                       {/* Lista partecipanti */}
-                      <ScrollArea className="max-h-60">
+                      <div className="max-h-[240px] overflow-y-auto">
                         <div className="p-2 space-y-1">
                           {filteredAssignableUsers.length > 0 ? (
                             filteredAssignableUsers.map((user) => {
@@ -552,7 +694,7 @@ const TaskInformationTab = ({
                             </div>
                           )}
                         </div>
-                      </ScrollArea>
+                      </div>
 
                       {/* Footer con azioni rapide */}
                       <div className="p-2 border-t border-gray-200 bg-gray-50">
@@ -582,6 +724,7 @@ const TaskInformationTab = ({
                     />
                   )}
                 </div>
+                )
               ) : null}
 
                              {/* Visualizzazione partecipanti selezionati */}
@@ -638,30 +781,126 @@ const TaskInformationTab = ({
                   Responsabile
                 </Label>
                 {isEditing ? (
-                  <Select
-                    value={editedData.AssignedTo}
-                    onValueChange={(value) =>
-                      setEditedData((prev) => ({ ...prev, AssignedTo: value }))
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Seleziona il responsabile dell'attività" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {assignableUsers.map((user) => (
-                        <SelectItem key={user.userId} value={user.userId.toString()}>
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs">
-                                {getInitials(user.firstName, user.lastName)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span>{user.firstName} {user.lastName}</span>
+                  !selectedCompanyId ? (
+                    <div className="p-4 text-center text-sm text-gray-500 bg-yellow-50 border border-yellow-200 rounded-md">
+                      Seleziona un'azienda per assegnare un responsabile
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      {/* Trigger del dropdown */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-between"
+                        onClick={() => setIsAssignedToDropdownOpen(!isAssignedToDropdownOpen)}
+                        disabled={isLoadingUsers}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Search className="h-4 w-4" />
+                          {isLoadingUsers 
+                            ? "Caricamento utenti..." 
+                            : editedData.AssignedTo && availableUsers.length > 0
+                              ? (() => {
+                                  const selectedUser = availableUsers.find(
+                                    u => u.userId.toString() === editedData.AssignedTo
+                                  );
+                                  return selectedUser 
+                                    ? `${selectedUser.firstName} ${selectedUser.lastName}`
+                                    : "Seleziona responsabile...";
+                                })()
+                              : assignedToSearch 
+                                ? `Cerca: ${assignedToSearch}` 
+                                : "Seleziona responsabile..."}
+                        </span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${isAssignedToDropdownOpen ? 'rotate-180' : ''}`} />
+                      </Button>
+
+                      {/* Dropdown menu */}
+                      {isAssignedToDropdownOpen && (
+                        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-80 overflow-hidden">
+                          {/* Header con ricerca */}
+                          <div className="p-3 border-b border-gray-200 bg-gray-50">
+                            <div className="flex items-center gap-2">
+                              <Search className="h-4 w-4 text-gray-400" />
+                              <Input
+                                placeholder="Cerca responsabile..."
+                                value={assignedToSearch}
+                                onChange={(e) => setAssignedToSearch(e.target.value)}
+                                className="flex-1"
+                              />
+                            </div>
                           </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+
+                          {/* Lista utenti */}
+                          <div className="max-h-[240px] overflow-y-auto">
+                            <div className="p-2 space-y-1">
+                              {availableUsers.length > 0 ? (
+                                availableUsers
+                                  .filter((user) => {
+                                    if (!assignedToSearch) return true;
+                                    const search = assignedToSearch.toLowerCase();
+                                    return (
+                                      user.firstName?.toLowerCase().includes(search) ||
+                                      user.lastName?.toLowerCase().includes(search) ||
+                                      user.role?.toLowerCase().includes(search)
+                                    );
+                                  })
+                                  .map((user) => {
+                                    const isSelected = editedData.AssignedTo === user.userId.toString();
+                                    return (
+                                      <div
+                                        key={user.userId}
+                                        className={`flex items-center space-x-3 hover:bg-gray-50 p-2 rounded-md transition-colors cursor-pointer ${
+                                          isSelected ? "bg-blue-50 border border-blue-200" : ""
+                                        }`}
+                                        onClick={() => {
+                                          setEditedData((prev) => ({ ...prev, AssignedTo: user.userId.toString() }));
+                                          setIsAssignedToDropdownOpen(false);
+                                          setAssignedToSearch("");
+                                        }}
+                                      >
+                                        <Avatar className="h-6 w-6">
+                                          <AvatarFallback className="text-xs">
+                                            {getInitials(user.firstName, user.lastName)}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1">
+                                          <span className="text-sm font-normal">
+                                            {user.firstName} {user.lastName}
+                                          </span>
+                                          {user.role && (
+                                            <span className="text-xs text-gray-500 ml-2">
+                                              - {user.role}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {isSelected && (
+                                          <Check className="h-4 w-4 text-blue-600" />
+                                        )}
+                                      </div>
+                                    );
+                                  })
+                              ) : (
+                                <div className="text-center py-8 text-sm text-gray-500">
+                                  {assignedToSearch
+                                    ? "Nessun utente trovato"
+                                    : "Nessun utente disponibile"}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Overlay per chiudere il dropdown */}
+                      {isAssignedToDropdownOpen && (
+                        <div 
+                          className="fixed inset-0 z-40" 
+                          onClick={() => setIsAssignedToDropdownOpen(false)}
+                        />
+                      )}
+                    </div>
+                  )
                 ) : (
                   <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
                     <div>

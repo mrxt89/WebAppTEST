@@ -15,7 +15,9 @@ import {
   ChevronUp,
   Plus,
   Info,
+  Search,
 } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -72,6 +74,7 @@ const NewTaskPanel = ({
   const [openCombobox, setOpenCombobox] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [participantSearchValue, setParticipantSearchValue] = useState("");
+  const [isParticipantDropdownOpen, setIsParticipantDropdownOpen] = useState(false);
   const [assignmentType, setAssignmentType] = useState("individual");
   const [availableGroups, setAvailableGroups] = useState([]);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
@@ -79,6 +82,9 @@ const NewTaskPanel = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showContent, setShowContent] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [companies, setCompanies] = useState([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(null);
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     basic: true,
     dates: true,
@@ -134,11 +140,33 @@ const NewTaskPanel = ({
     },
   };
 
+  // Carica la company dell'utente corrente come default
+  useEffect(() => {
+    try {
+      const userString = localStorage.getItem("user");
+      if (userString) {
+        const userData = JSON.parse(userString);
+        if (userData.CompanyId) {
+          setSelectedCompanyId(userData.CompanyId);
+        }
+      }
+    } catch (error) {
+      console.error("Error parsing user data from localStorage:", error);
+    }
+    fetchCompanies();
+  }, []);
+
+  // Carica utenti e gruppi quando cambia la company selezionata
+  useEffect(() => {
+    if (selectedCompanyId) {
+      fetchUsers(selectedCompanyId);
+      fetchGroups(selectedCompanyId);
+    }
+  }, [selectedCompanyId]);
+
   // Effetti
   useEffect(() => {
     if (isOpen) {
-      fetchUsers();
-      fetchGroups();
       const timer = setTimeout(() => setShowContent(true), 100);
       return () => clearTimeout(timer);
     } else {
@@ -171,11 +199,44 @@ const NewTaskPanel = ({
   };
 
   // Carica gruppi
-  const fetchGroups = useCallback(async () => {
+  // Funzione per caricare le companies
+  const fetchCompanies = useCallback(async () => {
+    try {
+      setIsLoadingCompanies(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${config.API_BASE_URL}/companies`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Error fetching companies");
+      }
+
+      const data = await response.json();
+      setCompanies(data);
+    } catch (error) {
+      console.error("Error fetching companies:", error);
+      toast({
+        title: "Errore",
+        description: "Errore nel caricamento delle aziende",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingCompanies(false);
+    }
+  }, []);
+
+  const fetchGroups = useCallback(async (companyId = null) => {
     try {
       setIsLoadingGroups(true);
       const token = localStorage.getItem("token");
-      const response = await fetch(`${config.API_BASE_URL}/groups`, {
+      const url = companyId 
+        ? `${config.API_BASE_URL}/groups?companyId=${companyId}`
+        : `${config.API_BASE_URL}/groups`;
+      const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -390,9 +451,7 @@ const NewTaskPanel = ({
   const filteredParticipants = users.filter(user => {
     const isNotLeader = user.userId.toString() !== taskData.AssignedTo;
     const matchesSearch = participantSearchValue
-      ? `${user.firstName} ${user.lastName}`
-          .toLowerCase()
-          .includes(participantSearchValue.toLowerCase())
+      ? `${user.firstName} ${user.lastName}`.toLowerCase().includes(participantSearchValue.toLowerCase())
       : true;
     
     if (showSelectedOnly) {
@@ -728,7 +787,47 @@ const NewTaskPanel = ({
                               transition={{ duration: 0.2 }}
                               className="overflow-hidden"
                             >
-                              <div className="p-4 pt-0">
+                              <div className="p-4 pt-0 space-y-3">
+                                {/* Selettore Company */}
+                                <div>
+                                  <Label htmlFor="companySelect" className="flex items-center text-sm mb-2">
+                                    <Users className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                                    Azienda
+                                  </Label>
+                                  <Select
+                                    value={selectedCompanyId?.toString() || ""}
+                                    onValueChange={(value) => {
+                                      const companyId = value ? parseInt(value) : null;
+                                      setSelectedCompanyId(companyId);
+                                      // Reset assegnazioni quando cambia company
+                                      setTaskData((prev) => ({
+                                        ...prev,
+                                        AssignedTo: currentUserId,
+                                        Participants: [],
+                                        DefaultGroupId: null,
+                                      }));
+                                      setSelectedGroupId(null);
+                                    }}
+                                    disabled={isLoadingCompanies}
+                                  >
+                                    <SelectTrigger className="w-full" id="companySelect">
+                                      <SelectValue placeholder={isLoadingCompanies ? "Caricamento..." : "Seleziona azienda"} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {companies.map((company) => (
+                                        <SelectItem key={company.CompanyId} value={company.CompanyId.toString()}>
+                                          {company.Description || company.CompanyCode}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {!selectedCompanyId && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Seleziona un'azienda per vedere i suoi utenti e gruppi
+                                    </p>
+                                  )}
+                                </div>
+                                
                                 <Tabs value={assignmentType} onValueChange={setAssignmentType}>
                                   <TabsList className="grid w-full grid-cols-2">
                                     <TabsTrigger value="individual" className="flex items-center gap-2">
@@ -742,6 +841,12 @@ const NewTaskPanel = ({
                                   </TabsList>
 
                                   <TabsContent value="individual" className="space-y-4">
+                                    {!selectedCompanyId ? (
+                                      <div className="p-4 text-center text-sm text-gray-500 bg-yellow-50 border border-yellow-200 rounded-md">
+                                        Seleziona un'azienda per assegnare un utente
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-4">
                                     <div>
                                       <Label className="flex items-center gap-1">
                                         <User className="h-4 w-4 text-gray-500" />
@@ -764,124 +869,269 @@ const NewTaskPanel = ({
                                             <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                           </Button>
                                         </PopoverTrigger>
-                                        <PopoverContent className="w-full p-0">
-                                          <Command>
-                                            <CommandInput
-                                              placeholder="Cerca utente..."
-                                              value={searchValue}
-                                              onValueChange={setSearchValue}
-                                            />
-                                            <CommandEmpty>Nessun utente trovato.</CommandEmpty>
-                                            <CommandGroup className="max-h-[200px] overflow-auto">
-                                              
-                                              {filterUsers.map((user) => {
-                                                const itemValue = [
-                                                  user.firstName,
-                                                  user.lastName,
-                                                  user.role,
-                                                ]
-                                                  .filter(Boolean)
-                                                  .join(" ")
-                                                  .toLowerCase();
+                                        <PopoverContent className="w-full p-0" style={{ maxHeight: "400px" }}>
+                                          <div className="bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden">
+                                            {/* Header con ricerca */}
+                                            <div className="p-3 border-b border-gray-200 bg-gray-50">
+                                              <div className="flex items-center gap-2">
+                                                <Search className="h-4 w-4 text-gray-400" />
+                                                <Input
+                                                  placeholder="Cerca responsabile..."
+                                                  value={searchValue}
+                                                  onChange={(e) => setSearchValue(e.target.value)}
+                                                  className="flex-1"
+                                                />
+                                              </div>
+                                            </div>
 
-                                                return (
-                                                  <CommandItem
-                                                    key={user.userId}
-                                                    value={itemValue}
-                                                    onSelect={() => {
-                                                      setTaskData((prev) => ({
-                                                        ...prev,
-                                                        AssignedTo: user.userId.toString(),
-                                                        DefaultGroupId: null,
-                                                      }));
-                                                      setOpenCombobox(false);
-                                                      setSearchValue("");
-                                                    }}
-                                                  >
-                                                  <CheckIcon
-                                                    className={cn(
-                                                      "mr-2 h-4 w-4",
-                                                      taskData.AssignedTo === user.userId.toString()
-                                                        ? "opacity-100"
-                                                        : "opacity-0"
-                                                    )}
-                                                  />
-                                                  {user.firstName} {user.lastName}
-                                                  </CommandItem>
-                                                );
-                                              })}
-                                            </CommandGroup>
-                                          </Command>
+                                            {/* Lista utenti */}
+                                            <div className="max-h-[240px] overflow-y-auto">
+                                              <div className="p-2 space-y-1">
+                                                {filterUsers.length > 0 ? (
+                                                  filterUsers.map((user) => {
+                                                    const isSelected = taskData.AssignedTo === user.userId.toString();
+                                                    return (
+                                                      <div
+                                                        key={user.userId}
+                                                        className={`flex items-center space-x-3 hover:bg-gray-50 p-2 rounded-md transition-colors cursor-pointer ${
+                                                          isSelected ? "bg-blue-50 border border-blue-200" : ""
+                                                        }`}
+                                                        onClick={() => {
+                                                          setTaskData((prev) => ({
+                                                            ...prev,
+                                                            AssignedTo: user.userId.toString(),
+                                                            DefaultGroupId: null,
+                                                          }));
+                                                          setOpenCombobox(false);
+                                                          setSearchValue("");
+                                                        }}
+                                                      >
+                                                        <Avatar className="h-6 w-6">
+                                                          <AvatarFallback className="text-xs">
+                                                            {user.firstName?.charAt(0) || ""}{user.lastName?.charAt(0) || ""}
+                                                          </AvatarFallback>
+                                                        </Avatar>
+                                                        <div className="flex-1">
+                                                          <span className="text-sm font-normal">
+                                                            {user.firstName} {user.lastName}
+                                                          </span>
+                                                          {user.role && (
+                                                            <span className="text-xs text-gray-500 ml-2">
+                                                              - {user.role}
+                                                            </span>
+                                                          )}
+                                                        </div>
+                                                        {isSelected && (
+                                                          <CheckIcon className="h-4 w-4 text-blue-600" />
+                                                        )}
+                                                      </div>
+                                                    );
+                                                  })
+                                                ) : (
+                                                  <div className="text-center py-8 text-sm text-gray-500">
+                                                    {searchValue
+                                                      ? "Nessun utente trovato"
+                                                      : "Nessun utente disponibile"}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
                                         </PopoverContent>
                                       </Popover>
                                     </div>
 
                                     <div>
-                                      <div className="flex justify-between items-center mb-2">
-                                        <Label className="flex items-center gap-1">
-                                          <Users className="h-4 w-4 text-gray-500" />
-                                          Partecipanti ({taskData.Participants.length})
-                                        </Label>
-                                        <div className="flex items-center space-x-2">
-                                          <Checkbox
-                                            id="showSelected"
-                                            checked={showSelectedOnly}
-                                            onCheckedChange={setShowSelectedOnly}
-                                            className="h-4 w-4 text-black"
-                                          />
-                                          <Label
-                                            htmlFor="showSelected"
-                                            className="text-xs text-gray-500 cursor-pointer"
+                                      <Label className="flex items-center gap-1 mb-2">
+                                        <Users className="h-4 w-4 text-gray-500" />
+                                        Partecipanti ({taskData.Participants.length})
+                                      </Label>
+                                      <Popover open={isParticipantDropdownOpen} onOpenChange={setIsParticipantDropdownOpen}>
+                                        <PopoverTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            role="combobox"
+                                            aria-expanded={isParticipantDropdownOpen}
+                                            className="w-full justify-between mt-1"
                                           >
-                                            Solo selezionati
-                                          </Label>
-                                        </div>
-                                      </div>
-                                      
-                                      {/* Campo di ricerca per partecipanti */}
-                                      <Input
-                                        placeholder="Cerca partecipante..."
-                                        value={participantSearchValue}
-                                        onChange={(e) => setParticipantSearchValue(e.target.value)}
-                                        className="w-full mb-2"
-                                      />
-                                      
-                                      <Card className="border-dashed">
-                                        <ScrollArea className="h-[120px]">
-                                          <div className="p-2 space-y-1">
-                                            {filteredParticipants.map((user) => (
-                                              <div
-                                                key={user.userId}
-                                                className="flex items-center space-x-2 hover:bg-gray-50 p-2 rounded"
-                                              >
-                                                <Checkbox
-                                                  checked={taskData.Participants.includes(user.userId.toString())}
-                                                  onCheckedChange={(checked) => {
-                                                    setTaskData(prev => ({
-                                                      ...prev,
-                                                      Participants: checked
-                                                        ? [...prev.Participants, user.userId.toString()]
-                                                        : prev.Participants.filter(id => id !== user.userId.toString()),
-                                                    }));
-                                                  }}
-                                                  id={`user-${user.userId}`}
-                                                  className="h-4 w-4 text-black"
+                                            {taskData.Participants.length > 0
+                                              ? `${taskData.Participants.length} partecipante${taskData.Participants.length > 1 ? 'i' : ''} selezionato${taskData.Participants.length > 1 ? 'i' : ''}`
+                                              : "Seleziona partecipanti..."}
+                                            <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-full p-0" style={{ maxHeight: "400px" }}>
+                                          <div className="bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden">
+                                            {/* Header con ricerca e filtri */}
+                                            <div className="p-3 border-b border-gray-200 bg-gray-50">
+                                              <div className="flex items-center gap-2 mb-2">
+                                                <Search className="h-4 w-4 text-gray-400" />
+                                                <Input
+                                                  placeholder="Cerca partecipante..."
+                                                  value={participantSearchValue}
+                                                  onChange={(e) => setParticipantSearchValue(e.target.value)}
+                                                  className="flex-1"
                                                 />
-                                                <Label
-                                                  htmlFor={`user-${user.userId}`}
-                                                  className="flex-grow cursor-pointer text-sm"
-                                                >
-                                                  {user.firstName} {user.lastName}
+                                              </div>
+                                              <div className="flex items-center space-x-2">
+                                                <Checkbox
+                                                  id="showSelected"
+                                                  checked={showSelectedOnly}
+                                                  onCheckedChange={setShowSelectedOnly}
+                                                  className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500 border-primary"
+                                                />
+                                                <Label htmlFor="showSelected" className="text-sm text-gray-600 cursor-pointer">
+                                                  Solo selezionati
                                                 </Label>
                                               </div>
-                                            ))}
+                                            </div>
+
+                                            {/* Lista partecipanti */}
+                                            <div className="max-h-[240px] overflow-y-auto">
+                                              <div className="p-2 space-y-1">
+                                                {filteredParticipants.length > 0 ? (
+                                                  filteredParticipants.map((user) => {
+                                                    const isChecked = taskData.Participants.includes(user.userId.toString());
+                                                    return (
+                                                      <div
+                                                        key={user.userId}
+                                                        className={`flex items-center space-x-3 hover:bg-gray-50 p-2 rounded-md transition-colors cursor-pointer ${
+                                                          isChecked ? "bg-blue-50 border border-blue-200" : ""
+                                                        }`}
+                                                        onClick={() => {
+                                                          setTaskData(prev => ({
+                                                            ...prev,
+                                                            Participants: prev.Participants.includes(user.userId.toString())
+                                                              ? prev.Participants.filter((id) => id !== user.userId.toString())
+                                                              : [...prev.Participants, user.userId.toString()],
+                                                          }));
+                                                        }}
+                                                      >
+                                                        <Checkbox
+                                                          checked={isChecked}
+                                                          onCheckedChange={(checked) => {
+                                                            setTaskData(prev => ({
+                                                              ...prev,
+                                                              Participants: checked
+                                                                ? [...prev.Participants, user.userId.toString()]
+                                                                : prev.Participants.filter(id => id !== user.userId.toString()),
+                                                            }));
+                                                          }}
+                                                          className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                                                          onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                        <Avatar className="h-6 w-6">
+                                                          <AvatarFallback className="text-xs">
+                                                            {user.firstName?.charAt(0) || ""}{user.lastName?.charAt(0) || ""}
+                                                          </AvatarFallback>
+                                                        </Avatar>
+                                                        <div className="flex-1">
+                                                          <span className="text-sm font-normal">
+                                                            {user.firstName} {user.lastName}
+                                                          </span>
+                                                          {user.role && (
+                                                            <span className="text-xs text-gray-500 ml-2">
+                                                              - {user.role}
+                                                            </span>
+                                                          )}
+                                                        </div>
+                                                        {isChecked && (
+                                                          <CheckIcon className="h-4 w-4 text-blue-600" />
+                                                        )}
+                                                      </div>
+                                                    );
+                                                  })
+                                                ) : (
+                                                  <div className="text-center py-8 text-sm text-gray-500">
+                                                    {participantSearchValue
+                                                      ? "Nessun partecipante trovato"
+                                                      : "Nessun partecipante disponibile"}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+
+                                            {/* Footer con azioni rapide */}
+                                            {taskData.Participants.length > 0 && (
+                                              <div className="p-2 border-t border-gray-200 bg-gray-50">
+                                                <div className="flex justify-between items-center text-xs text-gray-600">
+                                                  <span>{taskData.Participants.length} selezionati</span>
+                                                  <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                      setTaskData((prev) => ({ ...prev, Participants: [] }));
+                                                    }}
+                                                    className="h-6 px-2 text-red-600 hover:text-red-700"
+                                                  >
+                                                    Deseleziona tutti
+                                                  </Button>
+                                                </div>
+                                              </div>
+                                            )}
                                           </div>
-                                        </ScrollArea>
-                                      </Card>
+                                        </PopoverContent>
+                                      </Popover>
                                     </div>
-                                  </TabsContent>
+
+                                    {/* Visualizzazione partecipanti selezionati */}
+                                    <div className="min-h-[80px] bg-gray-50 rounded-lg p-3 border border-gray-200 mt-2">
+                                      {taskData.Participants.length > 0 ? (
+                                        <div className="space-y-2">
+                                          {taskData.Participants.map((participantId) => {
+                                            const user = users.find((u) => u.userId.toString() === participantId);
+                                            if (!user) return null;
+                                            return (
+                                              <div
+                                                key={participantId}
+                                                className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-md border border-gray-200 shadow-sm w-full"
+                                              >
+                                                <Avatar className="h-6 w-6">
+                                                  <AvatarFallback className="text-xs">
+                                                    {user.firstName?.charAt(0) || ""}{user.lastName?.charAt(0) || ""}
+                                                  </AvatarFallback>
+                                                </Avatar>
+                                                <span className="text-sm font-medium flex-1">
+                                                  {user.firstName} {user.lastName}
+                                                </span>
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  onClick={() => {
+                                                    setTaskData((prev) => ({
+                                                      ...prev,
+                                                      Participants: prev.Participants.filter((id) => id !== participantId),
+                                                    }));
+                                                  }}
+                                                  className="h-4 w-4 p-0 text-gray-400 hover:text-red-500"
+                                                >
+                                                  <X className="h-3 w-3" />
+                                                </Button>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center justify-center h-full">
+                                          <span className="text-sm text-gray-500 italic">
+                                            Nessun partecipante selezionato
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                      </div>
+                                    )}
+                                    </TabsContent>
 
                                   <TabsContent value="group" className="space-y-4">
+                                    {!selectedCompanyId ? (
+                                      <div className="p-4 text-center text-sm text-gray-500 bg-yellow-50 border border-yellow-200 rounded-md">
+                                        Seleziona un'azienda per assegnare un gruppo
+                                      </div>
+                                    ) : (
+                                      <>
                                     <div>
                                       <Label className="flex items-center gap-1">
                                         <Users className="h-4 w-4 text-gray-500" />
@@ -913,6 +1163,8 @@ const NewTaskPanel = ({
                                         </div>
                                       )}
                                     </div>
+                                    </>
+                                  )}
                                   </TabsContent>
                                 </Tabs>
                               </div>

@@ -77,7 +77,7 @@ const flattenComponents = (components, parentPath = []) => {
         component.Qty ||
         component.BaseQuantity ||
         1,
-      uom: component.UoM || component.Unit || component.UnitOfMeasure || "PZ",
+      uom: component.UoM || component.Unit || component.UnitOfMeasure || "NR",
       path: pathLabel.join(" › "),
     });
 
@@ -147,6 +147,7 @@ const CurrentBOMCodes = ({ importOptions }) => {
           entry.component.Id ||
           0,
         ComponentCode: entry.code,
+        ComponentBOMId: entry.component.BOMId || entry.component.ComponentBOMId || null,  // NUOVO: passa BOMId se disponibile per specificare versione
         Quantity: entry.component.Quantity || 1,
         ImportBOM: importOptions.copyBOM,
         createTempComponent: importOptions.createTempComponent,
@@ -163,7 +164,7 @@ const CurrentBOMCodes = ({ importOptions }) => {
     ComponentCode: entry.code,
     Description: entry.description,
     Quantity: entry.quantity || 1,
-    UoM: entry.uom || "PZ",
+    UoM: entry.uom || "NR",
     ComponentType: entry.component?.ComponentType || 7798784,
     ComponentId:
       entry.component?.ComponentId ||

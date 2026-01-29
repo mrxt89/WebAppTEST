@@ -34,9 +34,10 @@ export const createBOMDragDropHook = (dependencies) => {
           // Prepare component data for addition
           const componentData = {
             ComponentCode: itemData.Component || itemData.ComponentCode,
+            ComponentBOMId: itemData.BOMId || itemData.ComponentBOMId || null,  // NUOVO: passa BOMId se disponibile per specificare versione
             ComponentType: itemData.ComponentType || 7798784, // Default to Article
             Quantity: itemData.Quantity || 1,
-            UoM: itemData.UoM || "PZ",
+            UoM: itemData.UoM || "NR",
             Details: itemData.Description || "Component",
             ImportBOM: true, // Automatically import BOM if available
             ProcessMultilevelBOM: true,
@@ -57,9 +58,10 @@ export const createBOMDragDropHook = (dependencies) => {
             // Add the BOM's root component
             const componentData = {
               ComponentCode: itemData.BOM,
+              ComponentBOMId: itemData.BOMId || itemData.Id || null,  // NUOVO: passa BOMId se disponibile per specificare versione
               ComponentType: 7798784, // Article
               Quantity: 1,
-              UoM: itemData.UoM || "PZ",
+              UoM: itemData.UoM || "NR",
               Details: itemData.Description || "BOM",
               ImportBOM: true,
               ProcessMultilevelBOM: true,

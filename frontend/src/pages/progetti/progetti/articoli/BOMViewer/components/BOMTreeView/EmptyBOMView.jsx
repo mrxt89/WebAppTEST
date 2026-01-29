@@ -31,7 +31,7 @@ const EmptyBOMView = () => {
         componentDescription: "Nuovo componente radice",
         quantity: 1,
         nature: 22413312, // Semilavorato
-        uom: "PZ",
+        uom: "NR",
         importBOM: true,
       });
 
