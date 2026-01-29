@@ -9,10 +9,15 @@
   2) Trasparenza: in SP_GetBOMCostingDetails aggiunge un recordset con i ricarichi effettivi
      (ParameterName, MarkupPercentage, Source) così in UI/export puoi vedere cosa è stato usato.
 
+  3) Trasparenza su DetailsJSON: in SP_CalculateBOMCosting, quando UpdateBOMRecord = 1,
+     nel campo Details (DetailsJSON) della BOM vengono salvati anche:
+     - quantita_lotto (Quantità LOTTO per divisione costi fissi)
+     - ricarico_mp_pct, ricarico_ope_pct, ricarico_trasporto_pct, ricarico_scarto_pct,
+       ricarico_totale_pct, ricarico_sconto_pct (% di ricarico previste, anche in export).
+
   NOTE:
   - Questo script usa ALTER PROCEDURE diretto per SP_GetEffectiveBOMMarkups (breve).
-  - Per SP_GetBOMCostingDetails, applica una patch testuale sul modulo per sostituire la query
-    dei parametri globali con l'output effettivo.
+  - Per SP_GetBOMCostingDetails e SP_CalculateBOMCosting, applica patch testuali sul modulo.
 */
 
 SET NOCOUNT ON;
@@ -174,5 +179,72 @@ SET @Patched = REPLACE(@Patched, N'CREATE PROCEDURE', N'ALTER PROCEDURE');
 
 EXEC sp_executesql @Patched;
 PRINT N'Patch applicata con successo a ' + QUOTENAME(@SchemaName) + N'.' + QUOTENAME(@ProcName) + N'.';
+GO
+
+/* ============================================================
+   3) SP_CalculateBOMCosting: salva in DetailsJSON Lotto e % ricarichi effettivi
+      (per trasparenza e export: "Quantità LOTTO" e "% di ricarico previste")
+   ============================================================ */
+DECLARE @ProcName2 SYSNAME = N'SP_CalculateBOMCosting';
+DECLARE @SchemaName2 SYSNAME = N'dbo';
+
+DECLARE @Def2 NVARCHAR(MAX);
+SELECT @Def2 = m.definition
+FROM sys.sql_modules m
+INNER JOIN sys.objects o ON o.object_id = m.object_id
+INNER JOIN sys.schemas s ON s.schema_id = o.schema_id
+WHERE o.type = 'P'
+  AND o.name = @ProcName2
+  AND s.name = @SchemaName2;
+
+IF @Def2 IS NULL
+BEGIN
+  PRINT N'Procedura ' + QUOTENAME(@SchemaName2) + N'.' + QUOTENAME(@ProcName2) + N' non trovata. Salta patch DetailsJSON.';
+END
+ELSE
+BEGIN
+  DECLARE @OldDetailsBlock NVARCHAR(MAX) = N'
+        SET @DetailsJSON = (
+            SELECT @TotalPricePerLot / @ProductionLot as prezzo, @VariableCostsMP as costo_mp,
+                @VariableCostsOPE as costo_ope, @FixedCostsPerLot as costi_fissi,
+                @RicaricoMPAmount as ricarico_mp, @RicaricoOPEAmount as ricarico_op,
+                @RicaricoTrasportoAmount as ricarico_tr, @FinalUnitCost as costo_totale,
+                @RicaricoScartoAmount as ricarico_scarto, @RicaricoScontoAmount as ricarico_sconto,
+                @RicaricoTotaleAmount as ricarico_totale
+            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+        );';
+
+  DECLARE @NewDetailsBlock NVARCHAR(MAX) = N'
+        SET @DetailsJSON = (
+            SELECT @TotalPricePerLot / @ProductionLot as prezzo, @VariableCostsMP as costo_mp,
+                @VariableCostsOPE as costo_ope, @FixedCostsPerLot as costi_fissi,
+                @RicaricoMPAmount as ricarico_mp, @RicaricoOPEAmount as ricarico_op,
+                @RicaricoTrasportoAmount as ricarico_tr, @FinalUnitCost as costo_totale,
+                @RicaricoScartoAmount as ricarico_scarto, @RicaricoScontoAmount as ricarico_sconto,
+                @RicaricoTotaleAmount as ricarico_totale,
+                @ProductionLot as quantita_lotto,
+                @EffectiveRicaricoMP * 100 as ricarico_mp_pct,
+                @EffectiveRicaricoOPE * 100 as ricarico_ope_pct,
+                @EffectiveRicaricoTrasporto * 100 as ricarico_trasporto_pct,
+                @EffectiveRicaricoScarto * 100 as ricarico_scarto_pct,
+                @EffectiveRicaricoTotale * 100 as ricarico_totale_pct,
+                @EffectiveRicaricoSconto * 100 as ricarico_sconto_pct
+            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+        );';
+
+  DECLARE @Patched2 NVARCHAR(MAX) = REPLACE(@Def2, @OldDetailsBlock, @NewDetailsBlock);
+
+  IF @Patched2 = @Def2
+  BEGIN
+    PRINT N'Patch DetailsJSON non applicata su SP_CalculateBOMCosting: blocco target non trovato (potrebbe essere già aggiornato).';
+  END
+  ELSE
+  BEGIN
+    SET @Patched2 = REPLACE(@Patched2, N'CREATE   PROCEDURE', N'ALTER PROCEDURE');
+    SET @Patched2 = REPLACE(@Patched2, N'CREATE PROCEDURE', N'ALTER PROCEDURE');
+    EXEC sp_executesql @Patched2;
+    PRINT N'Patch DetailsJSON applicata con successo a ' + QUOTENAME(@SchemaName2) + N'.' + QUOTENAME(@ProcName2) + N'.';
+  END
+END
 GO
 

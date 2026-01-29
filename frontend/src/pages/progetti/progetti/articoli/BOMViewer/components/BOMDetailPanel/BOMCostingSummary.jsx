@@ -198,7 +198,8 @@ const BOMCostingSummary = ({ bomId, bomCode, bomVersion }) => {
         </div>
 
         {/* Parametri di calcolo “verificabili” (se presenti in Details JSON) */}
-        {(costingDetails?.ricarico_mp_pct != null ||
+        {(costingDetails?.quantita_lotto != null ||
+          costingDetails?.ricarico_mp_pct != null ||
           costingDetails?.ricarico_ope_pct != null ||
           costingDetails?.ricarico_trasporto_pct != null ||
           costingDetails?.ricarico_scarto_pct != null ||
@@ -207,6 +208,9 @@ const BOMCostingSummary = ({ bomId, bomCode, bomVersion }) => {
           <div className="rounded-md bg-slate-50 border text-xs p-3 text-gray-700">
             <p className="font-medium text-gray-800 mb-2">Parametri calcolo (ultimo salvataggio)</p>
             <div className="grid grid-cols-3 gap-2">
+              {costingDetails?.quantita_lotto != null && (
+                <div className="col-span-3"><span className="text-gray-500">Quantità LOTTO (per divisione costi fissi):</span> {formatValue(costingDetails.quantita_lotto, (v) => Number(v).toFixed(0))}</div>
+              )}
               <div><span className="text-gray-500">Ricarico MP:</span> {formatValue(costingDetails?.ricarico_mp_pct, (v) => `${Number(v).toFixed(2)}%`)}</div>
               <div><span className="text-gray-500">Ricarico OPE:</span> {formatValue(costingDetails?.ricarico_ope_pct, (v) => `${Number(v).toFixed(2)}%`)}</div>
               <div><span className="text-gray-500">Trasporto:</span> {formatValue(costingDetails?.ricarico_trasporto_pct, (v) => `${Number(v).toFixed(2)}%`)}</div>
