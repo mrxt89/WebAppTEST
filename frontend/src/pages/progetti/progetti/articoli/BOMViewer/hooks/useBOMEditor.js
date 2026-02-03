@@ -151,10 +151,14 @@ export const createBOMEditorHook = (dependencies) => {
   // Add a routing step
   const addRouting = useCallback(
     async (routingData) => {
-      if (!selectedBomId) {
+      // FIX: Permetti BOMId = 0 se c'è un ComponentId o ItemId (per creare automaticamente la BOM)
+      const bomId = selectedBomId || routingData.BOMId || 0;
+      const hasComponentId = routingData.ComponentId || routingData.ItemId;
+      
+      if (!bomId && !hasComponentId) {
         toast({
           title: "Error",
-          description: "No BOM selected",
+          description: "No BOM selected and no ComponentId/ItemId provided",
           variant: "destructive",
         });
         return;
@@ -163,10 +167,23 @@ export const createBOMEditorHook = (dependencies) => {
       try {
         setLoading(true);
 
-        const result = await addUpdateBOM("ADD_ROUTING", {
-          Id: selectedBomId,
+        // Se BOMId = 0, passa anche ItemId o ComponentId per creare automaticamente la BOM
+        const payload = {
+          Id: bomId,
           ...routingData,
-        });
+        };
+        
+        // Se BOMId = 0, aggiungi ItemId o ComponentId se non sono già presenti
+        if (bomId === 0 || bomId === "0") {
+          if (routingData.ComponentId && !payload.ItemId) {
+            payload.ItemId = routingData.ComponentId;
+          }
+          if (routingData.ItemId && !payload.ComponentId) {
+            payload.ComponentId = routingData.ItemId;
+          }
+        }
+
+        const result = await addUpdateBOM("ADD_ROUTING", payload);
 
         if (result.success) {
           toast({

@@ -317,6 +317,107 @@ router.post('/item-attachments/item-code/:itemCode/upload', authenticateToken, u
             CategoryIDs: categoryIds
         });
 
+        // LOGGING: Traccia aggiunta allegato articolo (ERP o progetto)
+        // result è l'oggetto con AttachmentID, FileName, ecc. dalla stored procedure
+        const attachmentId = result.Id || result.AttachmentID || null;
+        
+        console.log('[LOG DEBUG] Upload allegato item-code:', {
+            attachmentId: attachmentId,
+            itemCode: itemCode,
+            companyId: companyId,
+            userId: userId,
+            resultKeys: Object.keys(result || {}),
+            resultId: result?.Id,
+            resultAttachmentID: result?.AttachmentID,
+            hasResult: !!result
+        });
+        
+        if (result && attachmentId) {
+            const { logActivity, getRequestInfo } = require('../queries/projectActivityLog');
+            const requestInfo = getRequestInfo(req);
+            
+            // Recupera ProjectID dall'articolo (se è un articolo progetto)
+            let projectId = null;
+            let itemId = null;
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                
+                // Prima verifica se è un articolo progetto
+                const projectItemInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('ItemCode', sql.VarChar(64), itemCode)
+                    .query(`
+                        SELECT i.Id, pi.ProjectID
+                        FROM dbo.MA_ProjectArticles_Items i
+                        LEFT JOIN dbo.MA_ProjectsItems pi ON i.Id = pi.ItemId AND i.CompanyId = pi.CompanyId
+                        WHERE i.CompanyId = @CompanyId AND i.Item = @ItemCode
+                    `);
+                
+                if (projectItemInfo.recordset.length > 0) {
+                    itemId = projectItemInfo.recordset[0].Id;
+                    projectId = projectItemInfo.recordset[0].ProjectID;
+                }
+            } catch (err) {
+                console.warn('Errore nel recupero progetto per logging allegato item-code:', err);
+            }
+            
+            await logActivity({
+                companyId,
+                projectId: projectId,
+                userId,
+                activityType: 'ATTACHMENT_CREATE',
+                entityType: 'Attachment',
+                entityId: attachmentId,
+                entityCode: fileInfo.originalName,
+                action: 'CREATE',
+                description: `Aggiunto allegato ${fileInfo.originalName} all'articolo ${itemCode}${isErpAttachment ? ' (ERP)' : ''}`,
+                newValues: {
+                    AttachmentId: attachmentId,
+                    FileName: fileInfo.originalName,
+                    FileType: fileInfo.fileType,
+                    FileSizeKB: fileInfo.fileSizeKB,
+                    ItemCode: itemCode,
+                    ItemId: itemId,
+                    IsPublic: isPublic,
+                    IsErpAttachment: isErpAttachment,
+                    Description: description
+                },
+                metadata: {
+                    attachmentId: attachmentId,
+                    itemId: itemId,
+                    itemCode: itemCode,
+                    fileName: fileInfo.originalName,
+                    fileSizeKB: fileInfo.fileSizeKB,
+                    fileType: fileInfo.fileType,
+                    isPublic: isPublic,
+                    isErpAttachment: isErpAttachment
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.error('Errore nel logging attività allegato item-code:', err);
+                console.error('Dettagli errore logging:', {
+                    message: err.message,
+                    stack: err.stack,
+                    logData: {
+                        companyId,
+                        projectId,
+                        userId,
+                        activityType: 'ATTACHMENT_CREATE',
+                        entityType: 'Attachment',
+                        entityId: attachmentId
+                    }
+                });
+            });
+        } else {
+            console.warn('[LOG WARNING] Upload allegato item-code non loggato - risultato non valido:', {
+                result: result,
+                itemCode: itemCode,
+                attachmentId: attachmentId
+            });
+        }
+
         res.json({ success: 1, data: result });
     } catch (error) {
         console.error('Error uploading item attachment:', error);
@@ -389,7 +490,128 @@ router.post('/item-attachments/project-item/:projectItemId/upload', authenticate
             CategoryIDs: categoryIds
         });
 
-        res.json({ success: 1, data: result });
+        // DEBUG: Log del risultato completo
+        console.log('[LOG DEBUG] Risultato addItemAttachment:', JSON.stringify(result, null, 2));
+
+        // LOGGING: Traccia aggiunta allegato articolo progetto
+        // La funzione addItemAttachment restituisce result.recordset[0] che contiene i dati dell'allegato inserito
+        // Quindi result è un oggetto con AttachmentID, Id, ecc. (non ha success)
+        const attachmentId = result.Id || result.AttachmentID || (result.data && (result.data.Id || result.data.AttachmentID)) || null;
+        
+        console.log('[LOG DEBUG] Valori estratti:', {
+            attachmentId: attachmentId,
+            resultKeys: Object.keys(result || {}),
+            resultId: result?.Id,
+            resultAttachmentID: result?.AttachmentID,
+            hasResult: !!result
+        });
+        
+        // Se abbiamo un risultato (anche senza success esplicito), loggiamo
+        if (result && attachmentId) {
+            const { logActivity, getRequestInfo } = require('../queries/projectActivityLog');
+            const requestInfo = getRequestInfo(req);
+            
+            // Recupera ProjectID e ItemId dall'articolo progetto
+            let projectId = null;
+            let itemId = projectItemId;
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                const itemInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('ItemId', sql.BigInt, projectItemId)
+                    .query(`
+                        SELECT pi.ProjectID, pi.ItemId
+                        FROM dbo.MA_ProjectsItems pi
+                        WHERE pi.ItemId = @ItemId AND pi.CompanyId = @CompanyId
+                    `);
+                if (itemInfo.recordset.length > 0) {
+                    projectId = itemInfo.recordset[0].ProjectID;
+                    itemId = itemInfo.recordset[0].ItemId || projectItemId;
+                }
+            } catch (err) {
+                console.warn('Errore nel recupero progetto per logging allegato:', err);
+            }
+            
+            console.log('[LOG DEBUG] Upload allegato progetto:', {
+                resultSuccess: result.success,
+                attachmentId: attachmentId,
+                projectItemId: projectItemId,
+                itemCode: actualItemCode,
+                projectId: projectId,
+                companyId: companyId,
+                userId: userId
+            });
+            
+            await logActivity({
+                companyId,
+                projectId: projectId,
+                userId,
+                activityType: 'ATTACHMENT_CREATE',
+                entityType: 'Attachment',
+                entityId: attachmentId,
+                entityCode: fileInfo.originalName,
+                action: 'CREATE',
+                description: `Aggiunto allegato ${fileInfo.originalName} all'articolo ${actualItemCode || projectItemId}`,
+                newValues: {
+                    AttachmentId: attachmentId,
+                    FileName: fileInfo.originalName,
+                    FileType: fileInfo.fileType,
+                    FileSizeKB: fileInfo.fileSizeKB,
+                    ItemCode: actualItemCode,
+                    ItemId: itemId,
+                    ProjectItemId: projectItemId,
+                    IsPublic: isPublic,
+                    Description: description
+                },
+                metadata: {
+                    attachmentId: attachmentId,
+                    itemId: itemId,
+                    projectItemId: projectItemId,
+                    itemCode: actualItemCode,
+                    fileName: fileInfo.originalName,
+                    fileSizeKB: fileInfo.fileSizeKB,
+                    fileType: fileInfo.fileType,
+                    isPublic: isPublic
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.error('Errore nel logging attività allegato:', err);
+                console.error('Dettagli errore logging:', {
+                    message: err.message,
+                    stack: err.stack,
+                    logData: {
+                        companyId,
+                        projectId,
+                        userId,
+                        activityType: 'ATTACHMENT_CREATE',
+                        entityType: 'Attachment',
+                        entityId: attachmentId
+                    }
+                });
+            });
+        } else {
+            console.warn('[LOG WARNING] Upload allegato non loggato - risultato non valido:', {
+                result: result,
+                projectItemId: projectItemId,
+                actualItemCode: actualItemCode
+            });
+        }
+
+        // La risposta deve essere coerente con quello che il frontend si aspetta
+        // result è già l'oggetto con AttachmentID, FileName, ecc. dalla stored procedure
+        res.json({ 
+            success: 1, 
+            data: result,
+            // Mantieni compatibilità con il formato atteso dal frontend
+            AttachmentID: result.AttachmentID || result.Id,
+            FileName: result.FileName,
+            FilePath: result.FilePath,
+            FileSizeKB: result.FileSizeKB,
+            FileType: result.FileType,
+            UploadedAt: result.UploadedAt || result.UploadDate
+        });
     } catch (error) {
         console.error('Error uploading project item attachment:', error);
         res.status(500).json({ success: 0, message: 'Errore nel caricamento dell\'allegato', error: error.toString() });
@@ -441,6 +663,67 @@ router.delete('/item-attachments/:attachmentId', authenticateToken, async (req, 
         if (hardDelete) {
             await fileService.deleteFile(attachment.FilePath);
         }
+        
+        // LOGGING: Traccia eliminazione allegato
+        const { logActivity, getRequestInfo } = require('../queries/projectActivityLog');
+        const requestInfo = getRequestInfo(req);
+        
+        // Recupera ProjectID dall'articolo
+        let projectId = null;
+        let itemCode = attachment.ItemCode;
+        let itemId = attachment.ItemId;
+        
+        if (itemId) {
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                const itemInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('ItemId', sql.BigInt, itemId)
+                    .query(`
+                        SELECT pi.ProjectID
+                        FROM dbo.MA_ProjectsItems pi
+                        WHERE pi.CompanyId = @CompanyId AND pi.ItemId = @ItemId
+                    `);
+                if (itemInfo.recordset.length > 0) {
+                    projectId = itemInfo.recordset[0].ProjectID;
+                }
+            } catch (err) {
+                console.warn('Errore nel recupero progetto per logging eliminazione allegato:', err);
+            }
+        }
+        
+        await logActivity({
+            companyId,
+            projectId: projectId,
+            userId,
+            activityType: 'ATTACHMENT_DELETE',
+            entityType: 'Attachment',
+            entityId: attachmentId,
+            entityCode: attachment.FileName,
+            action: 'DELETE',
+            description: `Eliminato allegato ${attachment.FileName} dall'articolo ${itemCode || itemId || 'N/A'}`,
+            oldValues: {
+                AttachmentId: attachmentId,
+                FileName: attachment.FileName,
+                FileType: attachment.FileType,
+                ItemCode: itemCode,
+                ItemId: itemId,
+                Description: attachment.Description
+            },
+            metadata: {
+                attachmentId: attachmentId,
+                fileName: attachment.FileName,
+                fileType: attachment.FileType,
+                itemCode: itemCode,
+                itemId: itemId,
+                hardDelete: hardDelete
+            },
+            ...requestInfo
+        }).catch(err => {
+            console.warn('Errore nel logging eliminazione allegato:', err);
+        });
         
         res.json({ success: 1, message: 'Allegato eliminato con successo' });
     } catch (error) {
@@ -737,6 +1020,9 @@ router.put('/item-attachments/:attachmentId', authenticateToken, async (req, res
         // Gestisci correttamente il parametro tags per evitare stringhe vuote
         const tags = req.body.tags === "" ? null : req.body.tags;
         
+        // Ottieni l'allegato prima della modifica per logging
+        const attachmentBefore = await getItemAttachmentById(attachmentId);
+        
         // Chiamata al database per aggiornare l'allegato
         const result = await updateItemAttachment(
             attachmentId,
@@ -746,6 +1032,69 @@ router.put('/item-attachments/:attachmentId', authenticateToken, async (req, res
             userId,
             companyId
         );
+        
+        // LOGGING: Traccia modifica allegato
+        if (attachmentBefore) {
+            const { logActivity, getRequestInfo } = require('../queries/projectActivityLog');
+            const requestInfo = getRequestInfo(req);
+            
+            // Recupera ProjectID dall'articolo
+            let projectId = null;
+            let itemCode = attachmentBefore.ItemCode;
+            let itemId = attachmentBefore.ItemId;
+            
+            if (itemId) {
+                try {
+                    const sql = require('mssql');
+                    const config = require('../config');
+                    const pool = await sql.connect(config.database);
+                    const itemInfo = await pool.request()
+                        .input('CompanyId', sql.Int, companyId)
+                        .input('ItemId', sql.BigInt, itemId)
+                        .query(`
+                            SELECT pi.ProjectID
+                            FROM dbo.MA_ProjectsItems pi
+                            WHERE pi.CompanyId = @CompanyId AND pi.ItemId = @ItemId
+                        `);
+                    if (itemInfo.recordset.length > 0) {
+                        projectId = itemInfo.recordset[0].ProjectID;
+                    }
+                } catch (err) {
+                    console.warn('Errore nel recupero progetto per logging modifica allegato:', err);
+                }
+            }
+            
+            await logActivity({
+                companyId,
+                projectId: projectId,
+                userId,
+                activityType: 'ATTACHMENT_UPDATE',
+                entityType: 'Attachment',
+                entityId: attachmentId,
+                entityCode: attachmentBefore.FileName,
+                action: 'UPDATE',
+                description: `Modificato allegato ${attachmentBefore.FileName} dell'articolo ${itemCode || itemId || 'N/A'}`,
+                oldValues: {
+                    Description: attachmentBefore.Description,
+                    IsPublic: attachmentBefore.IsPublic,
+                    Tags: attachmentBefore.Tags
+                },
+                newValues: {
+                    Description: description,
+                    IsPublic: isPublic,
+                    Tags: tags
+                },
+                metadata: {
+                    attachmentId: attachmentId,
+                    fileName: attachmentBefore.FileName,
+                    itemCode: itemCode,
+                    itemId: itemId
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging modifica allegato:', err);
+            });
+        }
         
         res.json({ success: 1, data: result });
     } catch (error) {

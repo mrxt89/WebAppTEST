@@ -340,29 +340,13 @@ const ComponentDetail = ({ component, editMode }) => {
         // IMPORTANTE: TempSupplier* vanno in bomComponentChanges perché vengono gestiti da UPDATE_COMPONENT
         // Gestione speciale per le note della BOM di livello 0
         if (isRootComponent && field === "ComponentNotes") {
-          console.log('[ComponentDetail] Root notes change:', {
-            newValue: value,
-            originalNotes: bom?.Notes,
-            isDifferent: value !== (bom?.Notes || "")
-          });
+          
 
           const originalNotes = bom?.Notes || "";
 
-          if (value !== originalNotes) {
-            console.log('[ComponentDetail] Setting header.notes in pendingChanges');
-            newChanges.header = {
-              ...(newChanges.header || {}),
-              notes: value,
-            };
-          } else if (newChanges.header) {
-            console.log('[ComponentDetail] Removing header.notes from pendingChanges');
-            delete newChanges.header.notes;
-            if (Object.keys(newChanges.header).length === 0) {
-              delete newChanges.header;
-            }
-          }
 
-          console.log('[ComponentDetail] Updated pendingChanges:', newChanges);
+
+          
           return newChanges;
         }
 
@@ -404,11 +388,7 @@ const ComponentDetail = ({ component, editMode }) => {
               const newTotalCost = (currentUnitCost * currentQuantity) || 0;
               newChanges[componentId].bomComponentChanges.TotalCost = newTotalCost;
               
-              console.log('Ricalcolo TotalCost:', {
-                UnitCost: currentUnitCost,
-                Quantity: currentQuantity,
-                TotalCost: newTotalCost
-              });
+
             }
           } else {
             // Se il valore è tornato all'originale, rimuovi la modifica
@@ -522,7 +502,7 @@ const ComponentDetail = ({ component, editMode }) => {
   // Controlla se il componente è in ERP
   const isComponentInERP = component?.stato_erp == "1" || component?.stato_erp === 1;
   const isParentInERP = parentComponent?.stato_erp == "1" || parentComponent?.stato_erp === 1;
-console.log(component);
+
   return (
     <div className="space-y-4">
       {/* Avviso se il componente è in ERP */}

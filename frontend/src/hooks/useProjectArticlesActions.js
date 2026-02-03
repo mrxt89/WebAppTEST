@@ -907,13 +907,20 @@ const useProjectArticlesActions = () => {
   );
 
   const updateRoutingCheckOperation = useCallback(
-    async (bomId, rtgStep, checkOperation) => {
+    async (bomId, rtgStep, checkOperation, itemId = null, componentId = null) => {
       try {
+        // FIX: Se BOMId = 0, passa anche ItemId o ComponentId nel body
+        const body = { checkOperation };
+        if ((!bomId || bomId === 0 || bomId === "0") && (itemId || componentId)) {
+          if (itemId) body.ItemId = itemId;
+          if (componentId) body.ComponentId = componentId;
+        }
+        
         const data = await makeRequest(
           `${config.API_BASE_URL}/projectArticles/boms/${bomId}/routing/${rtgStep}/check`,
           {
             method: "POST",
-            body: JSON.stringify({ checkOperation }),
+            body: JSON.stringify(body),
           },
         );
         return data;

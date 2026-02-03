@@ -109,7 +109,10 @@ export const linkDocument = createAsyncThunk(
         purchaseOrdId: documentType === "PurchaseOrd" ? documentId : undefined,
         saleDocId: documentType === "SaleDoc" ? documentId : undefined,
         purchaseDocId: documentType === "PurchaseDoc" ? documentId : undefined,
-        itemCode: documentType === "Item" ? documentId : undefined,
+        // Per gli articoli: se documentId è un numero, è un ItemId (articolo progetto)
+        // Se è una stringa, è un ItemCode (articolo gestionale)
+        itemCode: documentType === "Item" && typeof documentId === "string" ? documentId : undefined,
+        itemId: documentType === "Item" && typeof documentId === "number" ? documentId : undefined,
         custSuppCode: documentType === "CustSupp" ? documentId : undefined,
         custSuppType: documentType === "CustSupp" ? 3211264 : undefined,
         bom: documentType === "BillOfMaterials" ? documentId : undefined,

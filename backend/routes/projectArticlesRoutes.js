@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authenticateToken = require('../authenticateToken');
+const { logActivity, getRequestInfo } = require('../queries/projectActivityLog');
 const {
     addUpdateItem,
     addUpdateBOM,
@@ -107,6 +108,29 @@ router.delete('/projectArticles/items/:itemId/project/:projectId', authenticateT
         }
         
         const result = await unlinkItemFromProject(companyId, projectId, itemId);
+        
+        // LOGGING: Traccia lo scollegamento articolo da progetto
+        if (result.success) {
+            const userId = req.user.UserId;
+            const requestInfo = getRequestInfo(req);
+            await logActivity({
+                companyId,
+                projectId,
+                userId,
+                activityType: 'ITEM_UNLINK_PROJECT',
+                entityType: 'Item',
+                entityId: itemId,
+                action: 'UNLINK',
+                description: `Scollegato articolo ${itemId} dal progetto ${projectId}`,
+                metadata: {
+                    itemId: itemId,
+                    projectId: projectId
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività unlink articolo:', err);
+            });
+        }
         
         return res.json(result);
     } catch (err) {
@@ -222,6 +246,52 @@ router.post('/projectArticles/items', authenticateToken, async (req, res) => {
         }
         
         const result = await addUpdateItem(action, companyId, itemData, userId, projectId, sourceItemId);
+        
+        // LOGGING: Traccia l'operazione solo se ha successo
+        if (result.success) {
+            const requestInfo = getRequestInfo(req);
+            const activityType = action === 'ADD' ? 'ITEM_CREATE' : 
+                               action === 'UPDATE' ? 'ITEM_UPDATE' : 
+                               'ITEM_CREATE'; // COPY è considerato CREATE
+            
+            // Determina se è stato generato un nuovo codice
+            const finalItemCode = itemData.Item || result.createdComponentCode;
+            const isNewCodeGenerated = result.createdComponentCode && !itemData.Item;
+            const descriptionText = isNewCodeGenerated 
+                ? `${action === 'ADD' ? 'Creato' : action === 'UPDATE' ? 'Modificato' : 'Copiato'} articolo con nuovo codice generato: ${result.createdComponentCode}`
+                : `${action === 'ADD' ? 'Creato' : action === 'UPDATE' ? 'Modificato' : 'Copiato'} articolo ${finalItemCode || itemData.Description || result.itemId}`;
+            
+            await logActivity({
+                companyId,
+                projectId: projectId || null,
+                userId,
+                activityType,
+                entityType: 'Item',
+                entityId: result.itemId,
+                entityCode: finalItemCode || null,
+                action: action === 'ADD' ? 'CREATE' : action === 'UPDATE' ? 'UPDATE' : 'CREATE',
+                description: descriptionText,
+                newValues: {
+                    Item: finalItemCode,
+                    Description: itemData.Description,
+                    CategoryId: itemData.CategoryId,
+                    StatusId: itemData.StatusId,
+                    Nature: itemData.Nature,
+                    CustomerItemReference: itemData.CustomerItemReference
+                },
+                metadata: {
+                    sourceItemId: sourceItemId,
+                    projectId: projectId,
+                    action: action,
+                    isNewCodeGenerated: isNewCodeGenerated,
+                    generatedCode: result.createdComponentCode || null
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività articolo:', err);
+            });
+        }
+        
         res.json(result);
     } catch (err) {
         console.error(`Error in ${req.body.action || 'unknown'} item:`, err);
@@ -282,6 +352,168 @@ router.post('/projectArticles/boms', authenticateToken, async (req, res) => {
             
             // Chiama la funzione con il flag di creazione componente temporaneo
             const result = await addUpdateBOM(action, companyId, processedData, userId);
+            
+            // LOGGING: Traccia l'aggiunta del componente temporaneo
+            if (result.success) {
+                const requestInfo = getRequestInfo(req);
+                // Converti Id a numero se è stringa
+                let bomId = null;
+                if (processedData.Id) {
+                    bomId = typeof processedData.Id === 'string' ? parseInt(processedData.Id, 10) : processedData.Id;
+                } else if (result.bomId) {
+                    bomId = typeof result.bomId === 'string' ? parseInt(result.bomId, 10) : result.bomId;
+                }
+                
+                if (!bomId || isNaN(bomId)) {
+                    console.error('[LOG ERROR] bomId non valido per logging ADD_COMPONENT:', {
+                        action,
+                        processedDataId: processedData.Id,
+                        resultBomId: result.bomId,
+                        bomId
+                    });
+                    bomId = 0;
+                }
+                
+                // Recupera il ComponentId e ComponentCode creati dal risultato
+                let createdComponentId = result.createdComponentId || result.ComponentId;
+                let createdComponentCode = result.createdComponentCode || result.ComponentCode;
+                let componentLine = result.ComponentLine || result.Line;
+                
+                // Se non disponibili nel risultato, recuperali dal database
+                if (!createdComponentId || !createdComponentCode) {
+                    try {
+                        const sql = require('mssql');
+                        const config = require('../config');
+                        const pool = await sql.connect(config.database);
+                        
+                        // Recupera l'ultimo componente aggiunto a questa BOM
+                        const compInfo = await pool.request()
+                            .input('CompanyId', sql.Int, companyId)
+                            .input('BOMId', sql.BigInt, bomId)
+                            .query(`
+                                SELECT TOP 1 c.ComponentId, c.Line, i.Item, i.Description
+                                FROM dbo.MA_ProjectArticles_BOMComponents c
+                                LEFT JOIN dbo.MA_ProjectArticles_Items i ON c.ComponentId = i.Id AND c.CompanyId = i.CompanyId
+                                WHERE c.CompanyId = @CompanyId AND c.BOMId = @BOMId
+                                ORDER BY c.Line DESC
+                            `);
+                        
+                        if (compInfo.recordset.length > 0) {
+                            if (!createdComponentId) createdComponentId = compInfo.recordset[0].ComponentId;
+                            if (!createdComponentCode) createdComponentCode = compInfo.recordset[0].Item || 'TMP (creato)';
+                            if (!componentLine) componentLine = compInfo.recordset[0].Line;
+                        }
+                    } catch (err) {
+                        console.warn('Errore nel recupero componente creato per logging:', err);
+                    }
+                }
+                
+                // Fallback se ancora non disponibili
+                if (!createdComponentCode) createdComponentCode = 'TMP (creato)';
+                
+                // Recupera TUTTI i ProjectID che usano questa BOM
+                let projectIds = [];
+                if (bomId && !isNaN(bomId) && bomId > 0) {
+                    try {
+                        const sql = require('mssql');
+                        const config = require('../config');
+                        const pool = await sql.connect(config.database);
+                        
+                        const bomInfo = await pool.request()
+                            .input('CompanyId', sql.Int, companyId)
+                            .input('BOMId', sql.BigInt, bomId)
+                            .query(`
+                                SELECT bom.ItemId, bom.MainRefBOMId
+                                FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                                WHERE bom.CompanyId = @CompanyId AND bom.Id = @BOMId
+                            `);
+                        
+                        if (bomInfo.recordset.length > 0) {
+                            const mainRefBOMId = bomInfo.recordset[0].MainRefBOMId;
+                            const itemId = bomInfo.recordset[0].ItemId;
+                            
+                            if (mainRefBOMId) {
+                                // BOM condivisa
+                                const allBOMs = await pool.request()
+                                    .input('CompanyId', sql.Int, companyId)
+                                    .input('MainRefBOMId', sql.BigInt, mainRefBOMId)
+                                    .query(`
+                                        SELECT DISTINCT bom.ItemId
+                                        FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                                        WHERE bom.CompanyId = @CompanyId 
+                                          AND (bom.MainRefBOMId = @MainRefBOMId OR bom.Id = @MainRefBOMId)
+                                    `);
+                                
+                                const itemIds = allBOMs.recordset.map(r => r.ItemId).filter(Boolean);
+                                if (itemIds.length > 0) {
+                                    const itemIdsStr = itemIds.join(',');
+                                    const projectsResult = await pool.request()
+                                        .query(`
+                                            SELECT DISTINCT pi.ProjectID
+                                            FROM dbo.MA_ProjectsItems pi
+                                            WHERE pi.CompanyId = ${companyId}
+                                              AND pi.ItemId IN (${itemIdsStr})
+                                        `);
+                                    projectIds = projectsResult.recordset.map(r => r.ProjectID).filter(Boolean);
+                                }
+                            } else if (itemId) {
+                                // BOM non condivisa
+                                const projectInfo = await pool.request()
+                                    .input('CompanyId', sql.Int, companyId)
+                                    .input('ItemId', sql.BigInt, itemId)
+                                    .query(`
+                                        SELECT DISTINCT pi.ProjectID
+                                        FROM dbo.MA_ProjectsItems pi
+                                        WHERE pi.CompanyId = @CompanyId AND pi.ItemId = @ItemId
+                                    `);
+                                projectIds = projectInfo.recordset.map(r => r.ProjectID).filter(Boolean);
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Errore nel recupero progetti per logging ADD_COMPONENT:', err);
+                    }
+                }
+                
+                const projectsToLog = projectIds.length > 0 ? projectIds : [null];
+                
+                for (const projectId of projectsToLog) {
+                    await logActivity({
+                        companyId,
+                        projectId: projectId,
+                        userId,
+                        activityType: 'BOM_COMPONENT_ADD',
+                        entityType: 'BOMComponent',
+                        entityId: createdComponentId,
+                        entityCode: createdComponentCode,
+                        action: 'CREATE',
+                        description: `Aggiunto componente temporaneo ${createdComponentCode} alla BOM ${bomId}`,
+                        oldValues: null,
+                        newValues: {
+                            ComponentCode: createdComponentCode,
+                            ComponentId: createdComponentId,
+                            ComponentDescription: processedData.ComponentDescription,
+                            Quantity: processedData.Quantity,
+                            UoM: processedData.ComponentUoM || processedData.UoM,
+                            Nature: processedData.ComponentNatureValue || processedData.Nature,
+                            ComponentLine: componentLine
+                        },
+                        metadata: {
+                            BOMId: bomId,
+                            ComponentId: createdComponentId,
+                            ComponentCode: createdComponentCode,
+                            ComponentLine: componentLine,
+                            Quantity: processedData.Quantity,
+                            action: 'ADD_COMPONENT',
+                            CreateTempComponent: true,
+                            affectedProjectsCount: projectIds.length > 0 ? projectIds.length : 0
+                        },
+                        ...requestInfo
+                    }).catch(err => {
+                        console.error('Errore nel logging attività ADD_COMPONENT:', err);
+                    });
+                }
+            }
+            
             return res.json(result);
         }
         
@@ -308,8 +540,329 @@ router.post('/projectArticles/boms', authenticateToken, async (req, res) => {
             return res.json(result);
         } 
         else {
+            // Per DELETE_COMPONENT, recupera i dati del componente PRIMA dell'eliminazione
+            let deletedComponentData = null;
+            if (action === 'DELETE_COMPONENT' && bomData.Id && bomData.Line) {
+                try {
+                    const sql = require('mssql');
+                    const config = require('../config');
+                    const pool = await sql.connect(config.database);
+                    // Converti Id a numero se è stringa
+                    const bomIdNum = parseInt(bomData.Id);
+                    const lineNum = parseInt(bomData.Line);
+                    const compInfo = await pool.request()
+                        .input('CompanyId', sql.Int, companyId)
+                        .input('BOMId', sql.BigInt, bomIdNum)
+                        .input('Line', sql.Int, lineNum)
+                        .query(`
+                            SELECT c.Quantity, c.UnitCost, c.FixedCost, c.UoM, c.ComponentId, i.Item, i.Description
+                            FROM dbo.MA_ProjectArticles_BOMComponents c
+                            LEFT JOIN dbo.MA_ProjectArticles_Items i ON c.ComponentId = i.Id AND c.CompanyId = i.CompanyId
+                            WHERE c.CompanyId = @CompanyId AND c.BOMId = @BOMId AND c.Line = @Line
+                        `);
+                    if (compInfo.recordset.length > 0) {
+                        deletedComponentData = {
+                            ComponentCode: compInfo.recordset[0].Item,
+                            ComponentDescription: compInfo.recordset[0].Description,
+                            ComponentId: compInfo.recordset[0].ComponentId,
+                            Quantity: compInfo.recordset[0].Quantity,
+                            UnitCost: compInfo.recordset[0].UnitCost,
+                            FixedCost: compInfo.recordset[0].FixedCost,
+                            UoM: compInfo.recordset[0].UoM
+                        };
+                    }
+                } catch (err) {
+                    console.warn('Errore nel recupero dati componente prima eliminazione:', err);
+                }
+            }
+            
             // Per tutte le altre azioni, usiamo la funzione standard
             const result = await addUpdateBOM(action, companyId, bomData, userId);
+            
+            // LOGGING: Traccia l'operazione BOM
+            if (result.success) {
+                const requestInfo = getRequestInfo(req);
+                // Determina activityType e action in base all'azione
+                let activityType, actionType, description;
+                // Converti Id a numero se è stringa - IMPORTANTE: usa parseInt per convertire stringhe
+                let bomId = null;
+                if (bomData.Id) {
+                    bomId = typeof bomData.Id === 'string' ? parseInt(bomData.Id, 10) : bomData.Id;
+                } else if (result.bomId) {
+                    bomId = typeof result.bomId === 'string' ? parseInt(result.bomId, 10) : result.bomId;
+                }
+                
+                // Se bomId è ancora null o NaN, non possiamo loggare
+                if (!bomId || isNaN(bomId)) {
+                    console.error('[LOG ERROR] bomId non valido per logging:', {
+                        action,
+                        bomDataId: bomData.Id,
+                        resultBomId: result.bomId,
+                        bomId
+                    });
+                    // Logga comunque senza bomId specifico
+                    bomId = 0; // Usa 0 come fallback per evitare errori SQL
+                }
+                
+                // Debug logging
+                console.log('[LOG DEBUG] BOM Operation:', {
+                    action,
+                    bomId,
+                    bomDataId: bomData.Id,
+                    resultBomId: result.bomId,
+                    resultSuccess: result.success,
+                    companyId,
+                    userId
+                });
+                
+                if (action === 'ADD') {
+                    activityType = 'BOM_CREATE';
+                    actionType = 'CREATE';
+                    description = `Creata distinta base ${bomData.BOM || bomId}`;
+                } else if (action === 'UPDATE') {
+                    activityType = 'BOM_UPDATE';
+                    actionType = 'UPDATE';
+                    description = `Modificata distinta base ${bomData.BOM || bomId}`;
+                } else if (action === 'ADD_COMPONENT') {
+                    activityType = 'BOM_COMPONENT_ADD';
+                    actionType = 'CREATE';
+                    const componentInfo = bomData.ComponentCode || bomData.ComponentId || 'nuovo';
+                    description = `Aggiunto componente ${componentInfo} alla BOM ${bomId}`;
+                } else if (action === 'UPDATE_COMPONENT') {
+                    activityType = 'BOM_COMPONENT_UPDATE';
+                    actionType = 'UPDATE';
+                    description = `Modificato componente nella BOM ${bomId}`;
+                } else if (action === 'DELETE_COMPONENT') {
+                    activityType = 'BOM_COMPONENT_DELETE';
+                    actionType = 'DELETE';
+                    // Usa i dati recuperati prima dell'eliminazione
+                    const compCode = deletedComponentData?.ComponentCode || bomData.ComponentCode || bomData.ComponentId || `linea ${bomData.Line || bomData.ComponentLine}`;
+                    description = `Rimosso componente ${compCode} dalla BOM ${bomId}`;
+                } else if (action === 'REPLACE_COMPONENT') {
+                    activityType = 'BOM_COMPONENT_REPLACE';
+                    actionType = 'UPDATE';
+                    description = `Sostituito componente nella BOM ${bomId}`;
+                } else {
+                    activityType = 'BOM_UPDATE';
+                    actionType = 'UPDATE';
+                    description = `Operazione ${action} sulla BOM ${bomId}`;
+                }
+                
+                // Recupera TUTTI i ProjectID che usano questa BOM
+                // Se la BOM ha MainRefBOMId, trova tutte le BOM con lo stesso MainRefBOMId
+                // e logga su tutti i progetti che le usano
+                let projectIds = [];
+                if (bomId && !isNaN(bomId) && bomId > 0) {
+                    try {
+                        const sql = require('mssql');
+                        const config = require('../config');
+                        const pool = await sql.connect(config.database);
+                        
+                        // Prima recupera MainRefBOMId della BOM corrente
+                        const bomInfo = await pool.request()
+                            .input('CompanyId', sql.Int, companyId)
+                            .input('BOMId', sql.BigInt, bomId)
+                            .query(`
+                                SELECT bom.ItemId, bom.MainRefBOMId
+                                FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                                WHERE bom.CompanyId = @CompanyId AND bom.Id = @BOMId
+                            `);
+                        
+                        if (bomInfo.recordset.length > 0) {
+                            const mainRefBOMId = bomInfo.recordset[0].MainRefBOMId;
+                            const itemId = bomInfo.recordset[0].ItemId;
+                            
+                            if (mainRefBOMId) {
+                                // BOM condivisa: trova tutte le BOM con lo stesso MainRefBOMId
+                                const allBOMs = await pool.request()
+                                    .input('CompanyId', sql.Int, companyId)
+                                    .input('MainRefBOMId', sql.BigInt, mainRefBOMId)
+                                    .query(`
+                                        SELECT DISTINCT bom.ItemId
+                                        FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                                        WHERE bom.CompanyId = @CompanyId 
+                                          AND (bom.MainRefBOMId = @MainRefBOMId OR bom.Id = @MainRefBOMId)
+                                    `);
+                                
+                                const itemIds = allBOMs.recordset.map(r => r.ItemId).filter(Boolean);
+                                if (itemIds.length > 0) {
+                                    // Costruisci query con IN clause usando valori letterali (sicuro perché sono BigInt dal DB)
+                                    const itemIdsStr = itemIds.join(',');
+                                    const projectsResult = await pool.request()
+                                        .query(`
+                                            SELECT DISTINCT pi.ProjectID
+                                            FROM dbo.MA_ProjectsItems pi
+                                            WHERE pi.CompanyId = ${companyId}
+                                              AND pi.ItemId IN (${itemIdsStr})
+                                        `);
+                                    
+                                    projectIds = projectsResult.recordset.map(r => r.ProjectID).filter(Boolean);
+                                }
+                            } else if (itemId) {
+                                // BOM non condivisa: recupera solo il progetto dell'articolo corrente
+                                const projectInfo = await pool.request()
+                                    .input('CompanyId', sql.Int, companyId)
+                                    .input('ItemId', sql.BigInt, itemId)
+                                    .query(`
+                                        SELECT DISTINCT pi.ProjectID
+                                        FROM dbo.MA_ProjectsItems pi
+                                        WHERE pi.CompanyId = @CompanyId AND pi.ItemId = @ItemId
+                                    `);
+                                projectIds = projectInfo.recordset.map(r => r.ProjectID).filter(Boolean);
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Errore nel recupero progetti per logging:', err);
+                        console.error('Stack:', err.stack);
+                    }
+                } else {
+                    console.warn('[LOG WARNING] bomId non valido per recupero progetti:', bomId);
+                }
+                
+                // Prepara oldValues e newValues per UPDATE_COMPONENT e DELETE_COMPONENT
+                let oldValues = null;
+                let newValues = null;
+                if (action === 'DELETE_COMPONENT' && deletedComponentData) {
+                    // Per DELETE_COMPONENT, oldValues contiene i dati del componente eliminato
+                    oldValues = {
+                        ComponentCode: deletedComponentData.ComponentCode,
+                        ComponentDescription: deletedComponentData.ComponentDescription,
+                        ComponentId: deletedComponentData.ComponentId,
+                        Quantity: deletedComponentData.Quantity,
+                        UnitCost: deletedComponentData.UnitCost,
+                        FixedCost: deletedComponentData.FixedCost,
+                        UoM: deletedComponentData.UoM,
+                        ComponentLine: bomData.Line || bomData.ComponentLine
+                    };
+                    newValues = null; // Nessun nuovo valore per DELETE
+                } else if (action === 'UPDATE_COMPONENT') {
+                    // Recupera valori precedenti per tracciare le modifiche
+                    if (bomId && bomData.ComponentLine) {
+                        try {
+                            const sql = require('mssql');
+                            const config = require('../config');
+                            const pool = await sql.connect(config.database);
+                            const oldComp = await pool.request()
+                                .input('CompanyId', sql.Int, companyId)
+                                .input('BOMId', sql.BigInt, bomId)
+                                .input('Line', sql.Int, bomData.ComponentLine)
+                                .query(`
+                                    SELECT c.Quantity, c.UnitCost, c.FixedCost, c.UoM, c.ComponentId, i.Item
+                                    FROM dbo.MA_ProjectArticles_BOMComponents c
+                                    LEFT JOIN dbo.MA_ProjectArticles_Items i ON c.ComponentId = i.Id AND c.CompanyId = i.CompanyId
+                                    WHERE c.CompanyId = @CompanyId AND c.BOMId = @BOMId AND c.Line = @Line
+                                `);
+                            if (oldComp.recordset.length > 0) {
+                                oldValues = {
+                                    Quantity: oldComp.recordset[0].Quantity,
+                                    UnitCost: oldComp.recordset[0].UnitCost,
+                                    FixedCost: oldComp.recordset[0].FixedCost,
+                                    UoM: oldComp.recordset[0].UoM,
+                                    ComponentCode: oldComp.recordset[0].Item
+                                };
+                                // Migliora la descrizione con i dettagli della modifica
+                                const oldQty = oldComp.recordset[0].Quantity;
+                                const newQty = bomData.ComponentQuantity;
+                                const componentCode = oldComp.recordset[0].Item || bomData.ComponentCode;
+                                if (newQty !== undefined && oldQty !== null && newQty !== oldQty) {
+                                    description = `Modificata quantità componente ${componentCode} nella BOM ${bomId}: ${oldQty} → ${newQty}`;
+                                } else {
+                                    description = `Modificato componente ${componentCode} nella BOM ${bomId}`;
+                                }
+                            }
+                        } catch (err) {
+                            // Ignora errori
+                        }
+                    }
+                    newValues = {
+                        Quantity: bomData.ComponentQuantity,
+                        UnitCost: bomData.UnitCost,
+                        FixedCost: bomData.FixedCost,
+                        UoM: bomData.UoM,
+                        ComponentCode: bomData.ComponentCode
+                    };
+                } else {
+                    newValues = {
+                        BOM: bomData.BOM,
+                        Description: bomData.Description,
+                        Version: bomData.Version,
+                        ProductionLot: bomData.ProductionLot
+                    };
+                }
+                
+                // Determina entityId e entityCode in base all'azione
+                let entityId, entityCode;
+                if (action === 'DELETE_COMPONENT' && deletedComponentData) {
+                    entityId = deletedComponentData.ComponentId;
+                    entityCode = deletedComponentData.ComponentCode;
+                } else if (action.includes('COMPONENT')) {
+                    entityId = bomData.ComponentId;
+                    entityCode = bomData.ComponentCode;
+                } else {
+                    entityId = bomId;
+                    entityCode = bomData.BOM;
+                }
+                
+                // Logga su tutti i progetti che usano questa BOM
+                // Se non ci sono progetti, logga comunque con projectId = null
+                const projectsToLog = projectIds.length > 0 ? projectIds : [null];
+                
+                console.log('[LOG DEBUG] About to log:', {
+                    action,
+                    activityType,
+                    bomId,
+                    entityId,
+                    entityCode,
+                    projectsToLog,
+                    projectIdsCount: projectIds.length
+                });
+                
+                for (const projectId of projectsToLog) {
+                    const logResult = await logActivity({
+                        companyId,
+                        projectId: projectId,
+                        userId,
+                        activityType,
+                        entityType: action.includes('COMPONENT') ? 'BOMComponent' : 'BOM',
+                        entityId: entityId,
+                        entityCode: entityCode,
+                        action: actionType,
+                        description,
+                        oldValues: oldValues,
+                        newValues: newValues,
+                        metadata: {
+                            BOMId: bomId,
+                            ComponentId: deletedComponentData?.ComponentId || bomData.ComponentId,
+                            ComponentCode: deletedComponentData?.ComponentCode || bomData.ComponentCode,
+                            ComponentLine: bomData.Line || bomData.ComponentLine,
+                            Quantity: deletedComponentData?.Quantity || bomData.ComponentQuantity || bomData.Quantity,
+                            action: action,
+                            affectedProjectsCount: projectIds.length > 0 ? projectIds.length : 0
+                        },
+                        ...requestInfo
+                    }).catch(err => {
+                        console.error('Errore nel logging attività BOM:', err);
+                        console.error('Dettagli errore:', {
+                            message: err.message,
+                            stack: err.stack,
+                            logData: {
+                                companyId,
+                                projectId,
+                                userId,
+                                activityType,
+                                entityType: action.includes('COMPONENT') ? 'BOMComponent' : 'BOM',
+                                entityId,
+                                entityCode,
+                                action: actionType
+                            }
+                        });
+                        return { success: false, error: err.message };
+                    });
+                    
+                    console.log('[LOG DEBUG] Log result:', logResult);
+                }
+            }
+            
             res.json(result);
         }
     } catch (err) {
@@ -530,14 +1083,14 @@ router.post('/projectArticles/boms/:id/routing/:rtgStep/check', authenticateToke
     try {
         const companyId = req.user.CompanyId;
         const userId = req.user.UserId;
-        const bomId = parseInt(req.params.id);
+        let bomId = parseInt(req.params.id);
         const rtgStep = parseInt(req.params.rtgStep);
-        const { checkOperation } = req.body;
+        const { checkOperation, ItemId, ComponentId } = req.body;
 
-        if (isNaN(bomId) || isNaN(rtgStep)) {
+        if (isNaN(rtgStep)) {
             return res.status(400).json({
                 success: 0,
-                msg: 'Parametri bomId o rtgStep non validi'
+                msg: 'Parametro rtgStep non valido'
             });
         }
 
@@ -545,6 +1098,49 @@ router.post('/projectArticles/boms/:id/routing/:rtgStep/check', authenticateToke
             return res.status(400).json({
                 success: 0,
                 msg: 'Valore checkOperation mancante'
+            });
+        }
+
+        // FIX: Se bomId = 0, cerca la BOM per ItemId o ComponentId
+        if ((!bomId || bomId === 0) && (ItemId || ComponentId)) {
+            const targetItemId = ItemId || ComponentId;
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                
+                const bomCheck = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('ItemId', sql.BigInt, targetItemId)
+                    .query(`
+                        SELECT TOP 1 Id
+                        FROM dbo.MA_ProjectArticles_BillOfMaterials
+                        WHERE CompanyId = @CompanyId AND ItemId = @ItemId
+                        ORDER BY TBCreated DESC
+                    `);
+                
+                if (bomCheck.recordset.length > 0) {
+                    bomId = bomCheck.recordset[0].Id;
+                    console.log(`[DEBUG] BOM trovata per ItemId ${targetItemId}: ${bomId}`);
+                } else {
+                    return res.status(404).json({
+                        success: 0,
+                        msg: `BOM non trovata per ItemId/ComponentId ${targetItemId}`
+                    });
+                }
+            } catch (err) {
+                console.error('Errore nel recupero BOM per ItemId/ComponentId:', err);
+                return res.status(500).json({
+                    success: 0,
+                    msg: 'Errore nel recupero BOM'
+                });
+            }
+        }
+
+        if (isNaN(bomId) || bomId === 0) {
+            return res.status(400).json({
+                success: 0,
+                msg: 'Parametro bomId non valido'
             });
         }
 
@@ -560,6 +1156,57 @@ router.post('/projectArticles/boms/:id/routing/:rtgStep/check', authenticateToke
 
         if (result.success === 0) {
             return res.status(400).json(result);
+        }
+
+        // LOGGING: Traccia modifica operazione routing
+        if (result.success === 1) {
+            const requestInfo = getRequestInfo(req);
+            // Recupera ProjectID dalla BOM
+            let projectId = null;
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                const bomInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('BOMId', sql.BigInt, bomId)
+                    .query(`
+                        SELECT bom.ItemId, pi.ProjectID
+                        FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                        LEFT JOIN dbo.MA_ProjectsItems pi ON bom.ItemId = pi.ItemId AND bom.CompanyId = pi.CompanyId
+                        WHERE bom.CompanyId = @CompanyId AND bom.Id = @BOMId
+                    `);
+                if (bomInfo.recordset.length > 0) {
+                    projectId = bomInfo.recordset[0].ProjectID;
+                }
+            } catch (err) {
+                // Ignora errori
+            }
+            
+            await logActivity({
+                companyId,
+                projectId,
+                userId,
+                activityType: 'BOM_ROUTING_UPDATE',
+                entityType: 'BOMRouting',
+                entityId: rtgStep,
+                action: 'UPDATE',
+                description: `${normalizedValue === 1 ? 'Abilitata' : 'Disabilitata'} operazione di controllo per ciclo ${rtgStep} nella BOM ${bomId}`,
+                oldValues: {
+                    checkOperation: normalizedValue === 1 ? 0 : 1
+                },
+                newValues: {
+                    checkOperation: normalizedValue
+                },
+                metadata: {
+                    BOMId: bomId,
+                    rtgStep: rtgStep,
+                    checkOperation: normalizedValue
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività modifica routing:', err);
+            });
         }
 
         res.json({
@@ -697,6 +1344,32 @@ router.post('/projectArticles/items/import', authenticateToken, async (req, res)
             maxLevels || 10
         );
         
+        // LOGGING: Traccia l'importazione
+        if (result.success) {
+            const requestInfo = getRequestInfo(req);
+            await logActivity({
+                companyId,
+                projectId,
+                userId,
+                activityType: 'ITEM_IMPORT',
+                entityType: 'Item',
+                entityId: result.itemId || null,
+                entityCode: erpItem?.Item || null,
+                action: 'IMPORT',
+                description: `Importato articolo ${erpItem?.Item || erpItem?.Description || 'da ERP'}${importBOM ? ' con BOM' : ''}`,
+                metadata: {
+                    erpItemCode: erpItem?.Item,
+                    importBOM: importBOM === true,
+                    processMultilevelBOM: processMultilevelBOM !== false,
+                    maxLevels: maxLevels || 10,
+                    itemId: result.itemId
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività import articolo:', err);
+            });
+        }
+        
         res.json(result);
     } catch (err) {
         console.error('Error importing item:', err);
@@ -735,6 +1408,29 @@ router.post('/projectArticles/items/link', authenticateToken, async (req, res) =
         
         // Associa l'articolo al progetto
         const result = await linkItemToProject(companyId, projectId, itemId);
+        
+        // LOGGING: Traccia il collegamento articolo a progetto
+        if (result.success) {
+            const requestInfo = getRequestInfo(req);
+            await logActivity({
+                companyId,
+                projectId,
+                userId,
+                activityType: 'ITEM_LINK_PROJECT',
+                entityType: 'Item',
+                entityId: itemId,
+                action: 'LINK',
+                description: `Collegato articolo ${itemId} al progetto ${projectId}${importBOM ? ' con importazione BOM' : ''}`,
+                metadata: {
+                    itemId: itemId,
+                    projectId: projectId,
+                    importBOM: importBOM === true
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività link articolo:', err);
+            });
+        }
         
         // Se l'associazione è avvenuta con successo e si richiede anche l'importazione della distinta base
         if (result.success && importBOM) {
@@ -835,6 +1531,77 @@ router.post('/projectArticles/boms/:id/replaceComponent', authenticateToken, asy
             userId
         );
         
+        // LOGGING: Traccia sostituzione componente
+        if (result.success) {
+            const requestInfo = getRequestInfo(req);
+            // Recupera ProjectID dalla BOM
+            let projectId = null;
+            let oldComponentCode = null;
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                const bomInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('BOMId', sql.BigInt, bomId)
+                    .query(`
+                        SELECT bom.ItemId, pi.ProjectID
+                        FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                        LEFT JOIN dbo.MA_ProjectsItems pi ON bom.ItemId = pi.ItemId AND bom.CompanyId = pi.CompanyId
+                        WHERE bom.CompanyId = @CompanyId AND bom.Id = @BOMId
+                    `);
+                if (bomInfo.recordset.length > 0) {
+                    projectId = bomInfo.recordset[0].ProjectID;
+                }
+                // Recupera codice componente vecchio
+                const oldComp = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('BOMId', sql.BigInt, bomId)
+                    .input('Line', sql.Int, parseInt(componentLine))
+                    .query(`
+                        SELECT c.ComponentId, i.Item
+                        FROM dbo.MA_ProjectArticles_BOMComponents c
+                        LEFT JOIN dbo.MA_ProjectArticles_Items i ON c.ComponentId = i.Id AND c.CompanyId = i.CompanyId
+                        WHERE c.CompanyId = @CompanyId AND c.BOMId = @BOMId AND c.Line = @Line
+                    `);
+                if (oldComp.recordset.length > 0) {
+                    oldComponentCode = oldComp.recordset[0].Item;
+                }
+            } catch (err) {
+                // Ignora errori
+            }
+            
+            await logActivity({
+                companyId,
+                projectId,
+                userId,
+                activityType: 'BOM_COMPONENT_REPLACE',
+                entityType: 'BOMComponent',
+                entityId: parseInt(newComponentId),
+                entityCode: newComponentCode,
+                action: 'UPDATE',
+                description: `Sostituito componente linea ${componentLine} nella BOM ${bomId}: ${oldComponentCode || 'vecchio'} → ${newComponentCode || newComponentId}`,
+                oldValues: {
+                    componentLine: parseInt(componentLine),
+                    oldComponentCode: oldComponentCode
+                },
+                newValues: {
+                    componentLine: parseInt(componentLine),
+                    newComponentId: parseInt(newComponentId),
+                    newComponentCode: newComponentCode
+                },
+                metadata: {
+                    BOMId: bomId,
+                    componentLine: parseInt(componentLine),
+                    oldComponentId: null,
+                    newComponentId: parseInt(newComponentId)
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività sostituzione componente:', err);
+            });
+        }
+        
         res.json(result);
     } catch (err) {
         console.error('Error replacing component:', err);
@@ -900,6 +1667,67 @@ router.post('/projectArticles/boms/:id/replaceWithNewComponent', authenticateTok
             bomDataParams,
             userId
         );
+        
+        // LOGGING: Traccia sostituzione con nuovo componente
+        if (result.success) {
+            const requestInfo = getRequestInfo(req);
+            // Recupera ProjectID dalla BOM
+            let projectId = null;
+            let newItemCode = null;
+            if (result.createdComponentCode) {
+                newItemCode = result.createdComponentCode;
+            } else if (newComponentData?.Item) {
+                newItemCode = newComponentData.Item;
+            }
+            
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                const bomInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('BOMId', sql.BigInt, bomId)
+                    .query(`
+                        SELECT bom.ItemId, pi.ProjectID
+                        FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                        LEFT JOIN dbo.MA_ProjectsItems pi ON bom.ItemId = pi.ItemId AND bom.CompanyId = pi.CompanyId
+                        WHERE bom.CompanyId = @CompanyId AND bom.Id = @BOMId
+                    `);
+                if (bomInfo.recordset.length > 0) {
+                    projectId = bomInfo.recordset[0].ProjectID;
+                }
+            } catch (err) {
+                // Ignora errori
+            }
+            
+            await logActivity({
+                companyId,
+                projectId,
+                userId,
+                activityType: 'BOM_COMPONENT_REPLACE',
+                entityType: 'BOMComponent',
+                entityId: result.newComponentId || null,
+                entityCode: newItemCode,
+                action: 'CREATE',
+                description: `Sostituito componente linea ${componentLine} nella BOM ${bomId} con nuovo componente ${newItemCode || 'temporaneo'}`,
+                newValues: {
+                    componentLine: parseInt(componentLine),
+                    newComponentCode: newItemCode,
+                    newComponentDescription: newComponentData?.Description,
+                    quantity: newComponentData?.Quantity
+                },
+                metadata: {
+                    BOMId: bomId,
+                    componentLine: parseInt(componentLine),
+                    createTempComponent: createTempComponent === true,
+                    newComponentId: result.newComponentId,
+                    copyBOM: newComponentData?.CopyBOM
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività sostituzione con nuovo componente:', err);
+            });
+        }
         
         res.json(result);
     } catch (err) {
@@ -984,6 +1812,51 @@ router.post('/projectArticles/boms/:id/reorderRoutings', authenticateToken, asyn
       // Chiama una nuova funzione nel backend che gestisce l'intera operazione in una transazione
       const result = await reorderBOMRoutings(companyId, bomId, cycles, userId);
       
+      // LOGGING: Traccia riordino cicli/routing
+      if (result.success) {
+        const requestInfo = getRequestInfo(req);
+        // Recupera ProjectID dalla BOM
+        let projectId = null;
+        try {
+          const sql = require('mssql');
+          const config = require('../config');
+          const pool = await sql.connect(config.database);
+          const bomInfo = await pool.request()
+            .input('CompanyId', sql.Int, companyId)
+            .input('BOMId', sql.BigInt, bomId)
+            .query(`
+              SELECT bom.ItemId, pi.ProjectID
+              FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+              LEFT JOIN dbo.MA_ProjectsItems pi ON bom.ItemId = pi.ItemId AND bom.CompanyId = pi.CompanyId
+              WHERE bom.CompanyId = @CompanyId AND bom.Id = @BOMId
+            `);
+          if (bomInfo.recordset.length > 0) {
+            projectId = bomInfo.recordset[0].ProjectID;
+          }
+        } catch (err) {
+          // Ignora errori
+        }
+        
+        await logActivity({
+          companyId,
+          projectId,
+          userId,
+          activityType: 'BOM_ROUTING_REORDER',
+          entityType: 'BOM',
+          entityId: bomId,
+          action: 'UPDATE',
+          description: `Riordinati ${cycles.length} cicli/routing nella BOM ${bomId}`,
+          metadata: {
+            BOMId: bomId,
+            cyclesCount: cycles.length,
+            cycles: cycles.map(c => ({ rtgStep: c.rtgStep, newSequence: c.sequence }))
+          },
+          ...requestInfo
+        }).catch(err => {
+          console.warn('Errore nel logging attività riordino routing:', err);
+        });
+      }
+      
       res.json(result);
     } catch (err) {
       console.error('Error reordering routings:', err);
@@ -1017,6 +1890,56 @@ router.get('/projectArticles/unitsOfMeasure', authenticateToken, async (req, res
         
         // Usa la funzione aggiornata con validazione
         const result = await updateItemDetailsWithValidation(itemId, itemData);
+        
+        // LOGGING: Traccia la modifica dettagli articolo
+        if (result.success) {
+            const companyId = req.user.CompanyId;
+            const userId = req.user.UserId;
+            const requestInfo = getRequestInfo(req);
+            // Recupera ProjectID
+            let projectId = null;
+            let itemCode = null;
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                const itemInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('ItemId', sql.BigInt, itemId)
+                    .query(`
+                        SELECT i.Item, pi.ProjectID
+                        FROM dbo.MA_ProjectArticles_Items i
+                        LEFT JOIN dbo.MA_ProjectsItems pi ON i.Id = pi.ItemId AND i.CompanyId = pi.CompanyId
+                        WHERE i.CompanyId = @CompanyId AND i.Id = @ItemId
+                    `);
+                if (itemInfo.recordset.length > 0) {
+                    itemCode = itemInfo.recordset[0].Item;
+                    projectId = itemInfo.recordset[0].ProjectID;
+                }
+            } catch (err) {
+                // Ignora errori
+            }
+            
+            await logActivity({
+                companyId,
+                projectId,
+                userId,
+                activityType: 'ITEM_UPDATE',
+                entityType: 'Item',
+                entityId: itemId,
+                entityCode: itemCode,
+                action: 'UPDATE',
+                description: `Modificati dettagli articolo ${itemCode || itemId}`,
+                newValues: itemData,
+                metadata: {
+                    itemId: itemId,
+                    itemCode: itemCode
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività modifica dettagli articolo:', err);
+            });
+        }
         
         if (result.success && result.warning) {
             // Include l'avviso nella risposta
@@ -1080,6 +2003,32 @@ router.post('/projectArticles/items/import-with-selection', authenticateToken, a
             parseInt(projectId),
             importData
         );
+        
+        // LOGGING: Traccia importazione con selezione
+        if (result.success) {
+            const requestInfo = getRequestInfo(req);
+            await logActivity({
+                companyId,
+                projectId: parseInt(projectId),
+                userId,
+                activityType: 'ITEM_IMPORT',
+                entityType: 'Item',
+                entityId: result.itemId || null,
+                entityCode: sourceItem?.Item || null,
+                action: 'IMPORT',
+                description: `Importato articolo ${sourceItem?.Item || sourceItem?.Description} con selezione componenti (${components.length} componenti selezionati)`,
+                metadata: {
+                    sourceItemCode: sourceItem?.Item,
+                    itemId: result.itemId,
+                    createNewBOM: createNewBOM === true,
+                    componentsCount: components.length,
+                    componentsSelected: components.map(c => c.ComponentCode || c.Item).filter(Boolean)
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività import con selezione:', err);
+            });
+        }
         
         res.json(result);
     } catch (err) {
@@ -1362,6 +2311,102 @@ router.post('/projectArticles/boms/:id/sync-intercompany', authenticateToken, as
             autoCreateReferences
         );
 
+        // LOGGING: Traccia sincronizzazione intercompany
+        if (result.success) {
+            const requestInfo = getRequestInfo(req);
+            // Recupera informazioni sulla BOM e progetti
+            let projectIds = [];
+            let entityCode = null;
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                const bomInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('BOMId', sql.BigInt, bomId)
+                    .query(`
+                        SELECT bom.BOM, bom.ItemId, bom.MainRefBOMId
+                        FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                        WHERE bom.CompanyId = @CompanyId AND bom.Id = @BOMId
+                    `);
+                if (bomInfo.recordset.length > 0) {
+                    entityCode = bomInfo.recordset[0].BOM;
+                    const mainRefBOMId = bomInfo.recordset[0].MainRefBOMId;
+                    const itemId = bomInfo.recordset[0].ItemId;
+                    
+                    if (mainRefBOMId) {
+                        const allBOMs = await pool.request()
+                            .input('CompanyId', sql.Int, companyId)
+                            .input('MainRefBOMId', sql.BigInt, mainRefBOMId)
+                            .query(`
+                                SELECT DISTINCT bom.ItemId
+                                FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                                WHERE bom.CompanyId = @CompanyId 
+                                  AND (bom.MainRefBOMId = @MainRefBOMId OR bom.Id = @MainRefBOMId)
+                            `);
+                        const itemIds = allBOMs.recordset.map(r => r.ItemId).filter(Boolean);
+                        if (itemIds.length > 0) {
+                            const itemIdsStr = itemIds.join(',');
+                            const projectsResult = await pool.request()
+                                .query(`
+                                    SELECT DISTINCT pi.ProjectID
+                                    FROM dbo.MA_ProjectsItems pi
+                                    WHERE pi.CompanyId = ${companyId}
+                                      AND pi.ItemId IN (${itemIdsStr})
+                                `);
+                            projectIds = projectsResult.recordset.map(r => r.ProjectID).filter(Boolean);
+                        }
+                    } else if (itemId) {
+                        const projectInfo = await pool.request()
+                            .input('CompanyId', sql.Int, companyId)
+                            .input('ItemId', sql.BigInt, itemId)
+                            .query(`
+                                SELECT DISTINCT pi.ProjectID
+                                FROM dbo.MA_ProjectsItems pi
+                                WHERE pi.CompanyId = @CompanyId AND pi.ItemId = @ItemId
+                            `);
+                        projectIds = projectInfo.recordset.map(r => r.ProjectID).filter(Boolean);
+                    }
+                }
+            } catch (err) {
+                console.warn('Errore nel recupero progetti per logging sync intercompany:', err);
+            }
+
+            const projectsToLog = projectIds.length > 0 ? projectIds : [null];
+            
+            for (const projId of projectsToLog) {
+                await logActivity({
+                    companyId,
+                    projectId: projId,
+                    userId,
+                    activityType: 'INTERCOMPANY_SYNC',
+                    entityType: 'BOM',
+                    entityId: bomId,
+                    entityCode: entityCode,
+                    action: 'SYNC',
+                    description: `Sincronizzata condivisione intercompany per BOM ${entityCode || bomId}`,
+                    newValues: {
+                        BOMId: bomId,
+                        BOMCode: entityCode,
+                        SyncAttachments: syncAttachments,
+                        AutoCreateReferences: autoCreateReferences,
+                        ReferencesCreated: result.referencesCreated || 0,
+                        ComponentsSynced: result.componentsSynced || 0
+                    },
+                    metadata: {
+                        bomId: bomId,
+                        bomCode: entityCode,
+                        syncAttachments: syncAttachments,
+                        autoCreateReferences: autoCreateReferences,
+                        affectedProjectsCount: projectIds.length > 0 ? projectIds.length : 0
+                    },
+                    ...requestInfo
+                }).catch(err => {
+                    console.warn('Errore nel logging sincronizzazione intercompany:', err);
+                });
+            }
+        }
+
         res.json(result);
     } catch (err) {
         console.error('Error syncing intercompany sharing:', err);
@@ -1589,6 +2634,37 @@ router.post('/projectArticles/sync-intercompany-components', authenticateToken, 
             syncAttachments
         );
 
+        // LOGGING: Traccia sincronizzazione componenti intercompany
+        if (result.success) {
+            const requestInfo = getRequestInfo(req);
+            await logActivity({
+                companyId,
+                projectId: projectId,
+                userId,
+                activityType: 'INTERCOMPANY_COMPONENTS_SYNC',
+                entityType: 'BOM',
+                entityId: null,
+                entityCode: null,
+                action: 'SYNC',
+                description: `Sincronizzati ${components.length} componenti intercompany per progetto ${projectId}`,
+                newValues: {
+                    ComponentsCount: components.length,
+                    SyncAttachments: syncAttachments,
+                    ComponentsSynced: result.componentsSynced || 0,
+                    ReferencesCreated: result.referencesCreated || 0
+                },
+                metadata: {
+                    projectId: projectId,
+                    componentsCount: components.length,
+                    syncAttachments: syncAttachments,
+                    componentIds: components.map(c => c.componentId || c.ComponentId).filter(Boolean)
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging sincronizzazione componenti intercompany:', err);
+            });
+        }
+
         if (result.success) {
             return res.json({
                 success: 1,
@@ -1661,6 +2737,63 @@ router.post('/projectArticles/intercompany/temporary-items/:id/replace', authent
             companyId,
             userId
         );
+
+        // LOGGING: Traccia la ricodifica
+        if (result.success) {
+            const requestInfo = getRequestInfo(req);
+            // Recupera informazioni sull'articolo ricodificato
+            let projectId = null;
+            let oldItemCode = null;
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                const itemInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('ItemId', sql.BigInt, temporaryItemId)
+                    .query(`
+                        SELECT i.Item, i.Description, pi.ProjectID
+                        FROM dbo.MA_ProjectArticles_Items i
+                        LEFT JOIN dbo.MA_ProjectsItems pi ON i.Id = pi.ItemId AND i.CompanyId = pi.CompanyId
+                        WHERE i.CompanyId = @CompanyId AND i.Id = @ItemId
+                    `);
+                if (itemInfo.recordset.length > 0) {
+                    oldItemCode = itemInfo.recordset[0].Item;
+                    projectId = itemInfo.recordset[0].ProjectID;
+                }
+            } catch (err) {
+                console.warn('Errore nel recupero info articolo per logging ricodifica:', err);
+            }
+
+            await logActivity({
+                companyId,
+                projectId: projectId,
+                userId,
+                activityType: 'ITEM_RECODE',
+                entityType: 'Item',
+                entityId: temporaryItemId,
+                entityCode: definitiveItemCode,
+                action: 'UPDATE',
+                description: `Ricodificato articolo da ${oldItemCode || temporaryItemId} a ${definitiveItemCode}`,
+                oldValues: {
+                    ItemCode: oldItemCode,
+                    ItemId: temporaryItemId
+                },
+                newValues: {
+                    ItemCode: definitiveItemCode,
+                    ItemId: result.newItemId || temporaryItemId
+                },
+                metadata: {
+                    oldItemCode: oldItemCode,
+                    newItemCode: definitiveItemCode,
+                    oldItemId: temporaryItemId,
+                    newItemId: result.newItemId
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività ricodifica:', err);
+            });
+        }
 
         res.json(result);
     } catch (err) {

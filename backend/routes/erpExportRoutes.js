@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authenticateToken = require('../authenticateToken');
+const { logActivity, getRequestInfo } = require('../queries/projectActivityLog');
 const {
     exportItemToERP,
     exportBOMToERP,
@@ -44,6 +45,54 @@ router.post('/erp/export/item', authenticateToken, async (req, res) => {
         // Export the item
         const result = await exportItemToERP(companyId, itemId, userId, autoSync);
         
+        // LOGGING: Traccia l'esportazione articolo
+        if (result.success) {
+            const requestInfo = getRequestInfo(req);
+            // Recupera ProjectID e ItemCode
+            let projectId = null;
+            let itemCode = null;
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                const itemInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('ItemId', sql.BigInt, itemId)
+                    .query(`
+                        SELECT i.Item, pi.ProjectID
+                        FROM dbo.MA_ProjectArticles_Items i
+                        LEFT JOIN dbo.MA_ProjectsItems pi ON i.Id = pi.ItemId AND i.CompanyId = pi.CompanyId
+                        WHERE i.CompanyId = @CompanyId AND i.Id = @ItemId
+                    `);
+                if (itemInfo.recordset.length > 0) {
+                    itemCode = itemInfo.recordset[0].Item;
+                    projectId = itemInfo.recordset[0].ProjectID;
+                }
+            } catch (err) {
+                // Ignora errori
+            }
+            
+            await logActivity({
+                companyId,
+                projectId,
+                userId,
+                activityType: 'EXPORT_ITEM',
+                entityType: 'Item',
+                entityId: itemId,
+                entityCode: itemCode,
+                action: 'EXPORT',
+                description: `Esportato articolo ${itemCode || itemId} a ERP${autoSync ? ' (con sincronizzazione automatica)' : ''}`,
+                metadata: {
+                    itemId: itemId,
+                    itemCode: itemCode,
+                    autoSync: autoSync
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività esportazione articolo:', err);
+            });
+        }
+        
         res.json({
             success: result.success ? 1 : 0,
             msg: result.message
@@ -85,6 +134,56 @@ router.post('/erp/export/bom', authenticateToken, async (req, res) => {
         
         // Export the BOM
         const result = await exportBOMToERP(companyId, bomId, version, userId, checkRecursive, autoSync);
+        
+        // LOGGING: Traccia esportazione BOM
+        if (result.success) {
+            const requestInfo = getRequestInfo(req);
+            // Recupera ProjectID e BOMCode dalla BOM
+            let projectId = null;
+            let bomCode = null;
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                const bomInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('BOMId', sql.BigInt, bomId)
+                    .query(`
+                        SELECT bom.BOM, bom.ItemId, pi.ProjectID
+                        FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                        LEFT JOIN dbo.MA_ProjectsItems pi ON bom.ItemId = pi.ItemId AND bom.CompanyId = pi.CompanyId
+                        WHERE bom.CompanyId = @CompanyId AND bom.Id = @BOMId
+                    `);
+                if (bomInfo.recordset.length > 0) {
+                    bomCode = bomInfo.recordset[0].BOM;
+                    projectId = bomInfo.recordset[0].ProjectID;
+                }
+            } catch (err) {
+                // Ignora errori
+            }
+            
+            await logActivity({
+                companyId,
+                projectId,
+                userId,
+                activityType: 'EXPORT_BOM',
+                entityType: 'BOM',
+                entityId: bomId,
+                entityCode: bomCode,
+                action: 'EXPORT',
+                description: `Esportata BOM ${bomCode || bomId} versione ${version} a ERP${autoSync ? ' (con sincronizzazione automatica)' : ''}`,
+                metadata: {
+                    bomId: bomId,
+                    bomCode: bomCode,
+                    version: version,
+                    checkRecursive: checkRecursive,
+                    autoSync: autoSync
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività esportazione BOM:', err);
+            });
+        }
         
         res.json({
             success: result.success ? 1 : 0,

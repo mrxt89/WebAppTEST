@@ -1,6 +1,7 @@
 // frontend/src/components/chat/DocumentLinker.jsx
 import React, { useState, useEffect } from "react";
 import { useNotifications } from "@/redux/features/notifications/notificationsHooks";
+import useProjectArticlesActions from "@/hooks/useProjectArticlesActions";
 import {
   X,
   Search,
@@ -13,14 +14,17 @@ import {
   Ticket,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { swal } from "@/lib/common";
 
 const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
   const [documentType, setDocumentType] = useState("MO");
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [projectId, setProjectId] = useState(null);
 
-  const { searchDocuments, linkDocument } = useNotifications();
+  const { searchDocuments, linkDocument, getLinkedDocuments } = useNotifications();
+  const { linkItemToProject } = useProjectArticlesActions();
 
   // Opzioni di tipo documento
   const documentTypes = [
@@ -37,11 +41,52 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
     { id: "Ticket", label: "Ticket", icon: <Ticket /> },
   ];
 
+  // Recupera il ProjectID dai documenti collegati alla chat
+  useEffect(() => {
+    const fetchProjectId = async () => {
+      if (!notificationId || !isOpen) {
+        setProjectId(null);
+        return;
+      }
+
+      try {
+        const linkedDocs = await getLinkedDocuments(notificationId);
+        if (linkedDocs && linkedDocs.documents) {
+          // Cerca un documento di tipo Project
+          const projectDoc = linkedDocs.documents.find(
+            (doc) => doc.DocumentType === "Project" && doc.ProjectID > 0
+          );
+          if (projectDoc) {
+            setProjectId(projectDoc.ProjectID);
+          } else {
+            // Se non c'è un documento Project, cerca un Task che ha un ProjectID
+            const taskDoc = linkedDocs.documents.find(
+              (doc) => doc.DocumentType === "Task" && doc.ProjectID > 0
+            );
+            if (taskDoc) {
+              setProjectId(taskDoc.ProjectID);
+            } else {
+              setProjectId(null);
+            }
+          }
+        } else {
+          setProjectId(null);
+        }
+      } catch (error) {
+        console.error("Errore nel recupero del ProjectID:", error);
+        setProjectId(null);
+      }
+    };
+
+    fetchProjectId();
+  }, [notificationId, isOpen, getLinkedDocuments]);
+
   // Reset alla chiusura
   useEffect(() => {
     if (!isOpen) {
       setSearchTerm("");
       setSearchResults([]);
+      setProjectId(null);
     }
   }, [isOpen]);
 
@@ -64,15 +109,77 @@ const DocumentLinker = ({ notificationId, isOpen, onClose }) => {
   // Collega un documento
   const handleLinkDocument = async (document) => {
     try {
-      console.log(document)
+      console.log("Collegamento documento:", document);
+      
+      // Collega il documento alla chat
       await linkDocument(
         notificationId,
         document.DocumentId,
         document.DocumentType,
       );
+
+      // Se è un articolo (Item) e la chat è collegata a un progetto, collega anche l'articolo al progetto
+      if (document.DocumentType === "Item" && projectId) {
+        try {
+          // Per gli articoli:
+          // - Dal gestionale: DocumentId è ItemCode (stringa), ItemId è NULL
+          // - Dai progetti: DocumentId è ItemId (numero), ItemId è presente
+          let itemId = null;
+          
+          // Se DocumentId è un numero, è un ItemId (articolo progetto)
+          if (typeof document.DocumentId === "number") {
+            itemId = document.DocumentId;
+          } 
+          // Se c'è un campo ItemId esplicito, usalo
+          else if (document.ItemId && typeof document.ItemId === "number") {
+            itemId = document.ItemId;
+          }
+          // Se DocumentId è una stringa (ItemCode), è un articolo dal gestionale
+          // In questo caso non possiamo collegarlo direttamente al progetto
+          // perché non ha ancora un ItemId nel database progetti
+          else {
+            console.log("Articolo dal gestionale (ItemCode):", document.DocumentId);
+            console.log("Per collegarlo al progetto, deve essere prima importato nel progetto");
+            // Non bloccare il flusso, l'articolo è comunque collegato alla chat
+          }
+
+          // Collega l'articolo al progetto solo se abbiamo un ItemId valido
+          if (itemId && typeof itemId === "number") {
+            console.log("Collegamento articolo al progetto:", { projectId, itemId });
+            const linkResult = await linkItemToProject(projectId, itemId);
+            
+            if (linkResult && linkResult.success) {
+              console.log("Articolo collegato al progetto con successo");
+            } else {
+              // Non mostrare errore se l'articolo è già associato
+              if (linkResult && linkResult.msg && !linkResult.msg.includes("già associato")) {
+                console.warn("Errore nel collegamento articolo al progetto:", linkResult.msg);
+              }
+            }
+          }
+        } catch (linkError) {
+          console.error("Errore nel collegamento articolo al progetto:", linkError);
+          // Non bloccare il flusso se il collegamento al progetto fallisce
+          // L'articolo è comunque collegato alla chat
+        }
+      }
+
+      await swal.fire({
+        title: "Successo",
+        text: "Documento collegato con successo",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
       onClose();
     } catch (error) {
       console.error("Error linking document:", error);
+      await swal.fire({
+        title: "Errore",
+        text: error.message || "Impossibile collegare il documento",
+        icon: "error",
+      });
     }
   };
 

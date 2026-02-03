@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authenticateToken = require('../authenticateToken');
 const bomCostingQueries = require('../queries/bomCostingManagement');
+const { logActivity, getRequestInfo } = require('../queries/projectActivityLog');
 
 /**
  * Routes per la gestione della costificazione BOM
@@ -173,6 +174,132 @@ router.post('/calculate/:bomId', authenticateToken, async (req, res) => {
             parseInt(bomId),
             options
         );
+        
+        // LOGGING: Traccia il calcolo costificazione
+        if (result.success) {
+            const requestInfo = getRequestInfo(req);
+            // Recupera ProjectID dalla BOM
+            let projectId = null;
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                const bomInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('BOMId', sql.BigInt, parseInt(bomId))
+                    .query(`
+                        SELECT bom.ItemId, pi.ProjectID
+                        FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                        LEFT JOIN dbo.MA_ProjectsItems pi ON bom.ItemId = pi.ItemId AND bom.CompanyId = pi.CompanyId
+                        WHERE bom.CompanyId = @CompanyId AND bom.Id = @BOMId
+                    `);
+                if (bomInfo.recordset.length > 0) {
+                    projectId = bomInfo.recordset[0].ProjectID;
+                }
+            } catch (err) {
+                // Ignora errori
+            }
+            
+            // Recupera entityCode (BOM code) e tutti i progetti associati
+            let entityCode = null;
+            let projectIds = [];
+            try {
+                const sql = require('mssql');
+                const config = require('../config');
+                const pool = await sql.connect(config.database);
+                const bomInfo = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('BOMId', sql.BigInt, parseInt(bomId))
+                    .query(`
+                        SELECT bom.BOM, bom.ItemId, bom.MainRefBOMId, pi.ProjectID
+                        FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                        LEFT JOIN dbo.MA_ProjectsItems pi ON bom.ItemId = pi.ItemId AND bom.CompanyId = pi.CompanyId
+                        WHERE bom.CompanyId = @CompanyId AND bom.Id = @BOMId
+                    `);
+                if (bomInfo.recordset.length > 0) {
+                    entityCode = bomInfo.recordset[0].BOM;
+                    const mainRefBOMId = bomInfo.recordset[0].MainRefBOMId;
+                    const itemId = bomInfo.recordset[0].ItemId;
+                    
+                    // Se BOM condivisa, trova tutti i progetti
+                    if (mainRefBOMId) {
+                        const allBOMs = await pool.request()
+                            .input('CompanyId', sql.Int, companyId)
+                            .input('MainRefBOMId', sql.BigInt, mainRefBOMId)
+                            .query(`
+                                SELECT DISTINCT bom.ItemId
+                                FROM dbo.MA_ProjectArticles_BillOfMaterials bom
+                                WHERE bom.CompanyId = @CompanyId 
+                                  AND (bom.MainRefBOMId = @MainRefBOMId OR bom.Id = @MainRefBOMId)
+                            `);
+                        const itemIds = allBOMs.recordset.map(r => r.ItemId).filter(Boolean);
+                        if (itemIds.length > 0) {
+                            const itemIdsStr = itemIds.join(',');
+                            const projectsResult = await pool.request()
+                                .query(`
+                                    SELECT DISTINCT pi.ProjectID
+                                    FROM dbo.MA_ProjectsItems pi
+                                    WHERE pi.CompanyId = ${companyId}
+                                      AND pi.ItemId IN (${itemIdsStr})
+                                `);
+                            projectIds = projectsResult.recordset.map(r => r.ProjectID).filter(Boolean);
+                        }
+                    } else if (itemId) {
+                        const projectInfo = await pool.request()
+                            .input('CompanyId', sql.Int, companyId)
+                            .input('ItemId', sql.BigInt, itemId)
+                            .query(`
+                                SELECT DISTINCT pi.ProjectID
+                                FROM dbo.MA_ProjectsItems pi
+                                WHERE pi.CompanyId = @CompanyId AND pi.ItemId = @ItemId
+                            `);
+                        projectIds = projectInfo.recordset.map(r => r.ProjectID).filter(Boolean);
+                    }
+                }
+            } catch (err) {
+                console.warn('Errore nel recupero progetti per logging costificazione:', err);
+            }
+
+            const projectsToLog = projectIds.length > 0 ? projectIds : (projectId ? [projectId] : [null]);
+            
+            for (const projId of projectsToLog) {
+                await logActivity({
+                    companyId,
+                    projectId: projId,
+                    userId: userId || req.user?.UserId || null,
+                    activityType: 'BOM_COSTING_CALCULATE',
+                    entityType: 'BOM',
+                    entityId: parseInt(bomId),
+                    entityCode: entityCode,
+                    action: 'CALCULATE',
+                    description: `Calcolata costificazione per BOM ${entityCode || bomId} con lotto produzione ${orderQuantity || 'default'}`,
+                    newValues: {
+                        BOMId: parseInt(bomId),
+                        BOMCode: entityCode,
+                        OrderQuantity: orderQuantity,
+                        ScrapPercentage: scrapPercentage,
+                        UseGranularMarkups: useGranularMarkups,
+                        Version: version,
+                        TotalCost: result.totalCost,
+                        MaterialCost: result.materialCost,
+                        OperationCost: result.operationCost,
+                        FixedCost: result.fixedCost
+                    },
+                    metadata: {
+                        bomId: parseInt(bomId),
+                        bomCode: entityCode,
+                        orderQuantity: orderQuantity,
+                        scrapPercentage: scrapPercentage,
+                        useGranularMarkups: useGranularMarkups,
+                        version: version,
+                        affectedProjectsCount: projectIds.length > 0 ? projectIds.length : 0
+                    },
+                    ...requestInfo
+                }).catch(err => {
+                    console.warn('Errore nel logging attività costificazione:', err);
+                });
+            }
+        }
         
         res.json(result);
     } catch (error) {

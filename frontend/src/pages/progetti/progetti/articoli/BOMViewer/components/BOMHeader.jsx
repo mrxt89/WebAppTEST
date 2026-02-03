@@ -513,6 +513,15 @@ const toggleEditMode = () => {
      return;
    }
 
+   // Se c'è un componente selezionato, mostra direttamente il dialog per aggiungere sotto
+   if (selectedComponents && selectedComponents.length > 0) {
+     // Apri il dialog per aggiungere sotto il componente selezionato
+     setShowAddDialog(true);
+     // Imposta automaticamente l'opzione "temp" se c'è un solo componente selezionato
+     // Altrimenti mostra le opzioni
+     return;
+   }
+
    // Apri il dialogo con le opzioni
    setShowAddDialog(true);
  };
@@ -585,29 +594,43 @@ const toggleEditMode = () => {
        return;
      }
 
+     // Determina se c'è un componente selezionato (per aggiungere sotto)
+     const parentComponentId = selectedComponents && selectedComponents.length === 1 
+       ? selectedComponents[0].data?.ComponentId 
+       : null;
+
      // Chiamata all'API per aggiungere un componente temporaneo
-     const result = await addComponent({
+     // CORREZIONE: Passa selectedBomId come primo parametro e componentData come secondo
+     const result = await addComponent(selectedBomId, {
        createTempComponent: true,
        tempComponentPrefix: "",
-       componentDescription: `Nuovo componente temporaneo`,
+       componentDescription: parentComponentId 
+         ? `Nuovo componente temporaneo sotto ${selectedComponents[0].data?.ComponentItemCode || "componente"}`
+         : `Nuovo componente temporaneo`,
        quantity: 1,
        nature: 22413312, // Semilavorato
-       UoM: "NR",
+       uom: "NR",
        importBOM: true,
+       parentComponentId: parentComponentId, // Se c'è un componente selezionato, aggiungi sotto
      });
 
-     if (result.success) {
+     if (result && result.success) {
        toast({
          title: "Componente aggiunto",
          description: "Nuovo componente temporaneo aggiunto con successo",
          variant: "success",
        });
 
+       // Deseleziona i componenti se aggiunto sotto uno selezionato
+       if (parentComponentId && selectedComponents) {
+         // La deselezione sarà gestita dal context se necessario
+       }
+
        // Ricarica i dati della distinta
        await smartRefresh();
      } else {
        throw new Error(
-         result.msg || "Errore durante l'aggiunta del componente",
+         result?.msg || "Errore durante l'aggiunta del componente",
        );
      }
    } catch (error) {
@@ -634,19 +657,36 @@ const toggleEditMode = () => {
        return;
      }
 
-     // Aggiungi il componente manuale
-     const result = await addComponent({
-       ComponentCode: manualData.code,
-       ComponentDescription: manualData.description,
-       ComponentType: 7798784, // Articolo
-       Quantity: parseFloat(manualData.quantity) || 1,
-       UoM: manualData.uom,
-       Nature: parseInt(manualData.nature, 10),
-       ImportBOM: true,
-       createTempComponent: false,
-     });
+     if (!selectedBomId) {
+       toast({
+         title: "Errore",
+         description: "Nessuna distinta selezionata",
+         variant: "destructive",
+       });
+       return;
+     }
 
-     if (result.success) {
+     // Determina se c'è un componente selezionato (per aggiungere sotto)
+     const parentComponentId = selectedComponents && selectedComponents.length === 1 
+       ? selectedComponents[0].data?.ComponentId 
+       : null;
+
+    // Aggiungi il componente manuale
+    // CORREZIONE: Passa selectedBomId come primo parametro
+    // IMPORTANTE: ImportBOM = false per nuovi codici manuali per evitare di copiare fasi/cicli dal codice principale
+    const result = await addComponent(selectedBomId, {
+      ComponentCode: manualData.code,
+      ComponentDescription: manualData.description,
+      ComponentType: 7798784, // Articolo
+      Quantity: parseFloat(manualData.quantity) || 1,
+      UoM: manualData.uom,
+      Nature: parseInt(manualData.nature, 10),
+      ImportBOM: false, // NON importare BOM per nuovi codici manuali (evita copia fasi/cicli)
+      createTempComponent: false,
+      parentComponentId: parentComponentId, // Se c'è un componente selezionato, aggiungi sotto
+    });
+
+     if (result && result.success) {
        toast({
          title: "Componente aggiunto",
          description: "Nuovo componente aggiunto con successo",
@@ -659,7 +699,7 @@ const toggleEditMode = () => {
          code: "",
          description: "",
          nature: "22413312",
-         UoM: "NR",
+         uom: "NR",
          quantity: 1,
        });
 
@@ -667,7 +707,7 @@ const toggleEditMode = () => {
        await smartRefresh();
      } else {
        throw new Error(
-         result.msg || "Errore durante l'aggiunta del componente",
+         result?.msg || "Errore durante l'aggiunta del componente",
        );
      }
    } catch (error) {
@@ -695,28 +735,45 @@ const toggleEditMode = () => {
        return;
      }
 
+     if (!selectedBomId) {
+       toast({
+         title: "Errore",
+         description: "Nessuna distinta selezionata",
+         variant: "destructive",
+       });
+       return;
+     }
+
      const componentId = item.Id || 0;
      const componentCode = item.Item || "";
+
+     // Determina se c'è un componente selezionato (per aggiungere sotto)
+     const parentComponentId = selectedComponents && selectedComponents.length === 1 
+       ? selectedComponents[0].data?.ComponentId 
+       : null;
 
      console.log("Aggiunta componente:", {
        bomId: selectedBomId,
        componentId: componentId,
        componentCode: componentCode,
+       parentComponentId: parentComponentId,
      });
 
      // Effettua l'aggiunta del componente
-     const result = await addComponent({
+     // CORREZIONE: Passa selectedBomId come primo parametro
+     const result = await addComponent(selectedBomId, {
        ComponentId: componentId,
        ComponentCode: componentCode,
        ComponentBOMId: item.BOMId || null,  // NUOVO: passa BOMId se disponibile per specificare versione
        ComponentType: 7798784, // Articolo
        Quantity: 1,
-      UoM: item.BaseUoM || "NR", // Usa l'unità di misura dell'articolo
+       UoM: item.BaseUoM || "NR", // Usa l'unità di misura dell'articolo
        ImportBOM: true, // Importa anche la distinta se presente
        createTempComponent: false, // Non creiamo un codice temporaneo
+       parentComponentId: parentComponentId, // Se c'è un componente selezionato, aggiungi sotto
      });
 
-     if (result.success) {
+     if (result && result.success) {
        toast({
          title: "Componente aggiunto",
          description: "Componente aggiunto con successo",
@@ -730,7 +787,7 @@ const toggleEditMode = () => {
        await smartRefresh();
      } else {
        throw new Error(
-         result.msg || "Errore durante l'aggiunta del componente",
+         result?.msg || "Errore durante l'aggiunta del componente",
        );
      }
    } catch (error) {
@@ -1061,9 +1118,19 @@ const handleCreateVersion = async () => {
                onClick={handleAddComponentOptions}
                disabled={loading || bom?.stato_erp == "1"}
                className={`h-8 ${isEmpty ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}
+               title={
+                 selectedComponents && selectedComponents.length > 0
+                   ? `Aggiungi componente sotto ${selectedComponents.length} componente/i selezionato/i`
+                   : "Aggiungi componente alla distinta"
+               }
              >
                <Plus className="h-4 w-4 mr-1" />
                Aggiungi
+               {selectedComponents && selectedComponents.length > 0 && (
+                 <Badge variant="secondary" className="ml-1 h-5 px-1 text-xs">
+                   {selectedComponents.length}
+                 </Badge>
+               )}
              </Button>
 
              {/* NUOVO: Pulsante Ricodifica diretto */}
@@ -1108,6 +1175,32 @@ const handleCreateVersion = async () => {
          </div>
        </div>
      )}
+     
+     {/* Tasto Aggiungi sempre visibile, anche in modalità modifica */}
+     {editMode && (
+       <div className="bg-gray-50 p-2 border-b flex justify-end">
+         <Button
+           size="sm"
+           variant="outline"
+           onClick={handleAddComponentOptions}
+           disabled={loading || bom?.stato_erp == "1"}
+           className="h-8"
+           title={
+             selectedComponents && selectedComponents.length > 0
+               ? `Aggiungi componente sotto ${selectedComponents.length} componente/i selezionato/i`
+               : "Aggiungi componente alla distinta"
+           }
+         >
+           <Plus className="h-4 w-4 mr-1" />
+           Aggiungi
+           {selectedComponents && selectedComponents.length > 0 && (
+             <Badge variant="secondary" className="ml-1 h-5 px-1 text-xs">
+               {selectedComponents.length}
+             </Badge>
+           )}
+         </Button>
+       </div>
+     )}
 
      {/* Dialogs (rimangono gli stessi) */}
      {/* Dialog per opzioni di "Aggiungi componente" */}
@@ -1118,6 +1211,13 @@ const handleCreateVersion = async () => {
          </DialogHeader>
 
          <div className="py-4 space-y-4">
+           {selectedComponents && selectedComponents.length > 0 && (
+             <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
+               <p className="text-sm text-blue-800">
+                 <strong>{selectedComponents.length} componente/i selezionato/i:</strong> Il nuovo componente verrà aggiunto sotto il componente selezionato.
+               </p>
+             </div>
+           )}
            <div
              className="p-3 border rounded-md cursor-pointer hover:bg-gray-50"
              onClick={() => handleAddOptionSelect("temp")}
@@ -1127,7 +1227,9 @@ const handleCreateVersion = async () => {
                Nuovo codice temporaneo
              </div>
              <p className="text-sm text-gray-500 mt-1">
-               Crea automaticamente un nuovo codice temporaneo
+               {selectedComponents && selectedComponents.length > 0
+                 ? "Crea automaticamente un nuovo codice temporaneo sotto il componente selezionato"
+                 : "Crea automaticamente un nuovo codice temporaneo"}
              </p>
            </div>
 

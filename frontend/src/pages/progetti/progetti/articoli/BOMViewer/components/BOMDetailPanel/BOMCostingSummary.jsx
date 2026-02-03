@@ -262,7 +262,7 @@ const BOMCostingSummary = ({ bomId, bomCode, bomVersion }) => {
         const costRouting = payload.routing || [];
         const productionLot = payload.costing?.production_lot || 1;
 
-        // Map costi operazioni
+        // Map costi operazioni (senza moltiplicare per qta - verrà fatto dopo)
         const operationCostMap = new Map();
         costRouting.forEach((route) => {
           const key = route.BOMId?.toString();
@@ -300,17 +300,23 @@ const BOMCostingSummary = ({ bomId, bomCode, bomVersion }) => {
             component.ComponentId?.toString(),
           );
 
+          // IMPORTANTE: Moltiplica i costi delle operazioni per la qta del semilavorato
+          // rispetto al padre, come si fa per i componenti (regola AUREA)
+          const componentQuantity = component.Quantity || 1;
           const materialCost = materialData?.CalculatedTotalCost || 0;
-          const operationCost = opData?.OperationCost || 0;
+          // Moltiplica operationCost per la qta del componente
+          const operationCost = (opData?.OperationCost || 0) * componentQuantity;
 
           return {
             ...component,
-            OperationCost: opData?.ProcessingCost || 0,
+            // Moltiplica anche ProcessingCost per la qta (per coerenza)
+            OperationCost: (opData?.ProcessingCost || 0) * componentQuantity,
             FixedCost:
               (materialData?.FixedCost || 0) +
               (opData?.FixedCostTotal || 0) / productionLot,
+            // FixedCostTotal delle operazioni va moltiplicato per la qta
             FixedCostTotal:
-              (materialData?.FixedCostTotal || 0) + (opData?.FixedCostTotal || 0),
+              (materialData?.FixedCostTotal || 0) + (opData?.FixedCostTotal || 0) * componentQuantity,
             MaterialCost: materialCost,
             TotalCost: materialCost + operationCost,
             CalculatedTotalCost: materialCost + operationCost,

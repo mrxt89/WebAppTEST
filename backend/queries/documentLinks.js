@@ -25,7 +25,7 @@ async function linkDocumentToNotification(params) {
       notificationId, companyId, documentType, 
       bom, projectId, taskId, moId, saleOrdId, serialNo,
       purchaseOrdId, saleDocId, purchaseDocId, 
-      itemCode, custSuppType, custSuppCode,
+      itemCode, itemId, custSuppType, custSuppCode,
       referenceId, componentCode, sourceCompanyId, targetCompanyId
     } = params;
     
@@ -57,6 +57,7 @@ async function linkDocumentToNotification(params) {
       .input('SaleDocId', sql.Int, saleDocId || 0)
       .input('PurchaseDocId', sql.Int, purchaseDocId || 0)
       .input('ItemCode', sql.VarChar(21), itemCode || null)
+      .input('ItemId', sql.BigInt, itemId || null)
       .input('CustSuppType', sql.Int, custSuppType || 0)
       .input('CustSuppCode', sql.VarChar(12), custSuppCode || null)
       .input('ReferenceId', sql.Int, referenceId || 0)

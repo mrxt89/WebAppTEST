@@ -811,7 +811,10 @@ const BOMCosting = ({ selectedItem }) => {
 
             // Costi materiali da SP_CalculateBOMCosting (non da GET_BOM_MULTILEVEL)
             const materialCost = materialData?.CalculatedTotalCost || materialData?.TotalCost || 0;
-            const operationCost = operationData?.OperationCost || 0;
+            // IMPORTANTE: Moltiplica i costi delle operazioni per la qta del semilavorato
+            // rispetto al padre, come si fa per i componenti (regola AUREA)
+            const componentQuantity = bomComp.Quantity || 1;
+            const operationCost = (operationData?.OperationCost || 0) * componentQuantity;
 
             // FixedCost totale = FixedCost del componente (materiale) + FixedCost delle operazioni
             const componentFixedCost = materialData?.FixedCost || 0;
@@ -820,9 +823,11 @@ const BOMCosting = ({ selectedItem }) => {
 
             return {
               ...bomComp,
-              OperationCost: operationData?.ProcessingCost || 0,
+              // Moltiplica anche ProcessingCost per la qta (per coerenza)
+              OperationCost: (operationData?.ProcessingCost || 0) * componentQuantity,
               FixedCost: totalFixedCost,
-              FixedCostTotal: (componentFixedCost * productionLot) + (operationData?.FixedCostTotal || 0),
+              // FixedCostTotal delle operazioni va moltiplicato per la qta
+              FixedCostTotal: (componentFixedCost * productionLot) + (operationData?.FixedCostTotal || 0) * componentQuantity,
               MaterialCost: materialCost,
               TotalCost: materialCost + operationCost,
               CalculatedTotalCost: materialCost + operationCost,
@@ -993,7 +998,10 @@ const BOMCosting = ({ selectedItem }) => {
 
             // Costi materiali da SP_CalculateBOMCosting (non da GET_BOM_MULTILEVEL)
             const materialCost = materialData?.CalculatedTotalCost || materialData?.TotalCost || 0;
-            const operationCost = operationData?.OperationCost || 0;
+            // IMPORTANTE: Moltiplica i costi delle operazioni per la qta del semilavorato
+            // rispetto al padre, come si fa per i componenti (regola AUREA)
+            const componentQuantity = bomComp.Quantity || 1;
+            const operationCost = (operationData?.OperationCost || 0) * componentQuantity;
 
             // FixedCost totale = FixedCost del componente (materiale) + FixedCost delle operazioni
             const componentFixedCost = materialData?.FixedCost || 0;
@@ -1002,9 +1010,11 @@ const BOMCosting = ({ selectedItem }) => {
 
             return {
               ...bomComp,
-              OperationCost: operationData?.ProcessingCost || 0,
+              // Moltiplica anche ProcessingCost per la qta (per coerenza)
+              OperationCost: (operationData?.ProcessingCost || 0) * componentQuantity,
               FixedCost: totalFixedCost,
-              FixedCostTotal: (componentFixedCost * productionLot) + (operationData?.FixedCostTotal || 0),
+              // FixedCostTotal delle operazioni va moltiplicato per la qta
+              FixedCostTotal: (componentFixedCost * productionLot) + (operationData?.FixedCostTotal || 0) * componentQuantity,
               MaterialCost: materialCost,
               TotalCost: materialCost + operationCost,
               CalculatedTotalCost: materialCost + operationCost,
@@ -1174,11 +1184,15 @@ const BOMCosting = ({ selectedItem }) => {
 
             // Costi materiali da SP_CalculateBOMCosting (non da GET_BOM_MULTILEVEL)
             const materialCost = materialData?.CalculatedTotalCost || 0;
-            const operationCost = operationData?.OperationCost || 0;
+            // IMPORTANTE: Moltiplica i costi delle operazioni per la qta del semilavorato
+            // rispetto al padre, come si fa per i componenti (regola AUREA)
+            const componentQuantity = bomComp.Quantity || 1;
+            const operationCost = (operationData?.OperationCost || 0) * componentQuantity;
 
             return {
               ...bomComp,
-              OperationCost: operationData?.ProcessingCost || 0,
+              // Moltiplica anche ProcessingCost per la qta (per coerenza)
+              OperationCost: (operationData?.ProcessingCost || 0) * componentQuantity,
             // Fixed cost componenti: somma costo fisso materiale + eventuale quota operazioni
             FixedCost: (
               (materialData?.FixedCost || 0) +
@@ -1186,9 +1200,10 @@ const BOMCosting = ({ selectedItem }) => {
                 ? operationData.FixedCostTotal / componentProductionLot
                 : 0)
             ),
+            // FixedCostTotal delle operazioni va moltiplicato per la qta
             FixedCostTotal: (
               (materialData?.FixedCostTotal ?? materialData?.FixedCost ?? 0) +
-              (operationData?.FixedCostTotal || 0)
+              (operationData?.FixedCostTotal || 0) * componentQuantity
             ),
               MaterialCost: materialCost,
               TotalCost: materialCost + operationCost,

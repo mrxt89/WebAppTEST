@@ -811,6 +811,12 @@ const CyclesTab = () => {
       isNew: true,
       CheckOperation: 0,
     };
+    
+    // FIX: Se BOMId = 0, aggiungi ItemId o ComponentId per creare automaticamente la BOM
+    if ((!selectedNode.data.BOMId || selectedNode.data.BOMId === 0 || selectedNode.data.BOMId === "0") && selectedNode.data.ComponentId) {
+      newCycle.ComponentId = selectedNode.data.ComponentId;
+      newCycle.ItemId = selectedNode.data.ItemId || selectedNode.data.ComponentId;
+    }
 
     setDraftCycles((prevDraft) => [...prevDraft, newCycle]);
     setHasChanges(true);
@@ -922,7 +928,10 @@ const CyclesTab = () => {
     setCheckOperationSaving((prev) => ({ ...prev, [rtgStep]: true }));
 
     try {
-      await updateRoutingCheckOperation(bomId, rtgStep, nextValue);
+      // FIX: Se BOMId = 0, passa anche ItemId o ComponentId
+      const itemId = selectedNode?.data?.ItemId || selectedNode?.data?.ComponentId;
+      const componentId = selectedNode?.data?.ComponentId;
+      await updateRoutingCheckOperation(bomId, rtgStep, nextValue, itemId, componentId);
       toast({
         title: "Operazione aggiornata",
         description: `Fase ${rtgStep} ${

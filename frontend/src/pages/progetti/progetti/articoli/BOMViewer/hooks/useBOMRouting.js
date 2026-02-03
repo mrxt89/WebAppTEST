@@ -92,10 +92,24 @@ export const useBOMRouting = () => {
         }
 
         // IMPORTANT: Include BOMId in the routing data
-        const result = await addUpdateBOM("ADD_ROUTING", {
-          Id: selectedBomId,
+        // FIX: Se BOMId = 0, passa anche ItemId o ComponentId per creare automaticamente la BOM
+        const bomId = selectedBomId || routingData.BOMId || 0;
+        const payload = {
+          Id: bomId,
           ...routingData,
-        });
+        };
+        
+        // Se BOMId = 0, aggiungi ItemId o ComponentId se non sono già presenti
+        if (bomId === 0 || bomId === "0") {
+          if (routingData.ComponentId && !payload.ItemId) {
+            payload.ItemId = routingData.ComponentId;
+          }
+          if (routingData.ItemId && !payload.ComponentId) {
+            payload.ComponentId = routingData.ItemId;
+          }
+        }
+        
+        const result = await addUpdateBOM("ADD_ROUTING", payload);
 
         if (result && result.success) {
           // Reload BOM details

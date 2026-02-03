@@ -56,20 +56,23 @@ router.post('/notifications/:notificationId/documents', authenticateToken, async
     
     // Verifica il formato della richiesta - supporta entrambi i formati possibili
     let documentType, bom, projectId, taskId, moId, saleOrdId, serialNo,
-        purchaseOrdId, saleDocId, purchaseDocId, itemCode, custSuppType, custSuppCode,
+        purchaseOrdId, saleDocId, purchaseDocId, itemCode, itemId, custSuppType, custSuppCode,
         referenceId, componentCode, sourceCompanyId, targetCompanyId;
     
     if (req.body.documentType && typeof req.body.documentType === 'object' && req.body.documentType.documentType) {
       // Formato 1: il frontend invia tutto dentro documentType: { documentType: 'X', moId: 10, ... }
       ({ documentType, bom, projectId, taskId, moId, saleOrdId, serialNo,
-         purchaseOrdId, saleDocId, purchaseDocId, itemCode, custSuppType, custSuppCode,
+         purchaseOrdId, saleDocId, purchaseDocId, itemCode, itemId, custSuppType, custSuppCode,
          referenceId, componentCode, sourceCompanyId, targetCompanyId } = req.body.documentType);
     } else {
       // Formato 2: i parametri sono al primo livello nella richiesta { documentType: 'X', moId: 10, ... }
       ({ documentType, bom, projectId, taskId, moId, saleOrdId, serialNo,
-         purchaseOrdId, saleDocId, purchaseDocId, itemCode, custSuppType, custSuppCode,
+         purchaseOrdId, saleDocId, purchaseDocId, itemCode, itemId, custSuppType, custSuppCode,
          referenceId, componentCode, sourceCompanyId, targetCompanyId } = req.body);
     }
+    
+    // NOTA: Non convertiamo più itemId in itemCode qui
+    // La stored procedure LinkDocumentToNotification gestisce entrambi i casi
     
     console.log('Parametri estratti:', {
       documentType,
@@ -96,6 +99,7 @@ router.post('/notifications/:notificationId/documents', authenticateToken, async
                       || saleDocId 
                       || purchaseDocId 
                       || itemCode 
+                      || itemId
                       || (custSuppCode && custSuppType) 
                       || taskId
                       || projectId
@@ -112,7 +116,7 @@ router.post('/notifications/:notificationId/documents', authenticateToken, async
       notificationId, companyId, documentType, 
       bom, projectId, taskId, moId, saleOrdId, serialNo,
       purchaseOrdId, saleDocId, purchaseDocId, 
-      itemCode, custSuppType, custSuppCode,
+      itemCode, itemId, custSuppType, custSuppCode,
       referenceId, componentCode, sourceCompanyId, targetCompanyId
     });
     

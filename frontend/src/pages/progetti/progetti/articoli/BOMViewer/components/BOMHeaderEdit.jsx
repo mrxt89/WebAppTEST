@@ -650,6 +650,9 @@ const BOMHeaderEdit = () => {
     }
 
     // Gestisci aggiunte
+    // FIX: Traccia i BOMId creati per ciclo, per usarli nelle operazioni successive
+    const createdBomIds = new Map(); // Map: rtgStep -> bomId creato
+    
     if (cycleChanges.newCycles && cycleChanges.newCycles.length > 0) {
       for (const cycle of cycleChanges.newCycles) {
         const desiredCheckOperation = cycle.CheckOperation;
@@ -660,11 +663,30 @@ const BOMHeaderEdit = () => {
           SetupTime: parseTimeToSeconds(cycle.SetupTime),
         };
         delete cycleData.CheckOperation;
-        await addUpdateBOM("ADD_ROUTING", cycleData);
-
+        
+        // FIX: Se BOMId = 0, aggiungi ItemId o ComponentId per creare automaticamente la BOM
+        // Usa ComponentId o ItemId dal ciclo se disponibili, altrimenti usa componentId passato come parametro
+        const targetItemId = cycle.ComponentId || cycle.ItemId || componentId;
+        if ((!bomId || bomId === 0 || bomId === "0") && targetItemId) {
+          const itemIdNum = typeof targetItemId === 'string' ? parseInt(targetItemId, 10) : targetItemId;
+          if (itemIdNum && !isNaN(itemIdNum)) {
+            cycleData.ItemId = itemIdNum;
+            cycleData.ComponentId = itemIdNum;
+          }
+        }
+        
+        const addRoutingResult = await addUpdateBOM("ADD_ROUTING", cycleData);
+        
+        // FIX: Se la BOM è stata creata automaticamente, salva il BOMId restituito
+        const actualBomId = addRoutingResult?.bomId || bomId;
+        if (actualBomId && actualBomId !== bomId) {
+          createdBomIds.set(cycle.RtgStep, actualBomId);
+          console.log(`[DEBUG] BOM creata per ciclo RtgStep ${cycle.RtgStep}: ${actualBomId}`);
+        }
+        
         if (desiredCheckOperation !== undefined) {
           await updateRoutingCheckOperation(
-            bomId,
+            actualBomId,
             cycle.RtgStep,
             parseInt(desiredCheckOperation, 10) === 1 ? 1 : 0,
           );
@@ -695,16 +717,35 @@ const BOMHeaderEdit = () => {
             updatedCycle.SetupTime = parseTimeToSeconds(updatedCycle.SetupTime);
           }
 
-          await addUpdateBOM("UPDATE_ROUTING", {
-            Id: bomId,
+          // FIX: Usa il BOMId creato se disponibile, altrimenti usa bomId originale
+          const actualBomIdForUpdate = createdBomIds.get(parseInt(rtgStep, 10)) || bomId;
+          
+          // FIX: Se BOMId = 0, aggiungi ItemId o ComponentId per trovare la BOM
+          const updateCycleData = {
+            Id: actualBomIdForUpdate,
             RtgStep: parseInt(rtgStep, 10),
             ...updatedCycle
-          });
+          };
+          
+          if ((!actualBomIdForUpdate || actualBomIdForUpdate === 0 || actualBomIdForUpdate === "0")) {
+            const targetItemId = updatedCycle.ComponentId || updatedCycle.ItemId || componentId;
+            if (targetItemId) {
+              const itemIdNum = typeof targetItemId === 'string' ? parseInt(targetItemId, 10) : targetItemId;
+              if (itemIdNum && !isNaN(itemIdNum)) {
+                updateCycleData.ItemId = itemIdNum;
+                updateCycleData.ComponentId = itemIdNum;
+              }
+            }
+          }
+
+          await addUpdateBOM("UPDATE_ROUTING", updateCycleData);
         }
 
         if (checkOperationChange !== undefined) {
+          // FIX: Usa il BOMId creato se disponibile
+          const actualBomIdForCheck = createdBomIds.get(parseInt(rtgStep, 10)) || bomId;
           await updateRoutingCheckOperation(
-            bomId,
+            actualBomIdForCheck,
             parseInt(rtgStep, 10),
             parseInt(checkOperationChange, 10) === 1 ? 1 : 0,
           );

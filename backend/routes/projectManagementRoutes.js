@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authenticateToken = require('../authenticateToken');
+const { logActivity, getRequestInfo } = require('../queries/projectActivityLog');
 const {
     getPaginatedProjects,
     getProjectById,
@@ -124,6 +125,35 @@ router.post('/projects', authenticateToken, async (req, res) => {
         };
         
         const result = await addUpdateProject(projectData, userId, companyId);
+        
+        // LOGGING: Traccia creazione/modifica progetto
+        if (result.success || result.ProjectID) {
+            const requestInfo = getRequestInfo(req);
+            const projectId = result.ProjectID || projectData.ProjectID;
+            const isUpdate = projectData.ProjectID && projectData.ProjectID > 0;
+            
+            await logActivity({
+                companyId,
+                projectId: projectId,
+                userId,
+                activityType: isUpdate ? 'PROJECT_UPDATE' : 'PROJECT_CREATE',
+                entityType: 'Project',
+                entityId: projectId,
+                action: isUpdate ? 'UPDATE' : 'CREATE',
+                description: `${isUpdate ? 'Modificato' : 'Creato'} progetto ${projectData.Name || projectId}`,
+                newValues: {
+                    Name: projectData.Name,
+                    Description: projectData.Description,
+                    Status: projectData.Status,
+                    StartDate: projectData.StartDate,
+                    EndDate: projectData.EndDate
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività progetto:', err);
+            });
+        }
+        
         res.json(result);
     } catch (err) {
         console.error('Error in project creation/update:', err);
@@ -173,6 +203,41 @@ router.post('/projects/:id/tasks', authenticateToken, async (req, res) => {
         }
         
         const result = await addUpdateProjectTask(taskData, userId);
+        
+        // LOGGING: Traccia creazione/modifica task
+        if (result.success || result.TaskID) {
+            const companyId = req.user.CompanyId;
+            const requestInfo = getRequestInfo(req);
+            const taskId = result.TaskID || taskData.TaskID;
+            const isUpdate = taskData.TaskID && taskData.TaskID > 0;
+            
+            await logActivity({
+                companyId,
+                projectId: projectId,
+                userId,
+                activityType: isUpdate ? 'TASK_UPDATE' : 'TASK_CREATE',
+                entityType: 'Task',
+                entityId: taskId,
+                action: isUpdate ? 'UPDATE' : 'CREATE',
+                description: `${isUpdate ? 'Modificata' : 'Creata'} attività ${taskData.Title || taskId}`,
+                newValues: {
+                    Title: taskData.Title,
+                    Description: taskData.Description,
+                    Status: taskData.Status,
+                    Priority: taskData.Priority,
+                    Operation: taskData.Operation
+                },
+                metadata: {
+                    taskId: taskId,
+                    projectId: projectId,
+                    assignedTo: taskData.AssignedTo
+                },
+                ...requestInfo
+            }).catch(err => {
+                console.warn('Errore nel logging attività task:', err);
+            });
+        }
+        
         res.json(result);
     } catch (err) {
         console.error('Error in task creation/update:', err);

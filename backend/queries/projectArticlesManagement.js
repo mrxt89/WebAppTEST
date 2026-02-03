@@ -414,6 +414,20 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
             request.input('RoutingAction', sql.NVarChar(50), action.replace('_ROUTING', ''));
             request.input('RtgStep', sql.SmallInt, bomData.RtgStep);
             
+            // FIX: Se BOMId = 0, passa ItemId o ComponentId per creare/trovare automaticamente la BOM
+            if ((action === 'ADD_ROUTING' || action === 'UPDATE_ROUTING') && (!bomData.Id || bomData.Id === 0 || bomData.Id === "0")) {
+                console.log(`[${action}] BOMId = 0, passando ItemId/ComponentId per creare/trovare BOM automaticamente:`, {
+                    ItemId: bomData.ItemId,
+                    ComponentId: bomData.ComponentId
+                });
+                if (bomData.ItemId) {
+                    request.input('ItemId', sql.BigInt, bomData.ItemId);
+                }
+                if (bomData.ComponentId) {
+                    request.input('ComponentId', sql.BigInt, bomData.ComponentId);
+                }
+            }
+            
             if (action === 'ADD_ROUTING' || action === 'UPDATE_ROUTING') {
                 request.input('Operation', sql.VarChar(21), bomData.Operation);
                 request.input('Notes', sql.VarChar(1024), bomData.Notes);
@@ -496,7 +510,8 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
         };
         
         // DEBUG: Se bomId è null, proviamo a recuperarlo dal database
-        if (returnValue === null && action === 'ADD_COMPONENT' && bomData.Id) {
+        // FIX: Gestisci anche ADD_ROUTING e UPDATE_ROUTING quando BOMId = 0
+        if (returnValue === null && (action === 'ADD_COMPONENT' || action === 'ADD_ROUTING' || action === 'UPDATE_ROUTING')) {
             console.log(`[DEBUG] ReturnValue è null, proviamo a recuperare l'ID dal database`);
             console.log(`[DEBUG] ParentComponentId:`, bomData.ParentComponentId);
             
@@ -523,19 +538,45 @@ const addUpdateBOM = async (action, companyId, bomData, userId) => {
             
             // Fallback: usa l'ID originale se non troviamo nulla
             if (!result.bomId) {
-                const bomCheck = await pool.request()
-                    .input('CompanyId', sql.Int, companyId)
-                    .input('BOMId', sql.BigInt, bomData.Id)
-                    .query(`
-                        SELECT Id, MainRefBOMId
-                        FROM dbo.MA_ProjectArticles_BillOfMaterials
-                        WHERE CompanyId = @CompanyId AND Id = @BOMId
-                    `);
+                // Per ADD_ROUTING e UPDATE_ROUTING, se BOMId era 0, cerca la BOM creata per ItemId/ComponentId
+                if ((action === 'ADD_ROUTING' || action === 'UPDATE_ROUTING') && (!bomData.Id || bomData.Id === 0 || bomData.Id === "0")) {
+                    const targetItemId = bomData.ItemId || bomData.ComponentId;
+                    if (targetItemId) {
+                        console.log(`[DEBUG] ${action}: Cercando BOM creata per ItemId/ComponentId ${targetItemId}`);
+                        const newBomCheck = await pool.request()
+                            .input('CompanyId', sql.Int, companyId)
+                            .input('ItemId', sql.BigInt, targetItemId)
+                            .query(`
+                                SELECT TOP 1 Id, BOM, Version
+                                FROM dbo.MA_ProjectArticles_BillOfMaterials
+                                WHERE CompanyId = @CompanyId AND ItemId = @ItemId
+                                ORDER BY TBCreated DESC
+                            `);
+                        
+                        if (newBomCheck.recordset.length > 0) {
+                            const newBomInfo = newBomCheck.recordset[0];
+                            result.bomId = newBomInfo.Id;
+                            console.log(`[DEBUG] Trovata BOM per ${action}:`, newBomInfo);
+                        }
+                    }
+                }
                 
-                if (bomCheck.recordset.length > 0) {
-                    const bomInfo = bomCheck.recordset[0];
-                    result.bomId = bomInfo.Id;
-                    console.log(`[DEBUG] Recuperato BOM ID originale dal database:`, bomInfo.Id);
+                // Se ancora non abbiamo il BOMId, prova con l'ID originale
+                if (!result.bomId && bomData.Id) {
+                    const bomCheck = await pool.request()
+                        .input('CompanyId', sql.Int, companyId)
+                        .input('BOMId', sql.BigInt, bomData.Id)
+                        .query(`
+                            SELECT Id, MainRefBOMId
+                            FROM dbo.MA_ProjectArticles_BillOfMaterials
+                            WHERE CompanyId = @CompanyId AND Id = @BOMId
+                        `);
+                    
+                    if (bomCheck.recordset.length > 0) {
+                        const bomInfo = bomCheck.recordset[0];
+                        result.bomId = bomInfo.Id;
+                        console.log(`[DEBUG] Recuperato BOM ID originale dal database:`, bomInfo.Id);
+                    }
                 }
             }
         }

@@ -591,7 +591,7 @@ const KnownDataWiki = () => {
                         <div className="space-y-2 text-gray-700">
                             <p><strong>Possibili cause:</strong></p>
                             <ul className="list-disc list-inside space-y-1 ml-4">
-                                <li>L'articolo ha già un <code className="bg-gray-100 px-1 rounded">UnitCost</code> > 0</li>
+                                <li>L'articolo ha già un <code className="bg-gray-100 px-1 rounded">UnitCost</code> &gt; 0</li>
                                 <li>I "dati noti" non sono configurati correttamente</li>
                                 <li>Le regole di matching non trovano corrispondenze</li>
                                 <li>Il parametro <code className="bg-gray-100 px-1 rounded">@UseKnownData</code> è disattivato</li>

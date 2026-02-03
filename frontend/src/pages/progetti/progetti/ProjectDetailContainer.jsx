@@ -24,6 +24,7 @@ import {
   Layout,
   Package,
   PieChart,
+  History,
   Lock,
   Unlock,
   Building2,
@@ -51,6 +52,7 @@ import ProjectArticlesTab from "./articoli/ProjectArticlesTab";
 import ProjectAttachmentsTab from "./ProjectAttachmentsTab";
 import ProjectTeamSection from "./ProjectTeamSection";
 import ProjectAnalyticsTab from "./analytics/ProjectAnalyticsTab";
+import ProjectHistoryTab from "./history/ProjectHistoryTab";
 import ProjectStagesView from "./ProjectStagesView";
 import ProjectStagesKanban from "./ProjectStagesKanban";
 import ProjectStagesTable from "./ProjectStagesTable";
@@ -1006,6 +1008,10 @@ const handleDisableProject = async (projectId) => {
                 <PieChart className="h-4 w-4 mr-2" />
                 Statistiche
               </TabsTrigger>
+              <TabsTrigger value="history" id="project-history-tab">
+                <History className="h-4 w-4 mr-2" />
+                History
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -1260,6 +1266,11 @@ const handleDisableProject = async (projectId) => {
                   refreshProject={(callback) => loadProject(true, callback)}
                 />
               </div>
+            </TabsContent>
+
+            {/* History Tab */}
+            <TabsContent value="history" className="h-full overflow-auto" id="history-tab">
+              <ProjectHistoryTab project={project} />
             </TabsContent>
           </div>
         </Tabs>
