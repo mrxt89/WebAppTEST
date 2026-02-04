@@ -34,6 +34,7 @@ import CodingHierarchySelector from "./CodingHierarchySelector";
 import SimplifiedRecodingSelector from "./SimplifiedRecodingSelector";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import useRecodingRules from "@/hooks/useRecodingRules";
+import { config } from "@/config";
 
 const RecodingTable = ({
   items = [],
@@ -110,6 +111,67 @@ const RecodingTable = ({
           } catch (error) {
             console.error(`Errore estrazione componenti per codice ${itemCode}:`, error);
             // Continua con valori vuoti se l'estrazione fallisce
+          }
+        }
+        
+        // NUOVO: Carica TechnicalCharacteristicsJSON dal database
+        // Prima prova da item.data (se già caricato), altrimenti carica dal database
+        if (itemId) {
+          try {
+            let techJson = null;
+            
+            // Prova prima da item.data (se già presente)
+            if (item.data?.TechnicalCharacteristicsJSON) {
+              techJson = item.data.TechnicalCharacteristicsJSON;
+              if (typeof techJson === 'string' && techJson.trim() !== '') {
+                techJson = JSON.parse(techJson);
+              }
+            } else {
+              // Se non presente, carica dal database
+              try {
+                const response = await fetch(
+                  `${config.API_BASE_URL}/projectArticles/items/${itemId}`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    },
+                  }
+                );
+                
+                if (response.ok) {
+                  const itemData = await response.json();
+                  if (itemData?.TechnicalCharacteristicsJSON) {
+                    techJson = itemData.TechnicalCharacteristicsJSON;
+                    
+                    // Gestisci il caso in cui TechnicalCharacteristicsJSON è un array (problema backend)
+                    if (Array.isArray(techJson)) {
+                      // Prendi il primo elemento non vuoto
+                      techJson = techJson.find(j => j && j.trim() !== '') || null;
+                      if (!techJson) {
+                        console.log(`RecodingTable - TechnicalCharacteristicsJSON è array vuoto per item ${itemId}`);
+                        continue; // Passa al prossimo item
+                      }
+                    }
+                    
+                    if (typeof techJson === 'string' && techJson.trim() !== '') {
+                      techJson = JSON.parse(techJson);
+                    }
+                  }
+                }
+              } catch (fetchError) {
+                console.error(`Errore caricamento TechnicalCharacteristicsJSON dal database per item ${itemId}:`, fetchError);
+              }
+            }
+            
+            // Se abbiamo JSON valido, aggiungilo ai recodingData
+            if (techJson && typeof techJson === 'object' && Object.keys(techJson).length > 0) {
+              recodingData.technicalCharacteristicsJSON = techJson;
+              console.log(`RecodingTable - TechnicalCharacteristicsJSON caricato per item ${itemId}:`, techJson);
+            } else {
+              console.log(`RecodingTable - Nessun TechnicalCharacteristicsJSON trovato per item ${itemId}`);
+            }
+          } catch (error) {
+            console.error(`Errore parsing TechnicalCharacteristicsJSON per item ${itemId}:`, error);
           }
         }
         

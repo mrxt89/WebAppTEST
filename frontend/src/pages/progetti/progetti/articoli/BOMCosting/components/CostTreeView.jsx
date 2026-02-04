@@ -628,10 +628,123 @@ const CostTreeView = ({ costingResult }) => {
         ? `component-path-${comp.Path}`
         : `component-${comp.ComponentId || index}-${comp.Level}-${index}`;
       const componentNode = nodeMap[nodeId];
+      
+      if (!componentNode) {
+        console.warn(`[CostTreeView] ComponentNode non trovato per nodeId: ${nodeId}`, comp);
+        return;
+      }
 
       // Aggiungi i cicli di routing per questo componente
-      const componentRouting = routing.filter(route => String(route.BOMId) === String(comp.BOMId));
+      // FIX: Migliorato il filtro per gestire BOMId = 0 e matchare correttamente i routing
+      const componentRouting = routing.filter(route => {
+        // Normalizza i valori per il confronto (gestisci null, undefined, 0, "0")
+        const routeBOMId = route.BOMId != null && route.BOMId !== 0 ? String(route.BOMId) : null;
+        const compBOMId = comp.BOMId != null && comp.BOMId !== '0' && comp.BOMId !== 0 ? String(comp.BOMId) : null;
+        const routeLevel = route.Level != null ? Number(route.Level) : null;
+        const compLevel = comp.Level != null ? Number(comp.Level) : null;
+        const routeComponentId = route.ComponentId != null ? String(route.ComponentId) : null;
+        const routeItemId = route.ItemId != null ? String(route.ItemId) : null;
+        const compComponentId = comp.ComponentId != null ? String(comp.ComponentId) : null;
+        const compItemId = comp.ItemId != null ? String(comp.ItemId) : null;
+        
+        // Match 1: BOMId esatto (priorità massima - quando entrambi hanno BOMId valido)
+        if (routeBOMId && compBOMId && routeBOMId === compBOMId) {
+          return true;
+        }
+        
+        // Match 2: Level + ComponentId/ItemId (per componenti con BOMId = 0 o quando BOMId non matcha)
+        // Questo è importante per componenti che non hanno ancora una BOM creata o per routing di componenti figli
+        if (routeLevel !== null && compLevel !== null && routeLevel === compLevel) {
+          // Match per ComponentId (priorità)
+          if (routeComponentId && compComponentId && routeComponentId === compComponentId) {
+            return true;
+          }
+          // Match per ItemId
+          if (routeItemId && compItemId && routeItemId === compItemId) {
+            return true;
+          }
+          // Match incrociato: route.ComponentId === comp.ItemId o route.ItemId === comp.ComponentId
+          if (routeComponentId && compItemId && routeComponentId === compItemId) {
+            return true;
+          }
+          if (routeItemId && compComponentId && routeItemId === compComponentId) {
+            return true;
+          }
+        }
+        
+        // Match 3: Solo ComponentId/ItemId (senza Level, come fallback)
+        // Utile quando il routing non ha Level ma ha ComponentId/ItemId
+        if (routeComponentId && compComponentId && routeComponentId === compComponentId) {
+          return true;
+        }
+        if (routeItemId && compItemId && routeItemId === compItemId) {
+          return true;
+        }
+        if (routeComponentId && compItemId && routeComponentId === compItemId) {
+          return true;
+        }
+        if (routeItemId && compComponentId && routeItemId === compComponentId) {
+          return true;
+        }
+        
+        return false;
+      });
+      
+      // Debug: log per capire perché i routing non vengono associati
+      if (componentRouting.length === 0 && comp.Level > 0) {
+        // Cerca routing con stesso Level
+        const matchingRoutesByLevel = routing.filter(route => {
+          const routeLevel = route.Level != null ? Number(route.Level) : null;
+          const compLevel = comp.Level != null ? Number(comp.Level) : null;
+          return routeLevel === compLevel;
+        });
+        
+        // Cerca routing con stesso BOMId
+        const matchingRoutesByBOMId = routing.filter(route => {
+          const routeBOMId = route.BOMId != null && route.BOMId !== 0 ? String(route.BOMId) : null;
+          const compBOMId = comp.BOMId != null && comp.BOMId !== '0' && comp.BOMId !== 0 ? String(comp.BOMId) : null;
+          return routeBOMId && compBOMId && routeBOMId === compBOMId;
+        });
+        
+        // Cerca routing con stesso ComponentId
+        const matchingRoutesByComponentId = routing.filter(route => {
+          const routeComponentId = route.ComponentId != null ? String(route.ComponentId) : null;
+          const compComponentId = comp.ComponentId != null ? String(comp.ComponentId) : null;
+          return routeComponentId && compComponentId && routeComponentId === compComponentId;
+        });
+        
+        if (matchingRoutesByLevel.length > 0 || matchingRoutesByBOMId.length > 0 || matchingRoutesByComponentId.length > 0) {
+          console.warn(`[CostTreeView] Componente ${comp.ComponentId} (Level ${comp.Level}, BOMId ${comp.BOMId}) non ha routing associati, ma:`, {
+            component: { Level: comp.Level, BOMId: comp.BOMId, ComponentId: comp.ComponentId, ItemId: comp.ItemId },
+            matchingByLevel: matchingRoutesByLevel.length,
+            matchingByBOMId: matchingRoutesByBOMId.length,
+            matchingByComponentId: matchingRoutesByComponentId.length,
+            sampleRoute: matchingRoutesByLevel[0] || matchingRoutesByBOMId[0] || matchingRoutesByComponentId[0]
+          });
+        }
+      }
 
+      // Debug: log per vedere quanti routing sono stati trovati
+      if (componentRouting.length > 0) {
+        console.log(`[CostTreeView] Trovati ${componentRouting.length} routing per componente ${comp.ComponentId} (Level ${comp.Level}, BOMId ${comp.BOMId})`, {
+          component: { Level: comp.Level, BOMId: comp.BOMId, ComponentId: comp.ComponentId, ItemId: comp.ItemId },
+          routing: componentRouting.map(r => ({ Level: r.Level, BOMId: r.BOMId, ComponentId: r.ComponentId, ItemId: r.ItemId, RtgStep: r.RtgStep, Operation: r.Operation }))
+        });
+      } else if (comp.Level > 0 && comp.BOMId && comp.BOMId !== '0') {
+        // Debug: per componenti con BOMId valido ma senza routing, verifica se ci sono routing con stesso BOMId
+        const routesWithSameBOMId = routing.filter(r => {
+          const rBOMId = r.BOMId != null && r.BOMId !== 0 ? String(r.BOMId) : null;
+          const cBOMId = comp.BOMId != null && comp.BOMId !== '0' && comp.BOMId !== 0 ? String(comp.BOMId) : null;
+          return rBOMId && cBOMId && rBOMId === cBOMId;
+        });
+        if (routesWithSameBOMId.length > 0) {
+          console.warn(`[CostTreeView] Componente ${comp.ComponentId} (Level ${comp.Level}, BOMId ${comp.BOMId}) ha ${routesWithSameBOMId.length} routing con stesso BOMId ma non matchati:`, {
+            component: { Level: comp.Level, BOMId: comp.BOMId, ComponentId: comp.ComponentId, ItemId: comp.ItemId },
+            routes: routesWithSameBOMId.map(r => ({ Level: r.Level, BOMId: r.BOMId, ComponentId: r.ComponentId, ItemId: r.ItemId }))
+          });
+        }
+      }
+      
       // Dedup per chiave (BOMId+RtgStep+Operation)
       const seenKeys = new Set();
       componentRouting.forEach((route, opIndex) => {

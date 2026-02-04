@@ -878,10 +878,39 @@ const BOMCosting = ({ selectedItem }) => {
             console.error('Error loading costing parameters:', error);
           }
 
+          // FIX: Unisci costingRouting (con costi) e bomRouting (completo con tutti i livelli)
+          // Crea una mappa dei routing con costi per BOMId+RtgStep
+          const costingRoutingMap = new Map();
+          costingRouting.forEach(route => {
+            const key = `${route.BOMId}|${route.RtgStep}`;
+            costingRoutingMap.set(key, route);
+          });
+          
+          // Arricchisci bomRouting con i costi da costingRouting quando disponibili
+          const mergedRouting = bomRouting.map(route => {
+            const key = `${route.BOMId}|${route.RtgStep}`;
+            const costingRoute = costingRoutingMap.get(key);
+            
+            if (costingRoute) {
+              // Unisci i dati: usa bomRouting come base e aggiungi i costi da costingRouting
+              return {
+                ...route,
+                ProcessingCost: costingRoute.ProcessingCost,
+                SetupCost: costingRoute.SetupCost,
+                TotalCost: costingRoute.TotalCost,
+                UnitCost: costingRoute.UnitCost,
+                FixedCost: costingRoute.FixedCost
+              };
+            }
+            
+            // Se non c'è costo calcolato, usa il routing originale
+            return route;
+          });
+          
           const finalTreeData = {
             ...costResponse.data.data,
             components: componentsWithCycles,
-            routing: costingRouting, // USA i dati di routing con i costi da SP_CalculateBOMCosting
+            routing: mergedRouting, // USA routing completo (tutti i livelli) con costi quando disponibili
             bomCode: bomData?.ItemCode || bomData?.BOMCode,
             bomDescription: bomData?.ItemDescription || bomData?.Description,
             parameters: costingParameters, // Aggiungi i parametri di costificazione

@@ -151,6 +151,7 @@ const applyBatchRecoding = async (companyId, userId, items) => {
         tvp.columns.add('Sequential', sql.Int);
         tvp.columns.add('UseExistingArticleId', sql.BigInt);
         tvp.columns.add('ReplaceWithExisting', sql.Bit);
+        tvp.columns.add('TechnicalCharacteristicsJSON', sql.NVarChar(sql.MAX)); // NUOVO: JSON caratteristiche tecniche
 
         // Add rows to TVP
         items.forEach(item => {
@@ -161,6 +162,18 @@ const applyBatchRecoding = async (companyId, userId, items) => {
                 null;
 
 
+
+            // Prepara TechnicalCharacteristicsJSON: se presente come oggetto, convertilo in JSON string
+            let technicalCharacteristicsJSON = null;
+            if (item.TechnicalCharacteristicsJSON) {
+                if (typeof item.TechnicalCharacteristicsJSON === 'string') {
+                    // Già una stringa JSON
+                    technicalCharacteristicsJSON = item.TechnicalCharacteristicsJSON;
+                } else if (typeof item.TechnicalCharacteristicsJSON === 'object') {
+                    // Converti oggetto in JSON string
+                    technicalCharacteristicsJSON = JSON.stringify(item.TechnicalCharacteristicsJSON);
+                }
+            }
 
             tvp.rows.add(
                 item.ItemId,
@@ -174,7 +187,8 @@ const applyBatchRecoding = async (companyId, userId, items) => {
                 item.Measures || null,
                 item.Sequential || null,
                 useExistingArticleId,
-                item.ReplaceWithExisting ? 1 : 0
+                item.ReplaceWithExisting ? 1 : 0,
+                technicalCharacteristicsJSON // NUOVO: JSON caratteristiche tecniche
             );
         });
 
@@ -1519,41 +1533,108 @@ const generateNormalizedDescription = async (companyId, baseDescription, technic
             WHERE CompanyId = @CompanyId AND IsActive = 1
         `);
         
-        // Crea un mapping dinamico: CharacteristicCode -> valore
-        // Il frontend passa i valori con i nomi dei campi (Diameter, Thickness, etc.)
-        // Dobbiamo mapparli ai CharacteristicCode (DIAMETRO, SPESSORE, etc.)
-        // Mapping per compatibilità con i nomi campo esistenti
-        const fieldToCodeMap = {
-            'Diameter': ['DIAMETER', 'DIAMETRO'],
-            'Bxh': ['BxH', 'BXH'],
-            'Depth': ['DEPTH', 'PROFONDITA'],
-            'Length': ['LENGTH', 'LUNGHEZZA'],
-            'MediumRadius': ['RADIUS', 'RAGGIO', 'RAGGIO_MEDIO'],
-            'Thickness': ['THICKNESS', 'SPESSORE']
-        };
+        console.log('Active characteristics in DB:', charResult.recordset.map(r => r.CharacteristicCode));
         
-        const characteristicMapping = {};
+        // NUOVO APPROCCIO: Usa direttamente CharacteristicCode dal JSON, senza mapping!
+        let characteristicMapping = {};
         
-        // Per ogni caratteristica nel database, cerca il valore corrispondente
-        charResult.recordset.forEach(char => {
-            const code = char.CharacteristicCode;
+        // Verifica se technicalData è già in formato JSON con CharacteristicCode
+        // (es. {"DIAMETRO":"14","RAGGIOM":"21"})
+        const isAlreadyJSONFormat = technicalData && typeof technicalData === 'object' && 
+            !technicalData.hasOwnProperty('Diameter') && 
+            !technicalData.hasOwnProperty('Bxh') && 
+            !technicalData.hasOwnProperty('Depth') && 
+            !technicalData.hasOwnProperty('Length') && 
+            !technicalData.hasOwnProperty('MediumRadius') && 
+            !technicalData.hasOwnProperty('Thickness');
+        
+        console.log('Is already JSON format?', isAlreadyJSONFormat);
+        console.log('Technical data keys:', Object.keys(technicalData || {}));
+        
+        if (isAlreadyJSONFormat) {
+            // Formato nuovo: usa direttamente CharacteristicCode dal JSON
+            // Verifica che i CharacteristicCode esistano nel database
+            const activeCodes = charResult.recordset.map(r => r.CharacteristicCode);
+            console.log('Active codes in DB:', activeCodes);
+            console.log('Technical data codes:', Object.keys(technicalData));
             
-            // Cerca il valore nel technicalData usando il mapping
-            for (const [fieldName, codes] of Object.entries(fieldToCodeMap)) {
-                if (codes.includes(code)) {
-                    const value = technicalData?.[fieldName];
-                    // Includi anche valori stringa non vuoti (es. "18", "44")
-                    // Converti in stringa per il JSON
-                    if (value !== null && value !== undefined && value !== '') {
-                        characteristicMapping[code] = String(value);
-                        break;
+            // Mapping per varianti comuni (se il codice esatto non esiste, prova varianti)
+            const variantMap = {
+                'DIAMETRO': ['DIAMETER'],
+                'DIAMETER': ['DIAMETRO'],
+                'SPESSORE': ['THICKNESS'],
+                'THICKNESS': ['SPESSORE'],
+                'PROFONDITA': ['DEPTH'],
+                'DEPTH': ['PROFONDITA'],
+                'LUNGHEZZA': ['LENGTH'],
+                'LENGTH': ['LUNGHEZZA'],
+                'RAGGIO': ['RADIUS', 'RAGGIO_MEDIO', 'RAGGIOM'],
+                'RAGGIO_MEDIO': ['RADIUS', 'RAGGIO', 'RAGGIOM'],
+                'RAGGIOM': ['RADIUS', 'RAGGIO', 'RAGGIO_MEDIO'],
+                'RADIUS': ['RAGGIO', 'RAGGIO_MEDIO', 'RAGGIOM'],
+                'BXH': ['BxH'],
+                'BxH': ['BXH']
+            };
+            
+            Object.keys(technicalData).forEach(code => {
+                const value = technicalData[code];
+                if (value === undefined || value === null || value === '') {
+                    console.log(`Skipped ${code}: empty value`);
+                    return;
+                }
+                
+                // Prova prima con il codice esatto
+                if (activeCodes.includes(code)) {
+                    characteristicMapping[code] = String(value);
+                    console.log(`Added to mapping (exact match): ${code} = ${value}`);
+                } else {
+                    // Prova con varianti
+                    const variants = variantMap[code] || [];
+                    let found = false;
+                    for (const variant of variants) {
+                        if (activeCodes.includes(variant)) {
+                            characteristicMapping[variant] = String(value);
+                            console.log(`Added to mapping (variant ${code} -> ${variant}): ${variant} = ${value}`);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        console.log(`Skipped ${code}: not found in DB and no matching variant`);
                     }
                 }
-            }
-        });
+            });
+        } else {
+            // Formato vecchio (retrocompatibilità): usa mapping per convertire nomi campo -> CharacteristicCode
+            const fieldToCodeMap = {
+                'Diameter': ['DIAMETER', 'DIAMETRO'],
+                'Bxh': ['BxH', 'BXH'],
+                'Depth': ['DEPTH', 'PROFONDITA'],
+                'Length': ['LENGTH', 'LUNGHEZZA'],
+                'MediumRadius': ['RADIUS', 'RAGGIO', 'RAGGIO_MEDIO', 'RAGGIOM'],
+                'Thickness': ['THICKNESS', 'SPESSORE']
+            };
+            
+            // Per ogni caratteristica nel database, cerca il valore corrispondente
+            charResult.recordset.forEach(char => {
+                const code = char.CharacteristicCode;
+                
+                // Cerca il valore nel technicalData usando il mapping
+                for (const [fieldName, codes] of Object.entries(fieldToCodeMap)) {
+                    if (codes.includes(code)) {
+                        const value = technicalData?.[fieldName];
+                        if (value !== null && value !== undefined && value !== '') {
+                            characteristicMapping[code] = String(value);
+                            break;
+                        }
+                    }
+                }
+            });
+        }
         
         // Debug: log del mapping creato
         console.log('Technical data received:', JSON.stringify(technicalData));
+        console.log('Is JSON format:', isAlreadyJSONFormat);
         console.log('Characteristic mapping:', characteristicMapping);
         
         // Converti in JSON per passarlo alla stored procedure
@@ -1586,10 +1667,64 @@ const generateNormalizedDescription = async (companyId, baseDescription, technic
         console.log('Output parameter:', {
             exists: !!outputParam,
             value: outputParam?.value,
-            type: typeof outputParam?.value
+            type: typeof outputParam?.value,
+            isNull: outputParam?.value === null,
+            isEmpty: outputParam?.value === '',
+            length: outputParam?.value?.length
         });
         
-        const normalizedDescription = outputParam?.value || baseDescription;
+        let normalizedDescription = outputParam?.value;
+        
+        // Se la stored procedure restituisce NULL o stringa vuota, ma abbiamo caratteristiche,
+        // significa che la stored procedure non ha gestito correttamente il caso BaseDescription vuoto
+        // In questo caso, costruiamo la descrizione solo con le caratteristiche
+        if ((!normalizedDescription || normalizedDescription.trim() === '') && characteristicMapping && Object.keys(characteristicMapping).length > 0) {
+            console.log('SP returned empty, but we have characteristics. Building description from characteristics only.');
+            
+            // Carica le caratteristiche con i loro template per costruire la descrizione manualmente
+            const codes = Object.keys(characteristicMapping);
+            const codesPlaceholder = codes.map((_, i) => `@Code${i}`).join(', ');
+            
+            const charDetailsRequest = pool.request();
+            charDetailsRequest.input('CompanyId', sql.Int, companyId);
+            
+            // Aggiungi i parametri per i codici
+            codes.forEach((code, i) => {
+                charDetailsRequest.input(`Code${i}`, sql.VarChar(50), code);
+            });
+            
+            const charDetails = await charDetailsRequest.query(`
+                SELECT CharacteristicCode, DisplayOrder, FormatTemplate
+                FROM MA_ArticleTechnicalCharacteristics
+                WHERE CompanyId = @CompanyId AND IsActive = 1
+                AND CharacteristicCode IN (${codesPlaceholder})
+                ORDER BY DisplayOrder
+            `);
+            
+            const parts = [];
+            // Se abbiamo una baseDescription, aggiungila prima
+            if (baseDescription && baseDescription.trim() !== '') {
+                parts.push(baseDescription);
+            }
+            
+            // Aggiungi le caratteristiche formattate
+            charDetails.recordset.forEach(char => {
+                const value = characteristicMapping[char.CharacteristicCode];
+                if (value && char.FormatTemplate) {
+                    const formatted = char.FormatTemplate.replace(/{value}/g, value).replace(/{Vvalue}/g, value);
+                    parts.push(formatted);
+                }
+            });
+            
+            normalizedDescription = parts.join(' - ');
+            console.log('Built description from characteristics:', normalizedDescription);
+        }
+        
+        // Fallback alla baseDescription se ancora vuoto
+        if (!normalizedDescription || normalizedDescription.trim() === '') {
+            normalizedDescription = baseDescription || '';
+        }
+        
         console.log('SP returned description:', normalizedDescription);
         console.log('Final normalized description length:', normalizedDescription?.length);
         
@@ -1702,9 +1837,22 @@ const applySimplifiedBatchRecoding = async (companyId, userId, items) => {
         tvp.columns.add('Sequential', sql.Int);
         tvp.columns.add('UseExistingArticleId', sql.BigInt);
         tvp.columns.add('ReplaceWithExisting', sql.Bit);
+        tvp.columns.add('TechnicalCharacteristicsJSON', sql.NVarChar(sql.MAX)); // NUOVO: JSON caratteristiche tecniche
 
         // Popola TVP
         items.forEach(item => {
+            // Prepara TechnicalCharacteristicsJSON: se presente come oggetto, convertilo in JSON string
+            let technicalCharacteristicsJSON = null;
+            if (item.TechnicalCharacteristicsJSON) {
+                if (typeof item.TechnicalCharacteristicsJSON === 'string') {
+                    // Già una stringa JSON
+                    technicalCharacteristicsJSON = item.TechnicalCharacteristicsJSON;
+                } else if (typeof item.TechnicalCharacteristicsJSON === 'object') {
+                    // Converti oggetto in JSON string
+                    technicalCharacteristicsJSON = JSON.stringify(item.TechnicalCharacteristicsJSON);
+                }
+            }
+
             tvp.rows.add(
                 item.ItemId,
                 item.OldCode,
@@ -1717,7 +1865,8 @@ const applySimplifiedBatchRecoding = async (companyId, userId, items) => {
                 item.Measures || null,
                 item.Sequential || null,
                 item.UseExistingArticleId || null,
-                item.ReplaceWithExisting || 0
+                item.ReplaceWithExisting || 0,
+                technicalCharacteristicsJSON // NUOVO: JSON caratteristiche tecniche
             );
         });
 

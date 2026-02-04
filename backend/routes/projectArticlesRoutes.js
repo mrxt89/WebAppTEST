@@ -32,6 +32,7 @@ const {
     reorderBOMRoutings,
     getUnitsOfMeasure,
     updateItemDetails,
+    saveTechnicalCharacteristics,
     importERPItemWithSelection,
     getERPItemsPaginated,
     validateItemCode,
@@ -1875,6 +1876,33 @@ router.get('/projectArticles/unitsOfMeasure', authenticateToken, async (req, res
     }
   });
   
+  // Salva solo caratteristiche tecniche (senza ricodificare)
+  router.put('/projectArticles/items/:itemId/technical-characteristics', authenticateToken, async (req, res) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+      const { technicalCharacteristicsJSON } = req.body;
+      const userId = req.user.UserId;
+      
+      if (!itemId || isNaN(itemId)) {
+        return res.status(400).json({ 
+          success: 0, 
+          msg: 'ID articolo non valido' 
+        });
+      }
+      
+      const result = await saveTechnicalCharacteristics(itemId, technicalCharacteristicsJSON, userId);
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (err) {
+      console.error('Error saving technical characteristics:', err);
+      res.status(500).json({ success: 0, msg: err.message });
+    }
+  });
+
   // Aggiorna dettagli articolo
   router.put('/projectArticles/items/:itemId/details', authenticateToken, async (req, res) => {
     try {

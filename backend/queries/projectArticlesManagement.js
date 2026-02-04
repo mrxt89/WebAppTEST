@@ -1079,6 +1079,7 @@ const getItemById = async (companyId, itemId) => {
             .query(`
                 SELECT 
                     i.*, 
+                    -- TechnicalCharacteristicsJSON è già incluso in i.*, non serve duplicarlo
                     s.StatusCode, s.Description AS StatusDescription,
                     CASE 
                         WHEN i.Nature = 22413312 THEN 'Semilavorato'
@@ -1097,6 +1098,14 @@ const getItemById = async (companyId, itemId) => {
         }
         
         const item = itemResult.recordset[0];
+        
+        // Normalizza TechnicalCharacteristicsJSON se è un array (problema con mssql quando ci sono JOIN)
+        if (Array.isArray(item.TechnicalCharacteristicsJSON)) {
+            // Se è un array, prendi il primo elemento non vuoto
+            const validJson = item.TechnicalCharacteristicsJSON.find(j => j && j.trim() !== '');
+            item.TechnicalCharacteristicsJSON = validJson || null;
+            console.log('Normalizzato TechnicalCharacteristicsJSON da array a stringa:', item.TechnicalCharacteristicsJSON);
+        }
         
         
         try {
@@ -3815,6 +3824,72 @@ const updateItemDetailsWithValidation = async (itemId, itemData) => {
     }
 };
 
+/**
+ * Salva solo le caratteristiche tecniche di un articolo (senza ricodificare)
+ * @param {number} itemId - ID dell'articolo
+ * @param {string|object} technicalCharacteristicsJSON - JSON delle caratteristiche tecniche
+ * @param {number} userId - ID utente che esegue l'operazione
+ * @returns {Promise<Object>} Risultato dell'operazione
+ */
+const saveTechnicalCharacteristics = async (itemId, technicalCharacteristicsJSON, userId) => {
+    try {
+        let pool = await sql.connect(config.database);
+        
+        // Verifica che l'articolo esista
+        const checkRequest = pool.request();
+        checkRequest.input('ItemId', sql.BigInt, itemId);
+        const checkResult = await checkRequest.query(`
+            SELECT CompanyId, Id 
+            FROM MA_ProjectArticles_Items 
+            WHERE Id = @ItemId
+        `);
+        
+        if (checkResult.recordset.length === 0) {
+            return { success: 0, msg: 'Articolo non trovato' };
+        }
+        
+        const companyId = checkResult.recordset[0].CompanyId;
+        
+        // Converti technicalCharacteristicsJSON in stringa se è un oggetto
+        let jsonString = null;
+        if (technicalCharacteristicsJSON) {
+            if (typeof technicalCharacteristicsJSON === 'string') {
+                jsonString = technicalCharacteristicsJSON;
+            } else if (typeof technicalCharacteristicsJSON === 'object') {
+                jsonString = JSON.stringify(technicalCharacteristicsJSON);
+            }
+        }
+        
+        // Aggiorna TechnicalCharacteristicsJSON
+        const updateRequest = pool.request();
+        updateRequest.input('ItemId', sql.BigInt, itemId);
+        updateRequest.input('TechnicalCharacteristicsJSON', sql.NVarChar(sql.MAX), jsonString);
+        updateRequest.input('UserId', sql.Int, userId);
+        
+        await updateRequest.query(`
+            UPDATE MA_ProjectArticles_Items
+            SET TechnicalCharacteristicsJSON = @TechnicalCharacteristicsJSON,
+                TBModified = GETDATE(),
+                TBModifiedId = @UserId
+            WHERE Id = @ItemId
+        `);
+        
+        // Sincronizza i campi hardcoded dal JSON
+        const syncRequest = pool.request();
+        syncRequest.input('ItemId', sql.BigInt, itemId);
+        syncRequest.input('CompanyId', sql.Int, companyId);
+        await syncRequest.execute('MA_SyncTechnicalCharacteristicsFromJSON');
+        
+        return { 
+            success: 1, 
+            msg: 'Caratteristiche tecniche salvate con successo' 
+        };
+    } catch (err) {
+        console.error('Error saving technical characteristics:', err);
+        return { success: 0, msg: err.message };
+    }
+};
+
 // Aggiungere alla fine del file projectArticlesManagement.js esistente
 
 /**
@@ -5161,6 +5236,7 @@ const getReferenceWithProjects = async (referenceId, companyId) => {
 
 // Esporta tutte le funzioni
 module.exports = {
+    saveTechnicalCharacteristics,
     addUpdateItem,
     addUpdateBOM,
     getBOMData,

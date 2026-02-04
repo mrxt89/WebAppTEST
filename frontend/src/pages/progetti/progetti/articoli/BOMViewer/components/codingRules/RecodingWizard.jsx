@@ -162,6 +162,38 @@ const RecodingWizard = ({
           recodingItem.AliasId = item.recodingData.aliasId ? parseInt(item.recodingData.aliasId) : null;
           recodingItem.Measures = item.recodingData.measures || "";
           recodingItem.Sequential = item.recodingData.sequential ? parseInt(item.recodingData.sequential) : null;
+          
+          // NUOVO: Estrai TechnicalCharacteristicsJSON da recodingData
+          // Supporta sia formato nuovo (technicalCharacteristicsJSON) che vecchio (campi individuali)
+          if (item.recodingData.technicalCharacteristicsJSON && typeof item.recodingData.technicalCharacteristicsJSON === 'object') {
+            // Formato nuovo: già in formato JSON con CharacteristicCode
+            recodingItem.TechnicalCharacteristicsJSON = JSON.stringify(item.recodingData.technicalCharacteristicsJSON);
+          } else {
+            // Formato vecchio: converti da nomi campo a JSON con CharacteristicCode
+            // Mapping inverso: fieldName -> CharacteristicCode
+            const CHARACTERISTIC_FIELD_MAP_REVERSE = {
+              'Diameter': ['DIAMETER', 'DIAMETRO'],
+              'Bxh': ['BxH', 'BXH'],
+              'Depth': ['DEPTH', 'PROFONDITA'],
+              'Length': ['LENGTH', 'LUNGHEZZA'],
+              'MediumRadius': ['RADIUS', 'RAGGIO', 'RAGGIO_MEDIO'],
+              'Thickness': ['THICKNESS', 'SPESSORE']
+            };
+            
+            const jsonData = {};
+            Object.entries(CHARACTERISTIC_FIELD_MAP_REVERSE).forEach(([fieldName, codes]) => {
+              const value = item.recodingData[fieldName];
+              if (value !== null && value !== undefined && value !== '') {
+                // Usa il primo codice disponibile (di solito il primo è quello principale)
+                jsonData[codes[0]] = String(value);
+              }
+            });
+            
+            // Se ci sono dati tecnici, aggiungi il JSON
+            if (Object.keys(jsonData).length > 0) {
+              recodingItem.TechnicalCharacteristicsJSON = JSON.stringify(jsonData);
+            }
+          }
         }
 
         itemsToRecode.push(recodingItem);

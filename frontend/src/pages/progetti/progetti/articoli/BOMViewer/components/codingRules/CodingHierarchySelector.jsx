@@ -152,6 +152,17 @@ const CodingHierarchySelector = ({
  // Funzione per generare descrizione normalizzata con caratteristiche tecniche
  const generateNormalizedDescription = useCallback(async (baseDescription, techData, hierarchyData) => {
    try {
+     // NUOVO APPROCCIO: Se techData contiene technicalCharacteristicsJSON, usalo direttamente
+     // Altrimenti usa il formato vecchio (retrocompatibilità)
+     let technicalDataToSend = techData;
+     
+     if (techData.technicalCharacteristicsJSON && typeof techData.technicalCharacteristicsJSON === 'object') {
+       // Formato nuovo: passa direttamente il JSON con CharacteristicCode
+       // Il backend lo gestirà correttamente
+       technicalDataToSend = techData.technicalCharacteristicsJSON;
+     }
+     // Altrimenti usa techData così com'è (formato vecchio con nomi campo)
+     
      const response = await fetch(`${config.API_BASE_URL}/codingRules/description/generate`, {
        method: 'POST',
        headers: {
@@ -160,7 +171,7 @@ const CodingHierarchySelector = ({
        },
        body: JSON.stringify({
          baseDescription,
-         technicalData: techData,
+         technicalData: technicalDataToSend,
          hierarchyData: {
            MacroFamilyId: hierarchyData.macroFamilyId || null,
            FamilyId: hierarchyData.familyId || null,
@@ -192,13 +203,25 @@ const CodingHierarchySelector = ({
      // Genera descrizione base dalla gerarchia
      const baseDescription = generateDescription(newValues);
      
-     // Se abbiamo dati tecnici e almeno una parte della gerarchia, genera descrizione normalizzata
-     const hasTechnicalData = Object.values(techDataToUse).some(v => v !== null && v !== '' && v !== undefined);
-     const hasHierarchy = newValues.macroFamilyId || newValues.familyId || newValues.typeId;
-     
+    // Se abbiamo dati tecnici, genera descrizione normalizzata
+    // IMPORTANTE: Le caratteristiche devono essere aggiunte in coda anche senza gerarchia completa
+    // La stored procedure gestirà correttamente l'aggiunta usando FormatTemplate e DisplayOrder
+    // NUOVO APPROCCIO: Supporta formato JSON (preferito) e formato vecchio (retrocompatibilità)
+    let hasTechnicalData = false;
+    if (techDataToUse.technicalCharacteristicsJSON && typeof techDataToUse.technicalCharacteristicsJSON === 'object') {
+      // Formato nuovo: controlla se il JSON ha almeno una chiave con valore
+      hasTechnicalData = Object.values(techDataToUse.technicalCharacteristicsJSON).some(v => v !== null && v !== '' && v !== undefined);
+    } else {
+      // Formato vecchio: controlla i campi individuali
+      hasTechnicalData = Object.values(techDataToUse).some(v => v !== null && v !== '' && v !== undefined);
+    }
+    const hasHierarchy = newValues.macroFamilyId || newValues.familyId || newValues.typeId;
+    
      let finalDescription = baseDescription;
      
-    if (hasTechnicalData && hasHierarchy) {
+    // MODIFICATO: Genera descrizione normalizzata se ci sono dati tecnici, anche senza gerarchia completa
+    // La stored procedure aggiungerà le caratteristiche in coda usando FormatTemplate e DisplayOrder
+    if (hasTechnicalData) {
       console.log('Generating normalized description with:', { baseDescription, techDataToUse, hierarchyData: {
         macroFamilyId: newValues.macroFamilyId,
         familyId: newValues.familyId,
@@ -208,9 +231,9 @@ const CodingHierarchySelector = ({
         baseDescription,
         techDataToUse,
         {
-          macroFamilyId: newValues.macroFamilyId,
-          familyId: newValues.familyId,
-          typeId: newValues.typeId,
+          macroFamilyId: newValues.macroFamilyId || null,
+          familyId: newValues.familyId || null,
+          typeId: newValues.typeId || null,
         }
       );
       console.log('Generated description:', finalDescription);
@@ -248,9 +271,21 @@ useEffect(() => {
       return updated;
     });
     
-    // Inizializza i dati tecnici se presenti nel value (include Thickness)
-    if (value.Diameter !== undefined || value.Bxh !== undefined || value.Depth !== undefined || 
+    // Inizializza i dati tecnici se presenti nel value
+    // NUOVO APPROCCIO: Supporta formato JSON (preferito) e formato vecchio (retrocompatibilità)
+    console.log('CodingHierarchySelector - value ricevuto:', value);
+    console.log('CodingHierarchySelector - value.technicalCharacteristicsJSON:', value.technicalCharacteristicsJSON);
+    
+    if (value.technicalCharacteristicsJSON && typeof value.technicalCharacteristicsJSON === 'object') {
+      // Formato nuovo: CharacteristicCode -> valore (es. {"DIAMETRO":"14","RAGGIOM":"21"})
+      console.log('CodingHierarchySelector - Usando formato JSON:', value.technicalCharacteristicsJSON);
+      setTechnicalData({
+        technicalCharacteristicsJSON: value.technicalCharacteristicsJSON
+      });
+    } else if (value.Diameter !== undefined || value.Bxh !== undefined || value.Depth !== undefined || 
         value.Length !== undefined || value.MediumRadius !== undefined || value.Thickness !== undefined) {
+      // Formato vecchio: nomi campo (retrocompatibilità)
+      console.log('CodingHierarchySelector - Usando formato vecchio (nomi campo)');
       setTechnicalData({
         Diameter: value.Diameter || null,
         Bxh: value.Bxh || null,
@@ -259,6 +294,8 @@ useEffect(() => {
         MediumRadius: value.MediumRadius || null,
         Thickness: value.Thickness || null,
       });
+    } else {
+      console.log('CodingHierarchySelector - Nessun dato tecnico trovato nel value');
     }
     
     // Carica le liste in base ai valori inizializzati
@@ -752,16 +789,27 @@ useEffect(() => {
 const handleTechnicalDataChange = useCallback(async (newTechnicalData) => {
   console.log('handleTechnicalDataChange called with:', newTechnicalData);
   
-  // Assicurati che tutti i campi siano presenti (incluso Thickness)
-  // Mantieni i valori stringa come stringhe, non convertirli in null se sono stringhe non vuote
-  const completeTechnicalData = {
-    Diameter: newTechnicalData.Diameter !== undefined && newTechnicalData.Diameter !== '' ? newTechnicalData.Diameter : null,
-    Bxh: newTechnicalData.Bxh !== undefined && newTechnicalData.Bxh !== '' ? newTechnicalData.Bxh : null,
-    Depth: newTechnicalData.Depth !== undefined && newTechnicalData.Depth !== '' ? newTechnicalData.Depth : null,
-    Length: newTechnicalData.Length !== undefined && newTechnicalData.Length !== '' ? newTechnicalData.Length : null,
-    MediumRadius: newTechnicalData.MediumRadius !== undefined && newTechnicalData.MediumRadius !== '' ? newTechnicalData.MediumRadius : null,
-    Thickness: newTechnicalData.Thickness !== undefined && newTechnicalData.Thickness !== '' ? newTechnicalData.Thickness : null,
-  };
+  // NUOVO APPROCCIO: Supporta formato JSON (preferito) e formato vecchio (retrocompatibilità)
+  let completeTechnicalData = {};
+  
+  // Se c'è technicalCharacteristicsJSON, usa quello (formato nuovo)
+  if (newTechnicalData.technicalCharacteristicsJSON && typeof newTechnicalData.technicalCharacteristicsJSON === 'object') {
+    // Formato nuovo: CharacteristicCode -> valore (es. {"DIAMETRO":"14","RAGGIOM":"21"})
+    // Mantieni il JSON per passarlo al parent
+    completeTechnicalData = {
+      technicalCharacteristicsJSON: newTechnicalData.technicalCharacteristicsJSON
+    };
+  } else {
+    // Formato vecchio: usa nomi campo (retrocompatibilità)
+    completeTechnicalData = {
+      Diameter: newTechnicalData.Diameter !== undefined && newTechnicalData.Diameter !== '' ? newTechnicalData.Diameter : null,
+      Bxh: newTechnicalData.Bxh !== undefined && newTechnicalData.Bxh !== '' ? newTechnicalData.Bxh : null,
+      Depth: newTechnicalData.Depth !== undefined && newTechnicalData.Depth !== '' ? newTechnicalData.Depth : null,
+      Length: newTechnicalData.Length !== undefined && newTechnicalData.Length !== '' ? newTechnicalData.Length : null,
+      MediumRadius: newTechnicalData.MediumRadius !== undefined && newTechnicalData.MediumRadius !== '' ? newTechnicalData.MediumRadius : null,
+      Thickness: newTechnicalData.Thickness !== undefined && newTechnicalData.Thickness !== '' ? newTechnicalData.Thickness : null,
+    };
+  }
   
   console.log('Complete technical data:', completeTechnicalData);
   
@@ -770,6 +818,8 @@ const handleTechnicalDataChange = useCallback(async (newTechnicalData) => {
   setTechnicalData(completeTechnicalData);
   
   // Rigenera la descrizione con i nuovi dati tecnici
+  // IMPORTANTE: Rigenera SEMPRE se ci sono dati tecnici, anche senza gerarchia completa
+  // (le caratteristiche devono essere aggiunte in coda alla descrizione base)
   if (!isEditingDescription && !selectedValues.useExistingArticle) {
     console.log('handleTechnicalDataChange: calling updateDescriptionAndState');
     // Imposta flag per evitare che useEffect si attivi
@@ -836,7 +886,15 @@ const handleTechnicalDataChange = useCallback(async (newTechnicalData) => {
   // IMPORTANTE: Non aggiornare se handleTechnicalDataChange ha appena aggiornato i dati
   // (per evitare chiamate duplicate)
   if ((hierarchyChanged || technicalDataChanged) && !isEditingDescription && !selectedValues.useExistingArticle && selectedValues.macroFamilyId && !isUpdatingFromHandler.current) {
-    const hasTechnicalData = Object.values(technicalData).some(v => v !== null && v !== '' && v !== undefined);
+    // NUOVO APPROCCIO: Supporta formato JSON (preferito) e formato vecchio (retrocompatibilità)
+    let hasTechnicalData = false;
+    if (technicalData.technicalCharacteristicsJSON && typeof technicalData.technicalCharacteristicsJSON === 'object') {
+      // Formato nuovo: controlla se il JSON ha almeno una chiave con valore
+      hasTechnicalData = Object.values(technicalData.technicalCharacteristicsJSON).some(v => v !== null && v !== '' && v !== undefined);
+    } else {
+      // Formato vecchio: controlla i campi individuali
+      hasTechnicalData = Object.values(technicalData).some(v => v !== null && v !== '' && v !== undefined);
+    }
     const hasHierarchy = selectedValues.macroFamilyId || selectedValues.familyId || selectedValues.typeId;
     
     if (hasHierarchy) {
@@ -1445,17 +1503,19 @@ const handleTechnicalDataChange = useCallback(async (newTechnicalData) => {
      )}
 
      {/* Selettore Caratteristiche Tecniche */}
-     {!selectedValues.useExistingArticle && selectedValues.macroFamilyId && (
+     {/* Mostra sempre se abbiamo componentId, indipendentemente dalla gerarchia */}
+     {!selectedValues.useExistingArticle && componentId && (
        <div className="space-y-2">
          <Label className="text-xs">Caratteristiche Tecniche</Label>
          <TechnicalCharacteristicsSelector
            companyId={companyId}
-           macroFamilyId={selectedValues.macroFamilyId}
+           macroFamilyId={selectedValues.macroFamilyId} // Opzionale, non obbligatorio
            familyId={selectedValues.familyId}
            typeId={selectedValues.typeId}
            currentTechnicalData={technicalData}
            onTechnicalDataChange={handleTechnicalDataChange}
            disabled={disabled}
+           itemId={componentId} // NUOVO: Passa componentId per salvataggio diretto
          />
        </div>
      )}

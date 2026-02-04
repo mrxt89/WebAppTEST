@@ -31,6 +31,7 @@ const CHARACTERISTIC_FIELD_MAP = {
   'RADIUS': 'MediumRadius',
   'RAGGIO': 'MediumRadius',
   'RAGGIO_MEDIO': 'MediumRadius',
+  'RAGGIOM': 'MediumRadius', // NUOVO: Aggiunto RAGGIOM
   'THICKNESS': 'Thickness',
   'SPESSORE': 'Thickness',
 };
@@ -43,6 +44,8 @@ const TechnicalCharacteristicsSelector = ({
   currentTechnicalData = {},
   onTechnicalDataChange,
   disabled = false,
+  itemId = null, // NUOVO: ID articolo per salvataggio diretto
+  onSaveOnly = null, // NUOVO: Callback per salvare solo caratteristiche senza ricodificare
 }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -51,33 +54,134 @@ const TechnicalCharacteristicsSelector = ({
   const [technicalValues, setTechnicalValues] = useState({});
   const [searchFilter, setSearchFilter] = useState("");
 
+  // Debug: log itemId quando cambia
+  useEffect(() => {
+    console.log('TechnicalCharacteristicsSelector - itemId ricevuto:', itemId);
+  }, [itemId]);
+
   // Carica le caratteristiche quando si apre il dialog
   useEffect(() => {
     if (dialogOpen && companyId) {
       loadCharacteristics();
+      // NUOVO: Carica TechnicalCharacteristicsJSON dal database quando si apre il dialog
+      if (itemId) {
+        loadTechnicalCharacteristicsFromDB();
+      }
     }
-  }, [dialogOpen, companyId]);
+  }, [dialogOpen, companyId, itemId]);
+
+  // NUOVO: Carica TechnicalCharacteristicsJSON dal database
+  const loadTechnicalCharacteristicsFromDB = async () => {
+    if (!itemId) return;
+    
+    try {
+      const response = await fetch(
+        `${config.API_BASE_URL}/projectArticles/items/${itemId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        console.error('Errore nella risposta API:', response.status, response.statusText);
+        return;
+      }
+      
+      const result = await response.json();
+      
+      // La route restituisce direttamente l'item, non un oggetto con success/data
+      const item = result;
+      
+      if (item?.TechnicalCharacteristicsJSON) {
+        let techJson = item.TechnicalCharacteristicsJSON;
+        
+        // Gestisci il caso in cui TechnicalCharacteristicsJSON è un array (problema backend)
+        if (Array.isArray(techJson)) {
+          // Prendi il primo elemento non vuoto
+          techJson = techJson.find(j => j && j.trim() !== '') || null;
+          if (!techJson) return;
+        }
+        
+        if (typeof techJson === 'string' && techJson.trim() !== '') {
+          try {
+            techJson = JSON.parse(techJson);
+          } catch (parseError) {
+            console.error('Errore parsing TechnicalCharacteristicsJSON:', parseError);
+            return;
+          }
+        }
+        
+        if (techJson && typeof techJson === 'object' && Object.keys(techJson).length > 0) {
+          console.log('TechnicalCharacteristicsSelector - TechnicalCharacteristicsJSON caricato dal database:', techJson);
+          
+          // Aggiorna currentTechnicalData con i dati dal database
+          // NUOVO APPROCCIO: Passa solo il JSON, senza mapping!
+          if (onTechnicalDataChange) {
+            onTechnicalDataChange({
+              technicalCharacteristicsJSON: techJson
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Errore nel caricamento TechnicalCharacteristicsJSON dal database:', error);
+    }
+  };
 
   // Inizializza i valori tecnici quando cambiano i dati esterni
   useEffect(() => {
     if (currentTechnicalData) {
-      setTechnicalValues(currentTechnicalData);
-      
-      // Determina quali caratteristiche sono già selezionate (hanno un valore)
+      // NUOVO APPROCCIO: Usa direttamente CharacteristicCode dal JSON, senza mapping
+      let valuesToUse = {};
       const selected = new Set();
-      Object.entries(currentTechnicalData).forEach(([fieldName, value]) => {
-        if (value !== null && value !== undefined && value !== '') {
-          // Trova il CharacteristicCode corrispondente - cerca tutte le possibili corrispondenze
-          Object.entries(CHARACTERISTIC_FIELD_MAP).forEach(([charCode, field]) => {
-            if (field === fieldName) {
+      
+      // Se c'è technicalCharacteristicsJSON, usa quello (formato nuovo - PREFERITO)
+      if (currentTechnicalData.technicalCharacteristicsJSON && typeof currentTechnicalData.technicalCharacteristicsJSON === 'object') {
+        // Formato nuovo: CharacteristicCode -> valore (es. {"DIAMETRO":"33","RAGGIOM":"44"})
+        Object.entries(currentTechnicalData.technicalCharacteristicsJSON).forEach(([charCode, value]) => {
+          if (value !== null && value !== undefined && value !== '') {
+            // Salva direttamente con CharacteristicCode (senza mapping!)
+            valuesToUse[charCode] = value;
+            // Seleziona solo se la caratteristica esiste nel database
+            if (allCharacteristics.some(char => char.CharacteristicCode === charCode)) {
               selected.add(charCode);
             }
-          });
-        }
-      });
+          }
+        });
+      } else {
+        // Formato vecchio (retrocompatibilità): usa mapping per convertire nomi campo -> CharacteristicCode
+        const { technicalCharacteristicsJSON, ...rest } = currentTechnicalData;
+        Object.entries(rest).forEach(([key, value]) => {
+          if (value !== null && value !== undefined && value !== '') {
+            // Cerca se la chiave è già un CharacteristicCode valido
+            const matchingChar = allCharacteristics.find(char => char.CharacteristicCode === key);
+            if (matchingChar) {
+              // È già un CharacteristicCode valido
+              valuesToUse[key] = value;
+              selected.add(key);
+            } else {
+              // Prova con il mapping (solo per retrocompatibilità)
+              Object.entries(CHARACTERISTIC_FIELD_MAP).forEach(([charCode, field]) => {
+                if (field === key) {
+                  // Trova il CharacteristicCode corrispondente nel database
+                  const matchingChar = allCharacteristics.find(char => char.CharacteristicCode === charCode);
+                  if (matchingChar) {
+                    valuesToUse[charCode] = value;
+                    selected.add(charCode);
+                  }
+                }
+              });
+            }
+          }
+        });
+      }
+      
+      setTechnicalValues(valuesToUse);
       setSelectedCharacteristics(selected);
     }
-  }, [currentTechnicalData, dialogOpen]);
+  }, [currentTechnicalData, dialogOpen, allCharacteristics]);
 
   const loadCharacteristics = async () => {
     try {
@@ -110,14 +214,12 @@ const TechnicalCharacteristicsSelector = ({
     if (newSelected.has(characteristicCode)) {
       // Rimuovi: deseleziona e cancella il valore
       newSelected.delete(characteristicCode);
-      const fieldName = CHARACTERISTIC_FIELD_MAP[characteristicCode];
-      if (fieldName) {
-        setTechnicalValues(prev => {
-          const updated = { ...prev };
-          delete updated[fieldName];
-          return updated;
-        });
-      }
+      setTechnicalValues(prev => {
+        const updated = { ...prev };
+        // Rimuovi direttamente con CharacteristicCode (senza mapping!)
+        delete updated[characteristicCode];
+        return updated;
+      });
     } else {
       // Aggiungi: seleziona
       newSelected.add(characteristicCode);
@@ -126,14 +228,12 @@ const TechnicalCharacteristicsSelector = ({
   };
 
   const handleValueChange = (characteristicCode, value) => {
-    const fieldName = CHARACTERISTIC_FIELD_MAP[characteristicCode];
-    if (fieldName) {
-      const newValues = {
-        ...technicalValues,
-        [fieldName]: value,
-      };
-      setTechnicalValues(newValues);
-    }
+    // NUOVO APPROCCIO: Salva direttamente con CharacteristicCode (senza mapping!)
+    const newValues = {
+      ...technicalValues,
+      [characteristicCode]: value, // Usa direttamente CharacteristicCode (es. "DIAMETRO", "RAGGIOM")
+    };
+    setTechnicalValues(newValues);
   };
 
   const handleRemoveCharacteristic = (characteristicCode) => {
@@ -141,43 +241,148 @@ const TechnicalCharacteristicsSelector = ({
     newSelected.delete(characteristicCode);
     setSelectedCharacteristics(newSelected);
     
-    const fieldName = CHARACTERISTIC_FIELD_MAP[characteristicCode];
-    if (fieldName) {
-      setTechnicalValues(prev => {
-        const updated = { ...prev };
-        delete updated[fieldName];
-        return updated;
-      });
-    }
+    setTechnicalValues(prev => {
+      const updated = { ...prev };
+      // Rimuovi direttamente con CharacteristicCode (senza mapping!)
+      delete updated[characteristicCode];
+      return updated;
+    });
+  };
+
+  const prepareJSONData = () => {
+    // NUOVO APPROCCIO: Usa direttamente CharacteristicCode dal JSON, senza mapping
+    const jsonData = {};
+    
+    // Itera su tutte le caratteristiche selezionate e salva i valori
+    // Usa direttamente CharacteristicCode come chiave (es. "DIAMETRO", "RAGGIOM")
+    selectedCharacteristics.forEach(charCode => {
+      // Cerca il valore direttamente con CharacteristicCode (senza mapping!)
+      const value = technicalValues[charCode];
+      
+      if (value !== null && value !== undefined && value !== '') {
+        jsonData[charCode] = String(value);
+      }
+    });
+    
+    return jsonData;
   };
 
   const handleSave = async () => {
-    // Notifica il parent dei nuovi valori tecnici
+    const jsonData = prepareJSONData();
+    
+    // Notifica il parent con i dati in formato JSON (CharacteristicCode -> valore)
+    // NUOVO APPROCCIO: Passa solo il JSON, senza mapping!
     if (onTechnicalDataChange) {
-      onTechnicalDataChange(technicalValues);
+      onTechnicalDataChange({
+        technicalCharacteristicsJSON: jsonData
+      });
     }
     setDialogOpen(false);
     setSearchFilter(""); // Reset filtro quando chiudi
+  };
+
+  // NUOVO: Salva solo le caratteristiche senza ricodificare
+  const handleSaveOnly = async () => {
+    console.log('handleSaveOnly chiamato', { itemId, technicalValues, selectedCharacteristics });
+    
+    if (!itemId) {
+      console.error('ItemId mancante per salvataggio caratteristiche', { itemId });
+      alert('Errore: ID articolo non disponibile. Impossibile salvare le caratteristiche.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const jsonData = prepareJSONData();
+      console.log('JSON preparato per salvataggio:', jsonData);
+      
+      if (Object.keys(jsonData).length === 0) {
+        alert('Nessuna caratteristica da salvare. Seleziona almeno una caratteristica e inserisci un valore.');
+        setLoading(false);
+        return;
+      }
+      
+      const url = `${config.API_BASE_URL}/projectArticles/items/${itemId}/technical-characteristics`;
+      console.log('Chiamata API:', url, { technicalCharacteristicsJSON: jsonData });
+      
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          technicalCharacteristicsJSON: jsonData,
+        }),
+      });
+
+      console.log('Risposta API:', response.status, response.statusText);
+      const result = await response.json();
+      console.log('Risultato API:', result);
+
+      if (result.success) {
+        // Notifica anche il parent per aggiornare lo stato locale
+        // NUOVO APPROCCIO: Passa solo il JSON, senza mapping!
+        if (onTechnicalDataChange) {
+          onTechnicalDataChange({
+            technicalCharacteristicsJSON: jsonData
+          });
+        }
+        
+        // Callback opzionale
+        if (onSaveOnly) {
+          onSaveOnly(result);
+        }
+        
+       
+        setDialogOpen(false);
+        setSearchFilter("");
+      } else {
+        throw new Error(result.msg || 'Errore nel salvataggio');
+      }
+    } catch (error) {
+      console.error('Errore nel salvataggio caratteristiche:', error);
+      alert('Errore nel salvataggio: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClear = () => {
     setTechnicalValues({});
     setSelectedCharacteristics(new Set());
     if (onTechnicalDataChange) {
-      onTechnicalDataChange({});
+      // Passa oggetto vuoto sia per JSON che per formato vecchio
+      onTechnicalDataChange({
+        technicalCharacteristicsJSON: {},
+        Diameter: null,
+        Bxh: null,
+        Depth: null,
+        Length: null,
+        MediumRadius: null,
+        Thickness: null
+      });
     }
   };
 
   const getCurrentValue = (characteristicCode) => {
-    const fieldName = CHARACTERISTIC_FIELD_MAP[characteristicCode];
-    return fieldName ? (technicalValues[fieldName] || '') : '';
+    // NUOVO APPROCCIO: Usa direttamente CharacteristicCode (senza mapping!)
+    return technicalValues[characteristicCode] || '';
   };
 
   const hasAnyValue = () => {
-    return Object.values(technicalValues).some(v => v !== '' && v !== null && v !== undefined);
+    const hasValue = Object.values(technicalValues).some(v => v !== '' && v !== null && v !== undefined);
+    // Debug: log per capire perché potrebbe essere false
+    if (!hasValue) {
+      console.log('hasAnyValue = false', { technicalValues, selectedCharacteristics });
+    }
+    return hasValue;
   };
 
+  // DEPRECATO: getFieldName non serve più, usiamo direttamente CharacteristicCode
+  // Mantenuto solo per retrocompatibilità con codice esistente
   const getFieldName = (characteristicCode) => {
+    // Non usiamo più il mapping, ma lo manteniamo per retrocompatibilità
     return CHARACTERISTIC_FIELD_MAP[characteristicCode] || null;
   };
 
@@ -202,7 +407,7 @@ const TechnicalCharacteristicsSelector = ({
           variant="outline"
           size="sm"
           onClick={() => setDialogOpen(true)}
-          disabled={disabled || !macroFamilyId}
+          disabled={disabled}
           className="gap-1"
         >
           {hasAnyValue() ? (
@@ -270,15 +475,13 @@ const TechnicalCharacteristicsSelector = ({
               ) : (
                 filteredAndSortedCharacteristics.map((char) => {
                 const isSelected = selectedCharacteristics.has(char.CharacteristicCode);
-                const fieldName = getFieldName(char.CharacteristicCode);
-                const currentValue = fieldName ? getCurrentValue(char.CharacteristicCode) : '';
-                const isBxh = fieldName === 'Bxh';
+                const currentValue = getCurrentValue(char.CharacteristicCode);
+                // Determina se è Bxh guardando il CharacteristicCode
+                const isBxh = char.CharacteristicCode === 'BxH' || char.CharacteristicCode === 'BXH';
                 const hasValue = currentValue !== '' && currentValue !== null && currentValue !== undefined;
 
-                // Se non c'è mapping per questo CharacteristicCode, non mostrarlo
-                if (!fieldName) {
-                  return null;
-                }
+                // MOSTRA TUTTE le caratteristiche dal database
+                // Usa direttamente CharacteristicCode, senza mapping!
 
                 return (
                   <div 
@@ -363,12 +566,45 @@ const TechnicalCharacteristicsSelector = ({
             >
               Annulla
             </Button>
+            {/* NUOVO: Pulsante per salvare solo caratteristiche (se itemId disponibile) */}
+            {itemId ? (
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => {
+                  console.log('Pulsante Salva Caratteristiche cliccato', {
+                    itemId,
+                    hasAnyValue: hasAnyValue(),
+                    technicalValues,
+                    selectedCharacteristics,
+                    loading
+                  });
+                  handleSaveOnly();
+                }}
+                disabled={loading || !hasAnyValue()}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Salvataggio...
+                  </>
+                ) : (
+                  'Salva Caratteristiche'
+                )}
+              </Button>
+            ) : (
+              <div className="text-xs text-gray-500">
+                {/* Debug: mostra se itemId è disponibile */}
+                {console.log('TechnicalCharacteristicsSelector - itemId NON disponibile:', itemId)}
+                <span>ID articolo non disponibile</span>
+              </div>
+            )}
             <Button
               type="button"
               onClick={handleSave}
               disabled={loading}
             >
-              Salva
+              Salva e Continua
             </Button>
           </DialogFooter>
         </DialogContent>
