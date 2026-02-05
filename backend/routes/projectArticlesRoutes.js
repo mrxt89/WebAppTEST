@@ -1882,6 +1882,8 @@ router.get('/projectArticles/unitsOfMeasure', authenticateToken, async (req, res
       const itemId = parseInt(req.params.itemId);
       const { technicalCharacteristicsJSON } = req.body;
       const userId = req.user.UserId;
+      const companyId = req.user.CompanyId;
+      const requestInfo = getRequestInfo(req);
       
       if (!itemId || isNaN(itemId)) {
         return res.status(400).json({ 
@@ -1889,8 +1891,173 @@ router.get('/projectArticles/unitsOfMeasure', authenticateToken, async (req, res
           msg: 'ID articolo non valido' 
         });
       }
+
+      // Recupera lo stato attuale per poter loggare in History (OldValues/NewValues)
+      // NB: getItemById include già anche la lista dei progetti associati DIRETTAMENTE all'articolo (MA_ProjectsItems)
+      const beforeItem = await getItemById(companyId, itemId);
+      const beforeJsonRaw = beforeItem?.TechnicalCharacteristicsJSON || null;
+      let beforeJsonObj = null;
+      try {
+        if (typeof beforeJsonRaw === 'string' && beforeJsonRaw.trim() !== '') {
+          beforeJsonObj = JSON.parse(beforeJsonRaw);
+        } else if (beforeJsonRaw && typeof beforeJsonRaw === 'object') {
+          beforeJsonObj = beforeJsonRaw;
+        }
+      } catch (e) {
+        // Non blocchiamo il salvataggio se il JSON precedente è corrotto
+        beforeJsonObj = null;
+      }
+
+      // IMPORTANTE:
+      // Se stiamo modificando un componente "interno" a una BOM, spesso NON è linkato direttamente a un progetto.
+      // Però il progetto usa la BOM principale che contiene quel componente.
+      // Quindi, oltre ai progetti linkati direttamente all'articolo, risaliamo la gerarchia BOM e troviamo
+      // tutti i progetti che usano una qualsiasi BOM/assiemi padre (anche a più livelli).
+      let projectsFromBomParents = [];
+      try {
+        const sql = require('mssql');
+        const config = require('../config');
+        const pool = await sql.connect(config.database);
+
+        // Risale i padri (ItemId) tramite BOMComponents, fino a 10 livelli
+        const parentProjectsResult = await pool.request()
+          .input('CompanyId', sql.Int, companyId)
+          .input('ItemId', sql.BigInt, itemId)
+          .query(`
+            ;WITH Parents AS (
+              SELECT 
+                bom.ItemId AS ParentItemId,
+                bom.Id AS ParentBOMId,
+                1 AS Lvl
+              FROM dbo.MA_ProjectArticles_BOMComponents bc
+              INNER JOIN dbo.MA_ProjectArticles_BillOfMaterials bom
+                ON bom.CompanyId = bc.CompanyId AND bom.Id = bc.BOMId
+              WHERE bc.CompanyId = @CompanyId
+                AND bc.ComponentId = @ItemId
+
+              UNION ALL
+
+              SELECT 
+                bom2.ItemId AS ParentItemId,
+                bom2.Id AS ParentBOMId,
+                p.Lvl + 1 AS Lvl
+              FROM Parents p
+              INNER JOIN dbo.MA_ProjectArticles_BOMComponents bc2
+                ON bc2.CompanyId = @CompanyId AND bc2.ComponentId = p.ParentItemId
+              INNER JOIN dbo.MA_ProjectArticles_BillOfMaterials bom2
+                ON bom2.CompanyId = bc2.CompanyId AND bom2.Id = bc2.BOMId
+              WHERE p.Lvl < 10
+            )
+            SELECT DISTINCT pi.ProjectID
+            FROM dbo.MA_ProjectsItems pi
+            INNER JOIN (SELECT DISTINCT ParentItemId FROM Parents) x
+              ON x.ParentItemId = pi.ItemId
+            WHERE pi.CompanyId = @CompanyId
+          `);
+
+        projectsFromBomParents = (parentProjectsResult.recordset || [])
+          .map(r => r.ProjectID)
+          .filter(Boolean);
+      } catch (e) {
+        // Se questa query fallisce, non blocchiamo: continueremo a loggare solo i progetti linkati direttamente
+        console.warn('Impossibile determinare progetti da BOM parents per logging caratteristiche:', e?.message || e);
+        projectsFromBomParents = [];
+      }
       
       const result = await saveTechnicalCharacteristics(itemId, technicalCharacteristicsJSON, userId);
+
+      // LOGGING: Traccia modifica caratteristiche tecniche nella History del progetto
+      // Usiamo activityType = ITEM_UPDATE (già standard) e descrizione specifica.
+      if (result?.success) {
+        try {
+          const afterItem = await getItemById(companyId, itemId);
+          const afterJsonRaw = afterItem?.TechnicalCharacteristicsJSON || null;
+          let afterJsonObj = null;
+          try {
+            if (typeof afterJsonRaw === 'string' && afterJsonRaw.trim() !== '') {
+              afterJsonObj = JSON.parse(afterJsonRaw);
+            } else if (afterJsonRaw && typeof afterJsonRaw === 'object') {
+              afterJsonObj = afterJsonRaw;
+            }
+          } catch (e) {
+            afterJsonObj = null;
+          }
+
+          // Calcola differenze (chiavi cambiate) per una descrizione più utile
+          const oldObj = (beforeJsonObj && typeof beforeJsonObj === 'object') ? beforeJsonObj : {};
+          const newObj = (afterJsonObj && typeof afterJsonObj === 'object') ? afterJsonObj : {};
+          const keys = Array.from(new Set([...Object.keys(oldObj), ...Object.keys(newObj)]));
+          const changed = keys
+            .map(k => {
+              const oldVal = oldObj[k] ?? null;
+              const newVal = newObj[k] ?? null;
+              // Normalizza stringhe vuote a null
+              const o = (typeof oldVal === 'string' && oldVal.trim() === '') ? null : oldVal;
+              const n = (typeof newVal === 'string' && newVal.trim() === '') ? null : newVal;
+              if (String(o ?? '') !== String(n ?? '')) return { key: k, oldVal: o, newVal: n };
+              return null;
+            })
+            .filter(Boolean);
+
+          const itemCode = afterItem?.Item || beforeItem?.Item || String(itemId);
+
+          // Descrizione compatta: elenca max 5 cambi (il resto in metadata)
+          const changesPreview = changed
+            .slice(0, 5)
+            .map(c => `${c.key}: ${c.oldVal ?? '∅'} → ${c.newVal ?? '∅'}`)
+            .join(', ');
+
+          const description = changed.length > 0
+            ? `Aggiornate caratteristiche tecniche articolo ${itemCode}: ${changesPreview}${changed.length > 5 ? ` (+${changed.length - 5} altre)` : ''}`
+            : `Salvate caratteristiche tecniche articolo ${itemCode}`;
+
+          // Logga su tutti i progetti collegati all’articolo.
+          // Se non ci sono progetti, logga comunque con projectId = null (log entità).
+          const directProjectIds = Array.isArray(beforeItem?.projects)
+            ? beforeItem.projects.map(p => p.ProjectID).filter(Boolean)
+            : [];
+
+          // Unione: progetti linkati direttamente + progetti che usano un qualsiasi padre BOM
+          const allProjectIds = Array.from(new Set([...(directProjectIds || []), ...(projectsFromBomParents || [])]))
+            .filter(Boolean);
+
+          // Se non ci sono progetti, logga comunque con projectId = null (log entità)
+          const projectsToLog = allProjectIds.length > 0 ? allProjectIds : [null];
+
+          for (const projectId of projectsToLog) {
+            await logActivity({
+              companyId,
+              projectId,
+              userId,
+              activityType: 'ITEM_UPDATE',
+              entityType: 'Item',
+              entityId: itemId,
+              entityCode: itemCode,
+              action: 'UPDATE',
+              description,
+              oldValues: {
+                TechnicalCharacteristicsJSON: oldObj
+              },
+              newValues: {
+                TechnicalCharacteristicsJSON: newObj
+              },
+              metadata: {
+                kind: 'TECHNICAL_CHARACTERISTICS',
+                changedCount: changed.length,
+                changedKeys: changed.map(c => c.key),
+                directProjectCount: directProjectIds.length,
+                bomParentsProjectCount: projectsFromBomParents.length
+              },
+              ...requestInfo
+            }).catch(err => {
+              console.warn('Errore nel logging attività caratteristiche tecniche:', err?.message || err);
+            });
+          }
+        } catch (logErr) {
+          // Non bloccare la risposta se il logging fallisce
+          console.warn('Logging caratteristiche tecniche fallito:', logErr?.message || logErr);
+        }
+      }
       
       if (result.success) {
         res.json(result);
