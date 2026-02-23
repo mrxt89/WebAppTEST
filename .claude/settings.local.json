@@ -24,7 +24,8 @@
       "Bash(docker exec:*)",
       "Bash(cat:*)",
       "Bash(docker ps:*)",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(iconv:*)"
     ],
     "deny": [],
     "ask": []
