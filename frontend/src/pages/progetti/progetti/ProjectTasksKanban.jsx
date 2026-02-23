@@ -37,6 +37,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const TaskCard = ({
   task,
+  project,
   onClick,
   onDragStart,
   onTaskDisable,
@@ -101,11 +102,11 @@ const TaskCard = ({
 
   const openExternalLink = (e) => {
     e.stopPropagation();
-    const prj = task.ProjectErpID || "";
+    const prj = task.ProjectErpID || project?.ProjectErpID || "";
     const stp = task.TaskSequence != null ? task.TaskSequence : "";
     const ute = user?.ERPUserId ?? 0;
     const ope = task.Operation || "";
-    const companyId = user?.CompanyId || 1; // Default a Ricos se non disponibile
+    const companyId = user?.CompanyId || 1;
     const url = getPhaseProgressUrl(companyId, prj, stp, ute, ope);
     window.open(url, "_blank", "noopener");
   };
@@ -818,6 +819,7 @@ const TasksKanban = ({
                             <TaskCard
                               key={task.TaskID}
                               task={task}
+                              project={project}
                               onClick={onTaskClick}
                               onDragStart={handleDragStart}
                               onTaskDisable={onTaskDisable}

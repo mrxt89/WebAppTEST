@@ -82,6 +82,7 @@ const MyTasksList = ({
   const [columnWidths, setColumnWidths] = useState([
     250, // title
     180, // project
+    160, // cliente
     150, // assignedTo
     150, // participants
     120, // status
@@ -99,6 +100,7 @@ const MyTasksList = ({
   const defaultColumnFilters = {
     title: "",
     project: "",
+    cliente: "",
     assignedTo: "",
     participants: "",
     status: "",
@@ -319,6 +321,10 @@ const MyTasksList = ({
             valueA = a.ProjectName || "";
             valueB = b.ProjectName || "";
             break;
+          case "Cliente":
+            valueA = (a.Cliente || "").trim();
+            valueB = (b.Cliente || "").trim();
+            break;
           case "AssignedToName":
             valueA = a.AssignedToName || "";
             valueB = b.AssignedToName || "";
@@ -379,6 +385,7 @@ const MyTasksList = ({
               <h4 className="font-medium text-sm">
                 Filtra {field === "title" ? "titolo" : 
                        field === "project" ? "progetto" : 
+                       field === "cliente" ? "cliente" : 
                        field === "assignedTo" ? "assegnato a" : 
                        field === "participants" ? "partecipanti" : 
                        field === "status" ? "stato" : 
@@ -403,6 +410,7 @@ const MyTasksList = ({
                 <Input
                   placeholder={`Cerca ${field === "title" ? "nel titolo..." : 
                                field === "project" ? "nel progetto..." : 
+                               field === "cliente" ? "nel cliente..." : 
                                field === "assignedTo" ? "l'utente..." : 
                                field === "participants" ? "i partecipanti..." : "..."}`}
                   value={localFilters[field] || ""}
@@ -621,10 +629,35 @@ const MyTasksList = ({
                   onMouseDown={(e) => handleMouseDown(e, 1)}
                 />
               </TableHead>
+
+              <TableHead
+                style={{ width: `${columnWidths[2]}px`, position: 'relative' }}
+                className="cursor-pointer hover:bg-gray-100"
+              >
+                <div className="flex items-center justify-between">
+                  <div
+                    className="flex items-center flex-1"
+                    onClick={() => handleSort("Cliente")}
+                  >
+                    <span>Cliente</span>
+                    {sortConfig.key === "Cliente" && (
+                      sortConfig.direction === "asc" ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />
+                    )}
+                  </div>
+                  {renderColumnFilter("cliente")}
+                </div>
+                {localFilters.cliente && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
+                )}
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
+                  onMouseDown={(e) => handleMouseDown(e, 2)}
+                />
+              </TableHead>
               
               {isAdmin && (
                 <TableHead
-                  style={{ width: `${columnWidths[2]}px`, position: 'relative' }}
+                  style={{ width: `${columnWidths[3]}px`, position: 'relative' }}
                   className="cursor-pointer hover:bg-gray-100"
                 >
                   <div className="flex items-center justify-between">
@@ -644,14 +677,14 @@ const MyTasksList = ({
                   )}
                   <div
                     className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
-                    onMouseDown={(e) => handleMouseDown(e, 2)}
+                    onMouseDown={(e) => handleMouseDown(e, 3)}
                   />
                 </TableHead>
               )}
               
               {isAdmin && (
                 <TableHead
-                  style={{ width: `${columnWidths[3]}px`, position: 'relative' }}
+                  style={{ width: `${columnWidths[4]}px`, position: 'relative' }}
                   className="hover:bg-gray-100"
                 >
                   <div className="flex items-center justify-between">
@@ -663,13 +696,13 @@ const MyTasksList = ({
                   )}
                   <div
                     className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
-                    onMouseDown={(e) => handleMouseDown(e, 3)}
+                    onMouseDown={(e) => handleMouseDown(e, 4)}
                   />
                 </TableHead>
               )}
               
               <TableHead
-                style={{ width: `${columnWidths[4]}px`, position: 'relative' }}
+                style={{ width: `${columnWidths[5]}px`, position: 'relative' }}
                 className="cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center justify-between">
@@ -689,12 +722,12 @@ const MyTasksList = ({
                 )}
                 <div
                   className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
-                  onMouseDown={(e) => handleMouseDown(e, 4)}
+                  onMouseDown={(e) => handleMouseDown(e, 5)}
                 />
               </TableHead>
               
               <TableHead
-                style={{ width: `${columnWidths[5]}px`, position: 'relative' }}
+                style={{ width: `${columnWidths[6]}px`, position: 'relative' }}
                 className="cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center justify-between">
@@ -714,12 +747,12 @@ const MyTasksList = ({
                 )}
                 <div
                   className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
-                  onMouseDown={(e) => handleMouseDown(e, 5)}
+                  onMouseDown={(e) => handleMouseDown(e, 6)}
                 />
               </TableHead>
               
               <TableHead
-                style={{ width: `${columnWidths[6]}px`, position: 'relative' }}
+                style={{ width: `${columnWidths[7]}px`, position: 'relative' }}
                 className="cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-center justify-between">
@@ -739,37 +772,37 @@ const MyTasksList = ({
                 )}
                 <div
                   className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
-                  onMouseDown={(e) => handleMouseDown(e, 6)}
+                  onMouseDown={(e) => handleMouseDown(e, 7)}
                 />
               </TableHead>
               
               <TableHead 
-                style={{ width: `${columnWidths[7]}px`, position: 'relative' }}
+                style={{ width: `${columnWidths[8]}px`, position: 'relative' }}
                 className="text-center"
               >
                 Commenti
                 <div
                   className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
-                  onMouseDown={(e) => handleMouseDown(e, 7)}
+                  onMouseDown={(e) => handleMouseDown(e, 8)}
                 />
               </TableHead>
               
               <TableHead
-                style={{ width: `${columnWidths[8]}px`, position: 'relative' }}
+                style={{ width: `${columnWidths[9]}px`, position: 'relative' }}
                 className="text-center"
               >
                 Allegati
                 <div
                   className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-500"
-                  onMouseDown={(e) => handleMouseDown(e, 8)}
+                  onMouseDown={(e) => handleMouseDown(e, 9)}
                 />
               </TableHead>
 
-              <TableHead style={{ width: `${columnWidths[9]}px` }} className="text-center">
+              <TableHead style={{ width: `${columnWidths[10]}px` }} className="text-center">
                 Link
               </TableHead>
 
-              <TableHead style={{ width: `${columnWidths[10]}px` }} className="text-center">
+              <TableHead style={{ width: `${columnWidths[11]}px` }} className="text-center">
                 Azioni
               </TableHead>
             </TableRow>
@@ -830,6 +863,11 @@ const MyTasksList = ({
                     >
                       {task.ProjectName}
                     </Button>
+                  </TableCell>
+
+                  {/* Cliente */}
+                  <TableCell className="text-sm text-gray-700">
+                    {task.Cliente ?? "-"}
                   </TableCell>
                   
                   {/* Assegnato a (solo per admin) */}

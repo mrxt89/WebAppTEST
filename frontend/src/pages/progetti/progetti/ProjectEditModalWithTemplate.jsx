@@ -140,12 +140,12 @@ const ProjectEditModalWithTemplate = ({
         TemplateID: project?.TemplateID || null,
         UseStages: project?.UseStages === 1 || project?.UseStages === true,
         CustSupp: custSuppInt, // Usa il valore convertito
-        // Se è un nuovo progetto e non ha uno stato, usa il primo stato attivo
+        // Se è un nuovo progetto e non ha uno stato, default 1B (altrimenti primo stato attivo)
         Status:
           project.Status ||
           (projectStatuses && projectStatuses.length > 0
-            ? projectStatuses.find((s) => s.IsActive === 1)?.Id
-            : "1A"),
+            ? (projectStatuses.find((s) => String(s.Code || "").toUpperCase() === "1B") || projectStatuses.find((s) => s.IsActive === 1))?.Id
+            : 2),
       };
       setLocalProject(updatedProject);
       setSelectedCategory(updatedProject.ProjectCategoryId);

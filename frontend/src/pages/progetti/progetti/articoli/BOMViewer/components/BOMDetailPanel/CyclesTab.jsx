@@ -1037,7 +1037,7 @@ const CyclesTab = () => {
   const isComponentInMago =
     selectedNode &&
     selectedNode.data &&
-    (selectedNode.data.stato_erp === "1" || selectedNode.data.stato_erp === 1);
+    (selectedNode.data.parentBOMStato_erp === "1" || selectedNode.data.parentBOMStato_erp === 1);
 
   if (!selectedNode || selectedNode.type !== "component") {
     return (

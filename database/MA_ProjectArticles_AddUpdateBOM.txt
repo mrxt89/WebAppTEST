@@ -1,0 +1,2129 @@
+
+
+
+
+ALTER PROCEDURE [dbo].[MA_ProjectArticles_AddUpdateBOM]
+    @Action NVARCHAR(50),                  -- 'ADD', 'UPDATE', 'COPY', 'ADD_COMPONENT', 'UPDATE_COMPONENT', 'DELETE_COMPONENT', 'ADD_ROUTING', 'UPDATE_ROUTING', 'DELETE_ROUTING'
+    @CompanyId INT,                        -- ID dell'azienda
+    @Id BIGINT = NULL,                     -- ID della distinta (NULL per nuove distinte)
+    @BOM VARCHAR(50) = NULL,               -- Codice distinta
+    @Description NVARCHAR(255) = NULL,     -- Descrizione distinta
+    @ItemId BIGINT = NULL,                 -- ID articolo a cui si riferisce la distinta
+    @Version INT = 1,                      -- Versione distinta
+    @UoM VARCHAR(8) = 'NR',                -- Unità di misura
+    @BOMStatus VARCHAR(50) = 'BOZZA',      -- Stato distinta
+    @ProductionLot INT = 1,                -- Lotto di produzione
+    
+    -- Parametri per componenti
+    @ComponentAction NVARCHAR(20) = NULL,  -- 'ADD', 'UPDATE', 'DELETE' (per i componenti)
+    @ComponentLine INT = NULL,             -- Numero di linea del componente
+    @ComponentId BIGINT = NULL,            -- ID del componente (allineato a MA_ProjectArticles_Items)
+    @ComponentCode VARCHAR(21) = NULL,     -- Codice articolo (da MA_Items se non passa ComponentId)
+	@ComponentBOMId BIGINT = NULL,          -- NUOVO: ID BOM specifica del componente da usare
+    @ComponentType INT = NULL,             -- Tipo di componente
+    @ComponentQuantity DECIMAL(18, 5) = NULL, -- Quantità del componente
+    @ComponentUnitCost FLOAT = NULL,       -- Costo unitario
+    @ComponentTotalCost FLOAT = NULL,      -- Costo totale
+    @ComponentFixedCost FLOAT = NULL,      -- Costo fisso
+    @ComponentUoM VARCHAR(10) = NULL,      -- Unità di misura del componente
+    @ComponentDetails NVARCHAR(MAX) = NULL, -- Dettagli del componente
+    @ComponentDescription VARCHAR(128) = NULL, -- Descrizione componente per azione ADD_COMPONENT
+    @ComponentNatureValue INT = NULL,      -- Natura del componente per azione ADD_COMPONENT
+    @ComponentNotes NVARCHAR(MAX) = NULL,  -- Note del componente
+    @ImportBOM BIT = 1,                    -- Flag per importare anche la distinta del componente
+    @MaxLevels INT = 1,                    -- Profondità massima per l'importazione delle distinte (1 = solo primo livello)
+    @ParentComponentId BIGINT = NULL,      -- ID del componente padre (se il componente deve essere aggiunto sotto un altro)
+    @CreateTempComponent BIT = 0,          -- NUOVO: Flag per indicare se creare un codice temporaneo automatico
+    @TempComponentPrefix VARCHAR(10) = NULL, -- NUOVO: Prefisso opzionale per il codice temporaneo
+	@SourceComponentId BIGINT = NULL,       -- ID del componente sorgente per copiare la distinta
+	@sourceItemCode VARCHAR(50) = NULL,		-- Codice articolo del componente da copiare, se non ancora presente in MA_ProjectArticles_Items
+	-- NUOVI PARAMETRI per fornitore Intercompany (solo componenti temporanei)
+	@TempSupplierId VARCHAR(12) = NULL,                      -- Fornitore temporaneo
+	@TempIntercompanyTargetId INT = NULL,                    -- ID azienda Intercompany target
+	@TempSupplierNotes NVARCHAR(255) = NULL,                 -- Note fornitore temporaneo
+	@UpdateSupplierData BIT = 0,                             -- Flag per aggiornare dati fornitore in UPDATE
+    -- Parametri per cicli
+    @RoutingAction NVARCHAR(20) = NULL,    -- 'ADD', 'UPDATE', 'DELETE' (per i cicli)
+    @RtgStep SMALLINT = NULL,              -- Fase del ciclo
+    @Operation VARCHAR(21) = NULL,         -- Operazione
+    @Notes VARCHAR(1024) = NULL,           -- Note
+    @WC VARCHAR(8) = NULL,                 -- Centro di lavoro
+    @ProcessingTime INT = NULL,            -- Tempo di lavorazione
+    @SetupTime INT = NULL,                 -- Tempo di setup
+    @NoOfProcessingWorkers SMALLINT = NULL, -- Numero operatori lavorazione
+    @NoOfSetupWorkers SMALLINT = NULL,     -- Numero operatori setup
+    @SubId INT = NULL,                     -- ID subfornitura
+    @Supplier VARCHAR(12) = NULL,          -- Fornitore
+    @Qty FLOAT = NULL,                     -- Quantità
+    
+    -- Parametri per copia
+    @SourceBOMId BIGINT = NULL,            -- ID distinta sorgente per copia
+    @CopyComponents BIT = 1,               -- Flag per copiare i componenti
+    @CopyRouting BIT = 1,                  -- Flag per copiare i cicli
+    @VerifyComponents BIT = 1,             -- Flag per verificare esistenza di tutti i componenti (anche sottolivelli)
+    
+    -- Parametri per costi
+    @RMCost FLOAT = NULL,                  -- Costo materie prime
+    @ProcessingCost FLOAT = NULL,          -- Costo lavorazione
+    @RMRefillCost FLOAT = NULL,            -- Costo ricarico materie prime
+    @ProcessingRefillCost FLOAT = NULL,    -- Costo ricarico lavorazione
+    @TotalCost FLOAT = NULL,               -- Costo totale
+    @TotalPrice FLOAT = NULL,              -- Prezzo totale
+    @RefillWaste FLOAT = NULL,             -- Ricarico per sfrido
+    @RefillDiscount FLOAT = NULL,          -- Sconto ricarico
+    @TotalRefill FLOAT = NULL,             -- Ricarico totale
+    @TransportRefill FLOAT = NULL,         -- Ricarico trasporto
+    @Details NVARCHAR(MAX) = NULL,         -- Dettagli
+
+    -- Parametri per sostituzione componenti
+    @NewCompItem VARCHAR(64) = NULL,             -- Codice del nuovo componente temporaneo
+    @NewCompDescription VARCHAR(128) = NULL,     -- Descrizione del nuovo componente temporaneo
+    @NewCompNature INT = NULL,                   -- Natura del nuovo componente temporaneo
+    @NewCompBaseUoM VARCHAR(3) = NULL,           -- UoM del nuovo componente temporaneo
+	@CopyBOM INT = 0,
+    
+    @UserId INT = 0,                       -- ID dell'utente che esegue l'operazione
+    @ReturnValue BIGINT OUTPUT,            -- ID della distinta creata/aggiornata
+    @ErrorCode INT OUTPUT,                 -- Codice di errore (0 = successo)
+    @ErrorMessage NVARCHAR(4000) OUTPUT,   -- Messaggio di errore
+    @CreatedComponentCode VARCHAR(20) OUTPUT -- NUOVO: Codice del componente temporaneo creato
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Inizializzazione variabili di output
+    SET @ErrorCode = 0;
+    SET @ErrorMessage = N'';
+    SET @ReturnValue = 0;
+    SET @CreatedComponentCode = NULL;
+    
+    DECLARE @NewId BIGINT;
+    DECLARE @TranCount INT = @@TRANCOUNT;
+    DECLARE @NeedCommit BIT = 0;
+    DECLARE @NextComponentLine INT = 0;
+
+	-- Step 1: Sincronizza il componente base per la stored procedure del sync
+    DECLARE @SyncErrorCode INT;
+    DECLARE @SyncErrorMessage NVARCHAR(4000);
+	DECLARE @RealComponentId BIGINT;
+    DECLARE @ComponentItemCode VARCHAR(64);
+    DECLARE @ComponentHasBOM BIT = 0;
+    DECLARE @NeedBOMSync BIT = 0;
+   
+    
+    -- Tabella temporanea per memorizzare i componenti già elaborati
+    -- per evitare cicli infiniti e duplicazioni
+    CREATE TABLE #ProcessedComponents (
+        ComponentId BIGINT PRIMARY KEY,
+        ComponentCode VARCHAR(21) NULL,
+        IsProcessed BIT DEFAULT 0
+    );
+    
+    -- Validazione dei parametri di input prima di avviare qualsiasi transazione
+    IF @Action NOT IN ('ADD', 'UPDATE', 'COPY', 'ADD_COMPONENT', 'UPDATE_COMPONENT', 'DELETE_COMPONENT', 'ADD_ROUTING', 'UPDATE_ROUTING', 'DELETE_ROUTING', 'REPLACE_COMPONENT', 'REPLACE_WITH_NEW_COMPONENT')
+    BEGIN
+        SET @ErrorCode = 1;
+        SET @ErrorMessage = N'Azione non valida.';
+        GOTO ErrorHandler;
+    END
+    
+    IF @CompanyId IS NULL OR @CompanyId <= 0
+    BEGIN
+        SET @ErrorCode = 2;
+        SET @ErrorMessage = N'CompanyId non valido.';
+        GOTO ErrorHandler;
+    END
+    
+    -- Validazione per ADD
+    IF @Action = 'ADD' AND @ItemId IS NULL 
+    BEGIN
+        SET @ErrorCode = 3;
+        SET @ErrorMessage = N'ItemId richiesto per l''azione ADD.';
+        GOTO ErrorHandler;
+    END
+    
+    -- Validazione per UPDATE, ADD_COMPONENT, UPDATE_COMPONENT, DELETE_COMPONENT, ADD_ROUTING, UPDATE_ROUTING, DELETE_ROUTING
+    IF @Action IN ('UPDATE', 'ADD_COMPONENT', 'UPDATE_COMPONENT', 'DELETE_COMPONENT', 'ADD_ROUTING', 'UPDATE_ROUTING', 'DELETE_ROUTING') 
+       AND ( (@Id IS NULL OR @Id <= 0) AND ISNULL(@ItemId,0) <= 0) 
+    BEGIN
+        SET @ErrorCode = 4;
+        SET @ErrorMessage = N'Id della distinta non valido.';
+        GOTO ErrorHandler;
+    END
+    
+    -- Validazione per COPY
+    IF @Action = 'COPY' 
+    BEGIN
+        IF @ItemId IS NULL
+        BEGIN
+            SET @ErrorCode = 5;
+            SET @ErrorMessage = N'ItemId richiesto per l''azione COPY.';
+            GOTO ErrorHandler;
+        END
+        
+        IF @SourceBOMId IS NULL OR @SourceBOMId <= 0
+        BEGIN
+            SET @ErrorCode = 6;
+            SET @ErrorMessage = N'SourceBOMId non valido per l''azione COPY.';
+            GOTO ErrorHandler;
+        END
+    END
+    
+    -- Validazione per ADD_COMPONENT e UPDATE_COMPONENT
+    IF @Action IN ('ADD_COMPONENT')
+    BEGIN
+        -- Se @CreateTempComponent = 1, non serve validare ComponentId o ComponentCode
+        IF @CreateTempComponent = 0 AND @ComponentId IS NULL AND @ComponentCode IS NULL
+        BEGIN
+            SET @ErrorCode = 7;
+            SET @ErrorMessage = N'ComponentId o ComponentCode richiesto per l''azione ' + @Action;
+            GOTO ErrorHandler;
+        END
+        
+        IF @Action = 'UPDATE_COMPONENT' AND @ComponentLine IS NULL
+        BEGIN
+            SET @ErrorCode = 8;
+            SET @ErrorMessage = N'ComponentLine richiesto per l''azione UPDATE_COMPONENT.';
+            GOTO ErrorHandler;
+        END
+    END
+
+	IF @Action IN ('UPDATE_COMPONENT')
+    BEGIN
+        -- Se @CreateTempComponent = 1, non serve validare ComponentId o ComponentCode
+        IF @CreateTempComponent = 0 AND @ComponentId IS NULL AND @ComponentCode IS NULL AND @ComponentLine IS NULL
+        BEGIN
+            SET @ErrorCode = 7;
+            SET @ErrorMessage = N'ComponentId o ComponentCode o @ComponentLine richiesto per l''azione ' + @Action;
+            GOTO ErrorHandler;
+        END
+        
+        IF @Action = 'UPDATE_COMPONENT' AND @ComponentLine IS NULL
+        BEGIN
+            SET @ErrorCode = 8;
+            SET @ErrorMessage = N'ComponentLine richiesto per l''azione UPDATE_COMPONENT.';
+            GOTO ErrorHandler;
+        END
+    END
+    
+    -- Validazione per DELETE_COMPONENT
+    IF @Action = 'DELETE_COMPONENT' AND @ComponentLine IS NULL
+    BEGIN
+        SET @ErrorCode = 9;
+        SET @ErrorMessage = N'ComponentLine richiesto per l''azione DELETE_COMPONENT.';
+        GOTO ErrorHandler;
+    END
+    
+    -- Validazione per ADD_ROUTING, UPDATE_ROUTING e DELETE_ROUTING
+    IF @Action IN ('ADD_ROUTING', 'UPDATE_ROUTING', 'DELETE_ROUTING')
+    BEGIN
+        IF @RtgStep IS NULL
+        BEGIN
+            SET @ErrorCode = 10;
+            SET @ErrorMessage = N'RtgStep richiesto per l''azione ' + @Action;
+            GOTO ErrorHandler;
+        END
+        
+        IF @Action IN ('ADD_ROUTING', 'UPDATE_ROUTING') AND @Operation IS NULL
+        BEGIN
+            SET @ErrorCode = 11;
+            SET @ErrorMessage = N'Operation richiesto per l''azione ' + @Action;
+            GOTO ErrorHandler;
+        END
+    END
+    
+    -- Validazione per REPLACE_WITH_NEW_COMPONENT
+    IF @Action = 'REPLACE_WITH_NEW_COMPONENT'
+    BEGIN
+        IF @Id IS NULL OR @Id <= 0
+        BEGIN
+            SET @ErrorCode = 50;
+            SET @ErrorMessage = N'Id distinta non valido';
+            GOTO ErrorHandler;
+        END
+
+        IF @ComponentLine IS NULL
+        BEGIN
+            SET @ErrorCode = 51;
+            SET @ErrorMessage = N'Linea componente non specificata';
+            GOTO ErrorHandler;
+        END
+
+        IF ( @NewCompItem IS NULL OR @NewCompDescription IS NULL ) AND @Action NOT IN ('REPLACE_WITH_NEW_COMPONENT')
+        BEGIN
+            SET @ErrorCode = 52;
+            SET @ErrorMessage = N'Dati nuovo componente insufficienti';
+            GOTO ErrorHandler;
+        END
+    END
+    
+
+    
+    -- Inizio transazione esplicita se non ne esiste già una
+    IF @TranCount = 0
+    BEGIN
+        BEGIN TRANSACTION;
+        SET @NeedCommit = 1;
+    END
+    
+    BEGIN TRY
+        -- Gestione del ParentComponentId per la struttura gerarchica
+        DECLARE @ParentBOMId BIGINT = NULL;
+        DECLARE @CurrentBOMItemId BIGINT = NULL;
+        DECLARE @CurrentBOMMainRefBOMId BIGINT = NULL;
+
+        -- Ottieni ItemId e MainRefBOMId della BOM corrente
+        SELECT @CurrentBOMItemId = ItemId,
+               @CurrentBOMMainRefBOMId = ISNULL(MainRefBOMId, Id)
+        FROM dbo.MA_ProjectArticles_BillOfMaterials
+        WHERE Id = @Id AND CompanyId = @CompanyId;
+
+        -- Se è stato specificato un ParentComponentId, lo verifichiamo.
+        -- @ParentComponentId è l'id in MA_ProjectArticles_Items
+        IF @ParentComponentId IS NOT NULL
+        BEGIN
+            -- Verifica che il componente esista in anagrafica MA_ProjectArticles_Items
+            IF NOT EXISTS (
+                SELECT 1 
+                FROM dbo.MA_ProjectArticles_Items
+                WHERE Id = @ParentComponentId AND CompanyId = @CompanyId
+            )
+            BEGIN
+                SET @ErrorCode = 33;
+                SET @ErrorMessage = N'Componente padre non trovato nell''anagrafica MA_ProjectArticles_Items';
+                THROW 50033, @ErrorMessage, 1;
+            END
+
+            -- IMPORTANTE: Se ParentComponentId corrisponde all'ItemId della BOM corrente,
+            -- aggiungi il componente direttamente alla BOM corrente (non cercare altre BOM)
+            IF @ParentComponentId = @CurrentBOMItemId
+            BEGIN
+                -- Il componente va aggiunto direttamente alla BOM corrente, ignora ParentComponentId
+                SET @ParentComponentId = NULL;
+            END
+            ELSE
+            BEGIN
+                -- Cerca la BOM del componente padre con priorità alla versione con stesso MainRefBOMId
+                SELECT TOP 1 @ParentBOMId = BOM.Id
+                FROM dbo.MA_ProjectArticles_BillOfMaterials BOM
+                WHERE BOM.ItemId = @ParentComponentId 
+                  AND BOM.CompanyId = @CompanyId
+                ORDER BY 
+                    -- Priorità 1: BOM con stesso MainRefBOMId della BOM corrente
+                    CASE WHEN ISNULL(BOM.MainRefBOMId, BOM.Id) = @CurrentBOMMainRefBOMId THEN 1
+                         -- Priorità 2: BOM esportata (stato_erp = 1)
+                         WHEN BOM.stato_erp = 1 THEN 2
+                         -- Priorità 3: Altre versioni
+                         ELSE 3
+                    END,
+                    BOM.Version DESC;
+        
+                -- Se il componente padre non ha una distinta, creala
+                IF @ParentBOMId IS NULL
+                BEGIN
+                    -- Ottieni informazioni sul componente padre
+                    DECLARE @ParentItem VARCHAR(21);
+                    DECLARE @ParentDescription NVARCHAR(255);
+                    DECLARE @ParentUoM VARCHAR(8);
+            
+                    SELECT 
+                        @ParentItem = Item,
+                        @ParentDescription = Description,
+                        @ParentUoM = BaseUoM
+                    FROM dbo.MA_ProjectArticles_Items
+                    WHERE Id = @ParentComponentId AND CompanyId = @CompanyId;
+            
+                    -- Genera un nuovo ID per la distinta del padre
+                    SET @ParentBOMId = dbo.GetNextProjectArticleBOMId(@CompanyId);
+            
+                    -- Inserisci la nuova distinta per il padre con MainRefBOMId della BOM corrente
+                    INSERT INTO dbo.MA_ProjectArticles_BillOfMaterials (
+                        CompanyId, Id, BOM, Description, ItemId, Version, UoM, BOMStatus,
+                        ProductionLot, TBCreated, TBCreatedId, MainRefBOMId  
+                    ) VALUES (
+                        @CompanyId, @ParentBOMId, @ParentItem, 
+                        'Distinta per ' + @ParentDescription, 
+                        @ParentComponentId, 1, @ParentUoM, 'BOZZA',
+                        1, GETDATE(), @UserId, @CurrentBOMMainRefBOMId
+                    );
+                END
+        
+                -- Utilizzeremo @ParentBOMId invece di @Id per aggiungere il componente
+                SET @Id = @ParentBOMId;
+            END
+        END
+
+IF @CreateTempComponent = 1 AND @Action IN ('ADD_COMPONENT', 'UPDATE_COMPONENT', 'REPLACE_COMPONENT')
+BEGIN
+    DECLARE @TempItemCode VARCHAR(20);
+    DECLARE @TempComponentId BIGINT;
+
+    -- Genera codice con logica unificata (semplificato se possibile, altrimenti TMP)
+    DECLARE @UnifiedMethod VARCHAR(20);
+    DECLARE @UnifiedError NVARCHAR(500);
+
+    EXEC dbo.MA_CodingRules_GenerateCodeUnified
+        @CompanyId = @CompanyId,
+        @OriginalCode = @sourceItemCode,  -- Usa codice sorgente come riferimento
+        @GeneratedCode = @TempItemCode OUTPUT,
+        @UsedMethod = @UnifiedMethod OUTPUT,
+        @ErrorMessage = @UnifiedError OUTPUT;
+
+    -- Se fallisce la generazione, blocca l'operazione
+    IF @TempItemCode IS NULL
+    BEGIN
+        SET @ErrorCode = 999;
+        SET @ErrorMessage = N'Impossibile generare codice temporaneo: ' + ISNULL(@UnifiedError, 'errore sconosciuto');
+        THROW 50999, @ErrorMessage, 1;
+    END
+
+    PRINT 'Codice componente temporaneo generato (' + @UnifiedMethod + '): ' +
+          ISNULL(@sourceItemCode, 'NULL') + ' -> ' + @TempItemCode;
+
+    -- Aggiunge il prefisso specifico se fornito
+    IF @TempComponentPrefix IS NOT NULL AND @TempComponentPrefix <> ''
+    BEGIN
+        -- Assicuriamoci che il prefisso non faccia superare i 20 caratteri
+        SET @TempItemCode = LEFT(@TempComponentPrefix + '_' + @TempItemCode, 20);
+        PRINT 'Prefisso applicato: ' + @TempItemCode;
+    END
+
+    -- OTTIMIZZAZIONE: Per prima cosa, recuperiamo i dati del componente sorgente, se fornito
+    DECLARE @SourceDescription NVARCHAR(255) = NULL;
+    DECLARE @SourceDiameter FLOAT = NULL;
+    DECLARE @SourceBxh VARCHAR(11) = NULL;
+    DECLARE @SourceDepth FLOAT = NULL;
+    DECLARE @SourceLength FLOAT = NULL;
+    DECLARE @SourceMediumRadius FLOAT = NULL;
+    DECLARE @SourceNotes NVARCHAR(MAX) = NULL;
+    DECLARE @SourceCategoryId BIGINT = NULL;
+    DECLARE @SourceFamilyId BIGINT = NULL;
+    DECLARE @SourceMacrofamilyId BIGINT = NULL;
+    DECLARE @SourceItemTypeId BIGINT = NULL;
+    DECLARE @SourceNature INT = NULL;
+    DECLARE @SourceStatusId BIGINT = NULL;
+    DECLARE @SourceBaseUoM VARCHAR(3) = NULL;
+    DECLARE @SourceOffset_acquisto VARCHAR(16) = NULL;
+    DECLARE @SourceOffset_autoconsumo VARCHAR(16) = NULL;
+    DECLARE @SourceOffset_vendita VARCHAR(16) = NULL;
+    DECLARE @SourceDescriptionExtension NVARCHAR(512) = NULL;
+    
+    -- Se vogliamo copiare un componente non ancora presente in MA_ProjectArticles_Items eseguiamo prima un sync
+    IF (@SourceComponentId IS NULL OR @SourceComponentId = 0) AND @sourceItemCode IS NOT NULL
+    BEGIN
+        -- NUOVA LOGICA: NON passa MainRefBOMId per sync di componenti temporanei
+        EXEC MA_ProjectArticles_SyncComponent
+            @CompanyId = @CompanyId, 	
+            @ComponentId = NULL, 
+            @ComponentCode = @sourceItemCode,
+            @ComponentDescription = NULL,
+            @ComponentNatureValue = NULL,
+            @ComponentUoM = @ComponentUoM,
+            @ImportBOM = 1,
+            @ValidateBOM = 1,
+            @MaxLevels = 1,
+            @CreateIfNotExists = 1,
+            @UserId = @UserId,
+            @MainRefBOMId = NULL,  -- SEMPRE NULL per componenti temporanei
+            @ReturnComponentId = @RealComponentId OUTPUT,
+            @ErrorCode = @SyncErrorCode OUTPUT,
+            @ErrorMessage = @SyncErrorMessage OUTPUT;
+
+        IF @SyncErrorCode <> 0 OR @RealComponentId IS NULL
+        BEGIN
+            SET @ErrorCode = 30 + @SyncErrorCode;
+            SET @ErrorMessage = N'Errore nella sincronizzazione del componente: ' + @SyncErrorMessage;
+            THROW 50030, @ErrorMessage, 1;
+        END
+
+        SET @SourceComponentId = (SELECT Id FROM MA_ProjectArticles_Items 
+                                 WHERE CompanyId = @CompanyId AND Item = @sourceItemCode);
+    END
+    
+    -- Genera un nuovo ID per il componente
+    SET @TempComponentId = dbo.GetNextProjectArticleItemId(@CompanyId);
+    
+    -- Se abbiamo un componente sorgente, otteniamo i suoi attributi in una sola query
+    IF @SourceComponentId > 0
+    BEGIN
+        SELECT 
+            @SourceDescription = Description,
+            @SourceDiameter = Diameter,
+            @SourceBxh = Bxh,
+            @SourceDepth = Depth,
+            @SourceLength = Length,
+            @SourceMediumRadius = MediumRadius,
+            @SourceNotes = Notes,
+            @SourceCategoryId = ISNULL(CategoryId,0),
+            @SourceFamilyId = FamilyId,
+            @SourceMacrofamilyId = MacrofamilyId,
+            @SourceItemTypeId = ItemTypeId,
+            @SourceNature = Nature,
+            @SourceStatusId = StatusId,
+            @SourceBaseUoM = BaseUoM,
+            @SourceOffset_acquisto = offset_acquisto,
+            @SourceOffset_autoconsumo = offset_autoconsumo,
+            @SourceOffset_vendita = offset_vendita,
+            @SourceDescriptionExtension = DescriptionExtension
+        FROM MA_ProjectArticles_Items
+        WHERE Id = @SourceComponentId AND CompanyId = @CompanyId;
+    END
+
+    -- Imposta i valori di default o usa quelli del componente sorgente
+    SET @ComponentDescription = ISNULL(@ComponentDescription, ISNULL(@SourceDescription, 'Componente temporaneo'));
+    SET @ComponentNatureValue = ISNULL(@ComponentNatureValue, ISNULL(@SourceNature, 22413312)); -- Default Semilavorato
+    SET @ComponentUoM = ISNULL(@ComponentUoM, ISNULL(@SourceBaseUoM, 'NR'));
+	
+    -- Crea il nuovo componente temporaneo con i dati del componente sorgente
+    INSERT INTO dbo.MA_ProjectArticles_Items (
+        Id, CompanyId, TBCreatedId, TBCreated, TBModifiedId, TBModified,
+        Item, Description, Nature, BaseUoM, stato_erp,
+        -- Includiamo tutti gli altri campi del componente sorgente
+        Diameter, Bxh, Depth, Length, MediumRadius, Notes, 
+        CategoryId, FamilyId, MacrofamilyId, ItemTypeId, StatusId,
+        Disabled, DescriptionExtension, offset_acquisto, 
+        offset_autoconsumo, offset_vendita
+    ) VALUES (
+        @TempComponentId, @CompanyId, @UserId, GETDATE(), @UserId, GETDATE(),
+        @TempItemCode, @ComponentDescription, @ComponentNatureValue, @ComponentUoM, 0,
+        -- Utilizziamo i valori dal componente sorgente
+        @SourceDiameter, @SourceBxh, @SourceDepth, @SourceLength, @SourceMediumRadius, @SourceNotes,
+        ISNULL(@SourceCategoryId,0), @SourceFamilyId, @SourceMacrofamilyId, @SourceItemTypeId, ISNULL(@SourceStatusId,0),
+        0, -- Non disabilitato
+        @SourceDescriptionExtension, @SourceOffset_acquisto, 
+        @SourceOffset_autoconsumo, @SourceOffset_vendita
+    );
+
+    -- Imposta i parametri per utilizzare il nuovo componente
+    SET @ComponentId = @TempComponentId;
+    SET @ComponentCode = @TempItemCode;
+    SET @CreatedComponentCode = @TempItemCode;
+
+    -- Se il componente è un semilavorato o prodotto finito e @ImportBOM = 1,
+    -- creiamo una distinta base
+    IF @ImportBOM = 1 AND @ComponentNatureValue IN (22413312, 22413313) 
+    BEGIN
+        DECLARE @TempBOMId BIGINT = dbo.GetNextProjectArticleBOMId(@CompanyId);
+
+        -- NUOVA LOGICA: Crea distinta temporanea SEMPRE con MainRefBOMId = NULL
+        INSERT INTO dbo.MA_ProjectArticles_BillOfMaterials (
+            CompanyId, Id, BOM, Description, ItemId, Version, UoM, BOMStatus,
+            ProductionLot, TBCreated, TBCreatedId, MainRefBOMId
+        ) VALUES (
+            @CompanyId, @TempBOMId, @TempItemCode, 
+            'Distinta per ' + @ComponentDescription, 
+            @TempComponentId, 
+            1,  -- SEMPRE Version 1
+            @ComponentUoM, 
+            'BOZZA',
+            1, 
+            GETDATE(), 
+            @UserId, 
+            NULL  -- SEMPRE NULL per componenti temporanei
+        );
+
+        -- OTTIMIZZAZIONE: Priorità al SourceBOMId specificato esplicitamente se fornito
+        DECLARE @SourceBOMId_0 BIGINT = NULL;
+
+        -- Se è stato fornito esplicitamente SourceBOMId, usiamo quello
+        IF @SourceBOMId IS NOT NULL AND @SourceBOMId > 0
+        BEGIN
+            SET @SourceBOMId_0 = @SourceBOMId;
+        END
+        -- Altrimenti, troviamo la Version 1 del componente sorgente se disponibile
+        ELSE IF @SourceComponentId IS NOT NULL
+        BEGIN
+            -- NUOVA LOGICA: Cerca sempre Version 1 per la copia
+            SELECT TOP(1) @SourceBOMId_0 = Id
+            FROM dbo.MA_ProjectArticles_BillOfMaterials 
+            WHERE ItemId = @SourceComponentId 
+                AND CompanyId = @CompanyId 
+                AND Version = 1  -- SEMPRE VERSION 1
+            ORDER BY Id DESC;
+        END
+
+        -- Se abbiamo trovato una distinta sorgente, copiamo i componenti
+        IF @SourceBOMId_0 IS NOT NULL
+        BEGIN
+            -- Copia i componenti dalla distinta sorgente
+            INSERT INTO dbo.MA_ProjectArticles_BOMComponents (
+                CompanyId, BOMId, Line, ComponentId, ComponentType, Quantity,
+                UnitCost, TotalCost, FixedCost, UoM, Details, Notes, TBCreated, TBCreatedId
+            )
+            SELECT 
+                @CompanyId, @TempBOMId, Line, ComponentId, ComponentType, Quantity,
+                UnitCost, TotalCost, FixedCost, UoM, Details, Notes, GETDATE(), @UserId
+            FROM dbo.MA_ProjectArticles_BOMComponents
+            WHERE BOMId = @SourceBOMId_0 AND CompanyId = @CompanyId;
+
+            -- Copia anche i cicli
+            INSERT INTO dbo.MA_ProjectArticles_BOMRouting (
+                CompanyId, RtgStep, BOMId, Operation, Notes, WC, ProcessingTime,
+                SetupTime, NoOfProcessingWorkers, NoOfSetupWorkers, SubId, Supplier,
+                Qty, TBCreated, TBModified, TBCreatedID, TBModifiedID, CheckOperation
+            )
+            SELECT 
+                @CompanyId, RtgStep, @TempBOMId, Operation, Notes, WC, ProcessingTime,
+                SetupTime, NoOfProcessingWorkers, NoOfSetupWorkers, SubId, Supplier,
+                Qty, GETDATE(), GETDATE(), @UserId, @UserId, 0
+            FROM dbo.MA_ProjectArticles_BOMRouting
+            WHERE BOMId = @SourceBOMId_0 AND CompanyId = @CompanyId;
+        END
+    END
+END
+        -- Esecuzione dell'azione richiesta
+        IF @Action = 'ADD'
+        BEGIN
+            -- Generazione nuovo ID specifico per questa azienda per la distinta
+            SET @NewId = dbo.GetNextProjectArticleBOMId(@CompanyId);
+            
+            -- Se BOM non è specificato, generiamo un codice distinta base
+            IF @BOM IS NULL
+            BEGIN
+                SET @BOM = 'TBOM_' + CAST(@NewId AS VARCHAR(20));
+            END
+            
+            -- Inserimento nuova distinta base
+            INSERT INTO dbo.MA_ProjectArticles_BillOfMaterials (
+                CompanyId, Id, BOM, Description, ItemId, Version, UoM, BOMStatus,
+                ProductionLot, RMCost, ProcessingCost, RMRefillCost, ProcessingRefillCost,
+                TotalCost, TotalPrice, RefillWaste, RefillDiscount, TotalRefill,
+                TransportRefill, Details, Notes, TBCreated, TBCreatedId, MainRefBOMId
+            ) VALUES (
+                @CompanyId, @NewId, @BOM, ISNULL(@Description, ''), @ItemId, @Version, @UoM, @BOMStatus,
+                @ProductionLot, ISNULL(@RMCost, 0), ISNULL(@ProcessingCost, 0), ISNULL(@RMRefillCost, 0), ISNULL(@ProcessingRefillCost, 0),
+                ISNULL(@TotalCost, 0), ISNULL(@TotalPrice, 0), ISNULL(@RefillWaste, 0), ISNULL(@RefillDiscount, 0), ISNULL(@TotalRefill, 0),
+                ISNULL(@TransportRefill, 0), @Details, @Notes, GETDATE(), @UserId, (SELECT ISNULL(MainRefBOMId, Id) FROM MA_ProjectArticles_BillOfMaterials WHERE Id = @Id AND CompanyId = @CompanyId)
+            );
+            
+            SET @ReturnValue = @NewId;
+        END
+        ELSE IF @Action = 'UPDATE'
+        BEGIN
+			
+            -- Aggiornamento distinta base esistente
+            UPDATE dbo.MA_ProjectArticles_BillOfMaterials
+            SET 
+                BOM = ISNULL(@BOM, BOM),
+                Description = ISNULL(@Description, Description),
+                Version = ISNULL(@Version, Version),
+                UoM = ISNULL(@UoM, UoM),
+                BOMStatus = ISNULL(@BOMStatus, BOMStatus),
+                ProductionLot = ISNULL(@ProductionLot, ProductionLot),
+                RMCost = ISNULL(@RMCost, RMCost),
+                ProcessingCost = ISNULL(@ProcessingCost, ProcessingCost),
+                RMRefillCost = ISNULL(@RMRefillCost, RMRefillCost),
+                ProcessingRefillCost = ISNULL(@ProcessingRefillCost, ProcessingRefillCost),
+                TotalCost = ISNULL(@TotalCost, TotalCost),
+                TotalPrice = ISNULL(@TotalPrice, TotalPrice),
+                RefillWaste = ISNULL(@RefillWaste, RefillWaste),
+                RefillDiscount = ISNULL(@RefillDiscount, RefillDiscount),
+                TotalRefill = ISNULL(@TotalRefill, TotalRefill),
+                TransportRefill = ISNULL(@TransportRefill, TransportRefill),
+                Details = ISNULL(@Details, Details),
+                Notes = ISNULL(@Notes, Notes)
+            WHERE Id = @Id AND CompanyId = @CompanyId AND Version = @Version
+            
+            IF @@ROWCOUNT = 0
+            BEGIN
+                SET @ErrorCode = 12;
+                SET @ErrorMessage = N'Distinta base non trovata.';
+                THROW 50012, @ErrorMessage, 1;
+            END
+            
+            SET @ReturnValue = @Id;
+        END
+ELSE IF @Action = 'COPY'
+BEGIN
+    -- Generazione nuovo ID specifico per questa azienda per la distinta
+    SET @NewId = dbo.GetNextProjectArticleBOMId(@CompanyId);
+    
+    -- Se BOM non è specificato, generiamo un codice distinta base
+    IF @BOM IS NULL
+    BEGIN
+        SET @BOM = ISNULL((SELECT TOP(1) BOM FROM dbo.MA_ProjectArticles_BillOfMaterials 
+                          WHERE Id = @SourceBOMId AND CompanyId = @CompanyId),
+                         CONCAT('DISTINTA ARTICOLO CON ID ', @NewId)) 
+    END
+    
+    -- NUOVA LOGICA: Determina il MainRefBOMId per la nuova copia
+    DECLARE @NewMainRefBOMId BIGINT;
+    DECLARE @SourceItemId BIGINT;
+    DECLARE @SourceMainRefBOMId BIGINT;
+    
+    -- Ottieni informazioni dalla BOM sorgente
+    SELECT @SourceItemId = ItemId,
+           @SourceMainRefBOMId = ISNULL(MainRefBOMId, Id)
+    FROM dbo.MA_ProjectArticles_BillOfMaterials 
+    WHERE Id = @SourceBOMId AND CompanyId = @CompanyId;
+    
+    -- LOGICA SEMPLIFICATA PER MainRefBOMId:
+    -- Se copia su articolo diverso -> nuova famiglia (MainRefBOMId = @NewId)
+    -- Se copia sullo stesso articolo -> mantieni famiglia originale
+    IF @ItemId != @SourceItemId
+    BEGIN
+        -- Copia su articolo diverso: crea nuova famiglia
+        SET @NewMainRefBOMId = @NewId;
+    END
+    ELSE
+    BEGIN
+        -- Copia sullo stesso articolo: mantieni la famiglia originale
+        SET @NewMainRefBOMId = @SourceMainRefBOMId;
+    END
+    
+    -- Calcola la versione corretta per la nuova distinta
+    DECLARE @NewVersion INT;
+    SELECT @NewVersion = ISNULL(MAX(Version), 0) + 1
+    FROM dbo.MA_ProjectArticles_BillOfMaterials 
+    WHERE ItemId = @ItemId AND CompanyId = @CompanyId;
+    
+    -- Copia distinta base esistente
+    INSERT INTO dbo.MA_ProjectArticles_BillOfMaterials (
+        CompanyId, Id, BOM, Description, ItemId, Version, UoM, BOMStatus,
+        ProductionLot, RMCost, ProcessingCost, RMRefillCost, ProcessingRefillCost,
+        TotalCost, TotalPrice, RefillWaste, RefillDiscount, TotalRefill,
+        TransportRefill, Details, Notes, TBCreated, TBCreatedId, MainRefBOMId 
+    )
+    SELECT 
+        @CompanyId, @NewId, @BOM, 
+        ISNULL(@Description, Description), 
+        @ItemId,
+        ISNULL(@Version, @NewVersion), 
+        ISNULL(@UoM, ISNULL(UoM,'NR')), 
+        ISNULL(@BOMStatus, ISNULL(BOMStatus,'BOZZA')),
+        ISNULL(@ProductionLot, ISNULL(ProductionLot,0)),
+        ISNULL(@RMCost, ISNULL(RMCost,0)), 
+        ISNULL(@ProcessingCost, ISNULL(ProcessingCost,0)), 
+        ISNULL(@RMRefillCost, ISNULL(RMRefillCost,0)), 
+        ISNULL(@ProcessingRefillCost, ISNULL(ProcessingRefillCost,0)),
+        ISNULL(@TotalCost, ISNULL(TotalCost,0)), 
+        ISNULL(@TotalPrice, ISNULL(TotalPrice,0)), 
+        ISNULL(@RefillWaste, ISNULL(RefillWaste,0)), 
+        ISNULL(@RefillDiscount, ISNULL(RefillDiscount,0)), 
+        ISNULL(@TotalRefill, ISNULL(TotalRefill,0)),
+        ISNULL(@TransportRefill, ISNULL(TransportRefill,0)), 
+        ISNULL(@Details, ISNULL(Details,'')), 
+        ISNULL(@Notes, ISNULL(Notes,'')),
+        GETDATE(), 
+        @UserId,
+        @NewMainRefBOMId  -- Usa la logica determinata sopra
+    FROM dbo.MA_ProjectArticles_BillOfMaterials
+    WHERE Id = @SourceBOMId AND CompanyId = @CompanyId;
+    
+    IF @@ROWCOUNT = 0
+    BEGIN
+        SET @ErrorCode = 13;
+        SET @ErrorMessage = N'Distinta base sorgente non trovata.';
+        THROW 50013, @ErrorMessage, 1;
+    END;
+    
+    -- Tabelle temporanee per tracciare elaborazione (se necessario)
+    CREATE TABLE #ProcessedBOMs (
+        OldBOMId BIGINT,
+        NewBOMId BIGINT,
+        ItemId BIGINT,
+        PRIMARY KEY (OldBOMId)
+    );
+    
+    CREATE TABLE #BOMQueue (
+        OldBOMId BIGINT,
+        NewBOMId BIGINT,
+        ItemId BIGINT,
+        ProcessingLevel INT,
+        Processed BIT DEFAULT 0
+    );
+    
+    -- Se richiesto, verifica ricorsivamente che tutti i componenti esistano
+    IF @VerifyComponents = 1 AND @CopyComponents = 1
+    BEGIN
+        -- NUOVA LOGICA: Verifica usando sempre Version 1 dei componenti
+        WITH ComponentCTE AS (
+            -- Query iniziale: ottiene tutti i componenti del primo livello
+            SELECT 
+                comp.ComponentId,
+                comp.ComponentType,
+                1 AS Level
+            FROM dbo.MA_ProjectArticles_BOMComponents comp
+            WHERE comp.BOMId = @SourceBOMId AND comp.CompanyId = @CompanyId
+                  AND comp.ComponentType = 7798784 -- Solo componenti di tipo Articolo
+            
+            UNION ALL
+            
+            -- Query ricorsiva: ottiene i sottocomponenti SEMPRE da Version 1
+            SELECT 
+                child.ComponentId,
+                child.ComponentType,
+                parent.Level + 1
+            FROM ComponentCTE parent
+            -- IMPORTANTE: Usa sempre Version 1 per i componenti
+            JOIN dbo.MA_ProjectArticles_BillOfMaterials bom 
+                ON bom.ItemId = parent.ComponentId 
+                AND bom.CompanyId = @CompanyId
+                AND bom.Version = 1  -- SEMPRE VERSION 1
+            JOIN dbo.MA_ProjectArticles_BOMComponents child 
+                ON child.BOMId = bom.Id 
+                AND child.CompanyId = @CompanyId
+            WHERE child.ComponentType = 7798784 -- Solo componenti di tipo Articolo
+                  AND NOT EXISTS (SELECT 1 FROM #ProcessedComponents WHERE ComponentId = child.ComponentId)
+                  AND parent.Level < 10  -- Limite di profondità
+        )
+        -- Inserisce nella tabella temporanea per tracciare i componenti già elaborati
+        INSERT INTO #ProcessedComponents (ComponentId)
+        SELECT DISTINCT ComponentId 
+        FROM ComponentCTE
+        WHERE ComponentType = 7798784 -- Solo componenti di tipo Articolo
+        OPTION (MAXRECURSION 100);
+
+        -- Verifica quali componenti esistono già
+        DECLARE @MissingComponents TABLE (
+            ComponentId BIGINT PRIMARY KEY
+        );
+        
+        -- Trova i componenti che non esistono nelle tabelle
+        INSERT INTO @MissingComponents (ComponentId)
+        SELECT pc.ComponentId
+        FROM #ProcessedComponents pc
+        WHERE NOT EXISTS (
+            SELECT 1 
+            FROM dbo.MA_ProjectArticles_Items 
+            WHERE Id = pc.ComponentId AND CompanyId = @CompanyId
+        );
+
+        -- Crea i componenti mancanti
+        DECLARE @CurrentComponentId BIGINT;
+        DECLARE @ComponentItem VARCHAR(64);
+        DECLARE @ComponentDesc VARCHAR(128);
+        DECLARE @ComponentNature INT;
+        DECLARE @ComponentBaseUoM VARCHAR(3);
+        
+        -- Cursor per processare i componenti mancanti
+        DECLARE ComponentCursor CURSOR FOR
+        SELECT mc.ComponentId
+        FROM @MissingComponents mc;
+        
+        OPEN ComponentCursor;
+        FETCH NEXT FROM ComponentCursor INTO @CurrentComponentId;
+        
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            -- Cerca informazioni dall'anagrafica articoli
+            SELECT 
+                @ComponentItem = i.Item,
+                @ComponentDesc = i.Description,
+                @ComponentNature = i.Nature,
+                @ComponentBaseUoM = i.BaseUoM
+            FROM dbo.MA_Items i
+            JOIN dbo.MA_ProjectArticles_Items pi ON i.Item = pi.Item
+            WHERE pi.Id = @CurrentComponentId AND i.CompanyId = @CompanyId;
+            
+            -- Se non troviamo l'articolo, usiamo valori predefiniti
+            IF @ComponentItem IS NULL
+            BEGIN
+                IF @CreateTempComponent = 1
+                BEGIN
+                    -- Usa logica unificata (nota: @CurrentCode contiene il codice originale)
+                    DECLARE @CopyMethod VARCHAR(20);
+                    DECLARE @CopyError NVARCHAR(500);
+
+                    -- Cerca di ottenere un codice di riferimento dal componente corrente
+                    DECLARE @CurrentCode VARCHAR(64) = NULL;
+                    SELECT @CurrentCode = Item
+                    FROM dbo.MA_ProjectArticles_Items
+                    WHERE Id = @CurrentComponentId AND CompanyId = @CompanyId;
+
+                    EXEC dbo.MA_CodingRules_GenerateCodeUnified
+                        @CompanyId = @CompanyId,
+                        @OriginalCode = @CurrentCode,  -- Può essere NULL
+                        @GeneratedCode = @ComponentItem OUTPUT,
+                        @UsedMethod = @CopyMethod OUTPUT,
+                        @ErrorMessage = @CopyError OUTPUT;
+
+                    IF @ComponentItem IS NULL
+                        SET @ComponentItem = 'TEMP_' + CAST(@CurrentComponentId AS VARCHAR(20));
+
+                    PRINT 'Codice componente mancante generato (' + @CopyMethod + '): ' + @ComponentItem;
+                END
+                ELSE
+                BEGIN
+                    SET @ComponentItem = 'TEMP_' + CAST(@CurrentComponentId AS VARCHAR(20));
+                END
+
+                SET @ComponentDesc = 'Articolo Temporaneo';
+                SET @ComponentNature = 22413312; -- Semilavorato
+                SET @ComponentBaseUoM = 'NR';
+            END
+            
+            -- Crea il componente mancante
+            INSERT INTO dbo.MA_ProjectArticles_Items (
+                Id, CompanyId, TBCreatedId, TBCreated, TBModifiedId, TBModified,
+                Item, Description, Nature, BaseUoM, stato_erp
+            ) VALUES (
+                @CurrentComponentId, @CompanyId, @UserId, GETDATE(), @UserId, GETDATE(),
+                @ComponentItem, @ComponentDesc, @ComponentNature, @ComponentBaseUoM, 0
+            );
+            
+            FETCH NEXT FROM ComponentCursor INTO @CurrentComponentId;
+        END
+        
+        CLOSE ComponentCursor;
+        DEALLOCATE ComponentCursor;
+    END
+
+    -- NUOVA LOGICA SEMPLIFICATA: Copia componenti SENZA creare nuove versioni BOM
+    IF @CopyComponents = 1
+    BEGIN
+        -- Copia diretta dei componenti dalla BOM sorgente
+        -- NON crea nuove versioni delle BOM dei componenti
+        INSERT INTO dbo.MA_ProjectArticles_BOMComponents (
+            CompanyId, BOMId, Line, ComponentId, ComponentType, Quantity,
+            UnitCost, TotalCost, FixedCost, UoM, Details, Notes, TBCreated, TBCreatedId
+        )
+        SELECT 
+            @CompanyId, @NewId, Line, ComponentId, ComponentType, Quantity,
+            UnitCost, TotalCost, FixedCost, UoM, Details, Notes, GETDATE(), @UserId
+        FROM dbo.MA_ProjectArticles_BOMComponents
+        WHERE BOMId = @SourceBOMId AND CompanyId = @CompanyId;
+    END
+
+    -- Copia cicli se richiesto
+    IF @CopyRouting = 1
+    BEGIN
+        INSERT INTO dbo.MA_ProjectArticles_BOMRouting (
+            CompanyId, RtgStep, BOMId, Operation, Notes, WC, ProcessingTime,
+            SetupTime, NoOfProcessingWorkers, NoOfSetupWorkers, SubId, Supplier,
+            Qty, TBCreated, TBModified, TBCreatedID, TBModifiedID, CheckOperation
+        )
+        SELECT 
+            @CompanyId, RtgStep, @NewId, Operation, Notes, WC, ProcessingTime,
+            SetupTime, NoOfProcessingWorkers, NoOfSetupWorkers, SubId, Supplier,
+            Qty, GETDATE(), GETDATE(), @UserId, @UserId, 0
+        FROM dbo.MA_ProjectArticles_BOMRouting
+        WHERE BOMId = @SourceBOMId AND CompanyId = @CompanyId;
+    END
+    
+    -- Cleanup
+    DROP TABLE IF EXISTS #ProcessedBOMs;
+    DROP TABLE IF EXISTS #BOMQueue;
+    
+    SET @ReturnValue = @NewId;
+END
+
+
+ELSE IF @Action = 'ADD_COMPONENT'
+	
+		BEGIN
+		 
+			-- Verifica che la distinta base esista
+			IF NOT EXISTS (SELECT 1 FROM dbo.MA_ProjectArticles_BillOfMaterials WHERE Id = @Id AND CompanyId = @CompanyId)
+			BEGIN
+				SET @ErrorCode = 14;
+				SET @ErrorMessage = N'Distinta base non trovata.';
+				THROW 50014, @ErrorMessage, 1;
+			END
+
+			-- Trova il prossimo numero di linea disponibile
+			SELECT @NextComponentLine = ISNULL(MAX(Line), 0) + 1
+			FROM dbo.MA_ProjectArticles_BOMComponents
+			WHERE BOMId = @Id AND CompanyId = @CompanyId;
+    
+			-- NUOVA LOGICA: Determina MainRefBOMId da usare
+			DECLARE @ParentMainRefBOMId BIGINT;
+			DECLARE @ComponentMainRefBOMId BIGINT = NULL;
+			DECLARE @TargetComponentBOMId BIGINT = NULL;
+			DECLARE @OldMainRefBOMId BIGINT = NULL;
+    
+			-- Ottieni il MainRefBOMId della BOM padre
+			SELECT @ParentMainRefBOMId = ISNULL(MainRefBOMId, Id) 
+			FROM MA_ProjectArticles_BillOfMaterials 
+			WHERE Id = @Id AND CompanyId = @CompanyId;
+			
+			-- Se il padre non ha MainRefBOMId, glielo assegno (il suo stesso Id)
+			IF @ParentMainRefBOMId = @Id AND NOT EXISTS (
+				SELECT 1 FROM MA_ProjectArticles_BillOfMaterials 
+				WHERE Id = @Id AND CompanyId = @CompanyId AND MainRefBOMId IS NOT NULL
+			)
+			BEGIN
+				UPDATE MA_ProjectArticles_BillOfMaterials
+				SET MainRefBOMId = @Id
+				WHERE Id = @Id AND CompanyId = @CompanyId;
+				SET @ParentMainRefBOMId = @Id;
+			END
+    
+			-- PRIORITÀ 1: Se viene passato @ComponentBOMId, usa quello
+			IF @ComponentBOMId IS NOT NULL
+			BEGIN
+				-- Verifica che la BOM appartenga al ComponentId passato
+				DECLARE @CheckComponentId BIGINT;
+				DECLARE @CheckMainRefBOMId BIGINT;
+				
+				SELECT 
+					@CheckComponentId = ItemId,
+					@CheckMainRefBOMId = MainRefBOMId
+				FROM dbo.MA_ProjectArticles_BillOfMaterials
+				WHERE Id = @ComponentBOMId AND CompanyId = @CompanyId;
+				
+				IF @CheckComponentId IS NULL
+				BEGIN
+					SET @ErrorCode = 60;
+					SET @ErrorMessage = N'BOM del componente specificata non trovata.';
+					THROW 50060, @ErrorMessage, 1;
+				END
+				
+				-- Verifica che appartenga al ComponentId passato (se specificato)
+				IF @ComponentId IS NOT NULL AND @CheckComponentId <> @ComponentId
+				BEGIN
+					SET @ErrorCode = 61;
+					SET @ErrorMessage = N'La BOM specificata non appartiene al componente indicato.';
+					THROW 50061, @ErrorMessage, 1;
+				END
+				
+				-- Se la BOM del componente ha già MainRefBOMId diverso, aggiorna TUTTI i MainRefBOMId
+				IF @CheckMainRefBOMId IS NOT NULL AND @CheckMainRefBOMId <> @ParentMainRefBOMId
+				BEGIN
+					-- Salva il vecchio MainRefBOMId
+					SET @OldMainRefBOMId = @CheckMainRefBOMId;
+					
+					-- AGGIORNA TUTTI i record con MainRefBOMId = @OldMainRefBOMId a @ParentMainRefBOMId
+					-- Questo unifica il ramo vecchio con il ramo nuovo
+					UPDATE dbo.MA_ProjectArticles_BillOfMaterials
+					SET MainRefBOMId = @ParentMainRefBOMId
+					WHERE MainRefBOMId = @OldMainRefBOMId
+						AND CompanyId = @CompanyId;
+					
+					-- Ora la BOM del componente ha MainRefBOMId = @ParentMainRefBOMId
+					SET @CheckMainRefBOMId = @ParentMainRefBOMId;
+				END
+				-- Se MainRefBOMId è NULL, imposta quello del padre
+				ELSE IF @CheckMainRefBOMId IS NULL
+				BEGIN
+					UPDATE dbo.MA_ProjectArticles_BillOfMaterials
+					SET MainRefBOMId = @ParentMainRefBOMId
+					WHERE Id = @ComponentBOMId AND CompanyId = @CompanyId;
+					SET @CheckMainRefBOMId = @ParentMainRefBOMId;
+				END
+				
+				SET @TargetComponentBOMId = @ComponentBOMId;
+				SET @ComponentMainRefBOMId = @ParentMainRefBOMId;
+				SET @ComponentId = @CheckComponentId;
+			END
+			ELSE
+			BEGIN
+				-- PRIORITÀ 2: Logica duale esistente
+				-- Verifica se il componente ha già versioni con questo MainRef
+				IF @ComponentCode IS NOT NULL OR @ComponentId IS NOT NULL
+				BEGIN
+					DECLARE @CheckComponentId2 BIGINT;
+        
+					-- Ottieni l'ID del componente se esiste
+					IF @ComponentId IS NOT NULL
+					BEGIN
+						SET @CheckComponentId2 = @ComponentId;
+					END
+					ELSE IF @ComponentCode IS NOT NULL
+					BEGIN
+						SELECT @CheckComponentId2 = Id 
+						FROM dbo.MA_ProjectArticles_Items 
+						WHERE Item = @ComponentCode AND CompanyId = @CompanyId;
+					END
+        
+					-- LOGICA DUALE: Verifica se esistono versioni del componente con il MainRef del padre
+					IF @CheckComponentId2 IS NOT NULL
+					BEGIN
+						-- Cerca versione con stesso MainRefBOMId
+						SELECT TOP 1 @TargetComponentBOMId = Id
+						FROM dbo.MA_ProjectArticles_BillOfMaterials
+						WHERE ItemId = @CheckComponentId2 
+							AND CompanyId = @CompanyId
+							AND MainRefBOMId = @ParentMainRefBOMId
+						ORDER BY Version DESC;
+						
+						IF @TargetComponentBOMId IS NOT NULL
+						BEGIN
+							SET @ComponentMainRefBOMId = @ParentMainRefBOMId;
+						END
+						ELSE
+						BEGIN
+							-- Non trova versione con stesso MainRef, cerca Version 1
+							SELECT TOP 1 @TargetComponentBOMId = Id
+							FROM dbo.MA_ProjectArticles_BillOfMaterials
+							WHERE ItemId = @CheckComponentId2 
+								AND CompanyId = @CompanyId
+								AND Version = 1
+							ORDER BY Id DESC;
+							
+							-- Se trova Version 1, imposta MainRefBOMId
+							IF @TargetComponentBOMId IS NOT NULL
+							BEGIN
+								-- Verifica se ha già MainRefBOMId diverso
+								DECLARE @ExistingMainRef BIGINT;
+								SELECT @ExistingMainRef = MainRefBOMId
+								FROM dbo.MA_ProjectArticles_BillOfMaterials
+								WHERE Id = @TargetComponentBOMId AND CompanyId = @CompanyId;
+								
+								-- Se ha MainRefBOMId diverso, aggiorna TUTTI i MainRefBOMId
+								IF @ExistingMainRef IS NOT NULL AND @ExistingMainRef <> @ParentMainRefBOMId
+								BEGIN
+									-- Aggiorna TUTTI i record con MainRefBOMId = @ExistingMainRef a @ParentMainRefBOMId
+									UPDATE dbo.MA_ProjectArticles_BillOfMaterials
+									SET MainRefBOMId = @ParentMainRefBOMId
+									WHERE MainRefBOMId = @ExistingMainRef
+										AND CompanyId = @CompanyId;
+								END
+								-- Se MainRefBOMId è NULL, imposta quello del padre
+								ELSE IF @ExistingMainRef IS NULL
+								BEGIN
+									UPDATE dbo.MA_ProjectArticles_BillOfMaterials
+									SET MainRefBOMId = @ParentMainRefBOMId
+									WHERE Id = @TargetComponentBOMId AND CompanyId = @CompanyId;
+								END
+								
+								SET @ComponentMainRefBOMId = @ParentMainRefBOMId;
+							END
+						END
+					END
+				END
+			END
+
+			-- Chiama SyncComponent con il MainRef determinato
+			EXEC dbo.MA_ProjectArticles_SyncComponent
+				@CompanyId = @CompanyId,
+				@ComponentId = @ComponentId,
+				@ComponentCode = @ComponentCode,
+				@ComponentDescription = @ComponentDescription,
+				@ComponentNatureValue = @ComponentNatureValue,
+				@ComponentUoM = @ComponentUoM,
+				@ImportBOM = @ImportBOM,
+				@MaxLevels = @MaxLevels,
+				@ValidateBOM = 1,
+				@CreateIfNotExists = 1,
+				@UserId = @UserId,
+				@MainRefBOMId = @ComponentMainRefBOMId,  -- NULL o MainRef determinato
+				@ReturnComponentId = @RealComponentId OUTPUT,
+				@ErrorCode = @SyncErrorCode OUTPUT,
+				@ErrorMessage = @SyncErrorMessage OUTPUT;
+
+			IF @SyncErrorCode <> 0 OR @RealComponentId IS NULL
+			BEGIN
+				SET @ErrorCode = 30 + @SyncErrorCode;
+				SET @ErrorMessage = N'Errore nella sincronizzazione del componente: ' + @SyncErrorMessage;
+				THROW 50030, @ErrorMessage, 1;
+			END
+
+
+			-- Se abbiamo un TargetComponentBOMId specifico, verifica che corrisponda
+			IF @TargetComponentBOMId IS NOT NULL
+			BEGIN
+				DECLARE @ActualBOMId BIGINT;
+				SELECT TOP 1 @ActualBOMId = Id
+				FROM dbo.MA_ProjectArticles_BillOfMaterials
+				WHERE ItemId = @RealComponentId 
+					AND CompanyId = @CompanyId
+					AND MainRefBOMId = @ComponentMainRefBOMId
+				ORDER BY 
+					CASE WHEN Id = @TargetComponentBOMId THEN 0 ELSE 1 END,
+					Version DESC;
+				
+				-- Se non corrisponde, aggiorna MainRefBOMId sulla BOM corretta
+				IF @ActualBOMId <> @TargetComponentBOMId AND @ActualBOMId IS NOT NULL
+				BEGIN
+					-- Verifica se ha MainRefBOMId diverso
+					DECLARE @ActualMainRef BIGINT;
+					SELECT @ActualMainRef = MainRefBOMId
+					FROM dbo.MA_ProjectArticles_BillOfMaterials
+					WHERE Id = @ActualBOMId AND CompanyId = @CompanyId;
+					
+					-- Se ha MainRefBOMId diverso, aggiorna TUTTI i MainRefBOMId
+					IF @ActualMainRef IS NOT NULL AND @ActualMainRef <> @ComponentMainRefBOMId
+					BEGIN
+						UPDATE dbo.MA_ProjectArticles_BillOfMaterials
+						SET MainRefBOMId = @ComponentMainRefBOMId
+						WHERE MainRefBOMId = @ActualMainRef
+							AND CompanyId = @CompanyId;
+					END
+					-- Altrimenti aggiorna solo questa BOM
+					ELSE
+					BEGIN
+						UPDATE dbo.MA_ProjectArticles_BillOfMaterials
+						SET MainRefBOMId = @ComponentMainRefBOMId
+						WHERE Id = @ActualBOMId AND CompanyId = @CompanyId;
+					END
+				END
+			END
+
+			-- Ottieni il codice articolo del componente
+			SELECT 
+				@ComponentItemCode = Item,
+				@ComponentType = ISNULL(@ComponentType, 7798784) -- Default Articolo
+			FROM dbo.MA_ProjectArticles_Items
+			WHERE Id = @RealComponentId AND CompanyId = @CompanyId;
+
+			-- Step 2: Verifica se il componente ha una distinta nel gestionale (se @ImportBOM = 1)
+			IF @ImportBOM = 1
+			BEGIN
+				-- Verifica se esiste già una distinta per questo componente nei progetti
+				SELECT 
+					@ComponentHasBOM = 1,
+					@ComponentBOMId = Id
+				FROM dbo.MA_ProjectArticles_BillOfMaterials
+				WHERE ItemId = @RealComponentId 
+					AND CompanyId = @CompanyId
+					-- NUOVA LOGICA: Cerca la versione corretta basata sul MainRef
+					AND (
+						(@ComponentMainRefBOMId IS NOT NULL AND MainRefBOMId = @ComponentMainRefBOMId)
+						OR 
+						(@ComponentMainRefBOMId IS NULL AND Version = 1)
+					);
+
+				-- Verifica se esiste una distinta nel gestionale
+				DECLARE @GestionaleBOMExists BIT = 0;
+
+				SELECT @GestionaleBOMExists = 1
+				FROM dbo.MA_BillOfMaterials
+				WHERE BOM = @ComponentItemCode AND CompanyId = @CompanyId AND Disabled = 0;
+
+				-- Se il componente ha una distinta nel gestionale, verifichiamo la sincronizzazione
+				IF @GestionaleBOMExists = 1
+				BEGIN
+					IF @ComponentHasBOM = 1
+					BEGIN
+						-- La distinta esiste nei progetti, verifichiamo se è sincronizzata col gestionale
+						-- Tabella per componenti da sincronizzare
+						DECLARE @ComponentsToSync TABLE (
+							GestionaleLine INT,
+							GestionaleComponent VARCHAR(64),
+							GestionaleQty DECIMAL(18, 5),
+							ProjectLine INT NULL,
+							ProjectComponentId BIGINT NULL
+						);
+
+						-- Ottieni i componenti dalla distinta del gestionale
+						INSERT INTO @ComponentsToSync (GestionaleLine, GestionaleComponent, GestionaleQty)
+						SELECT 
+							Line,
+							Component,
+							Qty
+						FROM dbo.MA_BillOfMaterialsComp
+						WHERE BOM = @ComponentItemCode AND CompanyId = @CompanyId;
+
+						-- Aggiorna con le informazioni dei componenti già presenti nei progetti
+						UPDATE CS
+						SET 
+							CS.ProjectLine = PC.Line,
+							CS.ProjectComponentId = PI.Id
+						FROM @ComponentsToSync CS
+						JOIN dbo.MA_ProjectArticles_BOMComponents PC ON PC.BOMId = @ComponentBOMId AND PC.CompanyId = @CompanyId
+						JOIN dbo.MA_ProjectArticles_Items PI ON PC.ComponentId = PI.Id AND PI.CompanyId = @CompanyId AND PI.Item = CS.GestionaleComponent;
+
+						-- Se ci sono componenti da sincronizzare, imposta il flag
+						IF EXISTS (SELECT 1 FROM @ComponentsToSync WHERE ProjectComponentId IS NULL)
+						BEGIN
+							SET @NeedBOMSync = 1;
+						END
+					END
+					ELSE
+					BEGIN
+						-- La distinta non esiste nei progetti ma esiste nel gestionale, dobbiamo importarla
+						SET @NeedBOMSync = 1;
+					END
+
+					-- Se necessario, sincronizza la distinta del componente
+					IF @NeedBOMSync = 1
+					BEGIN
+						DECLARE @SyncBOMErrorCode INT;
+						DECLARE @SyncBOMErrorMessage NVARCHAR(4000);
+						DECLARE @NewBOMId BIGINT;
+
+						-- Se la distinta già esiste, prima cancella tutti i componenti esistenti
+						IF @ComponentHasBOM = 1
+						BEGIN
+							DELETE FROM dbo.MA_ProjectArticles_BOMComponents
+							WHERE BOMId = @ComponentBOMId AND CompanyId = @CompanyId;
+						END
+
+						-- Importa la distinta dal gestionale con la logica MainRef corretta
+						EXEC dbo.MA_ProjectArticles_ImportBOMFromERP
+							@CompanyId = @CompanyId,
+							@ItemCode = @ComponentItemCode,
+							@ItemId = @RealComponentId,
+							@MaxLevels = @MaxLevels,
+							@UserId = @UserId,
+							@MainRefBOMId = @ComponentMainRefBOMId,  -- Passa NULL o MainRef condizionale
+							@ReturnBOMId = @NewBOMId OUTPUT,
+							@ErrorCode = @SyncBOMErrorCode OUTPUT,
+							@ErrorMessage = @SyncBOMErrorMessage OUTPUT;
+
+						IF @SyncBOMErrorCode <> 0
+						BEGIN
+							-- In questo caso non interrompiamo, ma loghiamo l'avviso
+							SET @ErrorMessage = N'Avviso: Errore nella sincronizzazione della distinta del componente: ' + @SyncBOMErrorMessage;
+						END
+					END
+				END
+			END
+
+			-- Se non abbiamo i dettagli del componente, otteniamoli dal componente sincronizzato
+			IF @ComponentDetails IS NULL OR @ComponentUoM IS NULL
+			BEGIN
+				SELECT
+					@ComponentDetails = ISNULL(@ComponentDetails, Description),
+					@ComponentUoM = ISNULL(@ComponentUoM, BaseUoM)
+				FROM dbo.MA_ProjectArticles_Items
+				WHERE Id = @RealComponentId AND CompanyId = @CompanyId;
+			END
+
+			-- Inserimento nuovo componente
+			  INSERT INTO dbo.MA_ProjectArticles_BOMComponents (
+				  CompanyId, BOMId, Line, ComponentId, ComponentType, Quantity,
+				  UnitCost, TotalCost, FixedCost, UoM, Details, Notes, TBCreated, TBCreatedId
+			  ) VALUES (
+				  @CompanyId, @Id, @NextComponentLine, @RealComponentId, @ComponentType, @ComponentQuantity,
+				  @ComponentUnitCost, @ComponentTotalCost, @ComponentFixedCost, @ComponentUoM,
+				  @ComponentDetails, @ComponentNotes, GETDATE(), @UserId
+			  );
+
+				-- NUOVO: Gestione dati fornitore Intercompany per componenti temporanei
+				  IF @TempSupplierId IS NOT NULL OR @TempIntercompanyTargetId IS NOT NULL OR @TempSupplierNotes IS NOT NULL
+				  BEGIN
+					  DECLARE @ItemCodeCheck VARCHAR(64);
+					  DECLARE @ExistsInMA_Items BIT = 0;
+
+					  -- Verifica se il componente esiste in MA_Items (gestionale)
+					  SELECT @ItemCodeCheck = Item
+					  FROM MA_ProjectArticles_Items
+					  WHERE Id = @RealComponentId AND CompanyId = @CompanyId;
+
+					  IF EXISTS (
+						  SELECT 1 FROM MA_Items
+						  WHERE Item = @ItemCodeCheck AND CompanyId = @CompanyId
+					  )
+					  BEGIN
+						  SET @ExistsInMA_Items = 1;
+					  END
+					 
+					  -- Aggiorna dati fornitore SOLO se componente NON esiste in gestionale
+					  IF @ExistsInMA_Items = 0
+					  BEGIN
+						  UPDATE MA_ProjectArticles_Items
+						  SET
+							  TempSupplierId = @TempSupplierId,
+							  TempIntercompanyTargetId = @TempIntercompanyTargetId,
+							  TempSupplierNotes = @TempSupplierNotes,
+							  TBModified = GETDATE(),
+							  TBModifiedId = @UserId
+						  WHERE Id = @RealComponentId AND CompanyId = @CompanyId;
+					  END
+					  -- Se esiste in gestionale, ignora i dati Temp* (la funzione fn_GetComponentSupplier leggerà da MA_Items)
+				  END
+
+				  SET @ReturnValue = @Id;
+
+				  END
+
+        ELSE IF @Action = 'UPDATE_COMPONENT'
+        BEGIN
+		
+            -- Verifica che la distinta base esista
+            IF NOT EXISTS (SELECT 1 FROM dbo.MA_ProjectArticles_BillOfMaterials WHERE Id = @Id AND CompanyId = @CompanyId)
+            BEGIN
+                SET @ErrorCode = 15;
+                SET @ErrorMessage = N'Distinta base non trovata.';
+                THROW 50015, @ErrorMessage, 1;
+            END
+            
+            -- Verifica che il componente esista
+            IF NOT EXISTS (SELECT 1 FROM dbo.MA_ProjectArticles_BOMComponents WHERE BOMId = @Id AND Line = @ComponentLine AND CompanyId = @CompanyId)
+            BEGIN
+                SET @ErrorCode = 16;
+                SET @ErrorMessage = N'Componente non trovato.';
+                THROW 50016, @ErrorMessage, 1;
+            END
+            
+            -- Se viene specificato un nuovo ComponentId, verifica che esista
+            IF @ComponentId IS NOT NULL
+            BEGIN
+                -- Utilizziamo la stored procedure per sincronizzare il componente
+                DECLARE @UpdateSyncErrorCode INT;
+                DECLARE @UpdateSyncErrorMessage NVARCHAR(4000);
+                DECLARE @UpdateRealComponentId BIGINT;
+                
+                EXEC dbo.MA_ProjectArticles_SyncComponent
+                    @CompanyId = @CompanyId,
+                    @ComponentId = @ComponentId,
+                    @ComponentCode = @ComponentCode,
+                    @ComponentDescription = @ComponentDescription,
+                    @ComponentNatureValue = @ComponentNatureValue,
+                    @ComponentUoM = @ComponentUoM,
+                    @ImportBOM = 0, -- Non importiamo la distinta durante l'aggiornamento
+                    @MaxLevels = 1,
+                    @CreateIfNotExists = 1,
+                    @UserId = @UserId,
+                    @ReturnComponentId = @UpdateRealComponentId OUTPUT,
+                    @ErrorCode = @UpdateSyncErrorCode OUTPUT,
+                    @ErrorMessage = @UpdateSyncErrorMessage OUTPUT;
+                
+                IF @UpdateSyncErrorCode <> 0 OR @UpdateRealComponentId IS NULL
+                BEGIN
+                    SET @ErrorCode = 35 + @UpdateSyncErrorCode;
+                    SET @ErrorMessage = N'Errore nella sincronizzazione del componente: ' + @UpdateSyncErrorMessage;
+                    THROW 50035, @ErrorMessage, 1;
+                END
+                
+                SET @ComponentId = @UpdateRealComponentId;
+            END
+            
+            -- Aggiornamento componente
+            UPDATE dbo.MA_ProjectArticles_BOMComponents
+			  SET
+				  ComponentId = ISNULL(@ComponentId, ComponentId),
+				  ComponentType = ISNULL(@ComponentType, ComponentType),
+				  Quantity = ISNULL(@ComponentQuantity, Quantity),
+				  UnitCost = ISNULL(@ComponentUnitCost, UnitCost),
+				  TotalCost = ISNULL(@ComponentTotalCost, TotalCost),
+				  FixedCost = ISNULL(@ComponentFixedCost, FixedCost),
+				  UoM = ISNULL(@ComponentUoM, UoM),
+				  Details = ISNULL(@ComponentDetails, Details),
+				  Notes = ISNULL(@ComponentNotes, Notes)
+			  WHERE BOMId = @Id AND Line = @ComponentLine AND CompanyId = @CompanyId;
+
+				  -- NUOVO: Se l'UoM è stata modificata, aggiorna anche BaseUoM dell'articolo temporaneo
+				IF @ComponentUoM IS NOT NULL
+				BEGIN
+					DECLARE @UpdatedComponentId BIGINT;
+
+					-- Ottieni il ComponentId dalla BOM appena aggiornata
+					SELECT @UpdatedComponentId = ComponentId
+					FROM MA_ProjectArticles_BOMComponents
+					WHERE BOMId = @Id AND Line = @ComponentLine AND CompanyId = @CompanyId;
+
+					-- Aggiorna BaseUoM SOLO se l'articolo è temporaneo (stato_erp = 0)
+					-- Non modificare articoli già presenti nel gestionale!
+					UPDATE MA_ProjectArticles_Items
+					SET BaseUoM = @ComponentUoM
+					WHERE Id = @UpdatedComponentId
+						AND CompanyId = @CompanyId
+						AND stato_erp = 0;  -- Solo articoli temporanei
+				END
+
+				IF ISNULL(@TempSupplierId,'') != ''  SET @UpdateSupplierData = 1
+				
+			  -- NUOVO: Gestione aggiornamento dati fornitore (solo se esplicitamente richiesto)
+			  IF @UpdateSupplierData = 1 AND (
+				  @TempSupplierId IS NOT NULL OR
+				  @TempIntercompanyTargetId IS NOT NULL OR
+				  @TempSupplierNotes IS NOT NULL
+			  )
+			  BEGIN
+				  DECLARE @UpdateItemCodeCheck VARCHAR(64);
+				  DECLARE @UpdateExistsInMA_Items BIT = 0;
+				  DECLARE @UpdateCurrentComponentId BIGINT;
+
+				  -- Ottieni ComponentId corrente
+				  SELECT @UpdateCurrentComponentId = ComponentId
+				  FROM MA_ProjectArticles_BOMComponents
+				  WHERE BOMId = @Id AND Line = @ComponentLine AND CompanyId = @CompanyId;
+
+				  -- Verifica se esiste in gestionale
+				  SELECT @UpdateItemCodeCheck = Item
+				  FROM MA_ProjectArticles_Items
+				  WHERE Id = @UpdateCurrentComponentId AND CompanyId = @CompanyId;
+
+			 
+
+				  IF EXISTS (
+					  SELECT 1 FROM MA_Items
+					  WHERE Item = @UpdateItemCodeCheck AND CompanyId = @CompanyId
+				  )
+				  BEGIN
+					  SET @UpdateExistsInMA_Items = 1;
+
+					  -- Se esiste in gestionale, NON permettere modifica dati fornitore
+					  SET @ErrorCode = 100;
+					  SET @ErrorMessage = N'Impossibile modificare dati fornitore: codice ' + @UpdateItemCodeCheck + N'
+			  esistente nel gestionale';
+					  THROW 50100, @ErrorMessage, 1;
+				  END
+
+				  -- Aggiorna dati fornitore solo se componente temporaneo
+				  IF @UpdateExistsInMA_Items = 0
+				  BEGIN
+			  
+					  UPDATE MA_ProjectArticles_Items
+					  SET
+						  TempSupplierId = ISNULL(@TempSupplierId, TempSupplierId),
+						  TempIntercompanyTargetId = ISNULL(@TempIntercompanyTargetId, TempIntercompanyTargetId),
+						  TempSupplierNotes = ISNULL(@TempSupplierNotes, TempSupplierNotes),
+						  TBModified = GETDATE(),
+						  TBModifiedId = @UserId
+					  WHERE Id = @UpdateCurrentComponentId AND CompanyId = @CompanyId;
+				  END
+			  END
+
+			  SET @ReturnValue = @Id;
+			  END
+        ELSE IF @Action = 'DELETE_COMPONENT'
+        BEGIN
+            -- Verifica che la distinta base esista
+            IF NOT EXISTS (SELECT 1 FROM dbo.MA_ProjectArticles_BillOfMaterials WHERE Id = @Id AND CompanyId = @CompanyId)
+            BEGIN
+                SET @ErrorCode = 17;
+                SET @ErrorMessage = N'Distinta base non trovata.';
+                THROW 50017, @ErrorMessage, 1;
+            END
+            
+            -- Eliminazione componente
+            DELETE FROM dbo.MA_ProjectArticles_BOMComponents
+            WHERE BOMId = @Id AND Line = @ComponentLine AND CompanyId = @CompanyId;
+            
+            IF @@ROWCOUNT = 0
+            BEGIN
+                SET @ErrorCode = 18;
+                SET @ErrorMessage = N'Componente non trovato.';
+                THROW 50018, @ErrorMessage, 1;
+            END
+            
+            SET @ReturnValue = @Id;
+        END
+        ELSE IF @Action = 'ADD_ROUTING'
+        BEGIN
+            -- Verifica che la distinta base esista
+            IF NOT EXISTS (SELECT 1 FROM dbo.MA_ProjectArticles_BillOfMaterials WHERE Id = @Id AND CompanyId = @CompanyId)
+            BEGIN
+				-- Se abbiamo ItemId allora creiamo la distinta altrimenti usciamo con errore
+				IF ISNULL(( SELECT TOP(1) Nature FROM MA_ProjectArticles_Items WHERE CompanyId = @CompanyId AND Id = @ItemId ),0) IN (22413312, 22413313)
+					BEGIN
+						DECLARE @TargetItemId BIGINT = NULL;
+						DECLARE @TargetItemNature INT = NULL;
+						DECLARE @TargetItemCode VARCHAR(64) = NULL;
+						DECLARE @TargetItemDescription NVARCHAR(255) = NULL;
+						DECLARE @BOMCreated BIT = 0;
+						
+						SELECT	TOP(1) 
+								@TargetItemId = Id
+								, @TargetItemNature = Nature
+								, @TargetItemCode = Item
+								, @TargetItemDescription = Description
+						FROM	MA_ProjectArticles_Items 
+						WHERE	CompanyId = @CompanyId 
+						AND		Id = @ItemId
+
+
+						-- Genera il codice BOM
+                        DECLARE @NewBOMCode VARCHAR(50) = @TargetItemCode + '-1-BOM';
+
+						
+				
+                        DECLARE @IdNuovo INT = ISNULL((SELECT MAX(Id) FROM MA_ProjectArticles_BillOfMaterials WHERE CompanyId = @CompanyId),0) + 1
+                        -- Inserisci la nuova distinta
+                        INSERT INTO dbo.MA_ProjectArticles_BillOfMaterials (
+							Id, CompanyId, ItemId, BOM, Description, Version, UoM, BOMStatus, ProductionLot,
+                            TBCreated, TBCreatedID, stato_erp
+                        ) VALUES (
+                            @IdNuovo, @CompanyId, @TargetItemId, @NewBOMCode, 
+                            ISNULL(@Description, N'BOM_' + @TargetItemCode), 
+                            1, ISNULL(@UoM, 'NR'), ISNULL(@BOMStatus, 'BOZZA'), 
+                            ISNULL(@ProductionLot, 1),
+                            GETDATE(), @UserId, 0
+                        );
+                        
+                        SET @ActualBOMId = @IdNuovo
+						SET @Id = @ActualBOMId
+                        SET @BOMCreated = 1;
+					END
+				ELSE 
+					BEGIN
+					SET @ErrorCode = 19;
+					SET @ErrorMessage = N'Non è possibile creare in automartico la distinta base per associare il ciclo. ItemId non trovato oppure articolo di acquisto.';
+					THROW 50019, @ErrorMessage, 1;
+				END
+			END
+            
+            -- Verifica che la fase non esista già
+            IF EXISTS (SELECT 1 FROM dbo.MA_ProjectArticles_BOMRouting WHERE BOMId = @Id AND RtgStep = @RtgStep AND CompanyId = @CompanyId)
+            BEGIN
+                SET @ErrorCode = 20;
+                SET @ErrorMessage = N'Fase già esistente.';
+                THROW 50020, @ErrorMessage, 1;
+            END
+            
+            -- Inserimento nuova fase
+            INSERT INTO dbo.MA_ProjectArticles_BOMRouting (
+                CompanyId, RtgStep, BOMId, Operation, Notes, WC, ProcessingTime,
+                SetupTime, NoOfProcessingWorkers, NoOfSetupWorkers, SubId, Supplier,
+                Qty, TBCreated, TBModified, TBCreatedID, TBModifiedID, CheckOperation
+            ) VALUES (
+                @CompanyId, @RtgStep, @Id, @Operation, @Notes, @WC, @ProcessingTime,
+                @SetupTime, @NoOfProcessingWorkers, @NoOfSetupWorkers, @SubId, @Supplier,
+                @Qty, GETDATE(), GETDATE(), @UserId, @UserId, 0
+            );
+            
+            SET @ReturnValue = @Id;
+        END
+        ELSE IF @Action = 'UPDATE_ROUTING'
+        BEGIN
+            -- Verifica che la distinta base esista
+            IF NOT EXISTS (SELECT 1 FROM dbo.MA_ProjectArticles_BillOfMaterials WHERE Id = @Id AND CompanyId = @CompanyId)
+            BEGIN
+				-- Se non viene passato id della bom, vediamo se riceviamo id di item
+				IF @Id = 0 AND ISNULL((SELECT TOP(1) Id FROM MA_ProjectArticles_BillOfMaterials WHERE CompanyId = @CompanyId AND ItemId = @ItemId ),0) > 0
+					BEGIN
+					 SET @Id = (SELECT TOP(1) Id FROM MA_ProjectArticles_BillOfMaterials WHERE CompanyId = @CompanyId AND ItemId = @ItemId )
+					END
+				ELSE 
+					BEGIN
+						SET @ErrorCode = 21;
+						SET @ErrorMessage = N'Distinta base non trovata.';
+						THROW 50021, @ErrorMessage, 1;
+					END
+            END
+            
+            -- Aggiornamento fase esistente
+            UPDATE dbo.MA_ProjectArticles_BOMRouting
+            SET 
+                Operation = ISNULL(@Operation, Operation),
+                Notes = ISNULL(@Notes, Notes),
+                WC = ISNULL(@WC, WC),
+                ProcessingTime = ISNULL(@ProcessingTime, ProcessingTime),
+                SetupTime = ISNULL(@SetupTime, SetupTime),
+                NoOfProcessingWorkers = ISNULL(@NoOfProcessingWorkers, NoOfProcessingWorkers),
+                NoOfSetupWorkers = ISNULL(@NoOfSetupWorkers, NoOfSetupWorkers),
+                SubId = ISNULL(@SubId, SubId),
+                Supplier = ISNULL(@Supplier, Supplier),
+                Qty = ISNULL(@Qty, Qty),
+                TBModified = GETDATE(),
+                TBModifiedID = @UserId
+            WHERE BOMId = @Id AND RtgStep = @RtgStep AND CompanyId = @CompanyId;
+            
+            IF @@ROWCOUNT = 0
+            BEGIN
+                SET @ErrorCode = 22;
+                SET @ErrorMessage = N'Fase non trovata.';
+                THROW 50022, @ErrorMessage, 1;
+            END
+            
+            SET @ReturnValue = @Id;
+        END
+        ELSE IF @Action = 'DELETE_ROUTING'
+        BEGIN
+            -- Verifica che la distinta base esista
+            IF NOT EXISTS (SELECT 1 FROM dbo.MA_ProjectArticles_BillOfMaterials WHERE Id = @Id AND CompanyId = @CompanyId)
+            BEGIN
+                SET @ErrorCode = 23;
+                SET @ErrorMessage = N'Distinta base non trovata.';
+                THROW 50023, @ErrorMessage, 1;
+            END
+            
+            -- Eliminazione fase
+            DELETE FROM dbo.MA_ProjectArticles_BOMRouting
+            WHERE BOMId = @Id AND RtgStep = @RtgStep AND CompanyId = @CompanyId;
+            
+            IF @@ROWCOUNT = 0
+            BEGIN
+                SET @ErrorCode = 24;
+                SET @ErrorMessage = N'Fase non trovata.';
+                THROW 50024, @ErrorMessage, 1;
+            END
+            
+            SET @ReturnValue = @Id;
+        END     
+        -- Per sostituire un componente con un altro esistente
+ELSE IF @Action = 'REPLACE_COMPONENT'
+BEGIN
+    -- Verifica che la distinta esista
+    IF NOT EXISTS (SELECT 1 FROM dbo.MA_ProjectArticles_BillOfMaterials WHERE Id = @Id AND CompanyId = @CompanyId)
+    BEGIN
+        SET @ErrorCode = 43;
+        SET @ErrorMessage = N'Distinta base non trovata.';
+        THROW 50043, @ErrorMessage, 1;
+    END
+
+    -- Verifica che il componente da sostituire esista
+    IF NOT EXISTS (SELECT 1 FROM dbo.MA_ProjectArticles_BOMComponents WHERE BOMId = @Id AND Line = @ComponentLine AND CompanyId = @CompanyId)
+    BEGIN
+        SET @ErrorCode = 44;
+        SET @ErrorMessage = N'Componente da sostituire non trovato.';
+        THROW 50044, @ErrorMessage, 1;
+    END
+
+    -- NUOVA LOGICA DUALE: Determina se passare MainRefBOMId
+    DECLARE @ReplaceMainRefBOMId BIGINT = NULL;
+    DECLARE @ParentMainRefForReplace BIGINT;
+    
+    -- Ottieni il MainRefBOMId della BOM padre
+    SELECT @ParentMainRefForReplace = ISNULL(MainRefBOMId, Id) 
+    FROM MA_ProjectArticles_BillOfMaterials 
+    WHERE Id = @Id AND CompanyId = @CompanyId;
+    
+    -- Verifica se il nuovo componente ha già versioni con questo MainRef
+    IF @ComponentCode IS NOT NULL OR @ComponentId IS NOT NULL
+    BEGIN
+        DECLARE @CheckReplaceComponentId BIGINT;
+        
+        -- Ottieni l'ID del componente se esiste
+        IF @ComponentId IS NOT NULL
+        BEGIN
+            SET @CheckReplaceComponentId = @ComponentId;
+        END
+        ELSE IF @ComponentCode IS NOT NULL
+        BEGIN
+            SELECT @CheckReplaceComponentId = Id 
+            FROM dbo.MA_ProjectArticles_Items 
+            WHERE Item = @ComponentCode AND CompanyId = @CompanyId;
+        END
+        
+        -- LOGICA DUALE: Verifica se esistono versioni del componente con il MainRef del padre
+        IF @CheckReplaceComponentId IS NOT NULL
+        BEGIN
+            IF EXISTS (
+                SELECT 1 
+                FROM dbo.MA_ProjectArticles_BillOfMaterials
+                WHERE ItemId = @CheckReplaceComponentId 
+                    AND CompanyId = @CompanyId
+                    AND MainRefBOMId = @ParentMainRefForReplace
+            )
+            BEGIN
+                -- Solo se esistono già versioni con questo MainRef, lo passiamo
+                SET @ReplaceMainRefBOMId = @ParentMainRefForReplace;
+            END
+            -- Altrimenti @ReplaceMainRefBOMId rimane NULL (userà Version 1)
+        END
+    END
+
+    -- Sincronizza il nuovo componente con la logica MainRef corretta
+    DECLARE @ReplaceCompSyncErrorCode INT;
+    DECLARE @ReplaceCompSyncErrorMessage NVARCHAR(4000);
+    DECLARE @ReplaceCompId BIGINT;
+    
+    EXEC dbo.MA_ProjectArticles_SyncComponent
+        @CompanyId = @CompanyId,
+        @ComponentId = @ComponentId,
+        @ComponentCode = @ComponentCode,
+        @ComponentDescription = NULL,
+        @ComponentNatureValue = NULL,
+        @ComponentUoM = @ComponentUoM,
+        @ImportBOM = @ImportBOM,  -- Usa il flag ImportBOM passato
+        @MaxLevels = @MaxLevels,
+        @ValidateBOM = 1,
+        @CreateIfNotExists = 1,
+        @UserId = @UserId,
+        @MainRefBOMId = @ReplaceMainRefBOMId,  -- NULL o MainRef condizionale
+        @ReturnComponentId = @ReplaceCompId OUTPUT,
+        @ErrorCode = @ReplaceCompSyncErrorCode OUTPUT,
+        @ErrorMessage = @ReplaceCompSyncErrorMessage OUTPUT;
+    
+    IF @ReplaceCompSyncErrorCode <> 0 OR @ReplaceCompId IS NULL
+    BEGIN
+        SET @ErrorCode = 45;
+        SET @ErrorMessage = N'Nuovo componente non trovato o errore nella sincronizzazione: ' + @ReplaceCompSyncErrorMessage;
+        SET @CreatedComponentCode = '';
+        THROW 50045, @ErrorMessage, 1;
+    END
+
+    -- Recupera i dati del componente da sostituire per mantenere alcuni valori
+    DECLARE @OldQuantity DECIMAL(18, 5);
+    DECLARE @OldUoM VARCHAR(10);
+    DECLARE @OldUnitCost FLOAT;
+    DECLARE @OldTotalCost FLOAT;
+    DECLARE @OldFixedCost FLOAT;
+
+    SELECT 
+        @OldQuantity = Quantity,
+        @OldUoM = UoM,
+        @OldUnitCost = UnitCost,
+        @OldTotalCost = TotalCost,
+        @OldFixedCost = FixedCost
+    FROM dbo.MA_ProjectArticles_BOMComponents
+    WHERE BOMId = @Id AND Line = @ComponentLine AND CompanyId = @CompanyId;
+
+    -- Prima eliminiamo il vecchio componente
+    DELETE FROM dbo.MA_ProjectArticles_BOMComponents
+    WHERE BOMId = @Id AND Line = @ComponentLine AND CompanyId = @CompanyId;
+
+    -- Otteniamo i dati del nuovo componente
+    DECLARE @NewComponentDescription VARCHAR(128);
+    DECLARE @NewComponentNature INT;
+    DECLARE @NewComponentBaseUoM VARCHAR(8);
+    
+    SELECT 
+        @NewComponentDescription = Description,
+        @NewComponentNature = Nature,
+        @NewComponentBaseUoM = BaseUoM
+    FROM dbo.MA_ProjectArticles_Items
+    WHERE Id = @ReplaceCompId AND CompanyId = @CompanyId;
+
+    -- Poi inseriamo il nuovo componente sulla stessa linea
+    INSERT INTO dbo.MA_ProjectArticles_BOMComponents (
+        CompanyId, BOMId, Line, ComponentId, ComponentType, Quantity,
+        UnitCost, TotalCost, FixedCost, UoM, Details, Notes, 
+        TBCreated, TBCreatedId
+    ) VALUES (
+        @CompanyId, 
+        @Id, 
+        @ComponentLine, 
+        @ReplaceCompId, 
+        ISNULL(@ComponentType, 7798784), -- ComponentType 7798784 = Articolo
+        ISNULL(@ComponentQuantity, @OldQuantity),
+        ISNULL(@ComponentUnitCost, @OldUnitCost),
+        ISNULL(@ComponentTotalCost, @OldTotalCost),
+        ISNULL(@ComponentFixedCost, @OldFixedCost),
+        ISNULL(@ComponentUoM, ISNULL(@OldUoM, @NewComponentBaseUoM)),
+        ISNULL(@ComponentDetails, @NewComponentDescription),
+        @ComponentNotes,
+        GETDATE(), 
+        @UserId
+    );
+
+    -- Assicuriamoci di impostare sempre i valori di output
+    SET @ReturnValue = @Id;
+    SET @ErrorCode = 0;
+    SET @ErrorMessage = N'';
+END
+
+
+
+        -- Per sostituire creando un nuovo componente temporaneo
+ELSE IF @Action = 'REPLACE_WITH_NEW_COMPONENT'
+BEGIN
+    -- Verifica se la distinta esiste
+    DECLARE @DistintaEsiste BIT = 0;
+    IF EXISTS (SELECT 1 FROM dbo.MA_ProjectArticles_BillOfMaterials WHERE Id = @Id AND CompanyId = @CompanyId) 
+        SET @DistintaEsiste = 1;
+    
+    -- Se CreateTempComponent = 1, generiamo un codice temporaneo
+    IF @CreateTempComponent = 1
+    BEGIN
+        -- Ottieni codice originale del componente da sostituire
+        DECLARE @OldComponentCode VARCHAR(64) = NULL;
+        IF @ComponentLine IS NOT NULL AND @DistintaEsiste = 1
+        BEGIN
+            SELECT @OldComponentCode = i.Item
+            FROM MA_ProjectArticles_BOMComponents bc
+            INNER JOIN MA_ProjectArticles_Items i ON i.Id = bc.ComponentId AND i.CompanyId = bc.CompanyId
+            WHERE bc.BOMId = @Id AND bc.Line = @ComponentLine AND bc.CompanyId = @CompanyId;
+        END
+
+        -- Genera nuovo codice con logica unificata
+        DECLARE @ReplaceMethod VARCHAR(20);
+        DECLARE @ReplaceError NVARCHAR(500);
+
+        EXEC dbo.MA_CodingRules_GenerateCodeUnified
+            @CompanyId = @CompanyId,
+            @OriginalCode = @OldComponentCode,  -- Usa codice vecchio come riferimento
+            @GeneratedCode = @NewCompItem OUTPUT,
+            @UsedMethod = @ReplaceMethod OUTPUT,
+            @ErrorMessage = @ReplaceError OUTPUT;
+
+        IF @NewCompItem IS NULL
+        BEGIN
+            SET @ErrorCode = 998;
+            SET @ErrorMessage = N'Impossibile generare codice nuovo componente: ' + ISNULL(@ReplaceError, 'errore');
+            THROW 50998, @ErrorMessage, 1;
+        END
+
+        PRINT 'Nuovo componente sostitutivo generato (' + @ReplaceMethod + '): ' +
+              ISNULL(@OldComponentCode, 'NULL') + ' -> ' + @NewCompItem;
+
+        -- Aggiunge il prefisso specifico se fornito
+        IF @TempComponentPrefix IS NOT NULL AND @TempComponentPrefix <> ''
+        BEGIN
+            -- Assicuriamoci che il prefisso non faccia superare i 20 caratteri
+            SET @NewCompItem = LEFT(@TempComponentPrefix + '_' + @NewCompItem, 20);
+            PRINT 'Prefisso applicato: ' + @NewCompItem;
+        END
+
+        -- Impostiamo il codice del componente creato nell'output
+        SET @CreatedComponentCode = @NewCompItem;
+    END
+    
+    -- Creiamo il nuovo componente in ogni caso
+    DECLARE @NewCompId BIGINT;
+    SET @NewCompId = dbo.GetNextProjectArticleItemId(@CompanyId);
+    
+    -- Recupera informazioni dal componente originale se esiste
+    DECLARE @OriginalNature INT;
+    DECLARE @OriginalBaseUoM VARCHAR(3);
+    DECLARE @OriginalDescription NVARCHAR(128);
+    
+    IF @DistintaEsiste = 1 AND @ComponentLine IS NOT NULL
+    BEGIN
+        SELECT 
+            @OriginalNature = T1.Nature,
+            @OriginalBaseUoM = T1.BaseUoM,
+            @OriginalDescription = T1.Description
+        FROM MA_ProjectArticles_BOMComponents T0
+        JOIN MA_ProjectArticles_Items T1 ON T1.Id = T0.ComponentId
+        WHERE T0.BOMId = @Id 
+            AND T0.Line = @ComponentLine
+            AND T0.CompanyId = @CompanyId;
+    END
+    
+    -- Crea il nuovo componente temporaneo
+    INSERT INTO dbo.MA_ProjectArticles_Items (
+        Id, CompanyId, TBCreatedId, TBCreated, TBModifiedId, TBModified,
+        Item, Description, Nature, BaseUoM, stato_erp
+    ) 
+    VALUES (
+        @NewCompId,
+        @CompanyId,
+        @UserId,
+        GETDATE(),
+        @UserId,
+        GETDATE(),
+        @NewCompItem,
+        ISNULL(@NewCompDescription, ISNULL(@OriginalDescription, 'Componente temporaneo')),
+        ISNULL(@NewCompNature, ISNULL(@OriginalNature, 22413312)), -- Default semilavorato
+        ISNULL(@NewCompBaseUoM, ISNULL(@OriginalBaseUoM, 'NR')),
+        0  -- stato_erp sempre 0 per componenti temporanei
+    );
+    
+    -- NUOVA LOGICA: Crea sempre una distinta vuota per il nuovo componente
+    -- MA senza MainRefBOMId (componenti temporanei iniziano sempre come Version 1)
+    DECLARE @NewCompBOMId BIGINT = dbo.GetNextProjectArticleBOMId(@CompanyId);
+    
+    -- Ottieni informazioni sul componente da sostituire
+    DECLARE @OriginalComponentId BIGINT;
+    DECLARE @OriginalComponentHasBOM BIT = 0;
+    DECLARE @OriginalComponentBOMId BIGINT;
+
+    -- Ottieni l'ID del componente originale da sostituire
+    IF @DistintaEsiste = 1 AND @ComponentLine IS NOT NULL
+    BEGIN
+        SELECT @OriginalComponentId = ComponentId
+        FROM dbo.MA_ProjectArticles_BOMComponents
+        WHERE BOMId = @Id AND Line = @ComponentLine AND CompanyId = @CompanyId;
+
+        -- Verifica se il componente originale ha una distinta base
+        IF @OriginalComponentId IS NOT NULL AND @CopyBOM = 1
+        BEGIN
+            -- NUOVA LOGICA: Cerca sempre la Version 1 del componente originale
+            SELECT TOP 1 
+                @OriginalComponentHasBOM = 1, 
+                @OriginalComponentBOMId = Id
+            FROM dbo.MA_ProjectArticles_BillOfMaterials
+            WHERE ItemId = @OriginalComponentId 
+                AND CompanyId = @CompanyId
+                AND Version = 1  -- SEMPRE VERSION 1 per componenti temporanei
+            ORDER BY Id DESC;
+        END
+    END
+    
+    -- Verifica se esiste già una distinta per questo componente
+    IF NOT EXISTS (
+        SELECT 1 FROM dbo.MA_ProjectArticles_BillOfMaterials
+        WHERE ItemId = @NewCompId AND CompanyId = @CompanyId
+    )
+    BEGIN
+        -- Crea una distinta base per il nuovo componente temporaneo
+        -- IMPORTANTE: MainRefBOMId = NULL per componenti temporanei
+        INSERT INTO dbo.MA_ProjectArticles_BillOfMaterials (
+            CompanyId, Id, BOM, Description, ItemId, Version, UoM, BOMStatus,
+            ProductionLot, TBCreated, TBCreatedId, MainRefBOMId
+        ) VALUES (
+            @CompanyId, 
+            @NewCompBOMId, 
+            @NewCompItem, 
+            'Distinta per ' + ISNULL(@NewCompDescription, 'componente temporaneo'), 
+            @NewCompId, 
+            1,  -- SEMPRE Version 1
+            ISNULL(@NewCompBaseUoM, 'NR'), 
+            'BOZZA',
+            1, 
+            GETDATE(), 
+            @UserId, 
+            NULL  -- SEMPRE NULL per componenti temporanei (no MainRef)
+        );
+        
+        -- Se il componente originale ha una distinta e @CopyBOM = 1, copiamo i contenuti
+        IF @OriginalComponentHasBOM = 1 AND @CopyBOM = 1
+        BEGIN
+            -- Copia componenti dalla Version 1 del componente originale
+            INSERT INTO dbo.MA_ProjectArticles_BOMComponents (
+                CompanyId, BOMId, Line, ComponentId, ComponentType, Quantity,
+                UnitCost, TotalCost, FixedCost, UoM, Details, Notes, TBCreated, TBCreatedId
+            )
+            SELECT 
+                @CompanyId, @NewCompBOMId, Line, ComponentId, ComponentType, Quantity,
+                UnitCost, TotalCost, FixedCost, UoM, Details, Notes, GETDATE(), @UserId
+            FROM dbo.MA_ProjectArticles_BOMComponents
+            WHERE BOMId = @OriginalComponentBOMId AND CompanyId = @CompanyId;
+            
+            -- Copia cicli dalla Version 1 del componente originale
+            INSERT INTO dbo.MA_ProjectArticles_BOMRouting (
+                CompanyId, RtgStep, BOMId, Operation, Notes, WC, ProcessingTime,
+                SetupTime, NoOfProcessingWorkers, NoOfSetupWorkers, SubId, Supplier,
+                Qty, TBCreated, TBModified, TBCreatedID, TBModifiedID, CheckOperation
+            )
+            SELECT 
+                @CompanyId, RtgStep, @NewCompBOMId, Operation, Notes, WC, ProcessingTime,
+                SetupTime, NoOfProcessingWorkers, NoOfSetupWorkers, SubId, Supplier,
+                Qty, GETDATE(), GETDATE(), @UserId, @UserId, 0
+            FROM dbo.MA_ProjectArticles_BOMRouting
+            WHERE BOMId = @OriginalComponentBOMId AND CompanyId = @CompanyId;
+        END
+    END
+    
+    -- Se la distinta esiste, sostituiamo il componente
+    IF @DistintaEsiste = 1
+    BEGIN
+        -- Verifica che il componente da sostituire esista
+        IF NOT EXISTS (SELECT 1 FROM dbo.MA_ProjectArticles_BOMComponents 
+                      WHERE BOMId = @Id AND Line = @ComponentLine AND CompanyId = @CompanyId)
+        BEGIN
+            SET @ErrorCode = 54;
+            SET @ErrorMessage = N'Componente da sostituire non trovato.';
+            THROW 50054, @ErrorMessage, 1;
+        END
+        
+        -- Recupera i dati del componente da sostituire per mantenere alcuni valori
+        DECLARE @ReplaceQuantity DECIMAL(18, 5);
+        DECLARE @ReplaceUoM VARCHAR(10);
+        DECLARE @ReplaceUnitCost FLOAT;
+        DECLARE @ReplaceTotalCost FLOAT;
+        DECLARE @ReplaceFixedCost FLOAT;
+        
+        SELECT 
+            @ReplaceQuantity = Quantity,
+            @ReplaceUoM = UoM,
+            @ReplaceUnitCost = UnitCost,
+            @ReplaceTotalCost = TotalCost,
+            @ReplaceFixedCost = FixedCost
+        FROM dbo.MA_ProjectArticles_BOMComponents
+        WHERE BOMId = @Id AND Line = @ComponentLine AND CompanyId = @CompanyId;
+        
+        -- Eliminiamo il vecchio componente
+        DELETE FROM dbo.MA_ProjectArticles_BOMComponents
+        WHERE BOMId = @Id AND Line = @ComponentLine AND CompanyId = @CompanyId;
+        
+        -- Inseriamo il nuovo componente sulla stessa linea
+        INSERT INTO dbo.MA_ProjectArticles_BOMComponents (
+            CompanyId, BOMId, Line, ComponentId, ComponentType, Quantity,
+            UnitCost, TotalCost, FixedCost, UoM, Details, Notes, 
+            TBCreated, TBCreatedId
+        ) VALUES (
+            @CompanyId, 
+            @Id, 
+            @ComponentLine, 
+            @NewCompId, 
+            7798784, -- ComponentType 7798784 = Articolo
+            ISNULL(@ComponentQuantity, @ReplaceQuantity),
+            ISNULL(@ComponentUnitCost, @ReplaceUnitCost),
+            ISNULL(@ComponentTotalCost, @ReplaceTotalCost),
+            ISNULL(@ComponentFixedCost, @ReplaceFixedCost),
+            ISNULL(@ComponentUoM, ISNULL(@ReplaceUoM, @NewCompBaseUoM)),
+            ISNULL(@ComponentDetails, @NewCompDescription),
+            ISNULL(@ComponentNotes, ''),
+            GETDATE(), 
+            @UserId
+        );
+    END
+    ELSE -- Se la distinta non esiste, creiamo una nuova distinta e aggiungiamo il componente
+    BEGIN
+        -- Crea una nuova distinta per l'articolo principale
+        DECLARE @NewReplaceBOMId BIGINT = dbo.GetNextProjectArticleBOMId(@CompanyId);
+        DECLARE @NewBOMCode_1 VARCHAR(50) = 'TBOM_' + CAST(@NewReplaceBOMId AS VARCHAR(20));
+        
+        INSERT INTO dbo.MA_ProjectArticles_BillOfMaterials (
+            CompanyId, Id, BOM, Description, ItemId, Version, UoM, BOMStatus,
+            ProductionLot, TBCreated, TBCreatedId, MainRefBOMId
+        ) VALUES (
+            @CompanyId, 
+            @NewReplaceBOMId, 
+            @NewBOMCode_1, 
+            'Distinta Automatica', 
+            @ItemId,  -- ItemId dell'articolo principale, non del componente
+            1,  -- Version
+            ISNULL(@UoM, 'NR'),  -- UoM dell'articolo principale
+            'BOZZA',  -- BOMStatus
+            1,  -- ProductionLot
+            GETDATE(), 
+            @UserId, 
+            NULL  -- MainRefBOMId NULL per nuove distinte
+        );
+        
+        -- Aggiungiamo il componente temporaneo alla nuova distinta
+        INSERT INTO dbo.MA_ProjectArticles_BOMComponents (
+            CompanyId, BOMId, Line, ComponentId, ComponentType, Quantity,
+            UoM, Details, Notes, TBCreated, TBCreatedId
+        ) VALUES (
+            @CompanyId, 
+            @NewReplaceBOMId, 
+            1,  -- Line 1 per il primo componente
+            @NewCompId,  -- Il nuovo componente temporaneo
+            7798784,  -- ComponentType 7798784 = Articolo
+            ISNULL(@ComponentQuantity, 1),  -- Default quantity 1
+            ISNULL(@ComponentUoM, @NewCompBaseUoM),
+            @NewCompDescription,
+            ISNULL(@ComponentNotes, ''),
+            GETDATE(), 
+            @UserId
+        );
+        
+        -- Aggiorniamo l'ID della distinta per il valore di ritorno
+        SET @Id = @NewReplaceBOMId;
+    END
+    
+    -- Ritorniamo l'ID della distinta (esistente o nuova)
+    SET @ReturnValue = @Id;
+    SET @ErrorCode = 0;
+    SET @ErrorMessage = N'';
+END
+        
+        -- Commit della transazione se è stata iniziata qui
+        IF @NeedCommit = 1 AND @TranCount = 0
+            COMMIT TRANSACTION;
+        
+        -- Ricalcolo silenzioso dei costi della distinta principale
+        IF @ErrorCode = 0 AND @ReturnValue > 0
+        BEGIN
+            DECLARE @CostingBOMId BIGINT;
+            
+            -- Determina la BOM principale da ricalcolare
+            -- Se abbiamo lavorato su un componente padre, risali alla root
+            -- Altrimenti usa la BOM corrente
+            SELECT @CostingBOMId = ISNULL(MainRefBOMId, Id)
+            FROM MA_ProjectArticles_BillOfMaterials
+            WHERE Id = COALESCE(@Id, @ReturnValue) AND CompanyId = @CompanyId;
+            
+            -- Se non trovato, usa direttamente ReturnValue
+            SET @CostingBOMId = ISNULL(@CostingBOMId, @ReturnValue);
+            
+            -- Esegui ricalcolo costi (silenzioso, ignora errori)
+            BEGIN TRY
+                EXEC SP_CalculateBOMCosting
+                    @CompanyId = @CompanyId,
+                    @BOMId = @CostingBOMId,
+                    @UserId = @UserId;
+            END TRY
+            BEGIN CATCH
+                -- Ignora errori del costing, non compromettere l'operazione principale
+                -- Opzionale: logga l'errore per debug
+                -- PRINT 'Costing error: ' + ERROR_MESSAGE();
+            END CATCH
+        END
+            
+    END TRY
+    BEGIN CATCH
+        -- Rollback della transazione se è stata iniziata qui e c'è un errore
+        IF @NeedCommit = 1 AND @TranCount = 0
+            ROLLBACK TRANSACTION;
+        
+        -- Cattura informazioni sull'errore
+        SET @ErrorCode = ERROR_NUMBER();
+        SET @ErrorMessage = ERROR_MESSAGE();
+        
+        -- Restituisci informazioni di errore
+        SET @ReturnValue = 0;
+    END CATCH
+    
+    -- Goto punto di uscita normale
+    GOTO ExitPoint;
+    
+ErrorHandler:
+    -- Gestione degli errori durante la validazione (prima della transazione)
+    SET @ReturnValue = 0;
+    
+ExitPoint:
+    -- Pulizia
+    DROP TABLE IF EXISTS #ProcessedComponents;
+    
+    RETURN @ErrorCode;
+END;

@@ -131,7 +131,7 @@ const TabComposition = () => {
   const handleAddComponent = async () => {
     if (!selectedBomId) return;
     // Se la distinta ha stato_erp = 1, non è possibile aggiungere componenti
-    if (selectedNode.data.stato_erp == "1") {
+    if (selectedNode.data.bomStato_erp == "1") {
       toast({
         title: "Operazione non consentita",
         description:

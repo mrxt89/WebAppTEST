@@ -878,6 +878,7 @@ router.get('/projectArticles/boms/:id', authenticateToken, async (req, res) => {
         const companyId = req.user.CompanyId;
         const bomId = parseInt(req.params.id);
         const action = req.query.action || 'GET_BOM_FULL';
+        const version = req.query.version ? parseInt(req.query.version) : null;
 
         // Opzioni aggiuntive
         const options = {};
@@ -886,7 +887,7 @@ router.get('/projectArticles/boms/:id', authenticateToken, async (req, res) => {
         if (req.query.expandPhantoms) options.ExpandPhantoms = req.query.expandPhantoms === 'true';
         if (req.query.includeRouting) options.IncludeRouting = req.query.includeRouting === 'true';
         
-        const result = await getBOMData(action, companyId, bomId, null, null, options);
+        const result = await getBOMData(action, companyId, bomId, null, version, options);
         res.json(result);
     } catch (err) {
         console.error(`Error fetching BOM data:`, err);
@@ -1964,7 +1965,8 @@ router.get('/projectArticles/unitsOfMeasure', authenticateToken, async (req, res
         projectsFromBomParents = [];
       }
       
-      const result = await saveTechnicalCharacteristics(itemId, technicalCharacteristicsJSON, userId);
+      // Passiamo sempre la companyId derivata dall'utente loggato
+      const result = await saveTechnicalCharacteristics(companyId, itemId, technicalCharacteristicsJSON, userId);
 
       // LOGGING: Traccia modifica caratteristiche tecniche nella History del progetto
       // Usiamo activityType = ITEM_UPDATE (già standard) e descrizione specifica.
@@ -2075,6 +2077,7 @@ router.get('/projectArticles/unitsOfMeasure', authenticateToken, async (req, res
     try {
         const itemId = parseInt(req.params.itemId);
         const itemData = req.body;
+        const companyId = req.user.CompanyId;
         
         if (!itemId || isNaN(itemId)) {
             return res.status(400).json({ 
@@ -2083,12 +2086,11 @@ router.get('/projectArticles/unitsOfMeasure', authenticateToken, async (req, res
             });
         }
         
-        // Usa la funzione aggiornata con validazione
-        const result = await updateItemDetailsWithValidation(itemId, itemData);
+        // Usa la funzione aggiornata con validazione, passando la company dell'utente loggato
+        const result = await updateItemDetailsWithValidation(companyId, itemId, itemData);
         
         // LOGGING: Traccia la modifica dettagli articolo
         if (result.success) {
-            const companyId = req.user.CompanyId;
             const userId = req.user.UserId;
             const requestInfo = getRequestInfo(req);
             // Recupera ProjectID

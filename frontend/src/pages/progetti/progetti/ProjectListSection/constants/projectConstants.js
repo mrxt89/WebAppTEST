@@ -14,7 +14,7 @@ export const DEFAULT_COLUMN_WIDTHS = [
     Description: "",
     StartDate: new Date().toISOString().split("T")[0],
     EndDate: "",
-    Status: "1A",
+    Status: "1B",
     ProjectCategoryId: 0,
     ProjectCategoryDetailLine: 0,
     CustSupp: 0,

@@ -308,6 +308,7 @@ const BOMHeader = () => {
              Version: 1,
              BOM: data.header.BOM || "",
              Description: data.header.Description || "",
+             stato_erp: data.header.stato_erp,
            };
          }
          return;
@@ -864,6 +865,7 @@ const handleCreateVersion = async () => {
          Version: newVersion,
          BOM: `${bom?.BOM || "BOM"} v${newVersion}`,
          Description: `${bom?.Description || ""} - Versione ${newVersion}`,
+         stato_erp: 0,
        };
 
        // Aggiorna elenco versioni - assicurati che siano numeri
@@ -1085,13 +1087,20 @@ const handleCreateVersion = async () => {
                        typeof version === "object" && version !== null
                          ? version.Version || "?"
                          : version;
+                     const versionData = versionMapRef.current[versionNumber];
+                     const isExported = versionData?.stato_erp == 1;
 
                      return (
                        <SelectItem
                          key={`version-${versionNumber}`}
                          value={String(versionNumber)}
                        >
-                         {versionNumber}
+                         <span className="flex items-center gap-1.5">
+                           {versionNumber}
+                           {isExported && (
+                             <span className="inline-block w-2 h-2 rounded-full bg-green-500" title="Esportata in ERP" />
+                           )}
+                         </span>
                        </SelectItem>
                      );
                    })}
@@ -1104,7 +1113,7 @@ const handleCreateVersion = async () => {
               className="h-8 w-8"
               title="Crea nuova versione"
               onClick={handleCreateVersion}
-              disabled={isCreating || loading || bom?.stato_erp == "1" || bom?.stato_erp === 1}
+              disabled={isCreating || loading}
             >
               <Plus className="h-4 w-4" />
             </Button>

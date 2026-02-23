@@ -212,6 +212,7 @@ const useProjectArticlesActions = () => {
       // If we have a BOM ID, use the /boms/:id endpoint
       if (id) {
         url = `${config.API_BASE_URL}/projectArticles/boms/${id}?action=${action}`;
+        if (version) url += `&version=${version}`;
       }
       // Otherwise if we have an ItemId, use the /boms/item/:itemId endpoint
       else if (itemId) {

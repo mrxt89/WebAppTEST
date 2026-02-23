@@ -643,6 +643,21 @@ const updateRoutingCheckOperation = async (companyId, bomId, rtgStep, checkOpera
 const getBOMData = async (action, companyId, id, itemId = null, version = null, options = {}) => {
     try {
         let pool = await sql.connect(config.database);
+
+        // Se sono passati sia id che version, la SP con solo @Id restituisce sempre quella riga (es. versione 5).
+        // Risolviamo id -> ItemId e usiamo (ItemId, Version) così la SP carica la versione richiesta.
+        if (id && version != null) {
+            const resolveResult = await pool.request()
+                .input('Id', sql.BigInt, id)
+                .input('CompanyId', sql.Int, companyId)
+                .query('SELECT ItemId FROM dbo.MA_ProjectArticles_BillOfMaterials WHERE Id = @Id AND CompanyId = @CompanyId');
+            const row = resolveResult.recordset && resolveResult.recordset[0];
+            if (row && row.ItemId != null) {
+                itemId = row.ItemId;
+                id = null;
+            }
+        }
+
         const request = pool.request();
 
         // Parametri obbligatori
@@ -652,9 +667,10 @@ const getBOMData = async (action, companyId, id, itemId = null, version = null, 
         // Parametri ID (o Id o ItemId)
         if (id) {
             request.input('Id', sql.BigInt, id);
+            if (version != null) request.input('Version', sql.Int, version);
         } else if (itemId) {
             request.input('ItemId', sql.BigInt, itemId);
-            if (version) request.input('Version', sql.Int, version);
+            if (version != null) request.input('Version', sql.Int, version);
         } else {
             console.error('Neither Id nor ItemId provided for getBOMData');
             throw new Error('Either Id or ItemId must be provided');
@@ -2868,8 +2884,8 @@ const getBOMVersions = async (companyId, itemId) => {
         .input('CompanyId', sql.Int, companyId)
         .input('ItemId', sql.BigInt, itemId)
         .query(`
-          SELECT 
-            Id, BOM, Version, Description, BOMStatus,
+          SELECT
+            Id, BOM, Version, Description, BOMStatus, stato_erp,
             TotalCost as LastCalculatedCost,
             TBCreated as CreatedDate,
             TBCreated as ModifiedDate
@@ -2975,14 +2991,16 @@ const getUnitsOfMeasure = async () => {
     }
   };
   
-  // funzione per aggiornare i dettagli dell'articolo
-const updateItemDetails = async (itemId, itemData) => {
+// funzione per aggiornare i dettagli dell'articolo
+// NOTA: companyId viene passato dal chiamante (es. route) in base all'utente loggato
+const updateItemDetails = async (companyId, itemId, itemData) => {
     try {
       let pool = await sql.connect(config.database);
       const request = pool.request();
       
       // Parametri obbligatori
       request.input('Id', sql.BigInt, itemId);
+      request.input('CompanyId', sql.Int, companyId);
       
       // Parametri opzionali in base ai dati forniti
       if (itemData.Code !== undefined) request.input('Item', sql.VarChar(128), itemData.Code);
@@ -2995,7 +3013,6 @@ const updateItemDetails = async (itemId, itemData) => {
       if (itemData.MediumRadius !== undefined) request.input('MediumRadius', sql.Float, itemData.MediumRadius);
       if (itemData.CustomerItemReference !== undefined) request.input('CustomerItemReference', sql.VarChar(64), itemData.CustomerItemReference);
       if (itemData.Notes !== undefined) request.input('Notes', sql.NVarChar(sql.MAX), itemData.Notes);
-      
       
       // Costruisci la query di aggiornamento in base ai campi forniti
       let updateFields = [];
@@ -3011,17 +3028,16 @@ const updateItemDetails = async (itemId, itemData) => {
       if (itemData.CustomerItemReference !== undefined) updateFields.push('CustomerItemReference = @CustomerItemReference');
       if (itemData.Notes !== undefined) updateFields.push('Notes = @Notes');
 
-      
       // Se non ci sono campi da aggiornare, esci
       if (updateFields.length === 0) {
         return { success: 1, msg: "Nessun campo da aggiornare" };
       }
       
-      // Esegui la query di aggiornamento
+      // Esegui la query di aggiornamento usando anche CompanyId nella chiave
       const result = await request.query(`
         UPDATE MA_ProjectArticles_Items
         SET ${updateFields.join(', ')}
-        WHERE Id = @Id
+        WHERE Id = @Id AND CompanyId = @CompanyId
       `);
       
       return { 
@@ -3727,27 +3743,18 @@ const checkItemCodeExists = async (companyId, itemCode, excludeItemId = null) =>
     }
 };
 
-const updateItemDetailsWithValidation = async (itemId, itemData) => {
+// Aggiorna i dettagli articolo con validazione del codice
+// NOTA: companyId viene passato dal chiamante (es. route) in base all'utente loggato
+const updateItemDetailsWithValidation = async (companyId, itemId, itemData) => {
     try {
         let pool = await sql.connect(config.database);
-        
+
         // Variabile per memorizzare il risultato della validazione
         let validationResult = null;
         
         // Se viene modificato il codice, prima validalo
         if (itemData.Code !== undefined) {
-            // Ottieni CompanyId dell'articolo
-            const itemQuery = await pool.request()
-                .input('Id', sql.BigInt, itemId)
-                .query('SELECT CompanyId FROM MA_ProjectArticles_Items WHERE Id = @Id');
-                
-            if (itemQuery.recordset.length === 0) {
-                return { success: 0, msg: "Articolo non trovato" };
-            }
-            
-            const companyId = itemQuery.recordset[0].CompanyId;
-            
-            // Valida il nuovo codice
+            // Valida il nuovo codice rispetto alla company
             validationResult = await validateItemCode(companyId, itemData.Code, itemId);
             
             if (!validationResult.isValid) {
@@ -3770,6 +3777,7 @@ const updateItemDetailsWithValidation = async (itemId, itemData) => {
         
         // Parametri obbligatori
         request.input('Id', sql.BigInt, itemId);
+        request.input('CompanyId', sql.Int, companyId);
         
         // Parametri opzionali in base ai dati forniti
         if (itemData.Code !== undefined) request.input('Item', sql.VarChar(64), itemData.Code);
@@ -3805,11 +3813,11 @@ const updateItemDetailsWithValidation = async (itemId, itemData) => {
         // Aggiungi timestamp di modifica
         updateFields.push('TBModified = GETDATE()');
         
-        // Esegui la query di aggiornamento
+        // Esegui la query di aggiornamento usando anche CompanyId nella chiave
         const result = await request.query(`
             UPDATE MA_ProjectArticles_Items
             SET ${updateFields.join(', ')}
-            WHERE Id = @Id
+            WHERE Id = @Id AND CompanyId = @CompanyId
         `);
         
         return { 
@@ -3831,24 +3839,24 @@ const updateItemDetailsWithValidation = async (itemId, itemData) => {
  * @param {number} userId - ID utente che esegue l'operazione
  * @returns {Promise<Object>} Risultato dell'operazione
  */
-const saveTechnicalCharacteristics = async (itemId, technicalCharacteristicsJSON, userId) => {
+// Salva solo le caratteristiche tecniche di un articolo (companyId passato dal chiamante)
+const saveTechnicalCharacteristics = async (companyId, itemId, technicalCharacteristicsJSON, userId) => {
     try {
         let pool = await sql.connect(config.database);
         
         // Verifica che l'articolo esista
         const checkRequest = pool.request();
         checkRequest.input('ItemId', sql.BigInt, itemId);
+        checkRequest.input('CompanyId', sql.Int, companyId);
         const checkResult = await checkRequest.query(`
             SELECT CompanyId, Id 
             FROM MA_ProjectArticles_Items 
-            WHERE Id = @ItemId
+            WHERE Id = @ItemId AND CompanyId = @CompanyId
         `);
         
         if (checkResult.recordset.length === 0) {
             return { success: 0, msg: 'Articolo non trovato' };
         }
-        
-        const companyId = checkResult.recordset[0].CompanyId;
         
         // Converti technicalCharacteristicsJSON in stringa se è un oggetto
         let jsonString = null;
@@ -3863,6 +3871,7 @@ const saveTechnicalCharacteristics = async (itemId, technicalCharacteristicsJSON
         // Aggiorna TechnicalCharacteristicsJSON
         const updateRequest = pool.request();
         updateRequest.input('ItemId', sql.BigInt, itemId);
+        updateRequest.input('CompanyId', sql.Int, companyId);
         updateRequest.input('TechnicalCharacteristicsJSON', sql.NVarChar(sql.MAX), jsonString);
         updateRequest.input('UserId', sql.Int, userId);
         
@@ -3872,6 +3881,7 @@ const saveTechnicalCharacteristics = async (itemId, technicalCharacteristicsJSON
                 TBModified = GETDATE(),
                 TBModifiedId = @UserId
             WHERE Id = @ItemId
+              AND CompanyId = @CompanyId
         `);
         
         // Sincronizza i campi hardcoded dal JSON

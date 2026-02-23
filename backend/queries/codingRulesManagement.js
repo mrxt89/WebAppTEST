@@ -1724,6 +1724,16 @@ const generateNormalizedDescription = async (companyId, baseDescription, technic
         if (!normalizedDescription || normalizedDescription.trim() === '') {
             normalizedDescription = baseDescription || '';
         }
+
+        // Normalizza eventuali trattini residui all'inizio/fine stringa
+        if (normalizedDescription && typeof normalizedDescription === 'string') {
+            let desc = normalizedDescription.trim();
+            // Rimuovi trattino iniziale tipo "- xxx" o " - xxx"
+            desc = desc.replace(/^-\s+/, '').replace(/^\s*-\s*/, '');
+            // Rimuovi trattino finale tipo "xxx -" o "xxx - "
+            desc = desc.replace(/\s+-\s*$/, '').replace(/\s*-\s*$/, '');
+            normalizedDescription = desc;
+        }
         
         console.log('SP returned description:', normalizedDescription);
         console.log('Final normalized description length:', normalizedDescription?.length);
