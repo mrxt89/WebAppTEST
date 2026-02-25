@@ -93,6 +93,7 @@ const BOMCosting = ({ selectedItem }) => {
   const [showCostTree, setShowCostTree] = useState(false);
   const [treeData, setTreeData] = useState(null);
   const [loadingTree, setLoadingTree] = useState(false);
+  const [treeModalBomId, setTreeModalBomId] = useState(null);
   
   // Stato per pannello opzioni compresso
   const [isOptionsPanelCollapsed, setIsOptionsPanelCollapsed] = useState(false);
@@ -920,6 +921,7 @@ const BOMCosting = ({ selectedItem }) => {
           console.log('TreeData assembled:', finalTreeData);
 
           setTreeData(finalTreeData);
+          setTreeModalBomId(bomId);
           setShowCostTree(true);
         }
       }
@@ -1077,6 +1079,7 @@ const BOMCosting = ({ selectedItem }) => {
           console.log('Components count:', componentsWithCycles.length);
 
           setTreeData(finalTreeData);
+          setTreeModalBomId(selectedBOM.Id);
           setShowCostTree(true);
         }
         return;
@@ -1303,6 +1306,7 @@ const BOMCosting = ({ selectedItem }) => {
           console.log('Components count:', componentsWithCycles.length);
 
           setTreeData(finalTreeData);
+          setTreeModalBomId(selectedBOM.Id);
           setShowCostTree(true);
           console.log('showCostTree set to true');
         } else {
@@ -1384,6 +1388,7 @@ const BOMCosting = ({ selectedItem }) => {
           console.log('Components count:', componentsWithCycles.length);
 
           setTreeData(finalTreeData);
+          setTreeModalBomId(selectedBOM.Id);
           setShowCostTree(true);
         }
       }
@@ -2242,6 +2247,7 @@ const BOMCosting = ({ selectedItem }) => {
         treeData={treeData}
         loading={loadingTree}
         onClose={() => setShowCostTree(false)}
+        bomId={treeModalBomId}
       />
 
       {/* Modal Dati Noti */}

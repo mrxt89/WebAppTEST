@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dettaglio Costi – Struttura BOM</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --border: #e2e5ea;
+    --border-strong: #c8cdd6;
+    --text: #1a1d23;
+    --text-muted: #6b7280;
+    --text-light: #9ca3af;
+    --blue: #2563eb;
+    --blue-light: #eff6ff;
+    --blue-mid: #dbeafe;
+    --green: #059669;
+    --green-light: #ecfdf5;
+    --green-mid: #d1fae5;
+    --red: #dc2626;
+    --red-light: #fef2f2;
+    --orange: #d97706;
+    --orange-light: #fffbeb;
+    --orange-mid: #fef3c7;
+    --purple: #7c3aed;
+    --purple-light: #f5f3ff;
+    --scenario-active: #1d4ed8;
+    --scenario-bg: #eff6ff;
+    --modified: #2563eb;
+    --added: #059669;
+    --removed: #dc2626;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* MODAL */
+  .modal {
+    background: var(--surface);
+    border-radius: 12px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+    max-width: 1200px;
+    margin: 20px auto;
+    overflow: hidden;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .modal-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+  }
+
+  .close-btn {
+    width: 28px; height: 28px;
+    border: none; background: none;
+    cursor: pointer; color: var(--text-muted);
+    font-size: 18px; display: flex; align-items: center; justify-content: center;
+    border-radius: 4px;
+  }
+  .close-btn:hover { background: var(--bg); }
+
+  /* TOOLBAR */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .toolbar-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 16px; font-weight: 600;
+  }
+  .toolbar-title .icon { color: var(--blue); font-size: 18px; }
+
+  .toolbar-right {
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: all 0.15s;
+  }
+  .btn:hover { background: var(--bg); }
+
+  .btn-primary {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: white;
+  }
+  .btn-primary:hover { background: #1d4ed8; }
+
+  .btn-success {
+    background: var(--green);
+    border-color: var(--green);
+    color: white;
+  }
+  .btn-success:hover { background: #047857; }
+
+  .btn-sm { padding: 4px 8px; font-size: 11px; }
+
+  /* SCENARIO BAR */
+  .scenario-bar {
+    background: var(--scenario-bg);
+    border-bottom: 2px solid var(--blue-mid);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .scenario-bar-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--scenario-active);
+  }
+
+  .scenario-select {
+    padding: 5px 28px 5px 10px;
+    border: 1.5px solid var(--blue);
+    border-radius: 6px;
+    background: white;
+    color: var(--scenario-active);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--sans);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%232563eb' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+  }
+
+  .scenario-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+    background: var(--blue-mid);
+    color: var(--scenario-active);
+  }
+  .scenario-badge .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--scenario-active);
+  }
+
+  .scenario-bar-actions {
+    margin-left: auto;
+    display: flex; gap: 8px; align-items: center;
+  }
+
+  .scenario-info {
+    font-size: 11px;
+    color: var(--scenario-active);
+    opacity: 0.8;
+  }
+
+  /* COST SUMMARY */
+  .cost-summary {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cost-summary-header {
+    display: flex; align-items: baseline; gap: 16px;
+    margin-bottom: 12px;
+  }
+
+  .bom-code {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--blue);
+  }
+
+  .total-row {
+    display: flex; align-items: baseline; gap: 8px;
+  }
+
+  .total-official {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: var(--text);
+  }
+
+  .total-scenario {
+    font-size: 18px;
+    font-weight: 600;
+    font-family: var(--mono);
+    color: var(--green);
+  }
+
+  .total-delta {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--green);
+    background: var(--green-light);
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+
+  .cost-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  .cost-card {
+    border-radius: 8px;
+    padding: 12px 14px;
+    border: 1px solid transparent;
+  }
+
+  .cost-card.mat { background: #eff6ff; border-color: #bfdbfe; }
+  .cost-card.ops { background: #f0fdf4; border-color: #bbf7d0; }
+  .cost-card.fix { background: #fafafa; border-color: var(--border); }
+  .cost-card.ric { background: #fffbeb; border-color: #fde68a; }
+
+  .cost-card-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .cost-card-official {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .cost-card-scenario {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--green);
+    margin-top: 2px;
+  }
+
+  .cost-card-delta {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--green);
+    margin-top: 1px;
+  }
+
+  .cost-card-delta.neg { color: var(--red); }
+
+  /* SEARCH */
+  .search-bar {
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 7px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: var(--sans);
+    color: var(--text);
+    background: var(--bg);
+  }
+  .search-input:focus { outline: none; border-color: var(--blue); }
+
+  /* TABLE */
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  thead th:first-child { text-align: left; padding-left: 20px; }
+  thead th.scenario-col {
+    background: var(--blue-mid);
+    color: var(--scenario-active);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: #fafbfc; }
+
+  tbody td {
+    padding: 7px 10px;
+    font-size: 12px;
+    text-align: right;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  tbody td:first-child { text-align: left; padding-left: 8px; }
+
+  /* ROW STATES */
+  .row-modified td:first-child { border-left: 3px solid var(--modified); }
+  .row-added td:first-child { border-left: 3px solid var(--added); background: var(--green-light); }
+  .row-removed td:first-child { border-left: 3px solid var(--removed); opacity: 0.6; text-decoration: line-through; }
+
+  .row-l1 { background: #f8f9ff; }
+  .row-l2 td:first-child { padding-left: 28px; }
+  .row-l3 td:first-child { padding-left: 46px; }
+
+  /* CELL STYLES */
+  .component-name {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px;
+  }
+
+  .icon-type {
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; flex-shrink: 0;
+  }
+  .icon-op { background: #d1fae5; color: #065f46; }
+  .icon-semi { background: #dbeafe; color: #1e40af; }
+  .icon-buy { background: #fef3c7; color: #92400e; }
+  .icon-root { background: #ede9fe; color: #5b21b6; }
+
+  .type-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 2px;
+  }
+  .badge-pf { background: #ede9fe; color: #5b21b6; }
+  .badge-tmp { background: #fef3c7; color: #92400e; }
+
+  .mono { font-family: var(--mono); }
+
+  .cost-highlight { color: var(--red); font-weight: 600; }
+  .cost-ok { color: var(--text); }
+
+  /* SCENARIO CELLS */
+  .sc-cell {
+    position: relative;
+  }
+
+  .sc-input {
+    width: 80px;
+    padding: 3px 6px;
+    border: 1.5px solid var(--blue);
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: var(--mono);
+    text-align: right;
+    background: white;
+    color: var(--scenario-active);
+    font-weight: 600;
+  }
+  .sc-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+
+  .sc-value {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--scenario-active);
+  }
+
+  .sc-unchanged {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .delta-cell {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .delta-neg { color: var(--green); }
+  .delta-pos { color: var(--red); }
+
+  /* ROW ACTIONS */
+  .row-action-btn {
+    opacity: 0;
+    padding: 2px 6px;
+    font-size: 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+    background: white;
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: opacity 0.15s;
+  }
+  tbody tr:hover .row-action-btn { opacity: 1; }
+
+  /* LEGEND */
+  .legend {
+    display: flex; align-items: center; gap: 16px;
+    padding: 8px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 2px;
+  }
+
+  /* PROMOTE DIALOG */
+  .promote-hint {
+    margin: 0 20px 12px;
+    padding: 10px 14px;
+    background: var(--green-light);
+    border: 1px solid var(--green-mid);
+    border-radius: 8px;
+    font-size: 12px;
+    color: #065f46;
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+  .promote-hint .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  .scenario-col-header {
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  .sc-input.fisso { border-color: #d97706; }
+
+  .formula-note {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+
+  .separator {
+    width: 1px; height: 20px; background: var(--border-strong); margin: 0 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="modal">
+
+  <!-- MODAL HEADER -->
+  <div class="modal-header">
+    <span class="modal-title">Dettaglio Costi – Struttura BOM</span>
+    <button class="close-btn">×</button>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="toolbar-title">
+      <span class="icon">↗</span>
+      Dettaglio costi
+    </div>
+    <div class="toolbar-right">
+      <button class="btn btn-sm">Espandi Tutto</button>
+      <button class="btn btn-sm">Comprimi Tutto</button>
+      <div class="separator"></div>
+      <button class="btn btn-sm">⬇ Esporta</button>
+    </div>
+  </div>
+
+  <!-- SCENARIO BAR (attiva) -->
+  <div class="scenario-bar">
+    <span class="scenario-bar-label">Scenario</span>
+
+    <select class="scenario-select" onchange="toggleScenario(this)">
+      <option value="none">— Nessuno (Ufficiale)</option>
+      <option value="sim1" selected>Simulazione target 2026</option>
+      <option value="sim2">Fornitore alternativo lamiera</option>
+    </select>
+
+    <span class="scenario-badge"><span class="dot"></span>Bozza</span>
+    <span class="scenario-info">Creato da M. Rossi · 21/02/2026 · 3 modifiche</span>
+
+    <div class="scenario-bar-actions">
+      <button class="btn btn-sm">+ Nuovo Scenario</button>
+      <button class="btn btn-sm btn-success" onclick="showPromote()">✓ Promuovi a Ufficiale</button>
+    </div>
+  </div>
+
+  <!-- PROMOTE HINT -->
+  <div class="promote-hint" id="promoteHint" style="display:none; margin-top:12px;">
+    <span class="icon">ℹ️</span>
+    <div>
+      <strong>Promozione scenario:</strong> La BOM <code>00000000000RE2</code> è già esportata in ERP.
+      Promuovendo questo scenario verrà creata una <strong>nuova versione BOM</strong> con i valori simulati.
+      La versione attuale resterà invariata e tracciata.
+      <br><br>
+      Riepilogo modifiche: <strong>2 componenti modificati</strong> · <strong>1 riga aggiunta</strong> · <strong>1 operazione modificata</strong>
+      <br><br>
+      <button class="btn btn-success btn-sm" style="margin-top:4px">Conferma e crea nuova versione</button>
+      <button class="btn btn-sm" style="margin-top:4px; margin-left:6px" onclick="document.getElementById('promoteHint').style.display='none'">Annulla</button>
+    </div>
+  </div>
+
+  <!-- COST SUMMARY -->
+  <div class="cost-summary">
+    <div class="cost-summary-header">
+      <span class="bom-code">00000000000RE2</span>
+      <div class="total-row">
+        <span class="total-official" style="text-decoration: line-through; color: #9ca3af; font-size:16px">97,33 €</span>
+        <span style="color: var(--text-muted); font-size:14px">→</span>
+        <span class="total-scenario">83,71 €</span>
+        <span class="total-delta">−13,62 € (−14%)</span>
+        <span style="font-size:11px; color: var(--text-muted); margin-left:4px">scenario attivo</span>
+      </div>
+    </div>
+
+    <div class="cost-cards">
+      <div class="cost-card mat">
+        <div class="cost-card-label">Materiali</div>
+        <div class="cost-card-official" style="text-decoration:line-through; color:#9ca3af">14,20 €</div>
+        <div class="cost-card-scenario">11,80 €</div>
+        <div class="cost-card-delta">−2,40 € (−17%)</div>
+      </div>
+      <div class="cost-card ops">
+        <div class="cost-card-label">Operazioni</div>
+        <div class="cost-card-official" style="text-decoration:line-through; color:#9ca3af">36,25 €</div>
+        <div class="cost-card-scenario">31,00 €</div>
+        <div class="cost-card-delta">−5,25 € (−14%)</div>
+      </div>
+      <div class="cost-card fix">
+        <div class="cost-card-label">Fissi</div>
+        <div class="cost-card-official" style="text-decoration:line-through; color:#9ca3af">4,63 €</div>
+        <div class="cost-card-scenario">3,21 €</div>
+        <div class="cost-card-delta">−1,42 € (−31%)</div>
+      </div>
+      <div class="cost-card ric">
+        <div class="cost-card-label">Ricarichi</div>
+        <div class="cost-card-official" style="text-decoration:line-through; color:#9ca3af">42,25 €</div>
+        <div class="cost-card-scenario">38,10 €</div>
+        <div class="cost-card-delta">−4,15 € (−10%)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <div class="search-bar">
+    <input class="search-input" type="text" placeholder="Cerca componenti o cicli...">
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="min-width:280px">Componente / Operazione</th>
+          <th>Q.tà</th>
+          <th>UM</th>
+          <th>Lotto</th>
+          <th>Costo Unit.</th>
+          <th>C. Fissi</th>
+          <th>C. Variabile</th>
+          <th>Tempo Totale</th>
+          <th class="scenario-col">Q.tà Sc.</th>
+          <th class="scenario-col">Costo Sc.</th>
+          <th class="scenario-col">C. Fissi Sc.</th>
+          <th class="scenario-col" title="(Costo Sc. × Q.tà Sc.) − (Costo × Q.tà)">Δ Variabile</th>
+          <th class="scenario-col" title="(Costo Sc. × Q.tà Sc. × Lotto) − (Costo × Q.tà × Lotto) + Fisso Sc. − Fisso Uff.">Δ Totale</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- ROOT -->
+        <tr class="row-l1">
+          <td>
+            <div class="component-name">
+              <span>▾ 🏠</span>
+              <span class="mono" style="font-weight:600">00000000000RE2</span>
+              <em style="font-size:11px; color:var(--text-muted)">Spina Birra Doppio</em>
+              <span class="type-badge badge-pf">PF</span>
+            </div>
+          </td>
+          <td class="mono">1</td>
+          <td>NR</td>
+          <td class="mono">100</td>
+          <td class="mono cost-ok">0,00 €</td>
+          <td>–</td>
+          <td class="mono" style="font-weight:700; color:var(--blue)">0,00 €</td>
+          <td>–</td>
+          <td class="scenario-col">–</td>
+          <td class="scenario-col">–</td>
+          <td class="scenario-col">–</td>
+          <td class="scenario-col">–</td>
+          <td class="scenario-col">–</td>
+          <td></td>
+        </tr>
+
+        <!-- OP FIN-000 — MODIFICATA -->
+        <tr class="row-l2 row-modified">
+          <td>
+            <div class="component-name" style="padding-left:20px">
+              <span class="icon-type icon-op">⚙</span>
+              <span style="color:#065f46; font-size:12px">FIN-000</span>
+              <span style="color:var(--text-muted); font-size:11px">(Costa – pulitura/lucidatura)</span>
+            </div>
+          </td>
+          <td class="mono">1</td>
+          <td>–</td>
+          <td class="mono">100</td>
+          <td class="mono">20,00 €</td>
+          <td class="mono cost-highlight">60,00 €</td>
+          <td class="mono">20,00 €</td>
+          <td>33h 20m</td>
+          <td class="scenario-col sc-cell"><input class="sc-input" value="0.80" title="Qty operazione scenario"></td>
+          <td class="scenario-col sc-cell"><input class="sc-input" value="18,00 €"></td>
+          <td class="scenario-col sc-cell"><input class="sc-input" value="50,00 €" style="border-color:#d97706"></td>
+          <td class="scenario-col delta-cell delta-neg" title="(18×0.80)−(20×1)">−5,60 €</td>
+          <td class="scenario-col delta-cell delta-neg" title="(18×0.80×100)−(20×1×100)+(50−60)">−570,00 €</td>
+          <td><button class="row-action-btn">Rimuovi ov.</button></td>
+        </tr>
+
+        <!-- TMP0010000000060 — invariato -->
+        <tr class="row-l2">
+          <td>
+            <div class="component-name" style="padding-left:20px">
+              <span>▾</span>
+              <span class="icon-type icon-semi">◈</span>
+              <span>TMP0010000000060</span>
+              <em style="color:var(--text-muted); font-size:11px">Saldato</em>
+            </div>
+          </td>
+          <td class="mono">1.000</td>
+          <td>NR</td>
+          <td class="mono">1</td>
+          <td class="mono">0,00 €</td>
+          <td class="mono cost-highlight">62,50 €</td>
+          <td class="mono">6,25 €</td>
+          <td>–</td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td><button class="row-action-btn">+ Override</button></td>
+        </tr>
+
+        <!-- SLD-000 — MODIFICATA qta -->
+        <tr class="row-l3 row-modified">
+          <td>
+            <div class="component-name" style="padding-left:36px">
+              <span class="icon-type icon-op">⚙</span>
+              <span style="color:#065f46">SLD-000</span>
+              <span style="color:var(--text-muted); font-size:11px">(CBL COlceresa – ex Conofer)</span>
+            </div>
+          </td>
+          <td class="mono">1</td>
+          <td>–</td>
+          <td class="mono">1</td>
+          <td class="mono">6,25 €</td>
+          <td class="mono cost-highlight">62,50 €</td>
+          <td class="mono">6,25 €</td>
+          <td>15m 0s</td>
+          <td class="scenario-col sc-cell"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col sc-cell"><input class="sc-input" value="5,00 €"></td>
+          <td class="scenario-col sc-cell"><input class="sc-input" value="50,00 €" style="border-color:#d97706"></td>
+          <td class="scenario-col delta-cell delta-neg" title="(5×1)−(6.25×1)">−1,25 €</td>
+          <td class="scenario-col delta-cell delta-neg" title="(5×1×1)−(6.25×1×1)+(50−62.50)">−13,75 €</td>
+          <td><button class="row-action-btn">Rimuovi ov.</button></td>
+        </tr>
+
+        <!-- TMP0010000000061 — invariato -->
+        <tr class="row-l2">
+          <td>
+            <div class="component-name" style="padding-left:20px">
+              <span>▾</span>
+              <span class="icon-type icon-semi">◈</span>
+              <span>TMP0010000000061</span>
+              <em style="color:var(--text-muted); font-size:11px">Guscio 1 – retro</em>
+            </div>
+          </td>
+          <td class="mono">1.000</td>
+          <td>NR</td>
+          <td class="mono">1</td>
+          <td class="mono">0,00 €</td>
+          <td>–</td>
+          <td class="mono">0,00 €</td>
+          <td>–</td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td><button class="row-action-btn">+ Override</button></td>
+        </tr>
+
+        <!-- STM-000 -->
+        <tr class="row-l3">
+          <td>
+            <div class="component-name" style="padding-left:36px">
+              <span class="icon-type icon-op">⚙</span>
+              <span style="color:#065f46">STM-000</span>
+              <span style="color:var(--text-muted); font-size:11px">(E-MENEG)</span>
+            </div>
+          </td>
+          <td class="mono">1</td><td>–</td><td class="mono">1</td>
+          <td class="mono">2,00 €</td>
+          <td class="mono cost-highlight">120,00 €</td>
+          <td class="mono">2,00 €</td>
+          <td>2m 0s</td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td><button class="row-action-btn">+ Override</button></td>
+        </tr>
+
+        <!-- LAMCBL01 — MODIFICATA costo -->
+        <tr class="row-l3 row-modified">
+          <td>
+            <div class="component-name" style="padding-left:36px">
+              <span class="icon-type icon-buy">🛒</span>
+              LAMCBL01
+              <em style="color:var(--text-muted); font-size:11px">Lamiera tagliata e mP CBL</em>
+            </div>
+          </td>
+          <td class="mono">1.000</td><td>NR</td><td class="mono">1</td>
+          <td class="mono">7,10 €</td>
+          <td class="mono cost-highlight">50,00 €</td>
+          <td class="mono">7,10 €</td>
+          <td>–</td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col sc-cell"><input class="sc-input" value="5,80 €"></td>
+          <td class="scenario-col sc-cell"><input class="sc-input" value="40,00 €" style="border-color:#d97706"></td>
+          <td class="scenario-col delta-cell delta-neg" title="(5.80×1)−(7.10×1)">−1,30 €</td>
+          <td class="scenario-col delta-cell delta-neg" title="(5.80×1×1)−(7.10×1×1)+(40−50)">−11,30 €</td>
+          <td><button class="row-action-btn">Rimuovi ov.</button></td>
+        </tr>
+
+        <!-- TMP0010000000062 -->
+        <tr class="row-l2">
+          <td>
+            <div class="component-name" style="padding-left:20px">
+              <span>▾</span>
+              <span class="icon-type icon-semi">◈</span>
+              <span>TMP0010000000062</span>
+              <em style="color:var(--text-muted); font-size:11px">Guscio 2 Fronte con 3 vie</em>
+            </div>
+          </td>
+          <td class="mono">1.000</td><td>NR</td><td class="mono">1</td>
+          <td class="mono">0,00 €</td><td>–</td>
+          <td class="mono">0,00 €</td><td>–</td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td><button class="row-action-btn">+ Override</button></td>
+        </tr>
+
+        <!-- STM-000 L3 -->
+        <tr class="row-l3">
+          <td>
+            <div class="component-name" style="padding-left:36px">
+              <span class="icon-type icon-op">⚙</span>
+              <span style="color:#065f46">STM-000</span>
+              <span style="color:var(--text-muted); font-size:11px">(E-MENEG)</span>
+            </div>
+          </td>
+          <td class="mono">1</td><td>–</td><td class="mono">1</td>
+          <td class="mono">8,00 €</td>
+          <td class="mono cost-highlight">120,00 €</td>
+          <td class="mono">8,00 €</td>
+          <td>8m 0s</td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td><button class="row-action-btn">+ Override</button></td>
+        </tr>
+
+        <!-- LAMCBL01 L3 invariata -->
+        <tr class="row-l3">
+          <td>
+            <div class="component-name" style="padding-left:36px">
+              <span class="icon-type icon-buy">🛒</span>
+              LAMCBL01
+              <em style="color:var(--text-muted); font-size:11px">Lamiera tagliata e mP CBL</em>
+            </div>
+          </td>
+          <td class="mono">1.000</td><td>NR</td><td class="mono">1</td>
+          <td class="mono">7,10 €</td>
+          <td class="mono cost-highlight">50,00 €</td>
+          <td class="mono">7,10 €</td>
+          <td>–</td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col"><span class="sc-unchanged">=</span></td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td class="scenario-col delta-cell" style="color:var(--text-muted)">—</td>
+          <td><button class="row-action-btn">+ Override</button></td>
+        </tr>
+
+        <!-- RIGA AGGIUNTA nello scenario -->
+        <tr class="row-l3 row-added">
+          <td>
+            <div class="component-name" style="padding-left:36px">
+              <span class="icon-type icon-buy" style="background:#d1fae5; color:#065f46">+</span>
+              <span style="color:var(--green); font-weight:600">LAMCBL02</span>
+              <em style="color:var(--text-muted); font-size:11px">Lamiera alternativa (scenario)</em>
+              <span class="type-badge" style="background:var(--green-light); color:var(--green)">+AGGIUNTA</span>
+            </div>
+          </td>
+          <td class="mono">0.800</td><td>NR</td><td class="mono">1</td>
+          <td class="mono" style="color:var(--text-muted)">0,00 €</td>
+          <td>–</td>
+          <td class="mono" style="color:var(--text-muted)">0,00 €</td>
+          <td>–</td>
+          <td class="scenario-col sc-cell"><input class="sc-input" value="0.800"></td>
+          <td class="scenario-col sc-cell"><input class="sc-input" value="4,20 €"></td>
+          <td class="scenario-col sc-cell"><input class="sc-input" value="0,00 €" style="border-color:#d97706"></td>
+          <td class="scenario-col delta-cell delta-pos" title="(4.20×0.800)−(0×0)">+3,36 €</td>
+          <td class="scenario-col delta-cell delta-pos" title="(4.20×0.800×1)−0+(0−0)">+3,36 €</td>
+          <td><button class="row-action-btn" style="color:var(--red)">Rimuovi</button></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <div class="legend">
+    <span style="font-weight:600; color:var(--text)">Legenda scenario:</span>
+    <span class="legend-item">
+      <span class="legend-dot" style="background:var(--modified)"></span>
+      Valore modificato
+    </span>
+    <span class="legend-item">
+      <span class="legend-dot" style="background:var(--added)"></span>
+      Riga aggiunta
+    </span>
+    <span class="legend-item">
+      <span class="legend-dot" style="background:var(--removed)"></span>
+      Riga rimossa
+    </span>
+    <span class="legend-item">
+      <span style="font-family:var(--mono); font-size:11px; color:var(--text-muted)">=</span>
+      &nbsp;Invariato (usa valore ufficiale)
+    </span>
+    <span class="legend-item" style="margin-left:8px">
+      <span style="display:inline-block; width:10px; height:10px; border-radius:2px; border:1.5px solid #d97706; margin-right:3px"></span>
+      C. Fissi Sc.
+    </span>
+    <span style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:2px">
+      <span style="color:var(--text-muted)">4 override attivi · Δ totale scenario: <strong style="color:var(--green)">−13,62 €</strong></span>
+      <span class="formula-note">ΔVar = (CostoSc×QtaSc)−(Costo×Qta) &nbsp;|&nbsp; ΔTot = ΔVar×Lotto + FissoSc − FissoUff</span>
+    </span>
+  </div>
+
+</div>
+
+<script>
+function toggleScenario(sel) {
+  const bar = document.querySelector('.scenario-bar');
+  const scenarioCols = document.querySelectorAll('.scenario-col');
+  if (sel.value === 'none') {
+    bar.style.background = '#f4f5f7';
+    bar.style.borderBottomColor = '#e2e5ea';
+    scenarioCols.forEach(c => c.style.display = 'none');
+  } else {
+    bar.style.background = 'var(--scenario-bg)';
+    bar.style.borderBottomColor = 'var(--blue-mid)';
+    scenarioCols.forEach(c => c.style.display = '');
+  }
+}
+
+function showPromote() {
+  const hint = document.getElementById('promoteHint');
+  hint.style.display = hint.style.display === 'none' ? 'flex' : 'none';
+}
+</script>
+
+</body>
+</html>

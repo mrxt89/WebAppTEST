@@ -74,6 +74,8 @@ const BOMDetailPanel = () => {
         <TabsContent value="costingParams" className="flex-1 p-0 m-0 overflow-auto">
           <TabCostingParameters />
         </TabsContent>
+
+
       </Tabs>
     </div>
   );

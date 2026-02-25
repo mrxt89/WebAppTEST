@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +45,13 @@ const COLUMN_WIDTHS = {
   setupTime: "6%",
   workCenter: "5%",
 };
+
+// Larghezze colonne scenario (aggiuntive, fixed px)
+const SC_W  = '72px'; // colonna input scenario
+const DLT_W = '72px'; // colonna delta
+
+// Converte stringa → numero o null (per i form override)
+const toNum = (v) => (v === '' || v == null) ? null : Number(v);
 
 const getLevelColor = (level) => {
   const LEVEL_COLORS = [
@@ -133,7 +140,7 @@ const NodeIcon = ({ node, isRootNode }) => {
 };
 
 // Componente per un nodo ciclo
-const CycleNode = ({ cycle, level }) => {
+const CycleNode = ({ cycle, level, activeScenario, onUpsertOverride }) => {
   const baseIndent = 8;
   const indentPerLevel = 24;
   const indent = level * indentPerLevel + baseIndent;
@@ -149,6 +156,46 @@ const CycleNode = ({ cycle, level }) => {
   const totalProcessingSeconds = processingSeconds * productionLot;
   const variableCost = unitCost * quantity;
 
+  // ── Scenario override per ciclo ───────────────────────────────────────────
+  const cycleOverride = useMemo(() => {
+    if (!activeScenario?.details) return null;
+    return activeScenario.details.find(d =>
+      d.RowType === 'R' &&
+      String(d.BOMId_Rt) === String(cycle.BOMId) &&
+      Number(d.RtgStep) === Number(cycle.RtgStep)
+    ) || null;
+  }, [activeScenario, cycle.BOMId, cycle.RtgStep]);
+
+  const [scProc,  setScProc]  = useState('');
+  const [scSetup, setScSetup] = useState('');
+  const [scQty,   setScQty]   = useState('');
+
+  useEffect(() => {
+    setScProc (cycleOverride?.ProcessingTime_Sc != null ? String(cycleOverride.ProcessingTime_Sc) : '');
+    setScSetup(cycleOverride?.SetupTime_Sc      != null ? String(cycleOverride.SetupTime_Sc)      : '');
+    setScQty  (cycleOverride?.Qty_Sc            != null ? String(cycleOverride.Qty_Sc)            : '');
+  }, [cycleOverride]);
+
+  const saveCycleOverride = () => {
+    if (!onUpsertOverride || !cycle.BOMId || cycle.RtgStep == null) return;
+    console.group('%c[Scenario Ciclo] ' + operationName, 'color:#16a34a;font-weight:bold');
+    console.table({
+      'T. Ciclo (s)': { Originale: processingSeconds, Scenario: toNum(scProc) ?? '(invariato)' },
+      'T. Setup (s)': { Originale: setupSeconds,      Scenario: toNum(scSetup) ?? '(invariato)' },
+      'Qtà':          { Originale: quantity,           Scenario: toNum(scQty)  ?? '(invariata)' },
+    });
+    console.info('Δ costo cicli calcolato server-side (SP_CalculateBOMCosting con @ScenarioId)');
+    console.groupEnd();
+    onUpsertOverride({
+      RowType:           'R',
+      BOMId_Rt:          cycle.BOMId,
+      RtgStep:           cycle.RtgStep,
+      ProcessingTime_Sc: toNum(scProc),
+      SetupTime_Sc:      toNum(scSetup),
+      Qty_Sc:            toNum(scQty),
+    });
+  };
+
   return (
     <div>
       <div
@@ -158,7 +205,7 @@ const CycleNode = ({ cycle, level }) => {
           backgroundColor: level > 0 ? `${getLevelColor(level)}05` : undefined
         }}
       >
-        {level > 0 && (
+        {level > 0 ? (
           <div
             className="flex items-center justify-center w-4 h-4 mr-2 text-xs font-medium rounded-full flex-shrink-0"
             style={{
@@ -170,11 +217,13 @@ const CycleNode = ({ cycle, level }) => {
           >
             {level}
           </div>
+        ) : (
+          <div className="w-4 h-4 mr-2 flex-shrink-0" />
         )}
 
         <div className="w-3 mr-1" />
 
-        <Factory className="h-4 w-4 text-green-600 mr-2 flex-shrink-0" />
+        <Factory className="h-4 w-4 text-green-600 flex-shrink-0" />
 
         <div className="flex-1 flex items-center ml-2 min-w-0">
           <div
@@ -231,6 +280,58 @@ const CycleNode = ({ cycle, level }) => {
           >
             {workCenter || '-'}
           </div>
+
+          {/* ── Colonne scenario ─────────────────────────────────────────── */}
+          {activeScenario && (
+            <>
+              {/* T.Ciclo Sc. (sec) */}
+              <div className="flex-shrink-0 px-1" style={{ width: SC_W }}>
+                <input
+                  type="number" min="0" step="1"
+                  placeholder="="
+                  className={`w-full text-right text-[11px] border rounded px-1 py-0.5 font-mono
+                    ${scProc !== '' ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                  value={scProc}
+                  onChange={e => setScProc(e.target.value)}
+                  onBlur={saveCycleOverride}
+                  onClick={e => e.stopPropagation()}
+                  title="T. Ciclo Sc. (secondi)"
+                />
+              </div>
+              {/* T.Setup Sc. (sec) */}
+              <div className="flex-shrink-0 px-1" style={{ width: SC_W }}>
+                <input
+                  type="number" min="0" step="1"
+                  placeholder="="
+                  className={`w-full text-right text-[11px] border rounded px-1 py-0.5 font-mono
+                    ${scSetup !== '' ? 'border-amber-400 bg-amber-50 text-amber-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                  value={scSetup}
+                  onChange={e => setScSetup(e.target.value)}
+                  onBlur={saveCycleOverride}
+                  onClick={e => e.stopPropagation()}
+                  title="T. Setup Sc. (secondi)"
+                />
+              </div>
+              {/* Qty Sc. */}
+              <div className="flex-shrink-0 px-1" style={{ width: SC_W }}>
+                <input
+                  type="number" min="0" step="any"
+                  placeholder="="
+                  className={`w-full text-right text-[11px] border rounded px-1 py-0.5 font-mono
+                    ${scQty !== '' ? 'border-green-400 bg-green-50 text-green-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                  value={scQty}
+                  onChange={e => setScQty(e.target.value)}
+                  onBlur={saveCycleOverride}
+                  onClick={e => e.stopPropagation()}
+                  title="Qty Sc."
+                />
+              </div>
+              {/* Δ Var — non calcolabile client-side per i cicli */}
+              <div className="flex-shrink-0 text-right text-[11px] text-gray-300 font-mono" style={{ width: DLT_W }}>—</div>
+              {/* Δ Tot */}
+              <div className="flex-shrink-0 text-right text-[11px] text-gray-300 font-mono" style={{ width: DLT_W }}>—</div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -299,7 +400,7 @@ const calculateChildrenCost = (node, parentLot = 100) => {
 };
 
 // Componente per un nodo componente
-const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery }) => {
+const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery, activeScenario, onUpsertOverride }) => {
   // MIGLIORATO: Sistema di indentazione progressivo
   // Calcola l'indentazione in base al livello del nodo
   const baseIndent = 8; // Indentazione base in pixel
@@ -383,6 +484,76 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
   const nodeDesc = node.data.ComponentItemDescription || node.data.Description || node.data.ComponentDescription || '';
   const nodeText = nodeCode ? `${nodeCode} - ${nodeDesc}` : nodeDesc;
 
+  // ── Scenario override per componente ─────────────────────────────────────
+  const compOverride = useMemo(() => {
+    if (!activeScenario?.details || !node.data.Path) return null;
+    return activeScenario.details.find(d =>
+      d.RowType === 'C' && d.AncestralPath === node.data.Path
+    ) || null;
+  }, [activeScenario, node.data.Path]);
+
+  const [scQtyC,   setScQtyC]   = useState('');
+  const [scCostC,  setScCostC]  = useState('');
+  const [scFixedC, setScFixedC] = useState('');
+
+  useEffect(() => {
+    setScQtyC  (compOverride?.Quantity_Sc   != null ? String(compOverride.Quantity_Sc)   : '');
+    setScCostC (compOverride?.UnitCost_Sc   != null ? String(compOverride.UnitCost_Sc)   : '');
+    setScFixedC(compOverride?.FixedCost_Sc  != null ? String(compOverride.FixedCost_Sc)  : '');
+  }, [compOverride]);
+
+  const saveCompOverride = () => {
+    if (!onUpsertOverride || !node.data.Path) return;
+
+    // ── Debug calcoli scenario ──────────────────────────────────────────────
+    const origQty   = node.data.Quantity ?? 1;
+    const effQtyDbg   = scQtyNum  ?? origQty;
+    const effCostDbg  = scCostNum ?? ownUnitCost;
+    const effFixedDbg = scFixedNum ?? ownFixedCost;
+    const dvVar = (effCostDbg * effQtyDbg) - (ownUnitCost * origQty);
+    const dvTot = dvVar * lot + (effFixedDbg - ownFixedCost);
+    console.group('%c[Scenario Componente] ' + (nodeCode || node.data.Path), 'color:#2563eb;font-weight:bold');
+    console.table({
+      'Qtà':             { Originale: origQty,        Scenario: scQtyNum  ?? '(invariata)', Effettivo: effQtyDbg },
+      'Costo Unit. (€)': { Originale: ownUnitCost,    Scenario: scCostNum ?? '(invariato)', Effettivo: effCostDbg },
+      'C. Fissi (€)':    { Originale: ownFixedCost,   Scenario: scFixedNum ?? '(invariato)', Effettivo: effFixedDbg },
+      'Lotto':           { Originale: lot,             Scenario: lot,                         Effettivo: lot },
+    });
+    console.log('Δ Variabile = (costoSc × qtàSc) − (costoOrig × qtàOrig) =',
+      `(${effCostDbg.toFixed(4)} × ${effQtyDbg}) − (${ownUnitCost.toFixed(4)} × ${origQty})`,
+      '=', dvVar.toFixed(4), '€');
+    console.log('Δ Totale    = ΔVar × lotto + (fissiSc − fissiOrig) =',
+      `${dvVar.toFixed(4)} × ${lot} + (${effFixedDbg.toFixed(4)} − ${ownFixedCost.toFixed(4)})`,
+      '=', dvTot.toFixed(4), '€');
+    console.groupEnd();
+    // ────────────────────────────────────────────────────────────────────────
+
+    onUpsertOverride({
+      RowType:      'C',
+      AncestralPath: node.data.Path,
+      Quantity_Sc:  toNum(scQtyC),
+      UnitCost_Sc:  toNum(scCostC),
+      FixedCost_Sc: toNum(scFixedC),
+    });
+  };
+
+  // Delta calcolato lato client (solo per foglie senza figli componente)
+  const scQtyNum   = scQtyC   !== '' ? Number(scQtyC)   : null;
+  const scCostNum  = scCostC  !== '' ? Number(scCostC)  : null;
+  const scFixedNum = scFixedC !== '' ? Number(scFixedC) : null;
+
+  const effQty   = scQtyNum   ?? (node.data.Quantity ?? 1);
+  const effCost  = scCostNum  ?? ownUnitCost;
+  const effFixed = scFixedNum ?? ownFixedCost;
+  const lot      = node.data.ProductionLot || node.data.BOMProductionLot || 1;
+
+  const deltaVar = (compOverride && !hasComponentChildren)
+    ? (effCost * effQty) - (ownUnitCost * (node.data.Quantity ?? 1))
+    : null;
+  const deltaTot = deltaVar !== null
+    ? deltaVar * lot + effFixed - ownFixedCost
+    : null;
+
   // Evidenzia il testo in base alla ricerca
   const highlightText = (text) => {
     if (!searchQuery) return text;
@@ -409,8 +580,8 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
         }}
         onClick={onToggle}
       >
-        {/* NUOVO: Numero del livello a sinistra */}
-        {level > 0 && (
+        {/* Numero del livello a sinistra — o spacer per il livello 0 */}
+        {level > 0 ? (
           <div
             className="flex items-center justify-center w-4 h-4 mr-2 text-xs font-medium rounded-full flex-shrink-0"
             style={{
@@ -422,6 +593,8 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
           >
             {level}
           </div>
+        ) : (
+          <div className="w-4 h-4 mr-2 flex-shrink-0" />
         )}
 
         {/* Toggle icon */}
@@ -506,6 +679,86 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
           <div className="text-xs text-gray-500 text-left flex-shrink-0" style={{ width: COLUMN_WIDTHS.workCenter }}>
             -
           </div>
+
+          {/* ── Colonne scenario ─────────────────────────────────────────── */}
+          {activeScenario && (
+            <>
+              {/* Q.tà Sc. */}
+              <div className="flex-shrink-0 px-1" style={{ width: SC_W }}>
+                {isRootNode ? (
+                  <span className="text-[11px] text-gray-200 font-mono">—</span>
+                ) : (
+                  <input
+                    type="number" min="0" step="any"
+                    placeholder="="
+                    className={`w-full text-right text-[11px] border rounded px-1 py-0.5 font-mono
+                      ${scQtyC !== '' ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                    value={scQtyC}
+                    onChange={e => setScQtyC(e.target.value)}
+                    onBlur={saveCompOverride}
+                    onClick={e => e.stopPropagation()}
+                    title="Quantità Scenario"
+                  />
+                )}
+              </div>
+              {/* Costo Unit. Sc. (€) */}
+              <div className="flex-shrink-0 px-1" style={{ width: SC_W }}>
+                {isRootNode ? (
+                  <span className="text-[11px] text-gray-200 font-mono">—</span>
+                ) : (
+                  <input
+                    type="number" min="0" step="any"
+                    placeholder="="
+                    className={`w-full text-right text-[11px] border rounded px-1 py-0.5 font-mono
+                      ${scCostC !== '' ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                    value={scCostC}
+                    onChange={e => setScCostC(e.target.value)}
+                    onBlur={saveCompOverride}
+                    onClick={e => e.stopPropagation()}
+                    title="Costo Unitario Scenario (€)"
+                  />
+                )}
+              </div>
+              {/* C. Fissi Sc. (€) */}
+              <div className="flex-shrink-0 px-1" style={{ width: SC_W }}>
+                {isRootNode ? (
+                  <span className="text-[11px] text-gray-200 font-mono">—</span>
+                ) : (
+                  <input
+                    type="number" min="0" step="any"
+                    placeholder="="
+                    className={`w-full text-right text-[11px] border rounded px-1 py-0.5 font-mono
+                      ${scFixedC !== '' ? 'border-amber-400 bg-amber-50 text-amber-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                    value={scFixedC}
+                    onChange={e => setScFixedC(e.target.value)}
+                    onBlur={saveCompOverride}
+                    onClick={e => e.stopPropagation()}
+                    title="Costo Fisso Scenario (€)"
+                  />
+                )}
+              </div>
+              {/* Δ Var */}
+              <div className="flex-shrink-0 text-right text-[11px] font-mono pr-1" style={{ width: DLT_W }}>
+                {deltaVar !== null ? (
+                  <span className={Math.abs(deltaVar) < 0.001 ? 'text-gray-400' : deltaVar < 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                    {deltaVar > 0 ? '+' : ''}{formatCurrency(deltaVar)}
+                  </span>
+                ) : (
+                  <span className="text-gray-200">—</span>
+                )}
+              </div>
+              {/* Δ Tot */}
+              <div className="flex-shrink-0 text-right text-[11px] font-mono pr-1" style={{ width: DLT_W }}>
+                {deltaTot !== null ? (
+                  <span className={Math.abs(deltaTot) < 0.001 ? 'text-gray-400' : deltaTot < 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                    {deltaTot > 0 ? '+' : ''}{formatCurrency(deltaTot)}
+                  </span>
+                ) : (
+                  <span className="text-gray-200">—</span>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -517,11 +770,18 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery 
 };
 
 // Componente principale TreeNode ricorsivo
-const TreeNode = ({ node, level = 0, expandedNodes, onToggle, searchQuery }) => {
+const TreeNode = ({ node, level = 0, expandedNodes, onToggle, searchQuery, activeScenario, onUpsertOverride, onDeleteOverride }) => {
   const isExpanded = expandedNodes.has(node.id);
 
   if (node.type === "cycle") {
-    return <CycleNode cycle={node.data} level={level} />;
+    return (
+      <CycleNode
+        cycle={node.data}
+        level={level}
+        activeScenario={activeScenario}
+        onUpsertOverride={onUpsertOverride}
+      />
+    );
   }
 
   // Render component node con eventuali figli
@@ -532,6 +792,9 @@ const TreeNode = ({ node, level = 0, expandedNodes, onToggle, searchQuery }) => 
       expanded={isExpanded}
       onToggle={() => onToggle(node.id)}
       searchQuery={searchQuery}
+      activeScenario={activeScenario}
+      onUpsertOverride={onUpsertOverride}
+      onDeleteOverride={onDeleteOverride}
     >
       {node.children && node.children.length > 0 && (
         <div>
@@ -543,6 +806,9 @@ const TreeNode = ({ node, level = 0, expandedNodes, onToggle, searchQuery }) => 
               expandedNodes={expandedNodes}
               onToggle={onToggle}
               searchQuery={searchQuery}
+              activeScenario={activeScenario}
+              onUpsertOverride={onUpsertOverride}
+              onDeleteOverride={onDeleteOverride}
             />
           ))}
         </div>
@@ -555,7 +821,7 @@ const TreeNode = ({ node, level = 0, expandedNodes, onToggle, searchQuery }) => 
  * Componente per visualizzare la struttura ad albero dei costi BOM
  * Utilizza la stessa logica grafica della BOMTreeView ma con i dati di costificazione
  */
-const CostTreeView = ({ costingResult }) => {
+const CostTreeView = ({ costingResult, activeScenario, onUpsertOverride, onDeleteOverride }) => {
   const [expandedNodes, setExpandedNodes] = useState(new Set(['root']));
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1404,10 +1670,10 @@ const CostTreeView = ({ costingResult }) => {
         </div>
 
         {/* Header colonne */}
-        <div className="flex items-center text-xs font-semibold text-gray-600 pb-2 border-b sticky top-0 bg-white z-10">
-          <div className="w-8"></div> {/* Spazio per toggle */}
-          <div className="w-6"></div> {/* Spazio per icona */}
-          <div className="flex-1 flex items-center ml-2">
+        <div className="flex items-center text-xs font-semibold text-gray-600 pb-2 border-b sticky top-0 bg-white z-10 px-2">
+          <div className="w-8"></div> {/* Spazio badge (w-4+mr-2=24px) + toggle (w-3+mr-1=12+4=16px) = 56px tot */}
+          <div className="w-6"></div> {/* Spazio icona (w-4=16px) */}
+          <div className="flex-1 flex items-center ml-2 min-w-0">
             <div style={{ width: COLUMN_WIDTHS.name }}>Componente / Operazione</div>
             <div style={{ width: COLUMN_WIDTHS.quantity }} className="text-right">Q.tà</div>
             <div style={{ width: COLUMN_WIDTHS.uom }} className="text-center">UM</div>
@@ -1418,6 +1684,15 @@ const CostTreeView = ({ costingResult }) => {
             <div style={{ width: COLUMN_WIDTHS.totalTime }} className="text-right">Tempo Totale</div>
             <div style={{ width: COLUMN_WIDTHS.setupTime }} className="text-right">Setup</div>
             <div style={{ width: COLUMN_WIDTHS.workCenter }} className="text-left">CDL</div>
+            {activeScenario && (
+              <>
+                <div style={{ width: SC_W }}  className="text-right text-blue-600 px-1">Qty / T.Ciclo Sc.</div>
+                <div style={{ width: SC_W }}  className="text-right text-blue-600 px-1">Costo / T.Setup Sc.</div>
+                <div style={{ width: SC_W }}  className="text-right text-amber-600 px-1">Fisso / Qty Sc.</div>
+                <div style={{ width: DLT_W }} className="text-right text-green-700 pr-1">Δ Var</div>
+                <div style={{ width: DLT_W }} className="text-right text-green-700 pr-1">Δ Tot</div>
+              </>
+            )}
           </div>
         </div>
 
@@ -1432,6 +1707,9 @@ const CostTreeView = ({ costingResult }) => {
                 expandedNodes={expandedNodes}
                 onToggle={toggleNode}
                 searchQuery={searchQuery}
+                activeScenario={activeScenario}
+                onUpsertOverride={onUpsertOverride}
+                onDeleteOverride={onDeleteOverride}
               />
             ))
           ) : (
