@@ -3,6 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
 import {
   ChevronDown,
   ChevronRight,
@@ -20,7 +24,8 @@ import {
   Search,
   Download,
   FileSpreadsheet,
-  Info
+  Info,
+  MessageSquare,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -165,11 +170,15 @@ const CycleNode = ({ cycle, level, activeScenario, onUpsertOverride }) => {
   const [scProc,  setScProc]  = useState('');
   const [scSetup, setScSetup] = useState('');
   const [scQty,   setScQty]   = useState('');
+  const [scNoteR, setScNoteR] = useState('');
+  const [noteOpenR, setNoteOpenR] = useState(false);
+  const [localNoteR, setLocalNoteR] = useState('');
 
   useEffect(() => {
     setScProc (cycleOverride?.ProcessingTime_Sc != null ? String(cycleOverride.ProcessingTime_Sc) : '');
     setScSetup(cycleOverride?.SetupTime_Sc      != null ? String(cycleOverride.SetupTime_Sc)      : '');
     setScQty  (cycleOverride?.Qty_Sc            != null ? String(cycleOverride.Qty_Sc)            : '');
+    setScNoteR(cycleOverride?.Notes ?? '');
   }, [cycleOverride]);
 
   const saveCycleOverride = () => {
@@ -189,6 +198,7 @@ const CycleNode = ({ cycle, level, activeScenario, onUpsertOverride }) => {
       ProcessingTime_Sc: toNum(scProc),
       SetupTime_Sc:      toNum(scSetup),
       Qty_Sc:            toNum(scQty),
+      Notes:             scNoteR || null,
     });
   };
 
@@ -234,6 +244,15 @@ const CycleNode = ({ cycle, level, activeScenario, onUpsertOverride }) => {
             </span>
             {workCenter && (
               <span className="text-xs text-green-600">({workCenter})</span>
+            )}
+            {activeScenario && (
+              <button
+                className={`flex-shrink-0 rounded p-0.5 hover:bg-green-100 transition-colors ${scNoteR ? 'text-amber-500' : 'text-gray-300'}`}
+                title={scNoteR ? scNoteR.substring(0, 120) : 'Aggiungi nota ciclo'}
+                onClick={e => { e.stopPropagation(); setLocalNoteR(scNoteR); setNoteOpenR(true); }}
+              >
+                <MessageSquare className="h-3 w-3" />
+              </button>
             )}
           </div>
 
@@ -325,6 +344,43 @@ const CycleNode = ({ cycle, level, activeScenario, onUpsertOverride }) => {
           </div>
         </div>
       )}
+
+      {/* ── Nota ciclo ──────────────────────────────────────────────────────── */}
+      <Dialog open={noteOpenR} onOpenChange={setNoteOpenR}>
+        <DialogContent className="sm:max-w-sm" onClick={e => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle className="text-sm font-medium flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-green-600" />
+              Nota — {operationName}
+            </DialogTitle>
+          </DialogHeader>
+          <Textarea
+            rows={4}
+            placeholder="Aggiungi una nota a questa operazione..."
+            value={localNoteR}
+            onChange={e => setLocalNoteR(e.target.value)}
+            className="text-sm resize-none"
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setNoteOpenR(false)}>Annulla</Button>
+            <Button size="sm" onClick={() => {
+              const trimmed = localNoteR.trim() || null;
+              setScNoteR(trimmed || '');
+              onUpsertOverride({
+                RowType:           'R',
+                BOMId_Rt:          cycle.BOMId,
+                RtgStep:           cycle.RtgStep,
+                ProcessingTime_Sc: toNum(scProc),
+                SetupTime_Sc:      toNum(scSetup),
+                Qty_Sc:            toNum(scQty),
+                Notes:             trimmed,
+              });
+              setNoteOpenR(false);
+            }}>Salva</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -486,11 +542,15 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery,
   const [scQtyC,   setScQtyC]   = useState('');
   const [scCostC,  setScCostC]  = useState('');
   const [scFixedC, setScFixedC] = useState('');
+  const [scNoteC, setScNoteC]   = useState('');
+  const [noteOpenC, setNoteOpenC] = useState(false);
+  const [localNoteC, setLocalNoteC] = useState('');
 
   useEffect(() => {
     setScQtyC  (compOverride?.Quantity_Sc   != null ? String(compOverride.Quantity_Sc)   : '');
     setScCostC (compOverride?.UnitCost_Sc   != null ? String(compOverride.UnitCost_Sc)   : '');
     setScFixedC(compOverride?.FixedCost_Sc  != null ? String(compOverride.FixedCost_Sc)  : '');
+    setScNoteC (compOverride?.Notes ?? '');
   }, [compOverride]);
 
   const saveCompOverride = () => {
@@ -525,6 +585,7 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery,
       Quantity_Sc:  toNum(scQtyC),
       UnitCost_Sc:  toNum(scCostC),
       FixedCost_Sc: toNum(scFixedC),
+      Notes:        scNoteC || null,
     });
   };
 
@@ -624,7 +685,15 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery,
                 PF
               </Badge>
             )}
-
+            {!isRootNode && activeScenario && (
+              <button
+                className={`flex-shrink-0 rounded p-0.5 hover:bg-blue-100 transition-colors ${scNoteC ? 'text-amber-500' : 'text-gray-300'}`}
+                title={scNoteC ? scNoteC.substring(0, 120) : 'Aggiungi nota componente'}
+                onClick={e => { e.stopPropagation(); setLocalNoteC(scNoteC); setNoteOpenC(true); }}
+              >
+                <MessageSquare className="h-3 w-3" />
+              </button>
+            )}
           </div>
 
           <div className="text-xs text-gray-700 text-right flex-shrink-0" style={{ width: COLUMN_WIDTHS.quantity }}>
@@ -733,6 +802,42 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery,
           </div>
         </div>
       )}
+
+      {/* ── Nota componente ─────────────────────────────────────────────────── */}
+      <Dialog open={noteOpenC} onOpenChange={setNoteOpenC}>
+        <DialogContent className="sm:max-w-sm" onClick={e => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle className="text-sm font-medium flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-blue-600" />
+              Nota — {nodeCode || 'Componente'}
+            </DialogTitle>
+          </DialogHeader>
+          <Textarea
+            rows={4}
+            placeholder="Aggiungi una nota a questo componente..."
+            value={localNoteC}
+            onChange={e => setLocalNoteC(e.target.value)}
+            className="text-sm resize-none"
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setNoteOpenC(false)}>Annulla</Button>
+            <Button size="sm" onClick={() => {
+              const trimmed = localNoteC.trim() || null;
+              setScNoteC(trimmed || '');
+              onUpsertOverride({
+                RowType:      'C',
+                AncestralPath: node.data.Path,
+                Quantity_Sc:  toNum(scQtyC),
+                UnitCost_Sc:  toNum(scCostC),
+                FixedCost_Sc: toNum(scFixedC),
+                Notes:        trimmed,
+              });
+              setNoteOpenC(false);
+            }}>Salva</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Render children */}
       {expanded && children}

@@ -57,12 +57,17 @@ router.post('/', authenticateToken, async (req, res) => {
     try {
         const companyId = req.user.CompanyId;
         const userId    = req.user.UserId;
-        const { bomId, title, description } = req.body;
+        const { bomId, title, description, pathsSnapshot } = req.body;
 
         if (!bomId)  return res.status(400).json({ success: 0, msg: 'bomId obbligatorio' });
         if (!title)  return res.status(400).json({ success: 0, msg: 'title obbligatorio' });
 
-        const result = await createScenario(companyId, userId, bomId, title, description);
+        // pathsSnapshot può essere un array (vecchio formato) o un oggetto {c:[...], r:[...]}
+        const snapshotStr = pathsSnapshot == null
+            ? null
+            : (typeof pathsSnapshot === 'string' ? pathsSnapshot : JSON.stringify(pathsSnapshot));
+
+        const result = await createScenario(companyId, userId, bomId, title, description, snapshotStr);
         res.status(201).json(result);
     } catch (err) {
         res.status(500).json({ success: 0, msg: err.message });

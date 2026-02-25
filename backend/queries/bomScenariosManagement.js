@@ -38,7 +38,7 @@ const getScenarioWithDetails = async (companyId, scenarioId) => {
             .input('CompanyId',  sql.Int,    companyId)
             .input('ScenarioId', sql.BigInt, scenarioId)
             .query(`
-                SELECT Id, CompanyId, BOMId, Title, Description, CreatedBy, CreatedAt
+                SELECT Id, CompanyId, BOMId, Title, Description, CreatedBy, CreatedAt, PathsSnapshot
                 FROM dbo.MA_BOM_Scenarios
                 WHERE CompanyId = @CompanyId AND Id = @ScenarioId;
 
@@ -69,21 +69,25 @@ const getScenarioWithDetails = async (companyId, scenarioId) => {
 
 /**
  * Crea un nuovo scenario per un BOMId.
+ * @param {string|null} pathsSnapshot  JSON array dei Path della BOM al momento della creazione.
  */
-const createScenario = async (companyId, userId, bomId, title, description) => {
+const createScenario = async (companyId, userId, bomId, title, description, pathsSnapshot) => {
     try {
         const pool = await sql.connect(config.database);
         const result = await pool.request()
-            .input('CompanyId',   sql.Int,                 companyId)
-            .input('BOMId',       sql.BigInt,              bomId)
-            .input('Title',       sql.NVarChar(200),       title)
-            .input('Description', sql.NVarChar(sql.MAX),   description || null)
-            .input('CreatedBy',   sql.Int,                 userId)
+            .input('CompanyId',     sql.Int,               companyId)
+            .input('BOMId',         sql.BigInt,            bomId)
+            .input('Title',         sql.NVarChar(200),     title)
+            .input('Description',   sql.NVarChar(sql.MAX), description || null)
+            .input('CreatedBy',     sql.Int,               userId)
+            .input('PathsSnapshot', sql.NVarChar(sql.MAX), pathsSnapshot || null)
             .query(`
-                INSERT INTO dbo.MA_BOM_Scenarios (CompanyId, BOMId, Title, Description, CreatedBy)
+                INSERT INTO dbo.MA_BOM_Scenarios
+                    (CompanyId, BOMId, Title, Description, CreatedBy, PathsSnapshot)
                 OUTPUT INSERTED.Id, INSERTED.CompanyId, INSERTED.BOMId, INSERTED.Title,
-                       INSERTED.Description, INSERTED.CreatedBy, INSERTED.CreatedAt
-                VALUES (@CompanyId, @BOMId, @Title, @Description, @CreatedBy)
+                       INSERTED.Description, INSERTED.CreatedBy, INSERTED.CreatedAt,
+                       INSERTED.PathsSnapshot
+                VALUES (@CompanyId, @BOMId, @Title, @Description, @CreatedBy, @PathsSnapshot)
             `);
         return { success: 1, scenario: result.recordset[0] };
     } catch (err) {

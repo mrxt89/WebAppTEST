@@ -1,11 +1,12 @@
 // CostTreeModal.jsx – Dettaglio costi BOM con gestione scenari di simulazione
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Loader2, FlaskConical, Plus, Calculator, Trash2 } from 'lucide-react';
+import { X, Loader2, FlaskConical, Plus, Calculator, Trash2, AlertTriangle, Package, Wrench } from 'lucide-react';
+// Package/Wrench usati nella sezione override orfani; AlertTriangle nell'header orfani
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -63,6 +64,29 @@ const CostTreeModal = ({ isOpen, treeData, loading, onClose, bomId }) => {
     setScenarioCost(null);
   }, [selectedScenarioId]);
 
+  // ── Override orfani ───────────────────────────────────────────────────────
+  // Un override è orfano se il ramo cui fa riferimento non esiste più nella BOM attuale.
+  // Lo scenario modifica solo ciò che l'utente ha toccato: rami aggiunti/rimossi
+  // senza override non sono rilevanti (la SP li calcola già a costo standard).
+  const orphanedOverrides = useMemo(() => {
+    if (!activeScenario?.details?.length || !treeData?.components) return [];
+
+    const currentComponents = new Set(
+      (treeData.components || []).filter(c => c.Level > 0 && c.Path).map(c => c.Path)
+    );
+    const currentRouting = new Set(
+      (treeData.routing || [])
+        .map(r => (r.BOMId && r.RtgStep != null) ? `${r.BOMId}|${r.RtgStep}` : null)
+        .filter(Boolean)
+    );
+
+    return activeScenario.details.filter(d => {
+      if (d.RowType === 'C') return d.AncestralPath && !currentComponents.has(d.AncestralPath);
+      if (d.RowType === 'R') return !currentRouting.has(`${d.BOMId_Rt}|${d.RtgStep}`);
+      return false;
+    });
+  }, [activeScenario, treeData]);
+
   // ── API helpers ───────────────────────────────────────────────────────────
   const loadScenarios = async () => {
     setLoadingScen(true);
@@ -92,8 +116,21 @@ const CostTreeModal = ({ isOpen, treeData, loading, onClose, bomId }) => {
     if (!newTitle.trim()) return;
     setCreating(true);
     try {
+      // Snapshot dei componenti E dei cicli presenti nella BOM al momento della creazione
+      const pathsSnapshot = {
+        c: (treeData?.components || []).filter(c => c.Level > 0 && c.Path).map(c => c.Path),
+        r: [...new Set(
+          (treeData?.routing || [])
+            .map(r => (r.BOMId && r.RtgStep != null) ? `${r.BOMId}|${r.RtgStep}` : null)
+            .filter(Boolean)
+        )],
+      };
+
       const res = await axios.post('/bom-scenarios', {
-        bomId, title: newTitle.trim(), description: newDesc.trim() || null,
+        bomId,
+        title:         newTitle.trim(),
+        description:   newDesc.trim() || null,
+        pathsSnapshot,
       });
       const created = res.data.scenario;
       setScenarios(prev => [created, ...prev]);
@@ -288,6 +325,57 @@ const CostTreeModal = ({ isOpen, treeData, loading, onClose, bomId }) => {
             )}
           </div>
         </div>
+
+
+        {/* ── Override orfani ───────────────────────────────────────────────── */}
+        {hasScenario && !loadingDetail && orphanedOverrides.length > 0 && (
+          <div className="px-4 py-2 border-b bg-red-50 border-red-200 flex-shrink-0">
+            <div className="flex items-center gap-2 mb-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 text-red-600 flex-shrink-0" />
+              <span className="text-[11px] font-semibold text-red-800 uppercase tracking-wide">
+                Override orfani — rami eliminati dalla BOM
+              </span>
+            </div>
+            <div className="space-y-1">
+              {orphanedOverrides.map(d => (
+                <div key={d.Id} className="flex items-center gap-2 text-[11px] bg-white border border-red-200 rounded px-2 py-1">
+                  {d.RowType === 'R'
+                    ? <Wrench className="h-3 w-3 text-green-600 flex-shrink-0" />
+                    : <Package className="h-3 w-3 text-blue-600 flex-shrink-0" />
+                  }
+                  <span className="text-gray-500 font-mono flex-shrink-0">
+                    {d.RowType === 'R' ? `Ciclo — BOM #${d.BOMId_Rt}, Fase ${d.RtgStep}` : `Comp. — ${d.AncestralPath}`}
+                  </span>
+                  {/* Riepilogo override */}
+                  <span className="text-gray-400 truncate flex-1">
+                    {d.RowType === 'C' && [
+                      d.Quantity_Sc  != null && `qty: ${d.Quantity_Sc}`,
+                      d.UnitCost_Sc  != null && `costo: ${d.UnitCost_Sc}€`,
+                      d.FixedCost_Sc != null && `fissi: ${d.FixedCost_Sc}€`,
+                    ].filter(Boolean).join(' · ')}
+                    {d.RowType === 'R' && [
+                      d.ProcessingTime_Sc != null && `ciclo: ${d.ProcessingTime_Sc}s`,
+                      d.SetupTime_Sc      != null && `setup: ${d.SetupTime_Sc}s`,
+                      d.Qty_Sc            != null && `qty: ${d.Qty_Sc}`,
+                    ].filter(Boolean).join(' · ')}
+                  </span>
+                  {d.Notes && (
+                    <span className="text-gray-400 italic truncate max-w-[140px] flex-shrink-0" title={d.Notes}>
+                      "{d.Notes}"
+                    </span>
+                  )}
+                  <button
+                    className="ml-auto text-red-400 hover:text-red-600 p-0.5 rounded hover:bg-red-100 flex-shrink-0 transition-colors"
+                    title="Elimina questo override orfano"
+                    onClick={() => handleDeleteOverride(d.Id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Cost comparison cards (after calculate) ───────────────────────── */}
         {sc && official && (
