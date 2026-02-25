@@ -25,7 +25,9 @@
       "Bash(cat:*)",
       "Bash(docker ps:*)",
       "Bash(where:*)",
-      "Bash(iconv:*)"
+      "Bash(iconv:*)",
+      "Bash(npx eslint:*)",
+      "Bash(xxd:*)"
     ],
     "deny": [],
     "ask": []

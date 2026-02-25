@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Schema Gestione Scenari BOM</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #f8f9fb;
+    color: #1a1d23;
+    font-size: 13px;
+    padding: 32px;
+  }
+
+  .page { max-width: 960px; margin: 0 auto; }
+
+  h1 {
+    font-size: 20px; font-weight: 700; margin-bottom: 4px;
+  }
+  .subtitle {
+    color: #6b7280; font-size: 13px; margin-bottom: 32px;
+  }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: #6b7280; margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  /* COMPARE GRID */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .card {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    border: 1.5px solid #e5e7eb;
+  }
+
+  .card.old { border-color: #fca5a5; background: #fff5f5; }
+  .card.new { border-color: #6ee7b7; background: #f0fdf4; }
+
+  .card-label {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+  .card.old .card-label { color: #dc2626; }
+  .card.new .card-label { color: #059669; }
+
+  .card-title {
+    font-size: 15px; font-weight: 700; margin-bottom: 12px;
+  }
+
+  .point {
+    display: flex; gap: 8px; align-items: flex-start;
+    margin-bottom: 8px; font-size: 12px; line-height: 1.5;
+  }
+  .point-icon { flex-shrink: 0; margin-top: 1px; }
+
+  /* FLOW */
+  .flow {
+    background: white;
+    border-radius: 10px;
+    border: 1.5px solid #e5e7eb;
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+
+  .flow-steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .step {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center;
+    width: 130px;
+  }
+
+  .step-circle {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+  }
+
+  .step-label {
+    font-size: 11px; font-weight: 600; line-height: 1.4;
+    color: #374151;
+  }
+
+  .step-note {
+    font-size: 10px; color: #9ca3af; margin-top: 3px; line-height: 1.3;
+  }
+
+  .arrow {
+    font-size: 20px; color: #d1d5db; margin: 0 4px; padding-bottom: 24px;
+  }
+
+  /* MODIFICHE TABLE */
+  .mods {
+    background: white;
+    border-radius: 10px;
+    border: 1.5px solid #e5e7eb;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+
+  .mods table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .mods thead th {
+    background: #f3f4f6;
+    padding: 10px 16px;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: #6b7280;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .mods tbody td {
+    padding: 10px 16px;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 12px;
+    vertical-align: middle;
+  }
+
+  .mods tbody tr:last-child td { border-bottom: none; }
+  .mods tbody tr:hover { background: #fafafa; }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 10px; font-weight: 700;
+    white-space: nowrap;
+  }
+  .tag-new { background: #d1fae5; color: #065f46; }
+  .tag-mod { background: #dbeafe; color: #1e40af; }
+  .tag-none { background: #f3f4f6; color: #6b7280; }
+
+  .effort {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .dot-filled { width: 10px; height: 10px; border-radius: 50%; background: #2563eb; }
+  .dot-empty { width: 10px; height: 10px; border-radius: 50%; background: #e5e7eb; }
+
+  /* FIELDS */
+  .fields {
+    background: white;
+    border-radius: 10px;
+    border: 1.5px solid #e5e7eb;
+    padding: 20px;
+    margin-bottom: 32px;
+  }
+
+  .fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 4px;
+  }
+
+  .field-group {
+    background: #f8f9fb;
+    border-radius: 8px;
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+  }
+
+  .field-group-title {
+    font-size: 11px; font-weight: 700;
+    color: #374151; margin-bottom: 8px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+
+  .field-item {
+    font-size: 12px; color: #4b5563;
+    padding: 3px 0;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .field-badge {
+    font-size: 10px; padding: 1px 5px;
+    border-radius: 3px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .fb-key { background: #ede9fe; color: #5b21b6; }
+  .fb-val { background: #fef3c7; color: #92400e; }
+
+  /* PROMOTE */
+  .promote {
+    background: white;
+    border-radius: 10px;
+    border: 1.5px solid #e5e7eb;
+    padding: 20px;
+    margin-bottom: 32px;
+  }
+
+  .promote-flow {
+    display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap; margin-top: 12px;
+  }
+
+  .pstep {
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px; font-weight: 500;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+    min-width: 130px;
+  }
+  .pstep.highlight { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+  .pstep.success { background: #f0fdf4; border-color: #bbf7d0; color: #065f46; }
+
+  .parrow { font-size: 16px; color: #9ca3af; }
+
+  /* NOTE */
+  .note {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: #92400e;
+    line-height: 1.6;
+  }
+  .note strong { color: #78350f; }
+
+  hr { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Gestione Scenari BOM — Schema proposta</h1>
+  <p class="subtitle">Documento di confronto per valutazione tecnica · rev. 1.0</p>
+
+  <!-- CONFRONTO -->
+  <div class="section-title">Confronto approcci</div>
+  <div class="compare">
+    <div class="card old">
+      <div class="card-label">Approccio attuale proposto</div>
+      <div class="card-title">Copia / Sostituzione livello per livello</div>
+      <div class="point"><span class="point-icon">⚠️</span><span>Per simulare una BOM multilivello occorre sostituire manualmente ogni componente a ogni livello</span></div>
+      <div class="point"><span class="point-icon">⚠️</span><span>Ogni simulazione genera nuovi codici temporanei → proliferazione archivi</span></div>
+      <div class="point"><span class="point-icon">⚠️</span><span>Difficile confrontare ufficiale vs simulato</span></div>
+      <div class="point"><span class="point-icon">✅</span><span>Nessuna modifica alle SP di costificazione</span></div>
+      <div class="point"><span class="point-icon">✅</span><span>Integrità ERP garantita</span></div>
+    </div>
+    <div class="card new">
+      <div class="card-label">Proposta alternativa</div>
+      <div class="card-title">Scenario Overlay su BOM ufficiale</div>
+      <div class="point"><span class="point-icon">✅</span><span>Struttura BOM ufficiale invariata — si salvano solo le differenze (override)</span></div>
+      <div class="point"><span class="point-icon">✅</span><span>Nessuna proliferazione di codici temporanei</span></div>
+      <div class="point"><span class="point-icon">✅</span><span>Confronto ufficiale vs scenario direttamente in griglia</span></div>
+      <div class="point"><span class="point-icon">✅</span><span>Più scenari paralleli sulla stessa BOM</span></div>
+      <div class="point"><span class="point-icon">✅</span><span>Integrità ERP garantita — promozione controllata e tracciata</span></div>
+    </div>
+  </div>
+
+  <!-- FLUSSO OPERATIVO -->
+  <div class="section-title">Flusso operativo</div>
+  <div class="flow">
+    <div class="flow-steps">
+      <div class="step">
+        <div class="step-circle" style="background:#eff6ff">📋</div>
+        <div class="step-label">BOM ufficiale</div>
+        <div class="step-note">struttura e valori reali invariati</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="step-circle" style="background:#f5f3ff">✏️</div>
+        <div class="step-label">Crea scenario</div>
+        <div class="step-note">nome, note, autore</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="step-circle" style="background:#fef3c7">🔧</div>
+        <div class="step-label">Modifica valori</div>
+        <div class="step-note">qta, costi, tempi, costi fissi</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="step-circle" style="background:#d1fae5">📊</div>
+        <div class="step-label">Calcola costi</div>
+        <div class="step-note">SP esistenti + parametro ScenarioID</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="step-circle" style="background:#fef3c7">✔️</div>
+        <div class="step-label">Approva scenario</div>
+        <div class="step-note">revisione e confronto delta</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="step-circle" style="background:#d1fae5">🚀</div>
+        <div class="step-label">Promuovi</div>
+        <div class="step-note">aggiorna ufficiale o crea nuova versione</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAMPI SCENARIO -->
+  <div class="section-title">Campi oggetto di simulazione</div>
+  <div class="fields">
+    <div class="fields-grid">
+      <div class="field-group">
+        <div class="field-group-title">📦 Componenti</div>
+        <div class="field-item"><span class="field-badge fb-key">Quantità</span> quantità riga componente</div>
+        <div class="field-item"><span class="field-badge fb-val">Costo unit.</span> costo unitario materiale</div>
+        <div class="field-item"><span class="field-badge fb-val" style="background:#fef3c7;color:#92400e">Costo fisso</span> costo fisso componente</div>
+        <div class="field-item" style="margin-top:6px; color:#6b7280; font-size:11px">Azioni: OVERRIDE · ADD · REMOVE · REPLACE</div>
+      </div>
+      <div class="field-group">
+        <div class="field-group-title">⚙️ Operazioni / Routing</div>
+        <div class="field-item"><span class="field-badge fb-key">Tempo ciclo</span> ProcessingTime</div>
+        <div class="field-item"><span class="field-badge fb-key">Tempo setup</span> SetupTime</div>
+        <div class="field-item"><span class="field-badge fb-val">Quantità</span> Qty operazione</div>
+        <div class="field-item" style="margin-top:6px; color:#6b7280; font-size:11px">Azioni: OVERRIDE · ADD · REMOVE</div>
+      </div>
+      <div class="field-group">
+        <div class="field-group-title">📐 Regola COALESCE</div>
+        <div class="field-item" style="font-size:11px; color:#4b5563; line-height:1.6">
+          Per ogni campo:<br>
+          se override scenario presente → usa scenario<br>
+          se NULL → usa valore ufficiale<br><br>
+          <strong>La struttura BOM ufficiale non viene mai toccata.</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORMULE DELTA -->
+    <div style="margin-top:14px; background:#f8f9fb; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#374151; margin-bottom:10px;">📊 Calcolo delta in griglia</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div style="background:white; border-radius:6px; border:1px solid #e5e7eb; padding:10px 14px;">
+          <div style="font-size:11px; font-weight:600; color:#1e40af; margin-bottom:4px;">Δ Variabile (per riga)</div>
+          <div style="font-family:monospace; font-size:12px; color:#1e40af; background:#eff6ff; padding:6px 8px; border-radius:4px;">
+            (CostoSc × QtaSc) − (Costo × Qta)
+          </div>
+          <div style="font-size:11px; color:#6b7280; margin-top:5px;">Impatto unitario indipendente dal lotto</div>
+        </div>
+        <div style="background:white; border-radius:6px; border:1px solid #e5e7eb; padding:10px 14px;">
+          <div style="font-size:11px; font-weight:600; color:#065f46; margin-bottom:4px;">Δ Totale (per lotto)</div>
+          <div style="font-family:monospace; font-size:12px; color:#065f46; background:#f0fdf4; padding:6px 8px; border-radius:4px;">
+            ΔVar × Lotto + FissoSc − FissoUff
+          </div>
+          <div style="font-size:11px; color:#6b7280; margin-top:5px;">Include amplificazione lotto e variazione costi fissi</div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- MODIFICHE TECNICHE -->
+  <div class="section-title">Modifiche tecniche necessarie</div>
+  <div class="mods">
+    <table>
+      <thead>
+        <tr>
+          <th>Componente</th>
+          <th>Tipo intervento</th>
+          <th>Descrizione</th>
+          <th>Impatto</th>
+          <th>Sforzo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>BOM_Scenario</strong></td>
+          <td><span class="tag tag-new">NUOVO</span></td>
+          <td>Tabella testata scenario (nome, stato, autore, BOM di riferimento)</td>
+          <td>Nessun impatto su esistente</td>
+          <td><div class="effort"><div class="dot-filled"></div><div class="dot-empty"></div><div class="dot-empty"></div></div></td>
+        </tr>
+        <tr>
+          <td><strong>BOM_Scenario_ComponentOverride</strong></td>
+          <td><span class="tag tag-new">NUOVO</span></td>
+          <td>Override componenti: Qta, CostoUnit, <strong>CostoFisso</strong> (tutti nullable: NULL = usa ufficiale) — il CostoFisso scenario entra nel Δ Totale moltiplicato per lotto</td>
+          <td>Nessun impatto su esistente</td>
+          <td><div class="effort"><div class="dot-filled"></div><div class="dot-empty"></div><div class="dot-empty"></div></div></td>
+        </tr>
+        <tr>
+          <td><strong>BOM_Scenario_RoutingOverride</strong></td>
+          <td><span class="tag tag-new">NUOVO</span></td>
+          <td>Override operazioni: TempoCiclo, TempoSetup, Qty (nullable = usa ufficiale)</td>
+          <td>Nessun impatto su esistente</td>
+          <td><div class="effort"><div class="dot-filled"></div><div class="dot-empty"></div><div class="dot-empty"></div></div></td>
+        </tr>
+        <tr>
+          <td><strong>SP_CalculateBOMCosting</strong></td>
+          <td><span class="tag tag-mod">MODIFICA</span></td>
+          <td>Aggiunta parametro <code>@ScenarioID = NULL</code> + LEFT JOIN override nel WHILE loop con COALESCE su Quantity, UnitCost, <strong>FixedCost</strong>. Nel calcolo routing: COALESCE su ProcessingTime, SetupTime, Qty. Con ScenarioID NULL → comportamento identico a oggi.</td>
+          <td>Zero regressioni sul percorso ufficiale</td>
+          <td><div class="effort"><div class="dot-filled"></div><div class="dot-filled"></div><div class="dot-empty"></div></div></td>
+        </tr>
+        <tr>
+          <td><strong>SP_GetBOMCostingDetails</strong></td>
+          <td><span class="tag tag-mod">MODIFICA</span></td>
+          <td>Stesso intervento speculare: parametro @ScenarioID nullable + COALESCE su Quantity, UnitCost, <strong>FixedCost</strong> componenti e su ProcessingTime, SetupTime, Qty routing</td>
+          <td>Zero regressioni sul percorso ufficiale</td>
+          <td><div class="effort"><div class="dot-filled"></div><div class="dot-filled"></div><div class="dot-empty"></div></div></td>
+        </tr>
+        <tr>
+          <td><strong>SP_GetBOMCostingHistory</strong></td>
+          <td><span class="tag tag-none">NESSUNO</span></td>
+          <td>Solo lettura storico, non coinvolta nel calcolo. Nessun intervento.</td>
+          <td>—</td>
+          <td><div class="effort"><div class="dot-empty"></div><div class="dot-empty"></div><div class="dot-empty"></div></div></td>
+        </tr>
+        <tr>
+          <td><strong>SP_PromoteBOMScenario</strong></td>
+          <td><span class="tag tag-new">NUOVO</span></td>
+          <td>Procedura transazionale di promozione: aggiorna campi ufficiali o crea nuova versione BOM se già esportata. Log prima/dopo. Marca DaEsportare.</td>
+          <td>Nessun impatto su SP esistenti</td>
+          <td><div class="effort"><div class="dot-filled"></div><div class="dot-filled"></div><div class="dot-empty"></div></div></td>
+        </tr>
+        <tr>
+          <td><strong>Frontend</strong></td>
+          <td><span class="tag tag-new">NUOVO</span></td>
+          <td>Selettore scenario, colonne Q.tà Sc. / Costo Sc. / Δ, badge stato riga, editing inline, dialog promozione</td>
+          <td>Additive, nessuna modifica a UI esistente</td>
+          <td><div class="effort"><div class="dot-filled"></div><div class="dot-filled"></div><div class="dot-filled"></div></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- PROMOZIONE -->
+  <div class="section-title">Logica di promozione scenario → ufficiale</div>
+  <div class="promote">
+    <div class="promote-flow">
+      <div class="pstep">Scenario approvato</div>
+      <div class="parrow">→</div>
+      <div class="pstep highlight">Verifica BOM non modificata da creazione scenario</div>
+      <div class="parrow">→</div>
+      <div class="pstep" style="background:#f0fdf4; border-color:#bbf7d0;">
+        BOM <strong>non</strong> esportata ERP?<br>
+        <span style="font-size:11px; color:#065f46">Aggiorna versione corrente</span>
+      </div>
+      <div class="parrow">/</div>
+      <div class="pstep" style="background:#eff6ff; border-color:#bfdbfe;">
+        BOM <strong>già</strong> esportata ERP?<br>
+        <span style="font-size:11px; color:#1e40af">Crea nuova versione BOM</span>
+      </div>
+      <div class="parrow">→</div>
+      <div class="pstep success">Marca DaEsportare → allineamento ERP</div>
+    </div>
+    <div style="margin-top:14px; font-size:11px; color:#6b7280;">
+      In entrambi i casi: log modifiche prima/dopo · stato scenario → Promosso · transazione atomica
+    </div>
+  </div>
+
+  <!-- STRUTTURA TABELLE -->
+  <div class="section-title">Struttura tabelle scenario</div>
+  <div style="background:white; border-radius:10px; border:1.5px solid #e5e7eb; padding:20px; margin-bottom:32px;">
+
+    <!-- BOM_Scenario -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:12px; font-weight:700; color:#1e40af; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:8px 12px; margin-bottom:10px; font-family:monospace;">BOM_Scenario — testata</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
+        <div><span style="font-family:monospace; color:#374151">ScenarioID</span> <span style="color:#9ca3af">PK</span></div>
+        <div><span style="font-family:monospace; color:#374151">BOMId</span> <span style="color:#9ca3af">FK → BillOfMaterials</span></div>
+        <div><span style="font-family:monospace; color:#374151">BOMStructureVersion</span> <span style="color:#9ca3af">snapshot versione struttura</span></div>
+        <div><span style="font-family:monospace; color:#374151">Nome, Stato, Note</span></div>
+        <div><span style="font-family:monospace; color:#374151">CreatoDa, CreatoIl</span></div>
+        <div><span style="font-family:monospace; color:#374151">PromossoDa, PromossoIl</span></div>
+        <div><span style="font-family:monospace; color:#374151">NuovaBOMVersioneId</span> <span style="color:#9ca3af">popolato se BOM esportata</span></div>
+        <div><span style="font-family:monospace; color:#374151">CompanyId</span></div>
+      </div>
+    </div>
+
+    <!-- BOM_Scenario_ComponentOverride -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:12px; font-weight:700; color:#065f46; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:8px 12px; margin-bottom:10px; font-family:monospace;">BOM_Scenario_ComponentOverride — override materiali</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
+        <div><span style="font-family:monospace; color:#374151">ScenarioID</span> <span style="color:#9ca3af">FK → BOM_Scenario</span></div>
+        <div><span style="font-family:monospace; color:#374151">BOMRowID</span> <span style="color:#9ca3af">FK → BOMComponents.Id (NULL se ADD)</span></div>
+        <div style="grid-column:1/-1; background:#fffbeb; border:1px solid #fde68a; border-radius:5px; padding:7px 10px;">
+          <span style="font-family:monospace; font-weight:700; color:#92400e">WhereUsedPath</span> <span style="color:#92400e; font-size:11px">NVARCHAR(500) — es. "D|C|B|A" — dal componente verso root</span>
+        </div>
+        <div><span style="font-family:monospace; color:#374151">ItemCode_Snapshot</span> <span style="color:#9ca3af">codice al momento creazione</span></div>
+        <div><span style="font-family:monospace; color:#374151">ParentBOMId_Snapshot</span></div>
+        <div><span style="font-family:monospace; color:#374151">ParentItemCode_Snapshot</span></div>
+        <div><span style="font-family:monospace; color:#374151">Azione</span> <span style="color:#9ca3af">OVERRIDE · ADD · REMOVE · REPLACE</span></div>
+        <div><span style="font-family:monospace; color:#374151">NewComponentId</span> <span style="color:#9ca3af">solo per REPLACE/ADD</span></div>
+        <div><span style="font-family:monospace; color:#374151">Quantity_Ipotesi</span> <span style="color:#9ca3af">nullable</span></div>
+        <div><span style="font-family:monospace; color:#374151">UnitCost_Ipotesi</span> <span style="color:#9ca3af">nullable</span></div>
+        <div><span style="font-family:monospace; color:#374151">FixedCost_Ipotesi</span> <span style="color:#9ca3af">nullable</span></div>
+        <div><span style="font-family:monospace; color:#374151">IsOrphaned, OrphanedAt</span></div>
+        <div><span style="font-family:monospace; color:#374151">ReconciledToRowID, ReconciledAt</span></div>
+      </div>
+    </div>
+
+    <!-- BOM_Scenario_RoutingOverride -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:12px; font-weight:700; color:#5b21b6; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:6px; padding:8px 12px; margin-bottom:10px; font-family:monospace;">BOM_Scenario_RoutingOverride — override operazioni</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
+        <div><span style="font-family:monospace; color:#374151">ScenarioID</span> <span style="color:#9ca3af">FK → BOM_Scenario</span></div>
+        <div><span style="font-family:monospace; color:#374151">RoutingRowID</span> <span style="color:#9ca3af">FK → BOMRouting.Id (NULL se ADD)</span></div>
+        <div style="grid-column:1/-1; background:#fffbeb; border:1px solid #fde68a; border-radius:5px; padding:7px 10px;">
+          <span style="font-family:monospace; font-weight:700; color:#92400e">WhereUsedPath</span> <span style="color:#92400e; font-size:11px">NVARCHAR(500) — es. "SLD-000|B|A" — operazione | BOM | ... | root</span>
+        </div>
+        <div><span style="font-family:monospace; color:#374151">OperationCode_Snapshot</span></div>
+        <div><span style="font-family:monospace; color:#374151">ParentBOMId_Snapshot</span></div>
+        <div><span style="font-family:monospace; color:#374151">Azione</span> <span style="color:#9ca3af">OVERRIDE · ADD · REMOVE</span></div>
+        <div><span style="font-family:monospace; color:#374151">ProcessingTime_Ipotesi</span> <span style="color:#9ca3af">nullable, in secondi</span></div>
+        <div><span style="font-family:monospace; color:#374151">SetupTime_Ipotesi</span> <span style="color:#9ca3af">nullable</span></div>
+        <div><span style="font-family:monospace; color:#374151">Qty_Ipotesi</span> <span style="color:#9ca3af">nullable</span></div>
+        <div><span style="font-family:monospace; color:#374151">IsOrphaned, ReconciledToRowID</span></div>
+      </div>
+    </div>
+
+    <!-- ReconciliationLog -->
+    <div>
+      <div style="font-size:12px; font-weight:700; color:#374151; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:6px; padding:8px 12px; margin-bottom:10px; font-family:monospace;">BOM_Scenario_ReconciliationLog — audit riconciliazioni</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
+        <div><span style="font-family:monospace; color:#374151">ScenarioID, OverrideType, OverrideId</span></div>
+        <div><span style="font-family:monospace; color:#374151">Esito</span> <span style="color:#9ca3af">AUTO · ORPHANED · USER · DISCARDED</span></div>
+        <div><span style="font-family:monospace; color:#374151">WhereUsedPathUsato</span> <span style="color:#9ca3af">path usato per trovare il padre</span></div>
+        <div><span style="font-family:monospace; color:#374151">FirstValidAncestor</span> <span style="color:#9ca3af">primo nodo valido trovato</span></div>
+        <div><span style="font-family:monospace; color:#374151">OldRowID → NewRowID</span></div>
+        <div><span style="font-family:monospace; color:#374151">RilevatoDa, RilevatoIl</span></div>
+      </div>
+    </div>
+
+    <!-- Regola COALESCE -->
+    <div style="margin-top:16px; background:#f8f9fb; border-radius:6px; border:1px solid #e5e7eb; padding:12px 14px; font-size:12px;">
+      <strong>Regola COALESCE nelle SP:</strong>
+      <span style="font-family:monospace; background:#eff6ff; color:#1e40af; padding:2px 8px; border-radius:3px; margin-left:8px;">COALESCE(override.Quantity_Ipotesi, comp.Quantity)</span>
+      — se il campo ipotesi è NULL usa il valore ufficiale. Le SP ricevono <span style="font-family:monospace">@ScenarioID = NULL</span> per il calcolo ufficiale invariato.
+    </div>
+  </div>
+
+  <!-- CASO PRATICO A→B→C→D -->
+  <div class="section-title">Caso pratico — A → B → C → D: costruzione interna vs acquisto E</div>
+  <div style="background:white; border-radius:10px; border:1.5px solid #e5e7eb; padding:20px; margin-bottom:32px;">
+
+    <!-- struttura -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+      <div style="background:#f8f9fb; border-radius:8px; padding:14px; border:1px solid #e5e7eb;">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#374151; margin-bottom:10px;">Struttura ufficiale</div>
+        <div style="font-family:monospace; font-size:12px; line-height:2;">
+          A (prodotto finito)<br>
+          └── B (semilavorato, ha ciclo)<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;└── C (semilavorato)<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── D (materia prima)
+        </div>
+      </div>
+      <div style="background:#fffbeb; border-radius:8px; padding:14px; border:1px solid #fde68a;">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#92400e; margin-bottom:10px;">Obiettivo simulazione</div>
+        <div style="font-size:12px; line-height:1.8; color:#78350f;">
+          Confrontare il costo di C costruito internamente (C→D) con l'acquisto di E che lo sostituisce interamente.<br><br>
+          <strong>Domanda chiave:</strong> si gestisce con uno scenario o serve una nuova versione BOM?
+        </div>
+      </div>
+    </div>
+
+    <!-- risposta -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+
+      <!-- scenario -->
+      <div style="background:#f0fdf4; border-radius:8px; padding:14px; border:1.5px solid #6ee7b7;">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#065f46; margin-bottom:10px;">✅ Gestibile con scenario — REPLACE</div>
+        <div style="font-size:12px; line-height:1.7; color:#064e3b;">
+          Crei uno scenario sulla BOM di A con un override REPLACE su C:<br><br>
+          <div style="font-family:monospace; background:white; border-radius:4px; padding:8px; font-size:11px; border:1px solid #bbf7d0; margin-bottom:8px;">
+            BOMRowID        → riga C in BOM di B<br>
+            Azione          = REPLACE<br>
+            NewComponentId  = E (acquisto)<br>
+            UnitCost_Ipotesi = 45,00 €<br>
+            WhereUsedPath   = "C|B|A"
+          </div>
+          La SP con scenario attivo sostituisce C con E e <strong>non scende nel ramo C→D</strong>. Il costo di D non entra nel calcolo. Ottieni direttamente il confronto: costo con C interno vs costo con E acquistato.<br><br>
+          <strong>Nessuna nuova versione BOM. Nessun codice temporaneo.</strong>
+        </div>
+      </div>
+
+      <!-- nuova versione -->
+      <div style="background:#fff5f5; border-radius:8px; padding:14px; border:1.5px solid #fca5a5;">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#dc2626; margin-bottom:10px;">⚠️ Quando serve nuova versione BOM</div>
+        <div style="font-size:12px; line-height:1.7; color:#7f1d1d;">
+          La nuova versione BOM (approccio del consulente originale) è necessaria solo se:<br><br>
+          — la sostituzione è <strong>definitiva</strong> e deve essere esportata in ERP<br>
+          — serve modificare la <strong>struttura di E</strong> (E ha a sua volta una sottodistinta da gestire)<br>
+          — si vogliono mantenere <strong>entrambe le strutture</strong> come versioni ufficiali parallele nel gestionale<br><br>
+          In tutti gli altri casi di simulazione e confronto, lo scenario REPLACE è sufficiente e molto più leggero.
+        </div>
+      </div>
+    </div>
+
+    <!-- WhereUsedPath nel caso pratico -->
+    <div style="background:#fffbeb; border-radius:8px; padding:14px; border:1px solid #fde68a;">
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#92400e; margin-bottom:8px;">WhereUsedPath in questo scenario</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:12px;">
+        <div>
+          <div style="color:#78350f; margin-bottom:4px;">Override su C (REPLACE con E):</div>
+          <div style="font-family:monospace; background:white; padding:6px 10px; border-radius:4px; border:1px solid #fde68a; color:#92400e;">"C|B|A"</div>
+          <div style="color:#9ca3af; font-size:11px; margin-top:4px;">Se B venisse eliminato → riconciliazione trova A come primo padre valido</div>
+        </div>
+        <div>
+          <div style="color:#78350f; margin-bottom:4px;">Override su ciclo di B (se presente):</div>
+          <div style="font-family:monospace; background:white; padding:6px 10px; border-radius:4px; border:1px solid #fde68a; color:#92400e;">"SLD-000|B|A"</div>
+          <div style="color:#9ca3af; font-size:11px; margin-top:4px;">B esiste ancora → riconciliazione automatica, nessun problema</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ricostruzione parziale -->
+    <div style="margin-top:12px; background:#f8f9fb; border-radius:8px; padding:12px 14px; border:1px solid #e5e7eb; font-size:12px; line-height:1.7;">
+      <strong>Regola sulla ricostruzione parziale.</strong>
+      Lo scenario salva solo le differenze rispetto all'ufficiale — non duplica la struttura BOM.
+      In caso di ristrutturazione della BOM ufficiale, il WhereUsedPath permette di risalire al primo antenato valido
+      e proporre la riassociazione guidata. La ricostruzione è completa per i nodi riorganizzati,
+      parziale per i nodi eliminati senza sostituzione. In quel caso la UI mostra il valore ipotesi salvato
+      e il punto di rottura del path, lasciando all'utente la decisione su come riapplicarlo.
+      <br><br>
+      <strong>Regola operativa:</strong> al salvataggio di un override, valorizza sempre i campi che vuoi proteggere
+      anche se il valore è identico all'ufficiale — il record esiste nella tabella e il WhereUsedPath è compilato,
+      garantendo la riconciliazione anche per quei campi.
+    </div>
+  </div>
+
+  <!-- SEZIONE ORFANI -->
+  <div class="section-title">Gestione orfani — BOM ufficiale modificata dopo la creazione dello scenario</div>
+  <div style="background:white;border-radius:10px;border:1.5px solid #e5e7eb;padding:20px;margin-bottom:32px;">
+
+    <!-- INTRO -->
+    <div style="font-size:12px;line-height:1.8;color:#374151;margin-bottom:18px;">
+      Lo scenario salva solo le <strong>differenze</strong> rispetto all'ufficiale: ogni override punta a un <code>BOMRowID</code> preciso.
+      Se la BOM ufficiale viene ristrutturata profondamente, quel RowID può non esistere più.
+      L'override diventa un <strong>orfano</strong>: sa cosa voleva modificare, ma non trova più dove applicarsi.
+      Il campo <span style="font-family:monospace;background:#fef3c7;color:#d97706;padding:1px 6px;border-radius:3px;font-weight:700;">WhereUsedPath</span>
+      è il filo che permette di risalire nell'albero e trovare il primo antenato ancora valido.
+    </div>
+
+    <!-- MATRICE CASI -->
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:10px;">Matrice dei casi — impatto sul scenario</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:20px;">
+      <thead>
+        <tr style="background:#f3f4f6;">
+          <th style="padding:8px 11px;text-align:left;border:1px solid #e5e7eb;font-weight:700;color:#374151;width:220px;">Tipo di modifica alla BOM ufficiale</th>
+          <th style="padding:8px 11px;text-align:left;border:1px solid #e5e7eb;font-weight:700;color:#374151;">Impatto sullo scenario</th>
+          <th style="padding:8px 11px;text-align:center;border:1px solid #e5e7eb;font-weight:700;color:#374151;width:110px;">Esito</th>
+          <th style="padding:8px 11px;text-align:left;border:1px solid #e5e7eb;font-weight:700;color:#374151;width:160px;">Azione richiesta</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;font-weight:600;">Modifica valore su riga <em>non</em> sovrascritta</td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;color:#4b5563;">COALESCE legge il nuovo valore ufficiale automaticamente.</td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;text-align:center;background:#f0fdf4;"><span style="color:#059669;font-weight:700;">✅ Valido</span></td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;color:#6b7280;">Nessuna</td>
+        </tr>
+        <tr style="background:#fafafa;">
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;font-weight:600;">Aggiunta nuova riga alla BOM ufficiale</td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;color:#4b5563;">Nuova riga non coperta dallo scenario: usa il valore ufficiale. Scenario non invalidato.</td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;text-align:center;background:#f0fdf4;"><span style="color:#059669;font-weight:700;">✅ Valido</span></td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;color:#6b7280;">Facoltativa: aggiungere override se necessario</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;font-weight:600;">Modifica valore su riga <em>con</em> override attivo</td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;color:#4b5563;">Lo scenario usa il valore ipotesi. Il cambio ufficiale non impatta il calcolo scenario — ma l'utente non lo vede.</td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;text-align:center;background:#fffbeb;"><span style="color:#d97706;font-weight:700;">⚠️ Avviso UI</span></td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;color:#6b7280;">Notifica: "valore ufficiale aggiornato sotto questo override"</td>
+        </tr>
+        <tr style="background:#fafafa;">
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;font-weight:600;">Rimossa riga con override attivo (es. D eliminato)</td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;color:#4b5563;">BOMRowID non esiste più. Override orfano. WhereUsedPath attivato per riconciliazione.</td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;text-align:center;background:#fef2f2;"><span style="color:#dc2626;font-weight:700;">🔴 Orfano</span></td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;color:#6b7280;">Riconciliazione guidata via path</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;font-weight:600;">Sostituito nodo intermedio (es. C eliminato, D collegato direttamente a B)</td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;color:#4b5563;">Override su D: path "D|C|B|A" — C non trovato sotto B. Primo padre valido trovato: <strong>B</strong>. Riconciliazione parziale guidata.</td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;text-align:center;background:#fef2f2;"><span style="color:#dc2626;font-weight:700;">🔴 Parziale</span></td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;color:#6b7280;">Riassociare override da B in poi</td>
+        </tr>
+        <tr style="background:#fafafa;">
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;font-weight:600;">Ristrutturazione profonda (2+ livelli eliminati o riorganizzati)</td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;color:#4b5563;">Tutti i RowID sotto i livelli eliminati sono orfani. Il path viene ciclato fino al primo nodo ancora esistente. Ricostruzione possibile solo da quel nodo in poi.</td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;text-align:center;background:#fef2f2;"><span style="color:#dc2626;font-weight:700;">🔴 Da ricostruire</span></td>
+          <td style="padding:8px 11px;border:1px solid #e5e7eb;color:#6b7280;">Ricostruzione manuale guidata o chiusura scenario</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- FLUSSO RILEVAMENTO -->
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:12px;">Flusso di rilevamento e riconciliazione (attivato ad apertura scenario)</div>
+    <div style="display:flex;align-items:stretch;gap:0;margin-bottom:20px;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
+      <div style="flex:1;background:#f8f9fb;padding:12px 11px;text-align:center;border-right:1px solid #e5e7eb;">
+        <div style="font-size:22px;margin-bottom:5px;">📂</div>
+        <div style="font-size:11px;font-weight:600;color:#374151;">1 — Apertura scenario</div>
+        <div style="font-size:10px;color:#6b7280;margin-top:4px;">Utente apre scenario. Lettura BOMStructureVersion salvata.</div>
+      </div>
+      <div style="flex:1;background:#eff6ff;padding:12px 11px;text-align:center;border-right:1px solid #e5e7eb;">
+        <div style="font-size:22px;margin-bottom:5px;">🔍</div>
+        <div style="font-size:11px;font-weight:600;color:#1e40af;">2 — Confronto versione</div>
+        <div style="font-size:10px;color:#6b7280;margin-top:4px;">BOMStructureVersion salvata = versione attuale? Se no → scansione.</div>
+      </div>
+      <div style="flex:1;background:#fef2f2;padding:12px 11px;text-align:center;border-right:1px solid #e5e7eb;">
+        <div style="font-size:22px;margin-bottom:5px;">🔎</div>
+        <div style="font-size:11px;font-weight:600;color:#dc2626;">3 — Scansione RowID</div>
+        <div style="font-size:10px;color:#6b7280;margin-top:4px;">Ogni BOMRowID degli override verificato vs struttura attuale. Orfani marcati <code>IsOrphaned=1</code>.</div>
+      </div>
+      <div style="flex:1;background:#fffbeb;padding:12px 11px;text-align:center;border-right:1px solid #e5e7eb;">
+        <div style="font-size:22px;margin-bottom:5px;">🧭</div>
+        <div style="font-size:11px;font-weight:600;color:#d97706;">4 — Ciclo WhereUsedPath</div>
+        <div style="font-size:10px;color:#6b7280;margin-top:4px;">STRING_SPLIT sul path. Token per token verso root. Primo nodo valido = <em>FirstValidAncestor</em>.</div>
+      </div>
+      <div style="flex:1;background:#f0fdf4;padding:12px 11px;text-align:center;">
+        <div style="font-size:22px;margin-bottom:5px;">🧑‍💻</div>
+        <div style="font-size:11px;font-weight:600;color:#065f46;">5 — Proposta utente</div>
+        <div style="font-size:10px;color:#6b7280;margin-top:4px;">UI mostra orfani con valore ipotesi, punto rottura, padre valido. L'utente decide.</div>
+      </div>
+    </div>
+
+    <!-- ESEMPIO VISIVO ORFANO -->
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:10px;">Esempio — mockup avviso orfano in UI</div>
+
+    <!-- banner avviso -->
+    <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:20px;">⚠️</span>
+      <div>
+        <div style="font-weight:700;font-size:12px;color:#dc2626;">Scenario SC1 — 1 override orfano rilevato</div>
+        <div style="font-size:11px;color:#7f1d1d;">La struttura BOM è cambiata dopo la creazione di questo scenario (versione 7 → 9). Verificare gli override prima di usare il calcolo.</div>
+      </div>
+    </div>
+
+    <!-- card orfano: D mancante -->
+    <div style="background:white;border-radius:8px;border:1.5px dashed #fca5a5;padding:14px;margin-bottom:10px;">
+      <div style="display:flex;align-items:flex-start;gap:12px;">
+
+        <!-- icona stato -->
+        <div style="background:#fef2f2;border-radius:8px;padding:10px 12px;text-align:center;flex-shrink:0;min-width:64px;">
+          <div style="font-size:24px;">🔴</div>
+          <div style="font-size:9px;font-weight:700;color:#dc2626;margin-top:3px;letter-spacing:.05em;">ORFANO</div>
+          <div style="font-size:9px;color:#9ca3af;margin-top:2px;">RowID 1003</div>
+        </div>
+
+        <!-- dettaglio orfano -->
+        <div style="flex:1;">
+          <div style="font-family:monospace;font-weight:700;font-size:13px;color:#dc2626;margin-bottom:3px;">D — Acciaio inox laminato (MP)</div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:10px;">BOMRowID <code>1003</code> non trovato nella struttura BOM attuale</div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:11px;margin-bottom:10px;">
+
+            <!-- valore ipotesi salvato -->
+            <div style="background:#fef2f2;border-radius:6px;padding:8px 10px;">
+              <div style="font-size:10px;color:#9ca3af;margin-bottom:3px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Valore ipotesi salvato</div>
+              <div style="font-family:monospace;font-weight:700;color:#dc2626;line-height:1.8;">
+                UnitCost: 9,50 €<br>FixedCost: 40,00 €
+              </div>
+              <div style="font-size:10px;color:#9ca3af;margin-top:4px;">Questi valori sono sempre disponibili indipendentemente da cosa è cambiato nell'ufficiale.</div>
+            </div>
+
+            <!-- path e punto di rottura -->
+            <div style="background:#fffbeb;border-radius:6px;padding:8px 10px;">
+              <div style="font-size:10px;color:#9ca3af;margin-bottom:3px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">WhereUsedPath — punto di rottura</div>
+              <div style="font-family:monospace;font-size:12px;color:#d97706;line-height:2;">
+                <span style="background:#d1fae5;color:#059669;border-radius:3px;padding:0 3px;">D</span> |
+                <span style="background:#fecaca;color:#dc2626;border-radius:3px;padding:0 3px;text-decoration:line-through;">C</span> |
+                <span style="background:#d1fae5;color:#059669;border-radius:3px;padding:0 3px;">B</span> |
+                <span style="background:#d1fae5;color:#059669;border-radius:3px;padding:0 3px;">A</span>
+              </div>
+              <div style="font-size:10px;color:#9ca3af;margin-top:4px;"><span style="color:#dc2626;font-weight:600;">C eliminato</span> dalla BOM ufficiale. D non è più figlio di C ma diretto figlio di B nella struttura nuova.</div>
+            </div>
+
+            <!-- primo padre valido -->
+            <div style="background:#f0fdf4;border-radius:6px;padding:8px 10px;">
+              <div style="font-size:10px;color:#9ca3af;margin-bottom:3px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Primo padre valido trovato</div>
+              <div style="font-family:monospace;font-weight:700;font-size:14px;color:#059669;margin-bottom:3px;">B</div>
+              <div style="font-size:10px;color:#4b5563;">Nella struttura attuale D è figlio diretto di B. L'override può essere riassociato al nuovo RowID di D sotto B.</div>
+            </div>
+
+          </div>
+
+          <!-- azioni -->
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button style="padding:6px 12px;font-size:11px;border-radius:5px;border:1.5px solid #059669;background:#f0fdf4;color:#059669;cursor:pointer;font-weight:600;">✓ Riassegna a D sotto B (RowID 1007)</button>
+            <button style="padding:6px 12px;font-size:11px;border-radius:5px;border:1px solid #e5e7eb;background:white;cursor:pointer;">Scarta questo override</button>
+            <span style="font-size:10px;color:#9ca3af;margin-left:4px;">oppure</span>
+            <button style="padding:6px 12px;font-size:11px;border-radius:5px;border:1px solid #fecaca;background:#fef2f2;color:#dc2626;cursor:pointer;">Chiudi scenario come non più applicabile</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- card override valido per confronto visivo -->
+    <div style="background:white;border-radius:8px;border:1.5px solid #d1fae5;padding:14px;margin-bottom:14px;opacity:.85;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="background:#f0fdf4;border-radius:8px;padding:10px 12px;text-align:center;flex-shrink:0;min-width:64px;">
+          <div style="font-size:24px;">✅</div>
+          <div style="font-size:9px;font-weight:700;color:#059669;margin-top:3px;letter-spacing:.05em;">VALIDO</div>
+          <div style="font-size:9px;color:#9ca3af;margin-top:2px;">RowID 5001</div>
+        </div>
+        <div>
+          <div style="font-family:monospace;font-weight:700;font-size:13px;color:#059669;margin-bottom:3px;">SLD-000 — Ciclo saldatura su B</div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:4px;">BOMRowID <code>5001</code> trovato. WhereUsedPath: <span style="font-family:monospace;color:#059669;background:#d1fae5;padding:1px 5px;border-radius:3px;">"SLD-000|B|A"</span> — tutti i nodi validi.</div>
+          <div style="font-size:11px;color:#4b5563;">ProcessingTime ipotesi: <strong>600s</strong> (uff. 900s). Override attivo senza modifiche necessarie.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- cosa si perde e cosa si conserva -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div style="background:#f0fdf4;border-radius:7px;padding:11px 13px;border:1px solid #bbf7d0;font-size:11px;line-height:1.7;">
+        <div style="font-weight:700;color:#065f46;margin-bottom:5px;">✅ Cosa è sempre disponibile anche dopo ristrutturazione</div>
+        <div style="color:#4b5563;">
+          — Valore ipotesi salvato dall'utente (UnitCost, FixedCost, Quantity)<br>
+          — WhereUsedPath completo al momento della creazione<br>
+          — Snapshot ItemCode, ParentItemCode, ParentBOMId<br>
+          — Primo padre valido trovato automaticamente<br>
+          — Log della riconciliazione nel ReconciliationLog
+        </div>
+      </div>
+      <div style="background:#fef2f2;border-radius:7px;padding:11px 13px;border:1px solid #fecaca;font-size:11px;line-height:1.7;">
+        <div style="font-weight:700;color:#dc2626;margin-bottom:5px;">🔴 Cosa non è recuperabile dallo scenario</div>
+        <div style="color:#4b5563;">
+          — Valore <em>ufficiale</em> originale del nodo eliminato al momento della creazione (es. UnitCost ufficiale di D prima dell'eliminazione)<br>
+          — Storia della BOM ufficiale: non è responsabilità dello scenario — va cercata nel registro modifiche BOM se presente<br>
+          — Sottodistinta del nodo eliminato se non era stata sovrascritta
+        </div>
+      </div>
+    </div>
+
+    <!-- regola operativa -->
+    <div style="background:#eff6ff;border-radius:7px;padding:11px 13px;border:1px solid #bfdbfe;font-size:12px;line-height:1.7;">
+      <strong style="color:#1e40af;">Regola operativa per ridurre il rischio orfani.</strong>
+      Al salvataggio di un override, valorizza esplicitamente <em>tutti</em> i campi della riga — anche quelli identici all'ufficiale.
+      Il record esiste nella tabella con il WhereUsedPath compilato e gli snapshot valorizzati.
+      Non duplichi la struttura BOM: duplichi solo i valori della singola riga che stai coprendo.
+      Se quella riga viene eliminata dall'ufficiale, lo scenario sa esattamente cosa voleva fare su di essa
+      e può proporre la riassociazione al padre valido più vicino.
+    </div>
+
+  </div><!-- /sezione orfani -->
+
+  <!-- NOTA FINALE -->
+  <div class="note">
+    <strong>Nota per il consulente.</strong>
+    Le SP di costificazione esistenti non vengono riscritte. L'intervento è chirurgico e limitato a due punti precisi nel WHILE loop di esplosione BOM, con l'aggiunta di un parametro nullable che garantisce backward compatibility totale. Il percorso di calcolo ufficiale (ScenarioID = NULL) non cambia di una riga. Le nuove tabelle sono additive e non alterano nessuna struttura esistente.
+  </div>
+
+</div>
+</body>
+</html>

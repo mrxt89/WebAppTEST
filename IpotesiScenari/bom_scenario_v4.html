@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOM Scenario — Confronto A→B→C→D vs A→B→E</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f4f5f7;--surface:#fff;--border:#e2e5ea;--bstr:#c8cdd6;
+    --text:#1a1d23;--muted:#6b7280;--light:#9ca3af;
+    --blue:#2563eb;--blbg:#eff6ff;--blmd:#dbeafe;
+    --green:#059669;--grbg:#ecfdf5;--grmd:#d1fae5;
+    --red:#dc2626;--rdbg:#fef2f2;
+    --ora:#d97706;--orbg:#fffbeb;--ormd:#fef3c7;
+    --mono:"IBM Plex Mono",monospace;--sans:"IBM Plex Sans",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;padding:20px;}
+  .modal{background:var(--surface);border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.12);max-width:1320px;margin:0 auto;overflow:hidden;}
+  .mh{display:flex;align-items:center;justify-content:space-between;padding:11px 20px;border-bottom:1px solid var(--border);}
+  .mh-t{font-size:11px;font-weight:500;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;}
+  .scbar{border-bottom:2px solid var(--blmd);padding:9px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;transition:background .2s,border-color .2s;background:var(--blbg);}
+  .scbar-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--blue);}
+  .scsel{border:1px solid var(--blmd);border-radius:5px;padding:5px 10px;font-size:12px;font-family:var(--sans);background:white;cursor:pointer;}
+  .scbadge{display:inline-flex;align-items:center;gap:5px;background:white;border:1px solid var(--blmd);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--blue);}
+  .scdot{width:7px;height:7px;border-radius:50%;background:#22c55e;}
+  .scinfo{font-size:11px;color:var(--muted);}
+  .scacts{margin-left:auto;display:flex;gap:8px;}
+  .btn{display:inline-flex;align-items:center;gap:4px;padding:5px 11px;border-radius:5px;border:1px solid var(--bstr);background:white;font-size:11px;font-weight:500;cursor:pointer;font-family:var(--sans);}
+  .btn:hover{background:var(--bg);}
+  .btng{background:var(--green);border-color:var(--green);color:white;}
+  .btng:hover{background:#047857;}
+  .tabs{display:flex;border-bottom:1px solid var(--border);background:white;}
+  .tab{padding:9px 18px;font-size:12px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);}
+  .tab:hover{color:var(--text);}
+  .tab.active{color:var(--blue);border-bottom-color:var(--blue);}
+  .tp{display:none;}
+  .tp.active{display:block;}
+
+  /* LAYOUT */
+  .layout{display:grid;grid-template-columns:290px 1fr;}
+  .treepan{border-right:1px solid var(--border);background:#fafbfc;}
+  .panhdr{padding:9px 14px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);background:white;}
+  .twrap{padding:14px 10px;}
+  .tsep{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:2px 7px;border-radius:3px;margin:10px 0 5px;display:inline-block;}
+  .ts-u{background:#f3f4f6;color:var(--muted);}
+  .ts-1{background:var(--blmd);color:#1e40af;}
+  .ts-2{background:var(--ormd);color:var(--ora);}
+
+  /* NODI ALBERO */
+  .tr{display:flex;align-items:center;gap:5px;padding:4px 7px;border-radius:5px;margin-bottom:2px;border:1px solid transparent;}
+  .tr:hover{background:#f0f4ff;}
+  .tr.tmod{background:var(--blbg);border-color:var(--blmd);}
+  .tr.trep{background:var(--orbg);border-color:var(--ormd);}
+  .tr.texc{background:var(--rdbg);border-color:#fecaca;opacity:.65;}
+  .tr.troot{background:#f0f9ff;border-color:#bae6fd;}
+  .tc{display:flex;flex-direction:column;}
+  .tcode{font-family:var(--mono);font-size:11px;font-weight:600;}
+  .tdesc{font-size:10px;color:var(--muted);}
+  .ti{width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
+  .tipf{background:#dbeafe;color:#1e40af;}
+  .tise{background:#ede9fe;color:#5b21b6;}
+  .tiop{background:#d1fae5;color:#065f46;font-size:9px;}
+  .timp{background:#fef9c3;color:#713f12;}
+  .tirp{background:var(--ormd);color:var(--ora);font-weight:700;}
+  .tiex{background:#fecaca;color:var(--red);}
+  .tbg{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:auto;white-space:nowrap;}
+  .tb1{background:var(--blmd);color:#1e40af;}
+  .tb2{background:var(--ormd);color:var(--ora);}
+  .tbeq{background:#f3f4f6;color:var(--muted);}
+  .tbex{background:#fecaca;color:var(--red);}
+  .tch{padding-left:18px;position:relative;}
+  .tch::before{content:"";position:absolute;left:6px;top:0;bottom:16px;width:1px;background:var(--border);}
+  .tnote{margin-top:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:9px 11px;font-size:11px;color:#78350f;line-height:1.6;}
+
+  /* TABELLA CONFRONTO */
+  .comppan{overflow-x:auto;}
+  .ch{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid var(--bstr);}
+  .chcol{padding:9px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:6px;}
+  .chuff{border-right:1px solid var(--border);background:#fafbfc;color:var(--muted);}
+  .ct{width:100%;border-collapse:collapse;}
+  .ct th{padding:6px 10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;background:#fafbfc;}
+  .ct td{padding:6px 10px;border-bottom:1px solid #f3f4f6;font-size:12px;vertical-align:middle;}
+  .ct tr:last-child td{border-bottom:none;}
+  .ct tr:hover td{background:#fafafa;}
+  .thdiv{border-left:2px solid var(--bstr)!important;}
+  .tddiv{border-left:2px solid var(--bstr)!important;}
+  .mono{font-family:var(--mono);}
+  .rsec{background:#f8f9fb!important;}
+  .rsec td{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);padding:5px 10px;}
+  .vuff{color:var(--text);}
+  .vsc1{color:var(--blue);font-weight:500;}
+  .vsc2{color:var(--ora);font-weight:600;}
+  .veq{color:var(--light);font-style:italic;font-size:11px;}
+  .vexc{color:var(--light);text-decoration:line-through;font-size:11px;}
+  .dn{color:var(--green);font-weight:600;}
+  .dp{color:var(--red);font-weight:600;}
+  .dz{color:var(--light);}
+  .rm1 td:first-child{border-left:3px solid var(--blue);}
+  .rm2 td:first-child{border-left:3px solid var(--ora);}
+  .rex td:first-child{border-left:3px solid var(--red);}
+  .tag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;}
+  .tagr{background:var(--ormd);color:var(--ora);}
+  .tage{background:#fecaca;color:var(--red);}
+
+  /* TOTALI */
+  .totbar{display:grid;grid-template-columns:1fr 1fr;border-top:2px solid var(--bstr);}
+  .totcol{padding:12px 16px;}
+  .totuff{background:#fafbfc;border-right:1px solid var(--border);}
+  .totlbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:4px;}
+  .totval{font-family:var(--mono);font-size:18px;font-weight:600;}
+  .totdlt{font-size:11px;margin-top:3px;}
+  .totbrk{display:flex;gap:10px;margin-top:7px;flex-wrap:wrap;font-size:11px;}
+  .tbl{color:var(--muted);}
+  .fbar{padding:9px 20px;background:#f8f9fb;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .fchip{font-family:var(--mono);font-size:10px;background:white;border:1px solid var(--border);border-radius:4px;padding:3px 7px;color:var(--muted);}
+  .li{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);}
+  .ld{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+  /* DB TAB */
+  .dbgrid{display:grid;grid-template-columns:1fr 1fr;}
+  .dbt{border-right:1px solid var(--border);border-bottom:1px solid var(--border);}
+  .dbt:nth-child(2n){border-right:none;}
+  .dbth{padding:8px 14px;font-size:11px;font-weight:700;font-family:var(--mono);border-bottom:1px solid var(--border);}
+  .dbsc{background:var(--blbg);color:#1e40af;}
+  .dbco{background:var(--grbg);color:#065f46;}
+  .dbro{background:#f5f3ff;color:#5b21b6;}
+  .dblg{background:#f8f9fb;color:var(--muted);}
+  .dbf{padding:8px 14px;}
+  .df{display:flex;align-items:baseline;gap:5px;padding:3px 0;border-bottom:1px solid #f9fafb;font-size:11px;}
+  .df:last-child{border-bottom:none;}
+  .dfn{font-family:var(--mono);font-weight:500;color:var(--text);min-width:170px;}
+  .dft{font-size:10px;color:var(--light);font-family:var(--mono);}
+  .dfno{font-size:10px;color:var(--muted);}
+  .pk{background:#fef9c3;color:#713f12;font-size:9px;padding:1px 4px;border-radius:2px;font-weight:700;}
+  .fk{background:#dbeafe;color:#1e40af;font-size:9px;padding:1px 4px;border-radius:2px;font-weight:700;}
+  .hi{background:var(--ormd);color:var(--ora);font-size:9px;padding:1px 4px;border-radius:2px;font-weight:700;}
+  .nu{background:#f3f4f6;color:var(--muted);font-size:9px;padding:1px 4px;border-radius:2px;}
+  .dfpath{background:#fffbeb;border-radius:4px;padding:5px 7px;margin:3px 0;}
+</style>
+</head>
+<body>
+<div class="modal">
+
+<div class="mh">
+  <span class="mh-t">BOM Scenario — Caso pratico: A → B → C → D &nbsp;(make) &nbsp;vs&nbsp; A → B → E &nbsp;(buy)</span>
+  <button style="background:none;border:none;font-size:18px;cursor:pointer;color:#9ca3af">×</button>
+</div>
+
+<div class="scbar" id="scBar">
+  <span class="scbar-lbl">Scenario</span>
+  <select class="scsel" onchange="sv(this.value)">
+    <option value="uff">— Nessuno (Ufficiale)</option>
+    <option value="sc1" selected>SC1 — Modifica ciclo B + costo D &nbsp;(make)</option>
+    <option value="sc2">SC2 — REPLACE C con E acquisto &nbsp;(buy)</option>
+  </select>
+  <span class="scbadge"><span class="scdot"></span><span id="bdgTxt">SC1 · Bozza</span></span>
+  <span class="scinfo" id="infoTxt">ScenarioID=42 · M. Rossi · 24/02/2026 · 2 override</span>
+  <div class="scacts">
+    <button class="btn">+ Nuovo Scenario</button>
+    <button class="btn btng">✓ Promuovi a Ufficiale</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="st('confronto',this)">Confronto Scenari</div>
+  <div class="tab" onclick="st('db',this)">Struttura Tabelle DB</div>
+</div>
+
+<!-- ═══ TAB CONFRONTO ═══ -->
+<div class="tp active" id="tab-confronto">
+<div class="layout">
+
+<!-- ALBERO -->
+<div class="treepan">
+<div class="panhdr">Struttura BOM — Albero</div>
+<div class="twrap">
+
+<span class="tsep ts-u">Struttura ufficiale</span>
+<div class="tr troot"><div class="ti tipf">🏠</div><div class="tc"><div class="tcode">A</div><div class="tdesc">Prodotto Finito</div></div></div>
+<div class="tch">
+  <div class="tr"><div class="ti tise">◈</div><div class="tc"><div class="tcode">B</div><div class="tdesc">Semilavorato</div></div></div>
+  <div class="tch">
+    <div class="tr"><div class="ti tiop">⚙</div><div class="tc"><div class="tcode" style="font-size:10px">SLD-000</div><div class="tdesc">Ciclo saldatura</div></div></div>
+    <div class="tr"><div class="ti tise">◈</div><div class="tc"><div class="tcode">C</div><div class="tdesc">Corpo valvola (semi)</div></div></div>
+    <div class="tch">
+      <div class="tr"><div class="ti timp">🛒</div><div class="tc"><div class="tcode">D</div><div class="tdesc">Acciaio inox (MP)</div></div></div>
+    </div>
+  </div>
+</div>
+
+<span class="tsep ts-1" style="margin-top:14px">SC1 — Modifica valori</span>
+<div class="tr"><div class="ti tipf">🏠</div><div class="tc"><div class="tcode">A</div></div></div>
+<div class="tch">
+  <div class="tr"><div class="ti tise">◈</div><div class="tc"><div class="tcode">B</div></div></div>
+  <div class="tch">
+    <div class="tr tmod"><div class="ti tiop">⚙</div><div class="tc"><div class="tcode" style="font-size:10px">SLD-000</div></div><span class="tbg tb1">−33% tempo</span></div>
+    <div class="tr"><div class="ti tise">◈</div><div class="tc"><div class="tcode">C</div></div><span class="tbg tbeq">=</span></div>
+    <div class="tch">
+      <div class="tr tmod"><div class="ti timp">🛒</div><div class="tc"><div class="tcode">D</div></div><span class="tbg tb1">costo+fissi</span></div>
+    </div>
+  </div>
+</div>
+
+<span class="tsep ts-2" style="margin-top:14px">SC2 — REPLACE C → E</span>
+<div class="tr"><div class="ti tipf">🏠</div><div class="tc"><div class="tcode">A</div></div></div>
+<div class="tch">
+  <div class="tr"><div class="ti tise">◈</div><div class="tc"><div class="tcode">B</div></div></div>
+  <div class="tch">
+    <div class="tr"><div class="ti tiop">⚙</div><div class="tc"><div class="tcode" style="font-size:10px">SLD-000</div></div><span class="tbg tbeq">=</span></div>
+    <div class="tr trep"><div class="ti tirp">↔</div><div class="tc"><div class="tcode" style="color:var(--ora)">E</div><div class="tdesc">acquisto esterno</div></div><span class="tbg tb2">REPLACE C</span></div>
+    <div class="tch">
+      <div class="tr texc"><div class="ti tiex">✕</div><div class="tc"><div class="tcode" style="color:var(--red);text-decoration:line-through">C → D</div><div class="tdesc">ramo non esploso</div></div><span class="tbg tbex">ESCLUSO</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="tnote"><strong>SC2:</strong> la SP con REPLACE usa E e <strong>non scende nel ramo C→D</strong>. D non entra nel calcolo. Nessuna nuova versione BOM.</div>
+</div><!-- /twrap -->
+</div><!-- /treepan -->
+
+<!-- TABELLA -->
+<div class="comppan">
+<div class="ch">
+  <div class="chcol chuff"><span style="width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block"></span>&nbsp;Ufficiale — A → B → C → D</div>
+  <div class="chcol" id="chSc" style="background:var(--blbg);color:var(--blue)"><span style="width:8px;height:8px;border-radius:50%;background:var(--blue);display:inline-block" id="chDot"></span>&nbsp;<span id="chTxt">SC1 — Modifica ciclo B + costo D</span></div>
+</div>
+<table class="ct">
+<thead><tr>
+  <th style="min-width:175px">Riga BOM</th>
+  <th>Q.tà</th><th>Costo Unit.</th><th>C. Fissi</th><th>Lotto</th><th>C. Variabile</th>
+  <th class="thdiv">Q.tà Sc.</th><th>Costo Sc.</th><th>C. Fissi Sc.</th><th>Δ Variabile</th><th>Δ Totale</th>
+</tr></thead>
+<tbody id="ctBody"></tbody>
+</table>
+<div class="totbar">
+  <div class="totcol totuff">
+    <div class="totlbl">Totale Ufficiale</div>
+    <div class="totval" style="color:var(--text)">97,33 €</div>
+    <div class="totbrk"><span><span class="tbl">Mat: </span>32,00 €</span><span><span class="tbl">Op: </span>28,00 €</span><span><span class="tbl">Fissi: </span>4,63 €</span><span><span class="tbl">Ric: </span>32,70 €</span></div>
+  </div>
+  <div class="totcol" id="totCol" style="background:var(--blbg)">
+    <div class="totlbl" id="totLbl">Totale SC1</div>
+    <div class="totval" id="totVal" style="color:var(--blue)">89,58 €</div>
+    <div class="totdlt" id="totDlt"><span class="dn">−7,75 € (−8%)</span> vs ufficiale</div>
+    <div class="totbrk" id="totBrk"></div>
+  </div>
+</div>
+</div><!-- /comppan -->
+</div><!-- /layout -->
+
+<div class="fbar">
+  <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Formule:</span>
+  <span class="fchip">ΔVar = (CostoSc × QtaSc) − (Costo × Qta)</span>
+  <span class="fchip">ΔTot = ΔVar × Lotto + FissoSc − FissoUff</span>
+  <div style="margin-left:auto;display:flex;gap:12px;">
+    <span class="li"><span class="ld" style="background:var(--blue)"></span>SC1 modificato</span>
+    <span class="li"><span class="ld" style="background:var(--ora)"></span>SC2 REPLACE</span>
+    <span class="li"><span class="ld" style="background:var(--red)"></span>SC2 Escluso</span>
+    <span class="li"><span style="font-family:var(--mono);font-size:11px">=</span>&nbsp;Invariato</span>
+    <span class="li"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;border:1.5px solid var(--ora)"></span>&nbsp;C.Fissi Sc.</span>
+  </div>
+</div>
+</div><!-- /tab-confronto -->
+
+<!-- ═══ TAB DB ═══ -->
+<div class="tp" id="tab-db">
+<div class="dbgrid">
+
+<div class="dbt"><div class="dbth dbsc">BOM_Scenario — testata</div><div class="dbf">
+  <div class="df"><span class="dfn">ScenarioID</span><span class="pk">PK</span><span class="dft">BIGINT</span></div>
+  <div class="df"><span class="dfn">BOMId</span><span class="fk">FK</span><span class="dfno">→ BillOfMaterials.Id</span></div>
+  <div class="df"><span class="dfn">BOMStructureVersion</span><span class="dft">INT</span><span class="dfno">snapshot versione struttura al momento creazione</span></div>
+  <div class="df"><span class="dfn">Nome</span><span class="dft">NVARCHAR(150)</span></div>
+  <div class="df"><span class="dfn">Stato</span><span class="dfno">Bozza · Approvato · Promosso · Annullato</span></div>
+  <div class="df"><span class="dfn">Note</span><span class="nu">NULL</span></div>
+  <div class="df"><span class="dfn">CreatoDa, CreatoIl</span><span class="fk">FK</span><span class="dfno">→ AR_Users</span></div>
+  <div class="df"><span class="dfn">PromossoDa, PromossoIl</span><span class="nu">NULL</span></div>
+  <div class="df"><span class="dfn">NuovaBOMVersioneId</span><span class="nu">NULL</span><span class="dfno">se BOM già esportata in ERP</span></div>
+  <div class="df"><span class="dfn">CompanyId</span><span class="dft">INT</span></div>
+</div></div>
+
+<div class="dbt"><div class="dbth dbco">BOM_Scenario_ComponentOverride — materiali</div><div class="dbf">
+  <div class="df"><span class="dfn">Id</span><span class="pk">PK</span></div>
+  <div class="df"><span class="dfn">ScenarioID</span><span class="fk">FK</span><span class="dfno">→ BOM_Scenario</span></div>
+  <div class="df"><span class="dfn">BOMRowID</span><span class="fk">FK</span><span class="dfno">→ BOMComponents.Id — NULL se ADD</span></div>
+  <div class="df dfpath"><span class="dfn" style="color:var(--ora)">WhereUsedPath</span><span class="hi">PATH</span><span class="dfno">"D|C|B|A" — dal nodo verso root. Per riconciliazione orfani.</span></div>
+  <div class="df"><span class="dfn">ItemCode_Snapshot</span><span class="dfno">codice al momento creazione</span></div>
+  <div class="df"><span class="dfn">ParentBOMId_Snapshot</span><span class="dfno">BOM padre al momento creazione</span></div>
+  <div class="df"><span class="dfn">ParentItemCode_Snapshot</span></div>
+  <div class="df"><span class="dfn">Azione</span><span class="dfno">OVERRIDE · ADD · REMOVE · REPLACE</span></div>
+  <div class="df"><span class="dfn">NewComponentId</span><span class="nu">NULL</span><span class="dfno">solo per REPLACE / ADD</span></div>
+  <div class="df"><span class="dfn">Quantity_Ipotesi</span><span class="nu">NULL</span><span class="dfno">NULL = COALESCE usa ufficiale</span></div>
+  <div class="df"><span class="dfn">UnitCost_Ipotesi</span><span class="nu">NULL</span></div>
+  <div class="df"><span class="dfn">FixedCost_Ipotesi</span><span class="nu">NULL</span><span class="dfno">entra in ΔTot</span></div>
+  <div class="df"><span class="dfn">IsOrphaned</span><span class="dft">BIT</span><span class="dfno">1 se BOMRowID non esiste più</span></div>
+  <div class="df"><span class="dfn">ReconciledToRowID</span><span class="nu">NULL</span><span class="dfno">nuovo RowID dopo riconciliazione</span></div>
+  <div class="df"><span class="dfn">ModificatoDa, ModificatoIl</span></div>
+</div></div>
+
+<div class="dbt"><div class="dbth dbro">BOM_Scenario_RoutingOverride — operazioni</div><div class="dbf">
+  <div class="df"><span class="dfn">Id</span><span class="pk">PK</span></div>
+  <div class="df"><span class="dfn">ScenarioID</span><span class="fk">FK</span><span class="dfno">→ BOM_Scenario</span></div>
+  <div class="df"><span class="dfn">RoutingRowID</span><span class="fk">FK</span><span class="dfno">→ BOMRouting.Id — NULL se ADD</span></div>
+  <div class="df dfpath"><span class="dfn" style="color:var(--ora)">WhereUsedPath</span><span class="hi">PATH</span><span class="dfno">"SLD-000|B|A" — ciclo | BOM | root</span></div>
+  <div class="df"><span class="dfn">OperationCode_Snapshot</span></div>
+  <div class="df"><span class="dfn">ParentBOMId_Snapshot, ParentItemCode_Snapshot</span></div>
+  <div class="df"><span class="dfn">Azione</span><span class="dfno">OVERRIDE · ADD · REMOVE</span></div>
+  <div class="df"><span class="dfn">ProcessingTime_Ipotesi</span><span class="nu">NULL</span><span class="dfno">in secondi</span></div>
+  <div class="df"><span class="dfn">SetupTime_Ipotesi</span><span class="nu">NULL</span></div>
+  <div class="df"><span class="dfn">Qty_Ipotesi</span><span class="nu">NULL</span></div>
+  <div class="df"><span class="dfn">IsOrphaned, ReconciledToRowID</span></div>
+  <div class="df"><span class="dfn">ModificatoDa, ModificatoIl</span></div>
+</div></div>
+
+<div class="dbt"><div class="dbth dblg">BOM_Scenario_ReconciliationLog — audit</div><div class="dbf">
+  <div class="df"><span class="dfn">ScenarioID, OverrideType</span><span class="fk">FK</span></div>
+  <div class="df"><span class="dfn">OverrideId</span><span class="dfno">FK → ComponentOverride o RoutingOverride</span></div>
+  <div class="df"><span class="dfn">Esito</span><span class="dfno">AUTO · ORPHANED · USER · DISCARDED</span></div>
+  <div class="df dfpath"><span class="dfn" style="color:var(--ora)">WhereUsedPathUsato</span><span class="dfno">path percorso per trovare primo padre valido</span></div>
+  <div class="df"><span class="dfn">FirstValidAncestor</span><span class="dfno">primo nodo valido trovato nel path</span></div>
+  <div class="df"><span class="dfn">OldRowID → NewRowID</span><span class="dfno">traccia la riassociazione</span></div>
+  <div class="df"><span class="dfn">RilevatoDa</span><span class="nu">NULL</span><span class="dfno">NULL = automatico</span></div>
+  <div class="df"><span class="dfn">RilevatoIl</span><span class="dft">DATETIME</span></div>
+  <div style="margin-top:10px;background:var(--blbg);border-radius:5px;padding:8px 10px;font-size:11px;color:#1e40af;line-height:1.7;">
+    <strong>Regola COALESCE in SP:</strong><br>
+    <code>COALESCE(ov.Quantity_Ipotesi, comp.Quantity)</code><br>
+    Con <code>@ScenarioID = NULL</code> → percorso ufficiale invariato.
+  </div>
+</div></div>
+
+</div><!-- /dbgrid -->
+
+<!-- ESEMPIO DATI -->
+<div style="border-top:1px solid var(--border);padding:16px 20px;">
+<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px;">Esempio dati — ScenarioID 42 (SC1) e ScenarioID 43 (SC2) sulla stessa BOM di A</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+  <div style="background:#f8f9fb;border-radius:6px;border:1px solid var(--border);padding:11px 13px;">
+    <div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:7px;font-family:var(--mono)">RoutingOverride — SLD-000 (SC1)</div>
+    <div style="font-family:var(--mono);font-size:11px;line-height:2;">
+      RoutingRowID = <b>5001</b><br>
+      <span style="color:var(--ora)">WhereUsedPath = <b>"SLD-000|B|A"</b></span><br>
+      Azione = <b>OVERRIDE</b><br>
+      ProcessingTime_Ipotesi = <b>600</b>s (uff. 900s)
+    </div>
+  </div>
+  <div style="background:#f8f9fb;border-radius:6px;border:1px solid var(--border);padding:11px 13px;">
+    <div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:7px;font-family:var(--mono)">ComponentOverride — D (SC1)</div>
+    <div style="font-family:var(--mono);font-size:11px;line-height:2;">
+      BOMRowID = <b>1003</b> (D in BOM di C)<br>
+      <span style="color:var(--ora)">WhereUsedPath = <b>"D|C|B|A"</b></span><br>
+      Azione = <b>OVERRIDE</b><br>
+      UnitCost = <b>9,50</b> (uff. 8,00)<br>
+      FixedCost = <b>40,00</b> (uff. 50,00)
+    </div>
+  </div>
+  <div style="background:#f8f9fb;border-radius:6px;border:1px solid var(--border);padding:11px 13px;">
+    <div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:7px;font-family:var(--mono)">ComponentOverride — C→E (SC2)</div>
+    <div style="font-family:var(--mono);font-size:11px;line-height:2;">
+      BOMRowID = <b>1002</b> (C in BOM di B)<br>
+      <span style="color:var(--ora)">WhereUsedPath = <b>"C|B|A"</b></span><br>
+      Azione = <b>REPLACE</b><br>
+      NewComponentId = <b>4500</b> (E)<br>
+      UnitCost = <b>45,00</b> · FixedCost = <b>0,00</b>
+    </div>
+  </div>
+</div>
+</div>
+
+</div><!-- /tab-db -->
+
+</div><!-- /modal -->
+
+<script>
+var D=[
+  {sec:"SLD-000 — Ciclo su B",rows:[
+    {code:"SLD-000",desc:"Saldatura CBL (ciclo su B)",tipo:"op",qta:1,cu:8.75,fi:0,lot:10,
+     sc1:{cu:5.83},sc2:null}
+  ]},
+  {sec:"C — Semilavorato corpo valvola",rows:[
+    {code:"C",desc:"Corpo valvola semilavorato",tipo:"semi",qta:1,cu:0,fi:0,lot:10,
+     sc1:null,sc2:{az:"REPLACE",nc:"E",nd:"Corpo valvola acquisto esterno",cu:45,fi:0}},
+    {code:"D",desc:"Acciaio inox laminato (MP)",tipo:"mp",qta:1,cu:8,fi:50,lot:10,
+     sc1:{cu:9.5,fi:40,qta:1},sc2:{az:"EXCLUDED"}}
+  ]}
+];
+var IC={pf:"tipf",semi:"tise",op:"tiop",mp:"timp"};
+var ICT={pf:"🏠",semi:"◈",op:"⚙",mp:"🛒"};
+function f(v){return v.toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";}
+function fd(v){return (v>=0?"+":"")+f(v);}
+function dc(v){return v<-0.001?"dn":v>0.001?"dp":"dz";}
+
+function rt(mode){
+  var h="";
+  D.forEach(function(sec){
+    h+="<tr class='rsec'><td colspan='11'>"+sec.sec+"</td></tr>";
+    sec.rows.forEach(function(r){
+      var sc=mode==="sc1"?r.sc1:mode==="sc2"?r.sc2:null;
+      var isExc=sc&&sc.az==="EXCLUDED";
+      var isRep=sc&&sc.az==="REPLACE";
+      var hasMod=sc&&!isExc;
+      var qtaSc=(sc&&sc.qta!=null)?sc.qta:r.qta;
+      var cuSc=isRep?sc.cu:(sc&&sc.cu!=null?sc.cu:r.cu);
+      var fiSc=isRep?(sc.fi||0):(sc&&sc.fi!=null?sc.fi:r.fi);
+      var dV=isExc?null:(cuSc*qtaSc)-(r.cu*r.qta);
+      var dT=isExc?null:dV*r.lot+(fiSc-r.fi);
+      var rc=mode!=="uff"?(isExc?"rex":isRep?"rm2":sc?"rm1":""):"";
+      var dc2=isRep?"tiex":(IC[r.tipo]||"timp");
+      var dt2=isRep?"↔":(ICT[r.tipo]||"?");
+      var lc=isRep?"vsc2":isExc?"red":"vuff";
+      h+="<tr class='"+rc+"'>";
+      h+="<td><div style='display:flex;align-items:center;gap:6px'>";
+      h+="<div class='ti "+dc2+"' style='width:20px;height:20px;font-size:10px'>"+dt2+"</div>";
+      h+="<div><div class='mono' style='font-size:11px;font-weight:600;color:"+(isRep?"var(--ora)":isExc?"var(--red)":"var(--text)")+";"+(isExc?"text-decoration:line-through":"")+";'>"+( isRep?sc.nc:r.code)+"</div>";
+      h+="<div style='font-size:10px;color:var(--muted)'>"+(isRep?sc.nd:r.desc)+"</div></div>";
+      if(isRep)h+="<span class='tag tagr' style='margin-left:4px'>REPLACE</span>";
+      if(isExc)h+="<span class='tag tage' style='margin-left:4px'>ESCLUSO</span>";
+      h+="</div></td>";
+      h+="<td class='mono vuff'>"+r.qta.toLocaleString("it-IT",{minimumFractionDigits:3})+"</td>";
+      h+="<td class='mono vuff'>"+f(r.cu)+"</td>";
+      h+="<td class='mono vuff'>"+(r.fi>0?f(r.fi):"–")+"</td>";
+      h+="<td class='mono vuff'>"+r.lot+"</td>";
+      h+="<td class='mono vuff'>"+f(r.cu*r.qta)+"</td>";
+      if(mode==="uff"){
+        h+="<td class='tddiv' colspan='5'><span class='veq'>— selezionare uno scenario</span></td>";
+      }else if(isExc){
+        h+="<td class='tddiv' colspan='5'><span class='vexc'>non entra nel calcolo — ramo C non esploso dalla SP</span></td>";
+      }else if(!hasMod){
+        h+="<td class='tddiv'><span class='veq'>=</span></td><td><span class='veq'>=</span></td><td><span class='veq'>=</span></td><td class='dz'>—</td><td class='dz'>—</td>";
+      }else{
+        var vc=isRep?"vsc2":"vsc1";
+        var qc=sc.qta!=null&&sc.qta!==r.qta;
+        var cc=cuSc!==r.cu;
+        var fc2=fiSc!==r.fi;
+        h+="<td class='tddiv mono "+vc+"'>"+(qc?qtaSc.toLocaleString("it-IT",{minimumFractionDigits:3}):"<span class='veq'>=</span>")+"</td>";
+        h+="<td class='mono "+vc+"'>"+(cc?f(cuSc):"<span class='veq'>=</span>")+"</td>";
+        h+="<td class='mono "+vc+"'"+(fc2?" style='border:1.5px solid var(--ora);border-radius:3px;padding:4px 8px;'":" ")+">"+(fc2||isRep?f(fiSc):"<span class='veq'>=</span>")+"</td>";
+        h+="<td class='mono "+dc(dV)+"' title='ΔVar'>"+fd(dV)+"</td>";
+        h+="<td class='mono "+dc(dT)+"' title='ΔTot'>"+fd(dT)+"</td>";
+      }
+      h+="</tr>";
+    });
+  });
+  document.getElementById("ctBody").innerHTML=h;
+}
+
+function ut(mode){
+  var col=document.getElementById("totCol");
+  var lbl=document.getElementById("totLbl");
+  var val=document.getElementById("totVal");
+  var dlt=document.getElementById("totDlt");
+  var brk=document.getElementById("totBrk");
+  var cs=document.getElementById("chSc");
+  var cd=document.getElementById("chDot");
+  var ct=document.getElementById("chTxt");
+  if(mode==="uff"){col.style.display="none";return;}
+  col.style.display="";
+  if(mode==="sc1"){
+    col.style.background="var(--blbg)";
+    lbl.textContent="Totale SC1 — Modifica valori (make)";
+    val.textContent="89,58 €";val.style.color="var(--blue)";
+    dlt.innerHTML="<span class='dn'>−7,75 € (−8%)</span> vs ufficiale";
+    brk.innerHTML="<span><span class='tbl'>Mat: </span><span class='dn'>30,50 €</span></span><span><span class='tbl'>Op: </span><span class='dn'>22,75 €</span></span><span><span class='tbl'>Fissi: </span><span class='dn'>3,63 €</span></span><span><span class='tbl'>Ric: </span><span style='color:var(--muted)'>32,70 €</span></span>";
+    cs.style.background="var(--blbg)";cs.style.color="var(--blue)";
+    cd.style.background="var(--blue)";
+    ct.textContent="SC1 — Modifica ciclo B + costo D (make)";
+  }else{
+    col.style.background="var(--orbg)";
+    lbl.textContent="Totale SC2 — E acquisto (buy)";
+    val.textContent="142,33 €";val.style.color="var(--ora)";
+    dlt.innerHTML="<span class='dp'>+45,00 € (+46%)</span> vs ufficiale — E più caro, D non entra";
+    brk.innerHTML="<span><span class='tbl'>Mat: </span><span class='dp'>77,00 €</span></span><span><span class='tbl'>Op: </span><span style='color:var(--muted)'>28,00 €</span></span><span><span class='tbl'>Fissi: </span><span style='color:var(--muted)'>4,63 €</span></span><span><span class='tbl'>Ric: </span><span style='color:var(--muted)'>32,70 €</span></span>";
+    cs.style.background="var(--orbg)";cs.style.color="var(--ora)";
+    cd.style.background="var(--ora)";
+    ct.textContent="SC2 — REPLACE C con E (buy)";
+  }
+}
+
+function sv(mode){
+  var bar=document.getElementById("scBar");
+  var bdg=document.getElementById("bdgTxt");
+  var inf=document.getElementById("infoTxt");
+  if(mode==="uff"){bar.style.background="#f4f5f7";bar.style.borderBottomColor="#e2e5ea";bdg.textContent="Ufficiale";}
+  else if(mode==="sc1"){bar.style.background="var(--blbg)";bar.style.borderBottomColor="var(--blmd)";bdg.textContent="SC1 · Bozza";inf.textContent="ScenarioID=42 · M. Rossi · 24/02/2026 · 2 override";}
+  else{bar.style.background="var(--orbg)";bar.style.borderBottomColor="var(--ormd)";bdg.textContent="SC2 · Bozza";inf.textContent="ScenarioID=43 · M. Rossi · 24/02/2026 · 1 override REPLACE";}
+  rt(mode);ut(mode);
+}
+
+function st(name,el){
+  document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active");});
+  document.querySelectorAll(".tp").forEach(function(p){p.classList.remove("active");});
+  el.classList.add("active");
+  document.getElementById("tab-"+name).classList.add("active");
+}
+
+window.onload=function(){sv("sc1");};
+</script>
+</body>
+</html>

@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  Info,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -37,6 +38,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { buildBOMTree } from "../../helpers/bomHelpers";
 import EmptyBOMView from "./EmptyBOMView";
 import { toast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
 
 // Dialogs
 import {
@@ -77,6 +79,7 @@ const BOMTreeView = ({
     addComponent,
     getBOMData,
     item,
+    bom,
     selectedComponents,
     setSelectedComponents,
     handleRemoveComponents,
@@ -121,6 +124,7 @@ const BOMTreeView = ({
   // variabile di stato per il dialogo temporaneo
   const [showTempReplaceDialog, setShowTempReplaceDialog] = useState(false);
   const [tempReplaceCopyBOM, setTempReplaceCopyBOM] = useState(false);
+  const [tempReplaceDeep, setTempReplaceDeep] = useState(false);
 
   // Stati per i form
   const [manualData, setManualData] = useState({
@@ -132,19 +136,20 @@ const BOMTreeView = ({
     copyBOM: false, // Campo per l'opzione di copia distinta
   });
 
+  // Verifica se la BOM corrente (root) NON è esportata in ERP
+  const isRootBOMNotExported = bom && bom.stato_erp != "1" && bom.stato_erp !== 1;
+
   // Verifica componenti bloccati (dall'ERP)
-  const hasLockedComponents = selectedComponents.some(
-    (comp) =>
-      comp.data.parentBOMStato_erp === "1" ||
-      comp.data.parentBOMStato_erp === 1,
-  );
+  // Se la BOM root non è esportata, i componenti ERP sono selezionabili per sostituzione
+  const isComponentLocked = (comp) =>
+    !isRootBOMNotExported &&
+    (comp.data.parentBOMStato_erp === "1" ||
+      comp.data.parentBOMStato_erp === 1);
+
+  const hasLockedComponents = selectedComponents.some(isComponentLocked);
 
   // Statistiche sui componenti selezionati
-  const lockedCount = selectedComponents.filter(
-    (comp) =>
-      comp.data.parentBOMStato_erp === "1" ||
-      comp.data.parentBOMStato_erp === 1,
-  ).length;
+  const lockedCount = selectedComponents.filter(isComponentLocked).length;
 
   const modifiableCount = selectedComponents.length - lockedCount;
 
@@ -1120,7 +1125,9 @@ const BOMTreeView = ({
       {/* Dialog per conferma e opzioni di sostituzione con temporaneo */}
       <Dialog
         open={showTempReplaceDialog}
-        onOpenChange={setShowTempReplaceDialog}
+        onOpenChange={(open) => {
+          if (!isRefreshing) setShowTempReplaceDialog(open);
+        }}
       >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -1129,110 +1136,214 @@ const BOMTreeView = ({
             </DialogTitle>
           </DialogHeader>
 
-          <div className="py-4 space-y-4">
-            <p className="text-sm text-gray-500">
-              Stai per sostituire {modifiableCount} componenti con nuovi codici
-              temporanei.
-            </p>
-
-            <div className="flex items-center space-x-2 pt-2">
-              <Checkbox
-                id="tempCopyBOM"
-                checked={tempReplaceCopyBOM}
-                onCheckedChange={(checked) => setTempReplaceCopyBOM(checked)}
-                className="h-4 w-4 bg-primary"
-              />
-              <Label htmlFor="tempCopyBOM" className="cursor-pointer">
-                Copia distinta del componente originale
-              </Label>
+          {isRefreshing ? (
+            <div className="py-8 flex flex-col items-center justify-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-gray-500 text-center">
+                Sostituzione in corso...
+                <br />
+                <span className="text-xs text-gray-400">
+                  Non chiudere questa finestra
+                </span>
+              </p>
             </div>
+          ) : (
+            <>
+              <div className="py-4 space-y-4">
+                <p className="text-sm text-gray-500">
+                  Stai per sostituire {modifiableCount} componenti con nuovi codici
+                  temporanei.
+                </p>
 
-            {hasLockedComponents && (
-              <div className="mt-2 p-2 bg-amber-50 rounded text-sm flex items-start">
-                <AlertTriangle className="h-4 w-4 text-amber-500 mr-2 mt-0.5 flex-shrink-0" />
-                <div>
-                  <strong>Nota:</strong> {lockedCount} componenti sono protetti
-                  e non verranno modificati.
+                <div className="flex items-center space-x-2 pt-2">
+                  <Checkbox
+                    id="tempCopyBOM"
+                    checked={tempReplaceCopyBOM || tempReplaceDeep}
+                    onCheckedChange={(checked) => setTempReplaceCopyBOM(checked)}
+                    disabled={tempReplaceDeep}
+                    className="h-4 w-4 bg-primary"
+                  />
+                  <Label htmlFor="tempCopyBOM" className={cn("cursor-pointer", tempReplaceDeep && "text-gray-400")}>
+                    Copia distinta del componente originale
+                  </Label>
                 </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="tempDeepReplace"
+                    checked={tempReplaceDeep}
+                    onCheckedChange={(checked) => {
+                      setTempReplaceDeep(checked);
+                      if (checked) setTempReplaceCopyBOM(true);
+                    }}
+                    className="h-4 w-4 bg-primary"
+                  />
+                  <Label htmlFor="tempDeepReplace" className="cursor-pointer">
+                    Includi sottolivelli (sostituzione multilivello)
+                  </Label>
+                </div>
+
+                {tempReplaceDeep && (
+                  <div className="mt-1 p-2 bg-blue-50 rounded text-sm flex items-start">
+                    <Info className="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
+                    <div>
+                      Per ogni componente sostituito, i sotto-componenti presenti in ERP
+                      verranno anch'essi sostituiti con codici temporanei, ramo per ramo.
+                    </div>
+                  </div>
+                )}
+
+                {hasLockedComponents && (
+                  <div className="mt-2 p-2 bg-amber-50 rounded text-sm flex items-start">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 mr-2 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <strong>Nota:</strong> {lockedCount} componenti sono protetti
+                      e non verranno modificati.
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowTempReplaceDialog(false)}
-            >
-              Annulla
-            </Button>
-            <Button
-              onClick={async () => {
-                // Filtra solo i componenti modificabili
-                const componentsToReplace = selectedComponents.filter(
-                  (comp) =>
-                    comp.data.parentBOMStato_erp !== "1" &&
-                    comp.data.parentBOMStato_erp !== 1,
-                );
-
-                if (componentsToReplace.length === 0) {
-                  toast({
-                    title: "Nessun componente da sostituire",
-                    description: "Tutti i componenti selezionati sono protetti",
-                    variant: "warning",
-                  });
-                  setShowTempReplaceDialog(false);
-                  return;
-                }
-
-                // Mostra indicatore di caricamento
-                setIsRefreshing(true);
-
-                try {
-                  for (const component of componentsToReplace) {
-                    await replaceWithNewComponent(
-                      component.data.ParentBOMId || component.data.BOMId,
-                      component.data.Line,
-                      {
-                        createTempComponent: true,
-                        tempComponentPrefix: "",
-                        Description: `Temporaneo per ${component.data.ComponentItemCode || "componente"}`,
-                        Quantity: component.data.Quantity || 1,
-                        Nature: 22413312,
-                        BaseUoM: component.data.UoM || "NR",
-                        CopyBOM: tempReplaceCopyBOM,
-                      },
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowTempReplaceDialog(false)}
+                >
+                  Annulla
+                </Button>
+                <Button
+                  onClick={async () => {
+                    // Filtra solo i componenti modificabili
+                    // Se la BOM root non è esportata, tutti i componenti sono sostituibili
+                    const componentsToReplace = selectedComponents.filter(
+                      (comp) => !isComponentLocked(comp),
                     );
-                  }
 
-                  // Ricarica i dati
-                  await smartRefresh();
+                    if (componentsToReplace.length === 0) {
+                      toast({
+                        title: "Nessun componente da sostituire",
+                        description: "Tutti i componenti selezionati sono protetti",
+                        variant: "warning",
+                      });
+                      setShowTempReplaceDialog(false);
+                      return;
+                    }
 
-                  toast({
-                    title: "Sostituzione completata",
-                    description: `Sostituiti ${componentsToReplace.length} componenti con codici temporanei`,
-                    variant: "success",
-                  });
+                    // Mostra indicatore di caricamento (blocca UI)
+                    setIsRefreshing(true);
 
-                  // Deseleziona tutti i componenti
-                  setSelectedComponents([]);
-                } catch (error) {
-                  console.error("Errore durante la sostituzione:", error);
-                  toast({
-                    title: "Errore",
-                    description:
-                      error.message ||
-                      "Si è verificato un errore durante la sostituzione",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setIsRefreshing(false);
-                  setShowTempReplaceDialog(false);
-                }
-              }}
-            >
-              Sostituisci
-            </Button>
-          </DialogFooter>
+                    try {
+                      if (tempReplaceDeep) {
+                        // === SOSTITUZIONE MULTILIVELLO (deep replace) ===
+                        // Ordina per livello (top-down) e poi per Path per processare ramo per ramo
+                        const sorted = [...componentsToReplace].sort((a, b) => {
+                          const levelDiff = (a.data.Level || 0) - (b.data.Level || 0);
+                          if (levelDiff !== 0) return levelDiff;
+                          return (a.data.Path || "").localeCompare(b.data.Path || "");
+                        });
+
+                        // Mappa: oldBOMId → newTempBOMId (aggiornata ad ogni sostituzione)
+                        const bomIdMapping = {};
+                        let replacedCount = 0;
+
+                        for (const component of sorted) {
+                          // Determina il BOMId target: se il padre è stato già sostituito, usa il nuovo BOMId
+                          let targetBOMId = component.data.ParentBOMId || component.data.BOMId;
+
+                          // Cerca nella mappa se il BOMId del padre è stato rimappato
+                          if (bomIdMapping[targetBOMId]) {
+                            targetBOMId = bomIdMapping[targetBOMId];
+                          }
+
+                          // Preserva la Nature originale del componente (acquisto, semilavorato, finito)
+                          const originalNature = component.data.Nature || component.data.ComponentNature || 22413312;
+
+                          const result = await replaceWithNewComponent(
+                            targetBOMId,
+                            component.data.Line,
+                            {
+                              createTempComponent: true,
+                              tempComponentPrefix: "",
+                              Description: `Temporaneo per ${component.data.ComponentItemCode || "componente"}`,
+                              Quantity: component.data.Quantity || 1,
+                              Nature: originalNature,
+                              BaseUoM: component.data.UoM || "NR",
+                              CopyBOM: true, // Sempre true per deep replace
+                            },
+                          );
+
+                          replacedCount++;
+
+                          // Aggiorna la mappa: se il componente originale aveva una BOM,
+                          // il nuovo temp avrà una nuova BOM. I figli di questo componente
+                          // useranno il nuovo BOMId.
+                          if (result && result.tempBOMId && component.data.BOMId) {
+                            bomIdMapping[component.data.BOMId] = result.tempBOMId;
+                          }
+                        }
+
+                        // Ricarica i dati
+                        await smartRefresh();
+
+                        toast({
+                          title: "Sostituzione multilivello completata",
+                          description: `Sostituiti ${replacedCount} componenti su ${sorted.length} selezionati con codici temporanei`,
+                          variant: "success",
+                        });
+                      } else {
+                        // === SOSTITUZIONE SINGOLO LIVELLO (comportamento originale) ===
+                        for (const component of componentsToReplace) {
+                          // Preserva la Nature originale del componente
+                          const originalNature = component.data.Nature || component.data.ComponentNature || 22413312;
+
+                          await replaceWithNewComponent(
+                            component.data.ParentBOMId || component.data.BOMId,
+                            component.data.Line,
+                            {
+                              createTempComponent: true,
+                              tempComponentPrefix: "",
+                              Description: `Temporaneo per ${component.data.ComponentItemCode || "componente"}`,
+                              Quantity: component.data.Quantity || 1,
+                              Nature: originalNature,
+                              BaseUoM: component.data.UoM || "NR",
+                              CopyBOM: tempReplaceCopyBOM,
+                            },
+                          );
+                        }
+
+                        // Ricarica i dati
+                        await smartRefresh();
+
+                        toast({
+                          title: "Sostituzione completata",
+                          description: `Sostituiti ${componentsToReplace.length} componenti con codici temporanei`,
+                          variant: "success",
+                        });
+                      }
+
+                      // Deseleziona tutti i componenti
+                      setSelectedComponents([]);
+                    } catch (error) {
+                      console.error("Errore durante la sostituzione:", error);
+                      toast({
+                        title: "Errore",
+                        description:
+                          error.message ||
+                          "Si è verificato un errore durante la sostituzione",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setIsRefreshing(false);
+                      setShowTempReplaceDialog(false);
+                      setTempReplaceDeep(false);
+                    }
+                  }}
+                >
+                  Sostituisci
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -1351,10 +1462,9 @@ const BOMTreeView = ({
                 }
 
                 // Filtra solo i componenti modificabili
+                // Se la BOM root non è esportata, tutti i componenti sono sostituibili
                 const componentsToReplace = selectedComponents.filter(
-                  (comp) =>
-                    comp.data.parentBOMStato_erp !== "1" &&
-                    comp.data.parentBOMStato_erp !== 1,
+                  (comp) => !isComponentLocked(comp),
                 );
 
                 if (componentsToReplace.length === 0) {
@@ -1551,9 +1661,7 @@ const BOMTreeView = ({
 
                           // Filtra solo i componenti modificabili
                           const componentsToReplace = selectedComponents.filter(
-                            (comp) =>
-                              comp.data.parentBOMStato_erp !== "1" &&
-                              comp.data.parentBOMStato_erp !== 1,
+                            (comp) => !isComponentLocked(comp),
                           );
 
                           if (componentsToReplace.length === 0) {
@@ -1966,9 +2074,7 @@ const BOMTreeView = ({
 
                 // Filtra solo i componenti modificabili
                 const componentsToModify = selectedComponents.filter(
-                  (comp) =>
-                    comp.data.parentBOMStato_erp !== "1" &&
-                    comp.data.parentBOMStato_erp !== 1,
+                  (comp) => !isComponentLocked(comp),
                 );
 
                 if (componentsToModify.length === 0) {
@@ -2084,9 +2190,7 @@ const BOMTreeView = ({
                         onClick={async () => {
                           // Filtra solo i componenti modificabili
                           const componentsToModify = selectedComponents.filter(
-                            (comp) =>
-                              comp.data.parentBOMStato_erp !== "1" &&
-                              comp.data.parentBOMStato_erp !== 1,
+                            (comp) => !isComponentLocked(comp),
                           );
 
                           if (componentsToModify.length === 0) {

@@ -221,7 +221,7 @@ const TreeNode = ({
   dropTarget, // Prop per il target di drop attuale
   dropMode, // Prop per la modalità di drop
 }) => {
-  const { expandedNodes, bomRouting, editMode, selectedComponents, canEdit, pendingChanges } =
+  const { expandedNodes, bomRouting, editMode, selectedComponents, canEdit, pendingChanges, bom } =
     useBOMViewer();
 
   const [nodeCycles, setNodeCycles] = useState([]);
@@ -239,11 +239,21 @@ const TreeNode = ({
     },
   });
 
-  // MODIFICA: Il livello 0 è bloccato solo se NON siamo in editMode
-  // In editMode può essere selezionato per la ricodifica ma non eliminato
+  // Verifica se la BOM corrente (root) NON è esportata in ERP
+  const isRootBOMNotExported = bom && bom.stato_erp != "1" && bom.stato_erp !== 1;
+
+  // Blocco per MODIFICA DIRETTA dei campi - resta come prima
   const isLocked =
     (isRootNode && !editMode) || // Root bloccato solo se non in edit mode
     (node.type === "component" &&
+      (node.data.parentBOMStato_erp === "1" ||
+        node.data.parentBOMStato_erp === 1));
+
+  // Blocco per SELEZIONE (checkbox per azioni bulk come sostituzione/copia)
+  // Se la BOM root non è esportata, i componenti ERP possono essere SELEZIONATI per sostituzione
+  const isLockedForSelection =
+    (isRootNode && !editMode) || // Root bloccato solo se non in edit mode
+    (!isRootBOMNotExported && node.type === "component" &&
       (node.data.parentBOMStato_erp === "1" ||
         node.data.parentBOMStato_erp === 1));
 
@@ -329,7 +339,7 @@ const TreeNode = ({
   const handleCheckboxChange = (e) => {
     e.stopPropagation(); // Prevent node selection
     // MODIFICA: Permetti la selezione del root solo se siamo in editMode e può essere ricodificato
-    if (onNodeCheck && !isLocked) {
+    if (onNodeCheck && !isLockedForSelection) {
       onNodeCheck(node, e.target.checked);
     }
   };
@@ -608,7 +618,7 @@ const TreeNode = ({
               <Checkbox
                 className={`mr-1.5 h-3.5 w-3.5 ${isChecked ? "bg-primary" : ""}`}
                 checked={isChecked}
-                disabled={isLocked || (isRootNode && node.data.stato_erp === 1)}
+                disabled={isLockedForSelection || (isRootNode && node.data.stato_erp === 1)}
                 onClick={(e) => e.stopPropagation()}
                 onCheckedChange={(value) => onNodeCheck && onNodeCheck(node, value)}
               />

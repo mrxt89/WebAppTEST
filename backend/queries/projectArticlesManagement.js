@@ -2605,8 +2605,29 @@ const replaceWithNewComponent = async (companyId, bomId, componentLine, newCompo
         // Aggiungi il codice generato al risultato se disponibile
         if (request.parameters.CreatedComponentCode && request.parameters.CreatedComponentCode.value) {
             result.createdComponentCode = request.parameters.CreatedComponentCode.value;
+
+            // Recupera il BOMId del nuovo componente temporaneo (utile per deep replace multilivello)
+            try {
+                const bomLookup = await pool.request()
+                    .input('CompanyId', sql.Int, companyId)
+                    .input('TempCode', sql.VarChar(64), result.createdComponentCode)
+                    .query(`
+                        SELECT TOP 1 bom.Id AS TempBOMId, i.Id AS TempItemId
+                        FROM dbo.MA_ProjectArticles_Items i
+                        LEFT JOIN dbo.MA_ProjectArticles_BillOfMaterials bom
+                            ON bom.ItemId = i.Id AND bom.CompanyId = i.CompanyId
+                        WHERE i.CompanyId = @CompanyId AND i.Item = @TempCode
+                        ORDER BY bom.Version DESC
+                    `);
+                if (bomLookup.recordset.length > 0) {
+                    result.tempBOMId = bomLookup.recordset[0].TempBOMId;
+                    result.tempItemId = bomLookup.recordset[0].TempItemId;
+                }
+            } catch (lookupErr) {
+                console.warn('Warning: could not lookup temp BOM ID:', lookupErr.message);
+            }
         }
-        
+
         return result;
     } catch (err) {
         console.error('Error replacing with new component:', err);

@@ -1,0 +1,424 @@
+Valutazione della discussione
+È una discussione tecnica di buon livello, con un'evoluzione logica molto interessante. Ti dico cosa penso concretamente.
+Il percorso ragionativo è corretto
+Si parte da una soluzione pragmatica (copia/sostituzione del consulente), si identificano i suoi limiti reali (proliferazione, lavoro manuale su BOM profonde), e si arriva a una proposta più matura. Questo è esattamente come dovrebbe evolvere una discussione tecnica applicata.
+La tua intuizione sui campi ipotesi è stata la svolta giusta
+Hai colto il problema vero: non è solo una questione di integrità dati, ma di sostenibilità operativa nel tempo. La proliferazione di versioni/codici temporanei è un costo nascosto enorme in qualsiasi sistema gestionale, e spesso viene sottovalutato nella fase di progettazione.
+La soluzione finale "scenario overlay" è architetturalmente solida
+Il modello con tabella override 1:N (salvare solo le differenze rispetto all'ufficiale, non tutto) è una scelta classica e ben collaudata in sistemi PLM e ERP evoluti. I punti di forza reali sono: niente duplicazione strutturale, multi-scenario possibile, promozione transazionale controllata.
+Cosa trovo meno convincente nella discussione
+Il punto più critico rimane quello delle stored procedure di costificazione. La discussione lo nomina ma lo minimizza un po'. Se le SP fanno rollup ricorsivo multilivello, introdurre la logica COALESCE(override, ufficiale) non è banale: dipende molto da come sono scritte. Questo è il vero rischio tecnico da quantificare prima di scegliere.
+In sintesi
+La proposta finale è la più intelligente delle tre discusse, ma richiede che il consulente faccia un'analisi onesta dell'impatto sulle SP di costificazione. Se quell'impatto è gestibile, la strada è quella giusta.sulla costificazione si dovrà definire le colonne delle versioni scenari presenti24 febEsatto, e questo è il punto tecnico centrale da chiarire bene prima di procedere.
+Cosa significa concretamente
+Il motore di costificazione oggi legge colonne fisse (Qta, CostoUnitario, TempoCiclo, ecc.). Per supportare gli scenari devi decidere come gli passi i valori da usare: se tramite una vista/query che già restituisce il dato "risolto" (override se presente, ufficiale altrimenti), il motore non cambia. Se invece le SP leggono direttamente le tabelle, devi intervenire.
+La strada più pulita e meno rischiosa
+Creare una vista o una funzione di "risoluzione scenario" che fa il lavoro di COALESCE e restituisce sempre le colonne che le SP si aspettano, con i valori giusti in base allo scenario attivo. Le SP di costificazione non cambiano, cambia solo la sorgente dati che leggono.
+In pratica diventa un parametro di sessione o di chiamata: "calcola la BOM X con scenario Y", e la vista restituisce la struttura con i valori già risolti.
+Il vero lavoro di analisi da fare
+Bisogna mappare esattamente quali colonne di quali tabelle le SP di costificazione leggono, e verificare se è fattibile interporre questa vista senza riscrivere la logica ricorsiva. Questo è il deliverable tecnico che dovresti chiedere al consulente prima di approvare qualsiasi stima di sviluppo.
+Se quella mappatura conferma che le SP leggono da punti isolabili, il rischio scende molto.dammi sintesi da proporre al consulente in mod convincente e toocando i vari aspetti tecnici indicanto che i campi scenraio da considera sono: qta e valore material rpia, qta e tempi cicli. per bom con struttura diversa lo scenario non vale, corretto?24 febEcco una sintesi pronta da girare al consulente.
+
+Proposta: Gestione Simulazioni BOM tramite Scenario Overlay
+Problema da risolvere
+L'approccio copia/sostituzione livello per livello, su BOM profonde, genera un lavoro manuale elevato e una proliferazione di codici temporanei che nel tempo degrada la qualità degli archivi e la leggibilità gestionale.
+Soluzione proposta: Scenario Overlay su BOM ufficiale
+Mantenere la struttura BOM ufficiale invariata e introdurre una tabella scenari collegata 1:N che salva solo le differenze rispetto ai valori ufficiali. La struttura BOM non viene duplicata né modificata.
+Campi oggetto di simulazione (scope definito):
+
+Quantità materiale riga
+Valore/costo unitario materiale riga
+Quantità e tempi ciclo operazioni
+
+Regola di calcolo: per ogni riga, se esiste un override nello scenario attivo si usa quello, altrimenti si usa il valore ufficiale. In SQL: COALESCE(override, ufficiale).
+Perimetro e limite esplicito
+Questo meccanismo vale esclusivamente per BOM con struttura identica all'ufficiale. Se la simulazione richiede variazioni strutturali (sostituzione componente, aggiunta/rimozione righe, sotto-BOM alternativa) lo scenario overlay non si applica e si ricorre al meccanismo di copia/sostituzione già esistente. I due approcci sono complementari, non alternativi.
+Impatto sul motore di costificazione
+Il punto critico da analizzare è che le SP di costificazione (SP_CalculateBOMCosting, SP_BatchCalculateBOMCosting, ecc.) oggi leggono colonne fisse da tabelle reali. Per non modificare la logica ricorsiva esistente, si propone di interporre una vista o funzione di risoluzione scenario che:
+
+riceve come parametro lo ScenarioID
+restituisce le stesse colonne che le SP si aspettano
+applica il COALESCE tra override e ufficiale
+
+Le SP non cambiano. Cambia solo la sorgente dati che leggono. Questo è il punto tecnico da verificare e quantificare prima di approvare qualsiasi stima.
+Deliverable richiesto al consulente: mappatura delle colonne lette dalle SP di costificazione e valutazione di fattibilità dell'interposizione della vista, senza modificare la logica ricorsiva.
+Struttura dati (essenziale)
+BOM_Scenario — testata scenario, comune a tutta la BOM
+
+ScenarioID, BOM_ID, Nome, Stato (Bozza/Approvato/Promosso), CreatoDa, CreatoIl
+
+BOM_Scenario_MaterialOverride — solo righe modificate
+
+ScenarioID, BOMRowID, Qta_Ipotesi, CostoUnit_Ipotesi (nullable: se NULL si usa l'ufficiale)
+
+BOM_Scenario_OperationOverride — solo operazioni modificate
+
+ScenarioID, OperationRowID, Qta_Ipotesi, TempoCiclo_Ipotesi (nullable: stessa regola)
+
+Promozione scenario → ufficiale
+Quando lo scenario è approvato, una procedura dedicata aggiorna i soli campi reali che hanno un override, scrive un log prima/dopo, e marca la BOM come "da esportare" verso il gestionale. Nessun update libero: tutto transazionale e tracciato.
+Vantaggi rispetto all'approccio copia/sostituzione
+
+Nessuna proliferazione di codici temporanei
+Nessun lavoro manuale livello per livello
+Più scenari paralleli sulla stessa BOM
+Archivi ufficiali puliti durante tutta la fase di simulazione
+Allineamento ERP solo a promozione confermata
+
+
+Vuoi che aggiunga anche una stima indicativa dei componenti da sviluppare, per dargli un riferimento di perimetro?dimmi piram se la escusioen di strutture diverse è corretta o è possibile isneerrle negli cenari con ovviaente costo ufficle e 024 febHai ragione a mettere in dubbio l'esclusione — è una limitazione che si può superare.
+Sì, le variazioni strutturali si possono inserire negli scenari
+Basta estendere la tabella override con un campo "azione" che indica cosa fare sulla riga:
+
+OVERRIDE — cambia solo i valori (qta, costo, tempi)
+ADD — aggiunge una riga non presente nell'ufficiale, con i suoi valori
+REMOVE — esclude una riga dall'ufficiale (costo = 0, qta = 0 nello scenario)
+REPLACE — sostituisce un componente con un altro, con i valori ipotesi
+
+Il costo ufficiale = 0 per le righe ADD è esattamente la logica giusta
+Una riga aggiunta nello scenario non esiste nell'ufficiale, quindi il suo valore di riferimento è 0 e il costo ipotesi è interamente a carico dello scenario. Coerente e pulito.
+Cosa cambia rispetto alla proposta precedente
+La vista di risoluzione scenario diventa leggermente più complessa: non fa solo COALESCE sui valori, ma deve anche gestire righe aggiunte, rimosse o sostituite. Non è una complicazione enorme, ma va progettata bene perché la logica ricorsiva di costificazione deve ricevere un albero BOM coerente, non solo valori sovrapposti.
+Il vero vantaggio di questo approccio completo
+Elimini completamente la necessità del meccanismo copia/sostituzione anche per variazioni strutturali. I due approcci non sono più complementari: lo scenario overlay diventa l'unico strumento, molto più pulito.
+Direi che vale la pena inserirlo nella proposta al consulente come estensione naturale, magari in una fase 2 dopo aver validato il meccanismo base sui valori.dammi analisi di priam con componenti sviluppo24 febAnalisi di fattibilità: Scenario Overlay BOM
+Componenti di sviluppo
+
+1. Database — Tabelle nuove
+Tre tabelle nuove, nessuna modifica alle tabelle esistenti:
+
+BOM_Scenario — testata scenario
+BOM_Scenario_MaterialOverride — override materiali con campo Azione (OVERRIDE/ADD/REMOVE/REPLACE)
+BOM_Scenario_OperationOverride — override operazioni con stesso schema
+
+Complessità: bassa. Nessun rischio regressione.
+
+2. Database — Vista/Funzione di risoluzione scenario
+Questo è il componente più delicato dell'intera soluzione.
+La funzione riceve @BOM_ID e @ScenarioID e restituisce l'albero BOM "risolto" con le stesse colonne che le SP di costificazione si aspettano, applicando:
+
+COALESCE per i valori modificati
+esclusione righe REMOVE
+aggiunta righe ADD con costo ufficiale = 0
+sostituzione codice per REPLACE
+
+Prerequisito bloccante: mappatura preventiva di quali tabelle e colonne leggono le SP di costificazione. Se la vista può sostituire la sorgente dati in modo trasparente, le SP non si toccano. Se la ricorsione è hardcoded su tabelle specifiche, serve un intervento chirurgico limitato.
+Complessità: media. È il punto da analizzare prima di stimare.
+
+3. Database — SP di promozione scenario
+SP_PromoteBOMScenario — procedura transazionale che:
+
+verifica stato scenario (solo Approvato è promuovibile)
+controlla che la BOM ufficiale non sia cambiata dal momento di creazione scenario (timestamp/versione)
+aggiorna solo i campi reali che hanno override
+gestisce ADD (inserisce righe nuove nell'ufficiale) e REMOVE (rimuove righe)
+scrive log prima/dopo
+marca BOM come "da esportare"
+aggiorna stato scenario a Promosso
+
+Complessità: media. Logica transazionale ma perimetro definito.
+
+4. Frontend — Gestione scenari
+Interfaccia per:
+
+creazione scenario su BOM (nome, note)
+selezione scenario attivo sulla BOM
+visualizzazione affiancata ufficiale vs ipotesi con delta evidenziato
+modifica campi ipotesi riga per riga (qta, costo, tempi)
+gestione azioni ADD/REMOVE/REPLACE su riga
+badge visivo chiaro: ufficiale / modificato nello scenario / aggiunto / rimosso
+comando Promuovi scenario con conferma esplicita
+
+Complessità: medio-alta. È la parte più laboriosa ma senza rischi tecnici.
+
+5. Frontend — Integrazione calcolo costificazione con scenario
+Aggiungere il parametro ScenarioID al lancio del calcolo costi, in modo che la costificazione lavori sulla vista risolta invece che sulle tabelle dirette. Se la vista è trasparente questo è un intervento minimo.
+Complessità: bassa se la vista funziona correttamente.
+
+Sequenza consigliata e dipendenze
+[1] Mappatura SP costificazione        ← prerequisito bloccante
+        ↓
+[2] Tabelle nuove                      ← parallelo con mappatura
+        ↓
+[3] Vista risoluzione scenario         ← dipende da mappatura
+        ↓
+[4] Test costificazione con scenario   ← validazione critica
+        ↓
+[5] SP promozione                      ← dipende da [3]
+[6] Frontend scenari                   ← dipende da [3] e [4]
+        ↓
+[7] Frontend integrazione calcolo      ← dipende da [4] e [6]
+
+Stima indicativa complessità
+ComponenteComplessitàNoteTabelle nuoveBassaNessun rischioVista risoluzioneMedia/AltaDipende da mappatura SPSP promozioneMediaLogica transazionaleFrontend scenariMedia/AltaParte più laboriosaFrontend calcoloBassaSe vista è trasparente
+
+Rischio principale
+L'unico rischio reale è la vista di risoluzione scenario rispetto alla ricorsione nelle SP di costificazione. Per questo la mappatura preventiva non è un'attività opzionale: è il gate che determina se la stima finale è in giorni o in settimane.
+Vuoi che formalizzi anche una checklist per quella mappatura da dare al consulente come primo deliverable?si24 febChecklist Mappatura SP Costificazione
+Deliverable preliminare — gate tecnico obbligatorio
+
+Obiettivo
+Verificare se è possibile interporre una vista di risoluzione scenario tra le tabelle BOM esistenti e le SP di costificazione, senza modificare la logica ricorsiva. L'esito di questa analisi determina la stima finale di sviluppo.
+
+SEZIONE 1 — Censimento tabelle lette dalle SP
+Per ciascuna SP di costificazione (SP_CalculateBOMCosting, SP_GetBOMCostingDetails, SP_BatchCalculateBOMCosting e qualsiasi altra coinvolta nel calcolo):
+
+ Elencare tutte le tabelle/viste lette (FROM, JOIN)
+ Elencare tutte le colonne lette per materiali (qta, costo unitario, sfrido, ecc.)
+ Elencare tutte le colonne lette per operazioni (tempi ciclo, tempi setup, costo orario, ecc.)
+ Identificare se le tabelle sono lette direttamente o tramite viste già esistenti
+ Verificare se esistono riferimenti hardcoded a nomi tabella nella logica ricorsiva
+
+
+SEZIONE 2 — Analisi della ricorsione
+
+ Identificare il meccanismo di ricorsione usato (CTE ricorsiva, while loop, cursor, chiamata SP annidata)
+ Verificare se la ricorsione referenzia le tabelle per nome diretto o tramite parametro/variabile
+ Verificare se è possibile sostituire la tabella sorgente con una vista avente lo stesso schema
+ Identificare eventuali indici o hint di query che dipendono dalla tabella fisica (potrebbero non funzionare su vista)
+ Verificare se esistono operazioni di scrittura temporanea (tabelle #temp, @table variable) che dipendono dalla struttura delle tabelle lette
+
+
+SEZIONE 3 — Analisi dei punti di ingresso
+
+ Identificare da dove viene chiamata ciascuna SP (frontend, altre SP, job schedulati, batch)
+ Verificare se le SP accettano già parametri aggiuntivi o se la firma è rigida
+ Valutare se è possibile aggiungere un parametro opzionale @ScenarioID NULL senza rompere le chiamate esistenti
+ Verificare se esistono chiamate batch notturne o pianificate che potrebbero essere impattate
+
+
+SEZIONE 4 — Valutazione fattibilità vista
+
+ Confermare che lo schema della vista di risoluzione scenario può essere identico alle tabelle originali
+ Verificare che la vista possa essere parametrica (funzione table-valued) o se serve gestire lo ScenarioID diversamente
+ Stimare impatto prestazionale: la vista aggiunge join alle tabelle override, verificare se su BOM grandi il piano di esecuzione rimane accettabile
+ Verificare se esistono vincoli di integrità referenziale che potrebbero complicare le righe ADD/REMOVE nello scenario
+
+
+SEZIONE 5 — Esito e classificazione
+Al termine della mappatura il consulente deve fornire una delle tre classificazioni:
+Caso A — Vista trasparente possibile
+Le SP leggono tabelle sostituibili con vista a schema identico. Impatto minimo, stima in giorni. Rischio basso.
+Caso B — Intervento chirurgico limitato
+Le SP richiedono modifiche puntuali (es. aggiunta parametro ScenarioID, sostituzione di 1-2 riferimenti diretti a tabella). Impatto contenuto, stima in giorni con margine. Rischio medio.
+Caso C — Refactoring significativo
+La ricorsione è hardcoded in modo non sostituibile con vista. Necessario modificare logica interna delle SP. Stima in settimane. Rischio alto — valutare approccio alternativo.
+
+Output atteso dal consulente
+Un documento sintetico che per ciascuna SP riporti:
+
+tabelle/colonne lette
+meccanismo ricorsione
+classificazione A/B/C
+stima giorni per il proprio componente
+
+Tempo stimato per la mappatura: 2-4 ore di analisi tecnica sul codice esistente.
+
+Questo documento è il gate: senza esito della mappatura nessuna stima di sviluppo complessiva è affidabile.la SP_CalculateBOMCosting da dove hai capito che fa parte del mio db?24 febHai perfettamente ragione a sollevarlo.
+I nomi delle SP (SP_CalculateBOMCosting, SP_GetBOMCostingDetails, SP_BatchCalculateBOMCosting) li ho presi dal documento che hai incollato nella conversazione — erano citati dal tuo consulente come esempi delle stored procedure coinvolte nel calcolo.
+Non ho alcuna conoscenza diretta del tuo database. Potevano essere nomi esemplificativi usati dal consulente nella sua proposta, oppure i nomi reali delle tue SP.
+Cosa fare
+Nella checklist da girare al consulente, i nomi delle SP vanno lasciati in bianco o sostituiti con "le SP di costificazione presenti nel sistema", chiedendo al consulente stesso di censirle come primo passo. Sarebbe un errore presentare nomi specifici che potrebbero non corrispondere alla realtà del tuo database.
+Vuoi che riveda la checklist togliendo i riferimenti espliciti a quei nomi?Files hidden in shared chatseccole24 febGrazie. Ho le prime due come file da leggere e la terza già nel contesto. Leggo subito le prime due.Eseguiti 2 comandiEseguiti 2 comandiLeggo la SP principale di costificazioneScriptLeggo la SP di dettaglio costificazioneScriptFattoOra ho letto tutto. Ecco l'analisi completa basata sul codice reale.
+
+Analisi SP costificazione — mappatura reale
+Tabelle lette dalle SP
+SP_CalculateBOMCosting (la SP critica)
+Tabelle coinvolte nella ricorsione:
+
+MA_ProjectArticles_BillOfMaterials — testata BOM
+MA_ProjectArticles_BOMComponents — righe componenti (Quantity, UnitCost, FixedCost)
+MA_ProjectArticles_BOMRouting — operazioni (ProcessingTime, SetupTime, Qty)
+MA_ProjectArticles_Items — anagrafica articoli
+MA_ProjectArticles_BOMOperations — costi operazioni (UnitCost, FixedCost)
+MA_ProjectArticles_BOMWorkCenters — centri lavoro (HourlyCost)
+
+SP_GetBOMCostingDetails — stessa struttura ricorsiva, stesse tabelle.
+SP_GetBOMCostingHistory — solo lettura storico, nessun calcolo. Non impattata.
+
+Campi oggetto di simulazione — dove vivono esattamente
+Campo simulabileTabellaColonnaQuantità materialeMA_ProjectArticles_BOMComponentsQuantityCosto unitario materialeMA_ProjectArticles_BOMComponentsUnitCostCosto fisso componenteMA_ProjectArticles_BOMComponentsFixedCostTempo ciclo operazioneMA_ProjectArticles_BOMRoutingProcessingTimeTempo setup operazioneMA_ProjectArticles_BOMRoutingSetupTimeQuantità operazioneMA_ProjectArticles_BOMRoutingQtyCosto unitario operazioneMA_ProjectArticles_BOMOperationsUnitCostCosto orario centro lavoroMA_ProjectArticles_BOMWorkCentersHourlyCost
+
+Analisi del meccanismo ricorsivo
+La ricorsione è implementata tramite WHILE loop su tabella temporanea #BOMExplosionCorrect, non CTE ricorsiva. Questo è un dettaglio tecnico importante.
+Il loop legge direttamente:
+sqlJOIN MA_ProjectArticles_BOMComponents comp 
+    ON t.BOMId = comp.BOMId AND comp.CompanyId = @CompanyId
+Il riferimento a MA_ProjectArticles_BOMComponents è hardcoded nel JOIN del WHILE loop. Stesso pattern in SP_GetBOMCostingDetails.
+
+Classificazione fattibilità — Caso B
+Non è il caso A (sostituzione trasparente con vista) perché il JOIN nel WHILE loop referenzia direttamente la tabella fisica. Non è il caso C perché l'intervento è chirurgico e localizzato.
+Cosa serve concretamente:
+Nelle due SP il WHILE loop va modificato in un punto preciso per sostituire il JOIN diretto con una logica che applica gli override di scenario. L'intervento è replicabile e limitato:
+sql-- OGGI (hardcoded)
+JOIN MA_ProjectArticles_BOMComponents comp 
+    ON t.BOMId = comp.BOMId AND comp.CompanyId = @CompanyId
+
+-- CON SCENARIO (da aggiungere)
+JOIN MA_ProjectArticles_BOMComponents comp 
+    ON t.BOMId = comp.BOMId AND comp.CompanyId = @CompanyId
+LEFT JOIN BOM_Scenario_MaterialOverride ovr 
+    ON ovr.BOMRowID = comp.Id AND ovr.ScenarioID = @ScenarioID
+-- poi nei campi: COALESCE(ovr.Quantity, comp.Quantity) as Quantity, ecc.
+Stesso intervento sul routing per i tempi ciclo.
+Parametro da aggiungere alle SP:
+sql@ScenarioID BIGINT = NULL  -- NULL = calcolo ufficiale, invariato
+Con @ScenarioID = NULL le SP si comportano esattamente come oggi. Zero regressioni sul percorso esistente.
+
+Impatto operazioni (BOMRouting)
+Attenzione: la SP_GetBOMCostingDetails legge il routing tramite:
+sqlLEFT JOIN MA_ProjectArticles_BOMRouting rt 
+    ON exp.BOMId = rt.BOMId AND rt.CompanyId = @CompanyId
+Anche qui serve aggiungere il LEFT JOIN alla tabella override operazioni con COALESCE su ProcessingTime, SetupTime, Qty.
+
+Stima intervento
+InterventoDoveComplessitàAggiunta @ScenarioID nullableFirma entrambe le SPMinimaCOALESCE componenti nel WHILE loopSP_CalculateBOMCostingBassaCOALESCE routing nel calcolo OPESP_CalculateBOMCostingBassaStesso intervento su SP_GetBOMCostingDetailsSP_GetBOMCostingDetailsBassa (copia stessa logica)SP_GetBOMCostingHistoryNessun interventoZero
+Stima totale intervento SP: 1-2 giorni incluso test. Il rischio regressione è basso perché il parametro è nullable e il percorso @ScenarioID = NULL non cambia di una virgola.
+
+Conclusione per il consulente
+Il rischio che aveva identificato sulle SP è reale ma sovrastimato. La ricorsione è un WHILE loop con JOIN hardcoded modificabile in modo chirurgico in due punti precisi. Il parametro @ScenarioID = NULL garantisce backward compatibility totale. Non serve riscrivere la logica di rollup né toccare i calcoli dei ricarichi.dammi ora la lista compatta dell attività e dei campi scenario da considerare, comprendendo vista con secnari e decisione update bom nuova da scenario24 febLista attività e campi scenario
+
+Tabelle nuove
+BOM_Scenario — testata scenario
+
+ScenarioID, BOMId, CompanyId, Nome, Stato (Bozza/Approvato/Promosso/Annullato), CreatoDa, CreatoIl, Note
+
+BOM_Scenario_ComponentOverride — override componenti (solo righe modificate)
+
+ScenarioID, ComponentRowID (→ MA_ProjectArticles_BOMComponents.Id)
+Quantity_Ipotesi, UnitCost_Ipotesi, FixedCost_Ipotesi (tutti nullable: NULL = usa ufficiale)
+Azione (OVERRIDE / ADD / REMOVE / REPLACE), NewComponentId (solo per REPLACE/ADD)
+ModifiedBy, ModifiedAt
+
+BOM_Scenario_RoutingOverride — override operazioni (solo righe modificate)
+
+ScenarioID, RoutingRowID (→ MA_ProjectArticles_BOMRouting.Id)
+ProcessingTime_Ipotesi, SetupTime_Ipotesi, Qty_Ipotesi (tutti nullable)
+Azione (OVERRIDE / ADD / REMOVE)
+ModifiedBy, ModifiedAt
+
+
+Modifiche SP esistenti
+SP_CalculateBOMCosting
+
+Aggiunta parametro @ScenarioID BIGINT = NULL
+Nel WHILE loop: LEFT JOIN BOM_Scenario_ComponentOverride + COALESCE su Quantity, UnitCost, FixedCost
+Nel calcolo routing: LEFT JOIN BOM_Scenario_RoutingOverride + COALESCE su ProcessingTime, SetupTime, Qty
+Gestione righe ADD/REMOVE da scenario nel popolamento #BOMExplosionCorrect
+Con @ScenarioID = NULL comportamento identico a oggi, zero regressioni
+
+SP_GetBOMCostingDetails
+
+Stesso intervento speculare su WHILE loop e routing
+Aggiunta @ScenarioID BIGINT = NULL
+
+SP_GetBOMCostingHistory
+
+Nessun intervento
+
+
+SP nuove
+SP_PromoteBOMScenario — promozione scenario a ufficiale
+
+Verifica stato scenario = Approvato
+Verifica timestamp BOM non cambiata dalla creazione scenario (controllo concorrenza)
+Per OVERRIDE: UPDATE MA_ProjectArticles_BOMComponents e BOMRouting sui campi modificati
+Per ADD: INSERT nuove righe in BOMComponents o BOMRouting
+Per REMOVE: DELETE righe da BOMComponents o BOMRouting
+Per REPLACE: UPDATE ComponentId + valori
+Scrittura log prima/dopo
+Marca BOM con flag DaEsportare = 1
+Aggiorna stato scenario a Promosso
+Tutto in unica transazione
+
+
+Decisione su update BOM alla promozione
+Alla promozione dello scenario i dati ufficiali vengono aggiornati sulla versione BOM esistente se non ancora esportata in ERP (stato_erp = 0). Se la BOM è già esportata (stato_erp = 1) la promozione crea automaticamente una nuova versione della BOM, copia la struttura, applica gli override e marca la nuova versione come DaEsportare. La versione precedente resta intatta e tracciabile. Questo preserva l'integrità storica e l'allineamento ERP.
+
+Frontend
+
+Pannello scenari sulla BOM: lista scenari, creazione, selezione attiva
+Visualizzazione affiancata ufficiale / ipotesi con delta evidenziato
+Editing campi ipotesi riga per riga su componenti e routing
+Gestione azioni ADD/REMOVE/REPLACE su riga
+Badge visivo per stato riga: invariata / modificata / aggiunta / rimossa
+Lancio calcolo costo con scenario attivo (passa @ScenarioID alla SP)
+Comando Promuovi con conferma esplicita e indicazione della regola (aggiorna versione esistente o crea nuova)
+
+
+Stima complessiva
+AttivitàComplessitàGiorni stimatiTabelle nuoveBassa0.5SP_CalculateBOMCostingBassa/Media1SP_GetBOMCostingDetailsBassa0.5SP_PromoteBOMScenarioMedia1.5Frontend scenari + editingMedia/Alta3-4Frontend calcolo con scenarioBassa0.5Test integrati—1.5Totale8-9 giorniFiles hidden in shared chatsquesta la finestra. inserisci opzioni scenario e calcli coem esempio24 febOttima base di partenza. Vedo la struttura multilivello con componenti e operazioni già visualizzati correttamente. Ecco come integrare la gestione scenari in questa stessa finestra.
+
+Proposta integrazione scenario nella finestra Dettaglio Costi
+Area header — aggiunta selettore scenario
+Nella barra superiore, accanto a "Espandi Tutto / Comprimi Tutto / Esporta", aggiungere:
+[ Scenario: Nessuno (Ufficiale) ▼ ]  [ + Nuovo Scenario ]  [ Promuovi ]
+Il dropdown mostra gli scenari disponibili per questa BOM:
+
+Nessuno (Ufficiale) — comportamento attuale
+Simulazione target 2026 — Bozza
+Fornitore alternativo lamiera — Bozza
+ecc.
+
+Quando si seleziona uno scenario attivo, la riga dei totali e i valori nella griglia si aggiornano mostrando i dati dello scenario invece degli ufficiali.
+
+Area totali — affiancamento ufficiale / scenario
+Oggi mostra quattro riquadri: Materiali 14,20€ / Operazioni 36,25€ / Fissi 4,63€ / Ricarichi 42,25€
+Con scenario attivo diventa:
+Materiali          Operazioni         Fissi              Ricarichi
+14,20 €            36,25 €            4,63 €             42,25 €
+↓ 11,80 € (sc.)    ↓ 31,00 € (sc.)    4,63 €             ↓ 38,10 € (sc.)
+-2,40 € (-17%)     -5,25 € (-14%)     invariato          -4,15 € (-10%)
+Totale ufficiale: 97,33€ → Totale scenario: 85,53€ (delta -11,80€ / -12%)
+I delta negativi in verde, positivi in rosso.
+
+Griglia righe — colonne scenario
+Aggiungere tre colonne opzionali che appaiono solo quando uno scenario è attivo:
+Colonna aggiuntaContenutoQ.tà Sc.Quantità ipotesi (editabile inline)Costo Sc.Costo unitario ipotesi (editabile inline)Δ CostoDelta costo totale riga ufficiale vs scenario
+Le righe modificate nello scenario ricevono un badge colorato a sinistra:
+
+blu — valore modificato rispetto all'ufficiale
+verde — riga aggiunta nello scenario
+rosso/barrato — riga rimossa nello scenario
+
+Esempio sulla griglia esistente con scenario attivo:
+🔵 LAMCBL01 - Lamiera tagliata   1.000  NR  1   7,10€  [5,80€ sc.]  -1,30€
+🔵 STM-000 (E-MENEG)             1      -   1   8,00€  [6,50€ sc.]  -1,50€
+   TMP0010000000062 - Guscio 2        invariato, nessun override
+🟢 LAMCBL02 - Lamiera alternativa 0,800 NR  1   [0€ uff.] [4,20€ sc.] +aggiunta
+
+Editing inline
+Click su un campo Q.tà Sc. o Costo Sc. apre un piccolo input inline direttamente sulla riga, senza aprire un pannello separato. Al blur salva l'override nella tabella BOM_Scenario_ComponentOverride. Il ricalcolo dei totali scenario avviene in tempo reale o con un pulsante "Ricalcola Scenario".
+
+Pulsante Promuovi
+Attivo solo se scenario in stato Approvato. Al click mostra un dialog di conferma che indica:
+
+se BOM non esportata → "I valori scenario verranno applicati alla versione corrente"
+se BOM già esportata → "Verrà creata una nuova versione BOM con i valori scenario. La versione attuale resta invariata."
+
+Con riepilogo delle modifiche (N righe componenti modificate, N operazioni modificate, N righe aggiunte, N rimosse).
+
+Vuoi che prepari anche un mockup visivo HTML di come apparirebbe la finestra con queste integrazioni?si24 febFile visualizzato, file creato, file lettoFile visualizzato, file creato, file lettoReading frontend design skillMockup HTML della finestra Dettaglio Costi con gestione scenari integratabom_scenario_mockup.htmlPresented fileFattoIl mockup è interattivo e mostra tutti gli elementi chiave:
+Scenario bar in cima con selettore dropdown, badge stato Bozza, info autore/data e pulsante Promuovi. Cambiando il dropdown su "Nessuno (Ufficiale)" le colonne scenario scompaiono.
+Totali affiancati con ufficiale barrato, valore scenario in verde e delta percentuale per ogni voce (Materiali, Operazioni, Fissi, Ricarichi).
+Colonne scenario (Q.tà Sc. / Costo Sc. / Δ Costo) con input inline editabili sulle righe modificate, "=" per le righe invariate.
+Codice colore righe: bordo blu per modificate, sfondo verde per la riga aggiunta LAMCBL02 con badge "+AGGIUNTA", e pulsante contestuale "+ Override" o "Rimuovi ov." che appare all'hover.
+Dialog promozione con avviso che la BOM è già esportata e verrà creata una nuova versione, con riepilogo modifiche.dammi schema semplice che descriva questo scenario considerando anche la modifica sui costi fissi. questo schema deve: descrive il nuovo prgetto rispeotta a quello proposta, dare indicazioen delle modifice, essere semplicistico e non preoccupare il cosnuelente come lavoro ma consivincerlo della bontà della silueion24 febReading docx skillReading docx skillReading docx skillFattoDato che è uno schema semplice e visivo da mostrare al consulente, un HTML è più efficace di un docx. Lo creo direttamente.File creato, file lettoFile creato, file lettoSchema visivo semplice per il consulente - confronto approcci e modifiche necessarieschema_scenario_consulente.htmlPresented fileFattoLo schema è strutturato in cinque blocchi pensati per non spaventare il consulente:
+Confronto affiancato vecchio/nuovo, dove i vantaggi della proposta parlano da soli senza sminuire il suo lavoro precedente.
+Flusso operativo visivo in sei passi, semplice da leggere anche a una prima occhiata.
+Campi di simulazione raggruppati per area (componenti, operazioni, regola COALESCE) inclusi i costi fissi che hai chiesto.
+Tabella modifiche con tipo di intervento (NUOVO / MODIFICA / NESSUNO), impatto e indicatore di sforzo visivo — il messaggio chiave è che le SP esistenti si toccano in modo chirurgico e con zero regressioni sul percorso ufficiale.
+Logica di promozione con il bivio BOM esportata / non esportata chiaro in un colpo d'occhio.
+La nota finale è scritta direttamente per rassicurare il consulente sul rispetto del suo lavoro esistente.Files hidden in shared chatscorreggi scenario considerando i costi fissi nello e scenario e che il delta costo variabile è dato da (costo scenario * quantita sceanrio) - (costo * qta) e delta costo totale dato da (costo scenario * quantita scenario)*lotto - (costo * qta)*lotto + fisso sceanrio - fisso scenario24 febLeggo il file originale per modificarlo correttamente.Eseguiti 2 comandi, ha visualizzato 2 fileEseguiti 2 comandi, ha visualizzato 2 fileControllo dimensioni fileScriptCopia file in working directoryScriptLeggo la parte della tabella e delle colonne scenarioLeggo la parte tabella e scriptFattoHo tutto quello che serve. Ora riscrive il file con le correzioni: colonne scenario estese con C. Fissi Sc., due colonne delta separate (Δ Variabile e Δ Totale), formule corrette e dati coerenti.2 file modificati2 file modificatiAggiorno intestazioni colonne tabella aggiungendo C. Fissi Sc. e separando Δ Variabile da Δ Totalebom_scenario_v2.html+6-4Aggiorno riga ROOT con nuove colonnebom_scenario_v2.html+9-7FattoOra aggiorno tutte le righe della tabella con i nuovi delta. Le formule:
+
+Δ Variabile = (CostoSc × QtaSc) − (Costo × Qta)
+Δ Totale = (CostoSc × QtaSc × Lotto) − (Costo × Qta × Lotto) + FissoSc − FissoUff
+3 file modificati, file visualizzato3 file modificati, file visualizzatoFIN-000: Qta=1 Costo=20 Lotto=100 Fisso=60 → ScQta=0.80 ScCosto=18 ScFisso=50 | ΔVar=(18×0.80)-(20×1)=-5.60 | ΔTot=(18×0.80×100)-(20×1×100)+(50-60)=1440-2000-10=-570bom_scenario_v2.html+6-4TMP0010000000060 invariato — 5 celle scenariobom_scenario_v2.html+9-7Vedo le righe SLD-000 e successive per aggiornarleSLD-000: Qta=1 Costo=6.25 Lotto=1 Fisso=62.50 → ScQta=1 ScCosto=5.00 ScFisso=50 | ΔVar=(5×1)-(6.25×1)=-1.25 | ΔTot=(5×1×1)-(6.25×1×1)+(50-62.50)=-13.75bom_scenario_v2.html+7-5FattoOra aggiorno tutte le righe invariate rimaste (ancora a 3 celle scenario):2 file modificati, eseguito un comando2 file modificati, eseguito un comandoSostituisco in bulk tutte le righe invariate rimaste con 3 celle + 2 deltaScriptLAMCBL01 L2 modificata: Qta=1.000 Costo=7.10 Lotto=1 Fisso=50 → ScQta=1 ScCosto=5.80 ScFisso=40 | ΔVar=(5.80×1)-(7.10×1)=-1.30 | ΔTot=(5.80×1×1)-(7.10×1×1)+(40-50)=-11.30bom_scenario_v2.html+9-7LAMCBL02 aggiunta: Qta=0 Costo=0 Lotto=1 Fisso=0 → ScQta=0.800 ScCosto=4.20 ScFisso=0 | ΔVar=(4.20×0.800)-(0)=+3.36 | ΔTot=(4.20×0.800×1)-(0)+(0-0)=+3.36bom_scenario_v2.html+6-4FattoOra aggiorno i totali nelle card sommario e aggiungo tooltip alle intestazioni colonna con la formula:2 file modificati2 file modificatiAggiorno card Fissi per mostrare scenario modificato (non più invariato)bom_scenario_v2.html+6-6Aggiorno totale scenario con nuovi valori che includono delta fissibom_scenario_v2.html+5-5FattoOra aggiungo stile per il campo costo fisso scenario (bordo arancione) e aggiorno la legenda:2 file modificati, eseguito un comando, file letto2 file modificati, eseguito un comando, file lettoAggiungo stile per input fisso scenario con bordo arancione e nota formula in legendabom_scenario_v2.html+13-1Aggiorno legenda con formule delta e nuovo conteggiobom_scenario_v2.html+27-23Copia output finaleScriptPresented fileFattoLe correzioni apportate:
+Nuova colonna C. Fissi Sc. — campo editabile con bordo arancione per distinguerlo visivamente dagli altri override. Presente su tutte le righe modificate (FIN-000, SLD-000, LAMCBL01).
+Δ Variabile — calcolato come (CostoSc × QtaSc) − (Costo × Qta), mostra l'impatto sul costo unitario della riga indipendentemente dal lotto.
+Δ Totale — calcolato come (CostoSc × QtaSc × Lotto) − (Costo × Qta × Lotto) + FissoSc − FissoUff, include quindi l'amplificazione del lotto più la variazione dei costi fissi. Per FIN-000 con lotto 100 il delta totale diventa −570 € invece di −5,60 €, rendendo immediatamente visibile il peso del lotto sul costo.
+Card Fissi aggiornata — non più "invariato" ma con il valore scenario e il delta, coerente con gli override sui costi fissi.
+Formula in legenda in notazione compatta per riferimento rapido durante l'uso.aggiorna anche schema sceanrtio consulente con i costi fissi24 feb6 file modificati, eseguiti 5 comandi, file visualizzato6 file modificati, eseguiti 5 comandi, file visualizzatoCopia file in working directoryScriptAggiorno campo costo fisso nei campi componenti e aggiungo sezione formule deltaschema_v2.html+45-23Aggiorno la tabella modifiche tecniche: BOM_Scenario_ComponentOverride ora include esplicitamente CostoFisso_Ipotesischema_v2.htmlTrovo la riga esattaScriptVedo il contesto della riga ComponentOverrideAggiorno descrizione ComponentOverride evidenziando CostoFissoschema_v2.html+1-1Aggiorno SP_CalculateBOMCosting per includere riferimento al CostoFisso scenario nel COALESCEschema_v2.htmlTrovo riferimenti a FixedCost nella SPScriptTrovo riga SP_CalculateBOMCostingScriptAggiorno descrizione SP_CalculateBOMCosting con dettaglio campi COALESCE incluso FixedCostschema_v2.html+1-1Aggiorno descrizione SP_GetBOMCostingDetails con dettaglio FixedCostschema_v2.html+1-1Copia outputScriptPresented fileFattoLe modifiche apportate allo schema:
+Campi simulazione — il Costo fisso nel gruppo Componenti ora ha il badge arancione per distinguerlo visivamente da Quantità e Costo unit., coerente con come appare nel mockup.
+Sezione formule delta — aggiunta sotto la griglia dei campi, con i due riquadri affiancati che mostrano esplicitamente le formule di calcolo che il consulente dovrà implementare: Δ Variabile (impatto unitario) e Δ Totale (con amplificazione lotto e variazione fissi).
+Tabella modifiche — BOM_Scenario_ComponentOverride ora evidenzia in grassetto CostoFisso con la nota che entra nel Δ Totale. Entrambe le SP aggiornate con l'elenco completo dei campi COALESCE incluso FixedCost.

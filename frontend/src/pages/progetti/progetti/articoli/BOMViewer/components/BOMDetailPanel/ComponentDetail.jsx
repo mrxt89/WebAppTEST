@@ -510,8 +510,12 @@ const ComponentDetail = ({ component, editMode }) => {
         <Alert className="bg-amber-50 border-amber-200">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800 text-sm">
-            <strong>Componente presente in ERP (Mago):</strong> Questo articolo è bloccato e non può essere modificato.
-            È possibile solo copiarlo per creare un nuovo codice.
+            <strong>Componente presente in ERP (Mago):</strong> Questo articolo non è modificabile direttamente.
+            {bom && bom.stato_erp != "1" && bom.stato_erp !== 1 ? (
+              <> Selezionalo con la checkbox e usa <strong>Azioni → Sostituisci componenti</strong> per creare una copia modificabile.</>
+            ) : (
+              <> È possibile solo copiarlo per creare un nuovo codice.</>
+            )}
           </AlertDescription>
         </Alert>
       )}
