@@ -46,10 +46,6 @@ const COLUMN_WIDTHS = {
   workCenter: "5%",
 };
 
-// Larghezze colonne scenario (aggiuntive, fixed px)
-const SC_W  = '72px'; // colonna input scenario
-const DLT_W = '72px'; // colonna delta
-
 // Converte stringa → numero o null (per i form override)
 const toNum = (v) => (v === '' || v == null) ? null : Number(v);
 
@@ -281,59 +277,54 @@ const CycleNode = ({ cycle, level, activeScenario, onUpsertOverride }) => {
             {workCenter || '-'}
           </div>
 
-          {/* ── Colonne scenario ─────────────────────────────────────────── */}
-          {activeScenario && (
-            <>
-              {/* T.Ciclo Sc. (sec) */}
-              <div className="flex-shrink-0 px-1" style={{ width: SC_W }}>
-                <input
-                  type="number" min="0" step="1"
-                  placeholder="="
-                  className={`w-full text-right text-[11px] border rounded px-1 py-0.5 font-mono
-                    ${scProc !== '' ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
-                  value={scProc}
-                  onChange={e => setScProc(e.target.value)}
-                  onBlur={saveCycleOverride}
-                  onClick={e => e.stopPropagation()}
-                  title="T. Ciclo Sc. (secondi)"
-                />
-              </div>
-              {/* T.Setup Sc. (sec) */}
-              <div className="flex-shrink-0 px-1" style={{ width: SC_W }}>
-                <input
-                  type="number" min="0" step="1"
-                  placeholder="="
-                  className={`w-full text-right text-[11px] border rounded px-1 py-0.5 font-mono
-                    ${scSetup !== '' ? 'border-amber-400 bg-amber-50 text-amber-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
-                  value={scSetup}
-                  onChange={e => setScSetup(e.target.value)}
-                  onBlur={saveCycleOverride}
-                  onClick={e => e.stopPropagation()}
-                  title="T. Setup Sc. (secondi)"
-                />
-              </div>
-              {/* Qty Sc. */}
-              <div className="flex-shrink-0 px-1" style={{ width: SC_W }}>
-                <input
-                  type="number" min="0" step="any"
-                  placeholder="="
-                  className={`w-full text-right text-[11px] border rounded px-1 py-0.5 font-mono
-                    ${scQty !== '' ? 'border-green-400 bg-green-50 text-green-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
-                  value={scQty}
-                  onChange={e => setScQty(e.target.value)}
-                  onBlur={saveCycleOverride}
-                  onClick={e => e.stopPropagation()}
-                  title="Qty Sc."
-                />
-              </div>
-              {/* Δ Var — non calcolabile client-side per i cicli */}
-              <div className="flex-shrink-0 text-right text-[11px] text-gray-300 font-mono" style={{ width: DLT_W }}>—</div>
-              {/* Δ Tot */}
-              <div className="flex-shrink-0 text-right text-[11px] text-gray-300 font-mono" style={{ width: DLT_W }}>—</div>
-            </>
-          )}
         </div>
       </div>
+
+      {/* ── Sub-riga scenario (ciclo) ──────────────────────────────────────── */}
+      {activeScenario && (
+        <div
+          className="flex items-center py-0.5 px-2 border-l-2"
+          style={{ borderLeftColor: getLevelColor(level), backgroundColor: '#F0FDF4' }}
+        >
+          <div className="w-4 h-4 mr-2 flex-shrink-0" />
+          <div className="w-3 mr-1 flex-shrink-0" />
+          <div className="w-4 flex-shrink-0" />
+          <div className="flex-1 flex items-center ml-2 min-w-0">
+            {/* Etichetta scenario */}
+            <div className="flex items-center gap-1 min-w-0 overflow-hidden" style={{ width: COLUMN_WIDTHS.name, paddingLeft: `${indent + 4}px` }}>
+              <span className="text-[10px] text-green-600 font-semibold whitespace-nowrap">▸ Sc.</span>
+              {cycleOverride && <span className="text-[9px] text-green-400 italic truncate">modificato</span>}
+            </div>
+            {/* Qty Sc. */}
+            <div className="flex-shrink-0 pr-0.5" style={{ width: COLUMN_WIDTHS.quantity }}>
+              <input type="number" min="0" step="any" placeholder="="
+                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${scQty !== '' ? 'border-green-400 bg-green-50 text-green-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                value={scQty} onChange={e => setScQty(e.target.value)} onBlur={saveCycleOverride}
+                onClick={e => e.stopPropagation()} title="Qty Sc." />
+            </div>
+            <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.uom }} />
+            <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.lot }} />
+            <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.unitCost }} />
+            <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.fixedCost }} />
+            <div className="flex-shrink-0 text-right text-[10px] text-gray-300 font-mono" style={{ width: COLUMN_WIDTHS.variableCost }}>—</div>
+            {/* T.Ciclo Sc. (sec) */}
+            <div className="flex-shrink-0 pr-0.5" style={{ width: COLUMN_WIDTHS.totalTime }}>
+              <input type="number" min="0" step="1" placeholder="="
+                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${scProc !== '' ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                value={scProc} onChange={e => setScProc(e.target.value)} onBlur={saveCycleOverride}
+                onClick={e => e.stopPropagation()} title="T. Ciclo Sc. (secondi)" />
+            </div>
+            {/* T.Setup Sc. (sec) */}
+            <div className="flex-shrink-0 pr-0.5" style={{ width: COLUMN_WIDTHS.setupTime }}>
+              <input type="number" min="0" step="1" placeholder="="
+                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${scSetup !== '' ? 'border-amber-400 bg-amber-50 text-amber-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                value={scSetup} onChange={e => setScSetup(e.target.value)} onBlur={saveCycleOverride}
+                onClick={e => e.stopPropagation()} title="T. Setup Sc. (secondi)" />
+            </div>
+            <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.workCenter }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -680,88 +671,68 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery,
             -
           </div>
 
-          {/* ── Colonne scenario ─────────────────────────────────────────── */}
-          {activeScenario && (
-            <>
-              {/* Q.tà Sc. */}
-              <div className="flex-shrink-0 px-1" style={{ width: SC_W }}>
-                {isRootNode ? (
-                  <span className="text-[11px] text-gray-200 font-mono">—</span>
-                ) : (
-                  <input
-                    type="number" min="0" step="any"
-                    placeholder="="
-                    className={`w-full text-right text-[11px] border rounded px-1 py-0.5 font-mono
-                      ${scQtyC !== '' ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
-                    value={scQtyC}
-                    onChange={e => setScQtyC(e.target.value)}
-                    onBlur={saveCompOverride}
-                    onClick={e => e.stopPropagation()}
-                    title="Quantità Scenario"
-                  />
-                )}
-              </div>
-              {/* Costo Unit. Sc. (€) */}
-              <div className="flex-shrink-0 px-1" style={{ width: SC_W }}>
-                {isRootNode ? (
-                  <span className="text-[11px] text-gray-200 font-mono">—</span>
-                ) : (
-                  <input
-                    type="number" min="0" step="any"
-                    placeholder="="
-                    className={`w-full text-right text-[11px] border rounded px-1 py-0.5 font-mono
-                      ${scCostC !== '' ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
-                    value={scCostC}
-                    onChange={e => setScCostC(e.target.value)}
-                    onBlur={saveCompOverride}
-                    onClick={e => e.stopPropagation()}
-                    title="Costo Unitario Scenario (€)"
-                  />
-                )}
-              </div>
-              {/* C. Fissi Sc. (€) */}
-              <div className="flex-shrink-0 px-1" style={{ width: SC_W }}>
-                {isRootNode ? (
-                  <span className="text-[11px] text-gray-200 font-mono">—</span>
-                ) : (
-                  <input
-                    type="number" min="0" step="any"
-                    placeholder="="
-                    className={`w-full text-right text-[11px] border rounded px-1 py-0.5 font-mono
-                      ${scFixedC !== '' ? 'border-amber-400 bg-amber-50 text-amber-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
-                    value={scFixedC}
-                    onChange={e => setScFixedC(e.target.value)}
-                    onBlur={saveCompOverride}
-                    onClick={e => e.stopPropagation()}
-                    title="Costo Fisso Scenario (€)"
-                  />
-                )}
-              </div>
-              {/* Δ Var */}
-              <div className="flex-shrink-0 text-right text-[11px] font-mono pr-1" style={{ width: DLT_W }}>
-                {deltaVar !== null ? (
-                  <span className={Math.abs(deltaVar) < 0.001 ? 'text-gray-400' : deltaVar < 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
-                    {deltaVar > 0 ? '+' : ''}{formatCurrency(deltaVar)}
-                  </span>
-                ) : (
-                  <span className="text-gray-200">—</span>
-                )}
-              </div>
-              {/* Δ Tot */}
-              <div className="flex-shrink-0 text-right text-[11px] font-mono pr-1" style={{ width: DLT_W }}>
-                {deltaTot !== null ? (
-                  <span className={Math.abs(deltaTot) < 0.001 ? 'text-gray-400' : deltaTot < 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
-                    {deltaTot > 0 ? '+' : ''}{formatCurrency(deltaTot)}
-                  </span>
-                ) : (
-                  <span className="text-gray-200">—</span>
-                )}
-              </div>
-            </>
-          )}
         </div>
       </div>
 
+      {/* ── Sub-riga scenario (componente) ────────────────────────────────── */}
+      {activeScenario && !isRootNode && (
+        <div
+          className="flex items-center py-0.5 px-2 border-l-2"
+          style={{ borderLeftColor: getLevelColor(level), backgroundColor: '#EFF6FF' }}
+        >
+          <div className="w-4 h-4 mr-2 flex-shrink-0" />
+          <div className="mr-1"><div className="w-3" /></div>
+          <div className="w-4 flex-shrink-0" />
+          <div className="flex-1 flex items-center ml-2 min-w-0">
+            {/* Etichetta scenario */}
+            <div className="flex items-center gap-1 min-w-0 overflow-hidden" style={{ width: COLUMN_WIDTHS.name, paddingLeft: `${indent + 4}px` }}>
+              <span className="text-[10px] text-blue-500 font-semibold whitespace-nowrap">▸ Sc.</span>
+              {compOverride && <span className="text-[9px] text-blue-400 italic truncate">modificato</span>}
+            </div>
+            {/* Qty Sc. */}
+            <div className="flex-shrink-0 pr-0.5" style={{ width: COLUMN_WIDTHS.quantity }}>
+              <input type="number" min="0" step="any" placeholder="="
+                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${scQtyC !== '' ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                value={scQtyC} onChange={e => setScQtyC(e.target.value)} onBlur={saveCompOverride}
+                onClick={e => e.stopPropagation()} title="Quantità Scenario" />
+            </div>
+            <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.uom }} />
+            <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.lot }} />
+            {/* Costo Unit. Sc. */}
+            <div className="flex-shrink-0 pr-0.5" style={{ width: COLUMN_WIDTHS.unitCost }}>
+              <input type="number" min="0" step="any" placeholder="="
+                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${scCostC !== '' ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                value={scCostC} onChange={e => setScCostC(e.target.value)} onBlur={saveCompOverride}
+                onClick={e => e.stopPropagation()} title="Costo Unitario Scenario (€)" />
+            </div>
+            {/* C. Fissi Sc. */}
+            <div className="flex-shrink-0 pr-0.5" style={{ width: COLUMN_WIDTHS.fixedCost }}>
+              <input type="number" min="0" step="any" placeholder="="
+                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${scFixedC !== '' ? 'border-amber-400 bg-amber-50 text-amber-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                value={scFixedC} onChange={e => setScFixedC(e.target.value)} onBlur={saveCompOverride}
+                onClick={e => e.stopPropagation()} title="Costo Fisso Scenario (€)" />
+            </div>
+            {/* ΔVar → col. Costo Variabile */}
+            <div className="flex-shrink-0 text-right text-[10px] font-mono pr-0.5" style={{ width: COLUMN_WIDTHS.variableCost }}>
+              {deltaVar !== null ? (
+                <span className={cn('font-semibold', Math.abs(deltaVar) < 0.001 ? 'text-gray-400' : deltaVar < 0 ? 'text-green-600' : 'text-red-600')} title="Δ Costo Variabile">
+                  {deltaVar > 0 ? '+' : ''}{formatCurrency(deltaVar)}
+                </span>
+              ) : <span className="text-gray-300">—</span>}
+            </div>
+            {/* ΔTot → col. Tempo Totale */}
+            <div className="flex-shrink-0 text-right text-[10px] font-mono pr-0.5" style={{ width: COLUMN_WIDTHS.totalTime }}>
+              {deltaTot !== null ? (
+                <span className={cn('font-semibold', Math.abs(deltaTot) < 0.001 ? 'text-gray-400' : deltaTot < 0 ? 'text-green-600' : 'text-red-600')} title="Δ Costo Totale (×lotto)">
+                  {deltaTot > 0 ? '+' : ''}{formatCurrency(deltaTot)}
+                </span>
+              ) : <span className="text-gray-300">—</span>}
+            </div>
+            <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.setupTime }} />
+            <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.workCenter }} />
+          </div>
+        </div>
+      )}
 
       {/* Render children */}
       {expanded && children}
@@ -1684,15 +1655,6 @@ const CostTreeView = ({ costingResult, activeScenario, onUpsertOverride, onDelet
             <div style={{ width: COLUMN_WIDTHS.totalTime }} className="text-right">Tempo Totale</div>
             <div style={{ width: COLUMN_WIDTHS.setupTime }} className="text-right">Setup</div>
             <div style={{ width: COLUMN_WIDTHS.workCenter }} className="text-left">CDL</div>
-            {activeScenario && (
-              <>
-                <div style={{ width: SC_W }}  className="text-right text-blue-600 px-1">Qty / T.Ciclo Sc.</div>
-                <div style={{ width: SC_W }}  className="text-right text-blue-600 px-1">Costo / T.Setup Sc.</div>
-                <div style={{ width: SC_W }}  className="text-right text-amber-600 px-1">Fisso / Qty Sc.</div>
-                <div style={{ width: DLT_W }} className="text-right text-green-700 pr-1">Δ Var</div>
-                <div style={{ width: DLT_W }} className="text-right text-green-700 pr-1">Δ Tot</div>
-              </>
-            )}
           </div>
         </div>
 
