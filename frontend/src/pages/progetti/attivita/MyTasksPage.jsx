@@ -226,6 +226,14 @@ const MyTasksPage = () => {
         );
       }
 
+      // Filtro per Cliente (ragione sociale)
+      if (colFilters.cliente) {
+        const clienteFilter = colFilters.cliente.toLowerCase();
+        result = result.filter((task) =>
+          (task.Cliente || "").toLowerCase().includes(clienteFilter),
+        );
+      }
+
       if (colFilters.project) {
         const projectFilter = colFilters.project.toLowerCase();
         result = result.filter((task) =>
@@ -274,7 +282,8 @@ const MyTasksPage = () => {
         });
       }
 
-      if (colFilters.assignedTo && isUserAdmin) {
+      // Filtro per "Assegnato a" (sempre attivo, anche per non admin)
+      if (colFilters.assignedTo) {
         const assignedFilter = colFilters.assignedTo.toLowerCase();
         result = result.filter((task) =>
           task.AssignedToName?.toLowerCase().includes(assignedFilter),

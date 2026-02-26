@@ -317,7 +317,11 @@ const CycleNode = ({ cycle, level, activeScenario, onUpsertOverride }) => {
             {/* Qty Sc. */}
             <div className="flex-shrink-0 pr-0.5" style={{ width: COLUMN_WIDTHS.quantity }}>
               <input type="number" min="0" step="any" placeholder="="
-                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${scQty !== '' ? 'border-green-400 bg-green-50 text-green-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${
+                  scQty !== ''
+                    ? 'border-green-600 bg-green-300 text-black font-semibold'
+                    : 'border-yellow-400 bg-yellow-100 text-yellow-800'
+                }`}
                 value={scQty} onChange={e => setScQty(e.target.value)} onBlur={saveCycleOverride}
                 onClick={e => e.stopPropagation()} title="Qty Sc." />
             </div>
@@ -329,14 +333,22 @@ const CycleNode = ({ cycle, level, activeScenario, onUpsertOverride }) => {
             {/* T.Ciclo Sc. (sec) */}
             <div className="flex-shrink-0 pr-0.5" style={{ width: COLUMN_WIDTHS.totalTime }}>
               <input type="number" min="0" step="1" placeholder="="
-                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${scProc !== '' ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${
+                  scProc !== ''
+                    ? 'border-green-600 bg-green-300 text-black font-semibold'
+                    : 'border-yellow-400 bg-yellow-100 text-yellow-800'
+                }`}
                 value={scProc} onChange={e => setScProc(e.target.value)} onBlur={saveCycleOverride}
                 onClick={e => e.stopPropagation()} title="T. Ciclo Sc. (secondi)" />
             </div>
             {/* T.Setup Sc. (sec) */}
             <div className="flex-shrink-0 pr-0.5" style={{ width: COLUMN_WIDTHS.setupTime }}>
               <input type="number" min="0" step="1" placeholder="="
-                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${scSetup !== '' ? 'border-amber-400 bg-amber-50 text-amber-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${
+                  scSetup !== ''
+                    ? 'border-green-600 bg-green-300 text-black font-semibold'
+                    : 'border-yellow-400 bg-yellow-100 text-yellow-800'
+                }`}
                 value={scSetup} onChange={e => setScSetup(e.target.value)} onBlur={saveCycleOverride}
                 onClick={e => e.stopPropagation()} title="T. Setup Sc. (secondi)" />
             </div>
@@ -624,7 +636,9 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery,
           "flex items-center py-1 px-2 rounded cursor-pointer hover:bg-blue-50 transition-colors",
           "border-l-2",
           expanded && "bg-blue-50",
-          isRootNode && "bg-purple-50 hover:bg-purple-100 font-semibold"
+          isRootNode && "bg-purple-50 hover:bg-purple-100 font-semibold",
+          // Se esiste un override di scenario, evidenzia leggermente la riga originale
+          activeScenario && compOverride && !isRootNode && "ring-1 ring-blue-200"
         )}
         style={{
           borderLeftColor: getLevelColor(level),
@@ -746,8 +760,12 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery,
       {/* ── Sub-riga scenario (componente) ────────────────────────────────── */}
       {activeScenario && !isRootNode && (
         <div
-          className="flex items-center py-0.5 px-2 border-l-2"
-          style={{ borderLeftColor: getLevelColor(level), backgroundColor: '#EFF6FF' }}
+          className={cn(
+            "flex items-center py-0.5 px-2 border-l-2",
+            // Riga scenario sempre chiaramente evidenziata
+            "border-blue-200 bg-blue-50"
+          )}
+          style={{ borderLeftColor: getLevelColor(level) }}
         >
           <div className="w-4 h-4 mr-2 flex-shrink-0" />
           <div className="mr-1"><div className="w-3" /></div>
@@ -761,7 +779,11 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery,
             {/* Qty Sc. */}
             <div className="flex-shrink-0 pr-0.5" style={{ width: COLUMN_WIDTHS.quantity }}>
               <input type="number" min="0" step="any" placeholder="="
-                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${scQtyC !== '' ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${
+                  scQtyC !== ''
+                    ? 'border-green-600 bg-green-300 text-black font-semibold'
+                    : 'border-yellow-400 bg-yellow-100 text-yellow-800'
+                }`}
                 value={scQtyC} onChange={e => setScQtyC(e.target.value)} onBlur={saveCompOverride}
                 onClick={e => e.stopPropagation()} title="Quantità Scenario" />
             </div>
@@ -770,14 +792,22 @@ const ComponentNode = ({ node, level, expanded, onToggle, children, searchQuery,
             {/* Costo Unit. Sc. */}
             <div className="flex-shrink-0 pr-0.5" style={{ width: COLUMN_WIDTHS.unitCost }}>
               <input type="number" min="0" step="any" placeholder="="
-                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${scCostC !== '' ? 'border-blue-400 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${
+                  scCostC !== ''
+                    ? 'border-green-600 bg-green-300 text-black font-semibold'
+                    : 'border-yellow-400 bg-yellow-100 text-yellow-800'
+                }`}
                 value={scCostC} onChange={e => setScCostC(e.target.value)} onBlur={saveCompOverride}
                 onClick={e => e.stopPropagation()} title="Costo Unitario Scenario (€)" />
             </div>
             {/* C. Fissi Sc. */}
             <div className="flex-shrink-0 pr-0.5" style={{ width: COLUMN_WIDTHS.fixedCost }}>
               <input type="number" min="0" step="any" placeholder="="
-                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${scFixedC !== '' ? 'border-amber-400 bg-amber-50 text-amber-700 font-semibold' : 'border-gray-200 bg-white text-gray-400'}`}
+                className={`w-full text-right text-[10px] border rounded px-0.5 py-0 font-mono h-5 ${
+                  scFixedC !== ''
+                    ? 'border-green-600 bg-green-300 text-black font-semibold'
+                    : 'border-yellow-400 bg-yellow-100 text-yellow-800'
+                }`}
                 value={scFixedC} onChange={e => setScFixedC(e.target.value)} onBlur={saveCompOverride}
                 onClick={e => e.stopPropagation()} title="Costo Fisso Scenario (€)" />
             </div>
