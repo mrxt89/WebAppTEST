@@ -326,7 +326,9 @@ const CycleNode = ({ cycle, level, activeScenario, onUpsertOverride }) => {
                 onClick={e => e.stopPropagation()} title="Qty Sc." />
             </div>
             <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.uom }} />
-            <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.lot }} />
+            <div className="flex-shrink-0 text-right text-[10px] text-gray-600 font-mono pr-0.5" style={{ width: COLUMN_WIDTHS.lot }} title="Lotto">
+              {cycle.ProductionLot ?? '–'}
+            </div>
             <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.unitCost }} />
             <div className="flex-shrink-0" style={{ width: COLUMN_WIDTHS.fixedCost }} />
             <div className="flex-shrink-0 text-right text-[10px] text-gray-300 font-mono" style={{ width: COLUMN_WIDTHS.variableCost }}>—</div>

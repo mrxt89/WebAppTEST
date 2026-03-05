@@ -1,0 +1,9 @@
+=== Bozza risposta a Michele – scenari costificazione ===
+
+• Tempo operazioni (T.Ciclo Sc. / T.Setup Sc.): il valore inserito nello scenario è in sostituzione dell’originale, non un incremento. Per ottenere un tempo diverso inserisci il valore totale desiderato (es. se l’originale è 100 s e vuoi 120 s totali, inserisci 120).
+
+• Totale operazioni: il costo delle operazioni (tempo × costo orario CDL, o standard se non definito) è già incluso nel totale scenario calcolato quando clicchi “Calcola costo”.
+
+• Lotto: nella riga scenario dei cicli ora viene mostrato anche il lotto (stesso valore della riga originale), così puoi fare il calcolo.
+
+• Allineamento righe / scostamento SL: lo verifichiamo con un esempio e ti aggiorniamo.
